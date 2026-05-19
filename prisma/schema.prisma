@@ -1,0 +1,308 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  teacher
+  admin
+}
+
+enum LessonStatus {
+  draft
+  published
+  archived
+}
+
+enum ScheduleStatus {
+  scheduled
+  completed
+  cancelled
+}
+
+enum Participation {
+  excellent
+  good
+  average
+  poor
+}
+
+enum AttendanceStatus {
+  present
+  late
+  absent
+  leave
+}
+
+enum EntryType {
+  lecture
+  lab
+  activity
+  homeroom
+}
+
+// ==================== Users ====================
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique @db.VarChar(255)
+  password  String?  @db.VarChar(255)
+  name      String   @db.VarChar(255)
+  role      Role     @default(teacher)
+  avatar    String?  @db.VarChar(500)
+  googleId  String?  @unique @map("google_id") @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  lessonPlans LessonPlan[]
+  schedules   Schedule[]
+  students    Student[]
+  evaluations Evaluation[]
+  files       File[]
+  classrooms  Classroom[]
+  weeklySchedules WeeklySchedule[]
+
+  @@map("users")
+}
+
+// ==================== Lesson Plans ====================
+model LessonPlan {
+  id              Int          @id @default(autoincrement())
+  userId          Int          @map("user_id")
+  title           String       @db.VarChar(255)
+  subject         String       @db.VarChar(255)
+  gradeLevel      String       @map("grade_level") @db.VarChar(100)
+  duration        Int
+  objectives      String?      @db.Text
+  content         String?      @db.Text
+  teachingMethods String?      @map("teaching_methods") @db.Text
+  materials       String?      @db.Text
+  aiGenerated     Boolean      @default(false) @map("ai_generated")
+  status          LessonStatus @default(draft)
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  schedules   Schedule[]
+  evaluations Evaluation[]
+  files       File[]
+
+  @@index([userId], map: "idx_lesson_plans_user")
+  @@map("lesson_plans")
+}
+
+// ==================== Schedules ====================
+model Schedule {
+  id            Int            @id @default(autoincrement())
+  userId        Int            @map("user_id")
+  lessonPlanId  Int            @map("lesson_plan_id")
+  scheduledDate DateTime       @map("scheduled_date") @db.Date
+  startTime     DateTime       @map("start_time") @db.Time(0)
+  endTime       DateTime       @map("end_time") @db.Time(0)
+  notes         String?        @db.Text
+  status        ScheduleStatus @default(scheduled)
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonPlan LessonPlan @relation(fields: [lessonPlanId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_schedules_user")
+  @@index([scheduledDate], map: "idx_schedules_date")
+  @@map("schedules")
+}
+
+// ==================== Classrooms ====================
+model Classroom {
+  id                   Int      @id @default(autoincrement())
+  userId               Int      @map("user_id")
+  name                 String   @db.VarChar(255)
+  description          String?  @db.Text
+  lateToAbsentRatio    Int      @default(3) @map("late_to_absent_ratio")
+  leaveToAbsentRatio   Int      @default(2) @map("leave_to_absent_ratio")
+  absentToFRatio       Int      @default(4) @map("absent_to_f_ratio")
+  totalClasses         Int      @default(40) @map("total_classes")
+  minAttendancePercent Int      @default(80) @map("min_attendance_percent")
+  assignmentWeight     Decimal? @default(10) @map("assignment_weight") @db.Decimal(5, 2)
+  postTestWeight       Decimal? @default(70) @map("post_test_weight") @db.Decimal(5, 2)
+  affectiveWeight      Decimal? @default(20) @map("affective_weight") @db.Decimal(5, 2)
+  midtermWeight        Decimal? @default(0) @map("midterm_weight") @db.Decimal(5, 2)
+  finalWeight          Decimal? @default(0) @map("final_weight") @db.Decimal(5, 2)
+  midtermMaxScore      Decimal? @default(100) @map("midterm_max_score") @db.Decimal(5, 2)
+  finalMaxScore        Decimal? @default(100) @map("final_max_score") @db.Decimal(5, 2)
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  students        Student[]
+  attendance      Attendance[]
+  gradeCriteria   GradeCriteria[]
+  scoreStructures ScoreStructure[]
+  studentScores   StudentScore[]
+
+  @@map("classrooms")
+}
+
+// ==================== Students ====================
+model Student {
+  id           Int      @id @default(autoincrement())
+  userId       Int      @map("user_id")
+  name         String   @db.VarChar(255)
+  studentCode  String?  @map("student_code") @db.VarChar(50)
+  gradeLevel   String?  @map("grade_level") @db.VarChar(100)
+  email        String?  @db.VarChar(255)
+  classroomId  Int?     @map("classroom_id")
+  midtermScore Decimal? @default(0) @map("midterm_score") @db.Decimal(5, 2)
+  finalScore   Decimal? @default(0) @map("final_score") @db.Decimal(5, 2)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  classroom     Classroom?     @relation(fields: [classroomId], references: [id], onDelete: SetNull)
+  evaluations   Evaluation[]
+  attendance    Attendance[]
+  studentScores StudentScore[]
+
+  @@index([userId], map: "idx_students_user")
+  @@map("students")
+}
+
+// ==================== Evaluations ====================
+model Evaluation {
+  id           Int           @id @default(autoincrement())
+  studentId    Int           @map("student_id")
+  lessonPlanId Int           @map("lesson_plan_id")
+  userId       Int           @map("user_id")
+  score        Decimal?      @db.Decimal(5, 2)
+  maxScore     Decimal?      @default(100) @map("max_score") @db.Decimal(5, 2)
+  participation Participation @default(average)
+  notes        String?       @db.Text
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  lessonPlan LessonPlan @relation(fields: [lessonPlanId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([studentId], map: "idx_evaluations_student")
+  @@index([lessonPlanId], map: "idx_evaluations_lesson")
+  @@map("evaluations")
+}
+
+// ==================== Files ====================
+model File {
+  id           Int      @id @default(autoincrement())
+  userId       Int      @map("user_id")
+  lessonPlanId Int?     @map("lesson_plan_id")
+  filename     String   @db.VarChar(255)
+  originalName String   @map("original_name") @db.VarChar(255)
+  mimeType     String   @map("mime_type") @db.VarChar(100)
+  size         Int
+  path         String   @db.VarChar(500)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonPlan LessonPlan? @relation(fields: [lessonPlanId], references: [id], onDelete: SetNull)
+
+  @@index([lessonPlanId], map: "idx_files_lesson")
+  @@map("files")
+}
+
+// ==================== Attendance ====================
+model Attendance {
+  id          Int              @id @default(autoincrement())
+  studentId   Int              @map("student_id")
+  classroomId Int              @map("classroom_id")
+  date        DateTime         @db.Date
+  status      AttendanceStatus
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  student   Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, classroomId, date], map: "unique_attendance")
+  @@map("attendance")
+}
+
+// ==================== Grade Criteria ====================
+model GradeCriteria {
+  id          Int      @id @default(autoincrement())
+  classroomId Int      @map("classroom_id")
+  grade       String   @db.VarChar(10)
+  minScore    Decimal  @map("min_score") @db.Decimal(5, 2)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+
+  @@map("grade_criteria")
+}
+
+// ==================== Score Structures ====================
+model ScoreStructure {
+  id                 Int      @id @default(autoincrement())
+  classroomId        Int      @map("classroom_id")
+  lessonNumber       Int      @map("lesson_number")
+  lessonName         String?  @map("lesson_name") @db.VarChar(255)
+  maxAssignmentScore Decimal? @default(0) @map("max_assignment_score") @db.Decimal(5, 2)
+  maxPostTestScore   Decimal? @default(0) @map("max_post_test_score") @db.Decimal(5, 2)
+  hours              Int?     @default(1)
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+
+  @@unique([classroomId, lessonNumber], map: "unique_lesson")
+  @@map("score_structures")
+}
+
+// ==================== Student Scores ====================
+model StudentScore {
+  id              Int      @id @default(autoincrement())
+  studentId       Int      @map("student_id")
+  classroomId     Int      @map("classroom_id")
+  lessonNumber    Int      @map("lesson_number")
+  assignmentScore Decimal? @default(0) @map("assignment_score") @db.Decimal(5, 2)
+  postTestScore   Decimal? @default(0) @map("post_test_score") @db.Decimal(5, 2)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  student   Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, classroomId, lessonNumber], map: "unique_student_score")
+  @@map("student_scores")
+}
+
+// ==================== Weekly Schedules (Timetable) ====================
+model WeeklySchedule {
+  id            Int       @id @default(autoincrement())
+  userId        Int       @map("user_id")
+  timetableName String    @default("ตารางสอน") @map("timetable_name") @db.VarChar(255)
+  semester      String?   @db.VarChar(100)
+  dayOfWeek     Int       @map("day_of_week") @db.TinyInt
+  startPeriod   Int       @map("start_period")
+  endPeriod     Int       @map("end_period")
+  startTime     DateTime? @map("start_time") @db.Time(0)
+  endTime       DateTime? @map("end_time") @db.Time(0)
+  subjectCode   String?   @map("subject_code") @db.VarChar(50)
+  subjectName   String?   @map("subject_name") @db.VarChar(255)
+  room          String?   @db.VarChar(100)
+  instructor    String?   @db.VarChar(255)
+  groupName     String?   @map("group_name") @db.VarChar(100)
+  hours         Int       @default(1)
+  entryType     EntryType @default(lecture) @map("entry_type")
+  color         String?   @db.VarChar(20)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_timetable_user")
+  @@index([dayOfWeek], map: "idx_timetable_day")
+  @@map("weekly_schedules")
+}

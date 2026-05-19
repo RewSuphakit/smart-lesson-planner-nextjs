@@ -1,0 +1,646 @@
+'use client';
+// @ts-nocheck
+import { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import api from '@/services/api';
+import { Plus, Edit, Trash2, X, Users as UsersIcon, Loader2, Search, ClipboardCheck, ChevronDown, ChevronUp, GraduationCap, Award, Upload, CheckCircle } from 'lucide-react';
+import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
+import Pagination from '@/components/Pagination';
+
+const animalAvatars = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐧', '🐥', '🦉', '🦄', '🐙', '🐢', '🦖', '🦕', '🦦', '🦥'];
+
+export default function Students() {
+  const [students, setStudents] = useState([]);
+  const [lessons, setLessons] = useState([]);
+  const [classrooms, setClassrooms] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  const [showForm, setShowForm] = useState(false);
+  const [showEvalForm, setShowEvalForm] = useState(false);
+  const [showImportForm, setShowImportForm] = useState(false);
+  
+  const [editing, setEditing] = useState(null);
+  const [search, setSearch] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [expandedStudent, setExpandedStudent] = useState(null);
+  const [evaluations, setEvaluations] = useState({});
+  const [filterClassroomId, setFilterClassroomId] = useState('');
+  const [selectedStudents, setSelectedStudents] = useState([]);
+  const [bulkAssignClassroomId, setBulkAssignClassroomId] = useState('');
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
+
+  const emptyForm = { name: '', student_code: '', grade_level: '', email: '', classroom_id: '' };
+  const [form, setForm] = useState(emptyForm);
+
+  const emptyEvalForm = { student_id: '', lesson_plan_id: '', score: '', max_score: 100, participation: 'average', notes: '' };
+  const [evalForm, setEvalForm] = useState(emptyEvalForm);
+
+  // Import states
+  const [importData, setImportData] = useState([]);
+  const [importClassroomId, setImportClassroomId] = useState('');
+
+  useEffect(() => { fetchData(); }, []);
+
+  const handleExport = () => {
+    if (filtered.length === 0) {
+      toast.error('ไม่มีข้อมูลนักเรียนสำหรับส่งออก');
+      return;
+    }
+    
+    // Format data for Excel
+    const exportData = filtered.map(s => ({
+      'รหัสนักเรียน': s.student_code || '',
+      'ชื่อ-นามสกุล': s.name || '',
+      'ระดับชั้น': s.grade_level || '',
+      'ห้องเรียน': classrooms.find(c => c.id === s.classroom_id)?.name || 'ไม่ระบุ',
+      'อีเมล': s.email || ''
+    }));
+
+    // Create worksheet
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Students");
+    
+    // Generate file
+    const className = filterClassroomId ? classrooms.find(c => c.id === Number(filterClassroomId))?.name : 'ทั้งหมด';
+    const fileName = `รายชื่อนักเรียน_${className}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    
+    XLSX.writeFile(wb, fileName);
+    toast.success('ส่งออกไฟล์เรียบร้อย');
+  };
+
+  const fetchData = async () => {
+    try {
+      const [studRes, lessRes, classRes] = await Promise.all([api.get('/students'), api.get('/lessons'), api.get('/classrooms')]);
+      setStudents(studRes.data.data || []);
+      setLessons(lessRes.data.data || []);
+      setClassrooms(classRes.data.data || []);
+    } catch { toast.error('โหลดข้อมูลไม่สำเร็จ'); }
+    finally { setLoading(false); }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      if (editing) {
+        await api.put('/students/' + editing, form);
+        toast.success('อัปเดตข้อมูลนักเรียนเรียบร้อย');
+      } else {
+        await api.post('/students', form);
+        toast.success('เพิ่มนักเรียนเรียบร้อย');
+      }
+      setShowForm(false); setEditing(null); setForm(emptyForm); fetchData();
+    } catch (err) { toast.error(err.response?.data?.message || 'บันทึกไม่สำเร็จ'); }
+    finally { setSaving(false); }
+  };
+
+  const handleEdit = (s) => {
+    setForm({ name: s.name, student_code: s.student_code || '', grade_level: s.grade_level || '', email: s.email || '', classroom_id: s.classroom_id || '' });
+    setEditing(s.id); setShowForm(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (!confirm('ต้องการลบนักเรียนคนนี้หรือไม่?')) return;
+    try { await api.delete('/students/' + id); toast.success('ลบนักเรียนแล้ว'); fetchData(); }
+    catch { toast.error('ลบไม่สำเร็จ'); }
+  };
+
+  const handleEvalSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.post('/evaluations', evalForm);
+      toast.success('บันทึกผลการประเมินเรียบร้อย');
+      setShowEvalForm(false); setEvalForm(emptyEvalForm);
+      if (expandedStudent) loadEvaluations(expandedStudent);
+    } catch (err) { toast.error(err.response?.data?.message || 'บันทึกไม่สำเร็จ'); }
+    finally { setSaving(false); }
+  };
+
+  const loadEvaluations = async (studentId) => {
+    try {
+      const { data } = await api.get('/evaluations/student/' + studentId);
+      setEvaluations(prev => ({ ...prev, [studentId]: data.data }));
+    } catch { /* silent */ }
+  };
+
+  const handleDeleteEvaluation = async (evaluationId, studentId) => {
+    if (!window.confirm('ยืนยันการลบผลการประเมินนี้?')) return;
+    try {
+      await api.delete('/evaluations/' + evaluationId);
+      toast.success('ลบผลการประเมินเรียบร้อย');
+      loadEvaluations(studentId);
+    } catch {
+      toast.error('ลบผลการประเมินไม่สำเร็จ');
+    }
+  };
+
+  const toggleExpand = (id) => {
+    if (expandedStudent === id) { setExpandedStudent(null); }
+    else { setExpandedStudent(id); if (!evaluations[id]) loadEvaluations(id); }
+  };
+
+  const handleToggleSelect = (id) => {
+    setSelectedStudents(prev => 
+      prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedStudents.length === filtered.length) {
+      setSelectedStudents([]);
+    } else {
+      setSelectedStudents(filtered.map(s => s.id));
+    }
+  };
+
+  const handleBulkAssign = async () => {
+    if (!bulkAssignClassroomId) {
+      toast.error('กรุณาเลือกห้องเรียนปลายทาง');
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.put('/students/bulk-classroom', {
+        studentIds: selectedStudents,
+        classroomId: bulkAssignClassroomId === 'null' ? null : bulkAssignClassroomId
+      });
+      toast.success('ย้ายห้องเรียนเรียบร้อย');
+      setSelectedStudents([]);
+      fetchData();
+    } catch {
+      toast.error('ย้ายห้องเรียนไม่สำเร็จ');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // --- Bulk Import ---
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+        
+        // Map columns
+        const mappedData = data.map(row => {
+          // Get values or empty string
+          const prefix = row['คำนำหน้า'] || '';
+          const firstName = row['ชื่อ'] || row['name'] || '';
+          const lastName = row['นามสกุล'] || '';
+          
+          // Combine prefix, first name, and last name
+          let fullName = row['ชื่อ-นามสกุล'] || '';
+          if (!fullName && firstName) {
+            fullName = `${prefix} ${firstName} ${lastName}`.trim().replace(/\s+/g, ' ');
+          }
+
+          return {
+            student_code: row['รหัสนักเรียน'] || row['student_code'] || '',
+            name: fullName,
+            grade_level: row['ระดับชั้น'] || row['ชั้น'] || row['grade_level'] || '',
+            email: row['อีเมล'] || row['email'] || '',
+          };
+        }).filter(item => item.name); // Require at least name
+
+        setImportData(mappedData);
+      } catch (err) {
+        toast.error('ไม่สามารถอ่านไฟล์ได้ กรุณาตรวจสอบรูปแบบไฟล์');
+      }
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = null; // reset
+  };
+
+  const handleImportSubmit = async () => {
+    if (importData.length === 0) return;
+    setSaving(true);
+    try {
+      const payload = importData.map(d => ({
+        ...d,
+        classroom_id: importClassroomId || null
+      }));
+      
+      const res = await api.post('/students/bulk', { students: payload });
+      toast.success(res.data.message || 'นำเข้านักเรียนสำเร็จ');
+      setShowImportForm(false);
+      setImportData([]);
+      setImportClassroomId('');
+      fetchData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'นำเข้าไม่สำเร็จ');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const filtered = students.filter(s => {
+    const matchSearch = s.name?.toLowerCase().includes(search.toLowerCase()) || s.student_code?.toLowerCase().includes(search.toLowerCase());
+    const matchClass = filterClassroomId ? s.classroom_id === Number(filterClassroomId) : true;
+    return matchSearch && matchClass;
+  });
+
+  // Paginated subset
+  const paginatedStudents = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filtered.slice(start, start + itemsPerPage);
+  }, [filtered, currentPage, itemsPerPage]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => { setCurrentPage(1); }, [search, filterClassroomId]);
+
+  const participationMap = {
+    excellent: { label: 'ดีเยี่ยม', badge: 'badge-accent' },
+    good: { label: 'ดี', badge: 'badge-primary' },
+    average: { label: 'ปานกลาง', badge: 'badge-warning' },
+    poor: { label: 'ต้องปรับปรุง', badge: 'badge-danger' }
+  };
+
+  const avatarColors = [
+    'from-indigo-500 to-purple-600',
+    'from-emerald-500 to-teal-600',
+    'from-amber-500 to-orange-600',
+    'from-rose-500 to-pink-600',
+    'from-cyan-500 to-blue-600',
+    'from-violet-500 to-purple-600',
+  ];
+
+  if (loading) return <div className="space-y-4">{[1,2,3].map(i => <div key={i} className="skeleton h-24 rounded-2xl" />)}</div>;
+
+  return (
+    <div className="space-y-6 animate-fade-in-up">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800 mb-1">นักเรียน</h1>
+          <p className="text-slate-500 text-sm">ทั้งหมด {students.length} คน</p>
+        </div>
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          <button onClick={handleExport} className="btn bg-emerald-600 hover:bg-emerald-500 text-slate-800 flex-1 sm:flex-none">
+            ส่งออก (Excel)
+          </button>
+          <button onClick={() => { setShowImportForm(true); setImportData([]); setImportClassroomId(''); }} className="btn bg-white hover:bg-indigo-100 text-slate-800 flex-1 sm:flex-none">
+            <Upload className="w-4 h-4" /> นำเข้าจาก Excel
+          </button>
+          <button onClick={() => { setForm(emptyForm); setEditing(null); setShowForm(true); }} className="btn btn-primary flex-1 sm:flex-none" id="add-student-btn">
+            <Plus className="w-4 h-4" /> เพิ่มนักเรียน
+          </button>
+        </div>
+      </div>
+
+      {/* Filter and Search */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+          <input value={search} onChange={e => setSearch(e.target.value)} className="form-input pl-11" placeholder="ค้นหานักเรียน..." id="student-search" />
+        </div>
+        <select 
+          value={filterClassroomId} 
+          onChange={e => setFilterClassroomId(e.target.value)} 
+          className="form-input w-full sm:w-64"
+        >
+          <option value="">-- ทุกห้องเรียน --</option>
+          {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </div>
+
+      {/* Bulk Actions Bar */}
+      {selectedStudents.length > 0 && (
+        <div className="glass p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 border border-indigo-200 bg-indigo-500/5 animate-fade-in-up">
+          <div className="flex items-center gap-3">
+            <span className="bg-indigo-500 text-slate-800 px-3 py-1 rounded-full text-sm font-medium">
+              เลือกแล้ว {selectedStudents.length} คน
+            </span>
+            <button 
+              onClick={() => setSelectedStudents([])}
+              className="text-slate-600 hover:text-slate-800 text-sm underline"
+            >
+              ยกเลิก
+            </button>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <select 
+              value={bulkAssignClassroomId} 
+              onChange={e => setBulkAssignClassroomId(e.target.value)} 
+              className="form-input flex-1 sm:flex-none"
+            >
+              <option value="">-- เลือกห้องเรียนเป้าหมาย --</option>
+              <option value="null">ไม่มีห้องเรียน (ลอยแพ)</option>
+              {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <button 
+              onClick={handleBulkAssign}
+              disabled={saving}
+              className="btn btn-primary"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'ย้ายห้อง'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Select All Checkbox (Only if there are students) */}
+      {filtered.length > 0 && (
+        <div className="flex items-center px-2 py-1 gap-3">
+          <label className="flex items-center gap-2 cursor-pointer group">
+            <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${selectedStudents.length === filtered.length ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600 group-hover:border-indigo-400 bg-indigo-50'}`}>
+              {selectedStudents.length === filtered.length && <CheckCircle className="w-3.5 h-3.5 text-slate-800" />}
+            </div>
+            <input 
+              type="checkbox" 
+              className="hidden"
+              checked={selectedStudents.length === filtered.length}
+              onChange={handleSelectAll}
+            />
+            <span className="text-sm text-slate-600 group-hover:text-slate-700">เลือกทั้งหมดบนหน้าจอนี้</span>
+          </label>
+        </div>
+      )}
+
+      {/* Students List */}
+      <div className="space-y-3">
+        {filtered.length === 0 ? (
+          <div className="glass p-14 text-center">
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-indigo-50 flex items-center justify-center mb-3">
+              <UsersIcon className="w-7 h-7 text-slate-700" />
+            </div>
+            <p className="text-slate-500 text-sm font-medium">ยังไม่มีข้อมูลนักเรียน</p>
+            <p className="text-slate-600 text-xs mt-1">เพิ่มนักเรียนเพื่อเริ่มบันทึกผลการเรียน</p>
+          </div>
+        ) : paginatedStudents.map((student, i) => (
+          <div
+            key={student.id}
+            className={`glass overflow-hidden transition-all duration-300 animate-fade-in-up ${selectedStudents.includes(student.id) ? 'border-indigo-500/50 bg-indigo-500/5' : ''}`}
+            style={{ animationDelay: (i * 50) + 'ms', animationFillMode: 'forwards' }}
+          >
+            <div className="p-4 flex items-center gap-4">
+              <label className="cursor-pointer group flex-shrink-0">
+                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${selectedStudents.includes(student.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600 group-hover:border-indigo-400 bg-indigo-50'}`}>
+                  {selectedStudents.includes(student.id) && <CheckCircle className="w-3.5 h-3.5 text-slate-800" />}
+                </div>
+                <input 
+                  type="checkbox" 
+                  className="hidden"
+                  checked={selectedStudents.includes(student.id)}
+                  onChange={() => handleToggleSelect(student.id)}
+                />
+              </label>
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-2xl shadow-sm shrink-0">
+                {animalAvatars[(student.id || 0) % animalAvatars.length]}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-slate-800 text-[0.95rem]">{student.name}</p>
+                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-0.5">
+                  {student.student_code && <span>รหัส: {student.student_code}</span>}
+                  {student.grade_level && <span>ระดับ {student.grade_level}</span>}
+                  {student.classroom_id && <span>ห้อง: {classrooms.find(c => c.id === student.classroom_id)?.name || 'ไม่ทราบ'}</span>}
+                  {student.email && <span>{student.email}</span>}
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <button onClick={() => { setEvalForm({ ...emptyEvalForm, student_id: student.id }); setShowEvalForm(true); }}
+                  className="p-2.5 rounded-xl hover:bg-emerald-500/10 text-slate-500 hover:text-emerald-400 transition-all" title="บันทึกผลประเมิน">
+                  <Award className="w-4 h-4" />
+                </button>
+                <button onClick={() => handleEdit(student)} className="p-2.5 rounded-xl hover:bg-indigo-500/10 text-slate-500 hover:text-indigo-700 transition-all" title="แก้ไข">
+                  <Edit className="w-4 h-4" />
+                </button>
+                <button onClick={() => handleDelete(student.id)} className="p-2.5 rounded-xl hover:bg-red-500/10 text-slate-500 hover:text-red-400 transition-all" title="ลบ">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+                <button onClick={() => toggleExpand(student.id)} className="p-2.5 rounded-xl hover:bg-indigo-50 text-slate-500 transition-all">
+                  {expandedStudent === student.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Evaluation History */}
+            {expandedStudent === student.id && (
+              <div className="border-t border-white/[0.04] px-4 py-4 bg-[rgba(10,14,26,0.4)]">
+                <h4 className="text-xs font-semibold text-slate-500 mb-3 flex items-center gap-2">
+                  <ClipboardCheck className="w-3.5 h-3.5" /> ประวัติการประเมิน
+                </h4>
+                {evaluations[student.id]?.length > 0 ? (
+                  <div className="space-y-2">
+                    {evaluations[student.id].map((ev, j) => (
+                      <div key={j} className="glass-light p-3.5 flex items-center justify-between rounded-xl">
+                        <div>
+                          <p className="text-sm font-medium text-slate-800">{ev.lesson_title}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">{ev.subject}</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <p className="text-sm font-bold text-indigo-700">{ev.score}/{ev.max_score}</p>
+                            <p className="text-[0.6rem] text-slate-600">{Math.round((ev.score / ev.max_score) * 100)}%</p>
+                          </div>
+                          <span className={'badge ' + (participationMap[ev.participation]?.badge || 'badge-primary')}>
+                            {participationMap[ev.participation]?.label || ev.participation}
+                          </span>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleDeleteEvaluation(ev.id, student.id); }}
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all ml-1"
+                            title="ลบการประเมินนี้"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-600 py-2">ยังไม่มีผลการประเมิน</p>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Pagination */}
+      {filtered.length > 0 && (
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filtered.length}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(size) => { setItemsPerPage(size); setCurrentPage(1); }}
+        />
+      )}
+
+      {/* Student Form Modal */}
+      {showForm && createPortal(
+        <div className="modal-overlay" onClick={() => setShowForm(false)}>
+          <div className="glass w-full max-w-md p-7 animate-fade-in-up" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                  <GraduationCap className="w-5 h-5 text-slate-800" />
+                </div>
+                <h2 className="text-lg font-bold text-slate-800">{editing ? 'แก้ไขข้อมูลนักเรียน' : 'เพิ่มนักเรียนใหม่'}</h2>
+              </div>
+              <button onClick={() => setShowForm(false)} className="p-2 hover:bg-indigo-50 rounded-xl"><X className="w-5 h-5 text-slate-500" /></button>
+            </div>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div><label className="form-label">ชื่อ-นามสกุล</label><input value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="form-input" required id="student-name" placeholder="กรอกชื่อ-นามสกุล" /></div>
+              <div><label className="form-label">รหัสนักเรียน</label><input value={form.student_code} onChange={e => setForm({...form, student_code: e.target.value})} className="form-input" id="student-code" placeholder="เช่น 65010001" /></div>
+              <div><label className="form-label">ระดับชั้น</label><input value={form.grade_level} onChange={e => setForm({...form, grade_level: e.target.value})} className="form-input" id="student-grade" placeholder="เช่น ม.3 หรือ ปวช.1" /></div>
+              <div><label className="form-label">อีเมล</label><input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} className="form-input" id="student-email" placeholder="student@email.com (ไม่บังคับ)" /></div>
+              <div>
+                <label className="form-label">ห้องเรียน</label>
+                <select value={form.classroom_id} onChange={e => setForm({...form, classroom_id: e.target.value})} className="form-input">
+                  <option value="">-- ไม่ระบุห้องเรียน --</option>
+                  {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <button type="submit" disabled={saving} className="btn btn-primary w-full py-3" id="student-save-btn">
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : editing ? 'อัปเดต' : <><Plus className="w-4 h-4" /> เพิ่มนักเรียน</>}
+              </button>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Import Form Modal */}
+      {showImportForm && createPortal(
+        <div className="modal-overlay" onClick={() => setShowImportForm(false)}>
+          <div className="glass w-full max-w-2xl p-7 animate-fade-in-up" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-lg">
+                  <Upload className="w-5 h-5 text-slate-800" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-800">นำเข้ารายชื่อนักเรียนจาก Excel / CSV</h2>
+                  <p className="text-xs text-slate-500">รองรับคอลัมน์: รหัสนักเรียน, ชื่อ-นามสกุล, ระดับชั้น, อีเมล</p>
+                </div>
+              </div>
+              <button onClick={() => setShowImportForm(false)} className="p-2 hover:bg-indigo-50 rounded-xl"><X className="w-5 h-5 text-slate-500" /></button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="border-2 border-dashed border-slate-700 rounded-xl p-8 text-center hover:border-indigo-500 transition-colors cursor-pointer relative">
+                <input 
+                  type="file" 
+                  accept=".xlsx, .xls, .csv" 
+                  onChange={handleFileUpload} 
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+                <Upload className="w-8 h-8 text-slate-500 mx-auto mb-3" />
+                <p className="text-slate-700 font-medium">คลิกเพื่อเลือกไฟล์ หรือลากไฟล์มาวาง</p>
+                <p className="text-slate-500 text-xs mt-1">.xlsx, .xls, .csv</p>
+              </div>
+
+              {importData.length > 0 && (
+                <div className="space-y-4 mt-6 animate-fade-in-up">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-emerald-400">พบข้อมูล {importData.length} รายการ</h3>
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm text-slate-600">นำเข้าห้อง:</label>
+                      <select value={importClassroomId} onChange={e => setImportClassroomId(e.target.value)} className="form-input py-1.5 text-sm w-48">
+                        <option value="">-- ไม่ระบุห้องเรียน --</option>
+                        {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white rounded-xl max-h-60 overflow-y-auto border border-indigo-100">
+                    <table className="w-full text-left text-sm border-collapse">
+                      <thead className="sticky top-0 bg-white">
+                        <tr>
+                          <th className="p-3 font-medium text-slate-700 w-24">รหัส</th>
+                          <th className="p-3 font-medium text-slate-700">ชื่อ-นามสกุล</th>
+                          <th className="p-3 font-medium text-slate-700">ระดับชั้น</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {importData.slice(0, 50).map((s, i) => (
+                          <tr key={i} className="border-b border-indigo-100">
+                            <td className="p-3 text-slate-600">{s.student_code || '-'}</td>
+                            <td className="p-3 text-slate-800">{s.name}</td>
+                            <td className="p-3 text-slate-600">{s.grade_level || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {importData.length > 50 && (
+                      <div className="p-3 text-center text-xs text-slate-500 bg-indigo-50">
+                        แสดงตัวอย่าง 50 รายการแรก จากทั้งหมด {importData.length} รายการ
+                      </div>
+                    )}
+                  </div>
+                  
+                  <button onClick={handleImportSubmit} disabled={saving} className="btn btn-primary w-full py-3">
+                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'ยืนยันการนำเข้าข้อมูล'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Evaluation Form Modal */}
+      {showEvalForm && createPortal(
+        <div className="modal-overlay" onClick={() => setShowEvalForm(false)}>
+          <div className="glass w-full max-w-md p-7 animate-fade-in-up" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                  <Award className="w-5 h-5 text-slate-800" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-800">บันทึกผลการประเมิน</h2>
+                  <p className="text-xs text-slate-500">ประเมินผลการเรียนรู้ของนักเรียน</p>
+                </div>
+              </div>
+              <button onClick={() => setShowEvalForm(false)} className="p-2 hover:bg-indigo-50 rounded-xl"><X className="w-5 h-5 text-slate-500" /></button>
+            </div>
+            <form onSubmit={handleEvalSubmit} className="space-y-4">
+              <div>
+                <label className="form-label">แผนการสอน</label>
+                <select value={evalForm.lesson_plan_id} onChange={e => setEvalForm({...evalForm, lesson_plan_id: e.target.value})} className="form-input" required id="eval-lesson">
+                  <option value="">เลือกแผนการสอน...</option>
+                  {lessons.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="form-label">คะแนนที่ได้</label><input type="number" value={evalForm.score} onChange={e => setEvalForm({...evalForm, score: e.target.value})} className="form-input" required id="eval-score" placeholder="0" /></div>
+                <div><label className="form-label">คะแนนเต็ม</label><input type="number" value={evalForm.max_score} onChange={e => setEvalForm({...evalForm, max_score: e.target.value})} className="form-input" id="eval-max-score" /></div>
+              </div>
+              <div>
+                <label className="form-label">ระดับการมีส่วนร่วม</label>
+                <select value={evalForm.participation} onChange={e => setEvalForm({...evalForm, participation: e.target.value})} className="form-input" id="eval-participation">
+                  <option value="excellent">ดีเยี่ยม</option>
+                  <option value="good">ดี</option>
+                  <option value="average">ปานกลาง</option>
+                  <option value="poor">ต้องปรับปรุง</option>
+                </select>
+              </div>
+              <div><label className="form-label">หมายเหตุ</label><textarea value={evalForm.notes} onChange={e => setEvalForm({...evalForm, notes: e.target.value})} className="form-input min-h-[60px]" placeholder="บันทึกเพิ่มเติม (ไม่บังคับ)" id="eval-notes" /></div>
+              <button type="submit" disabled={saving} className="btn btn-accent w-full py-3" id="eval-save-btn">
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Award className="w-4 h-4" /> บันทึกผลประเมิน</>}
+              </button>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}

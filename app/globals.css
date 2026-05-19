@@ -1,26 +1,439 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: #f0f4ff;
+  --color-foreground: #334155;
+  --font-sans: 'IBM Plex Sans Thai', 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ========== Base Styles — Light Pastel Theme ========== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'IBM Plex Sans Thai', 'Inter', system-ui, -apple-system, sans-serif;
+  background: #f0f4ff;
+  min-height: 100vh;
+  color: #334155;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Soft Pastel Background */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(165, 180, 252, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(167, 243, 208, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 80%, rgba(196, 181, 253, 0.10) 0%, transparent 50%),
+    linear-gradient(180deg, #f0f4ff 0%, #e8eeff 50%, #f5f3ff 100%);
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Scrollbar — Light */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(129, 140, 248, 0.35); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(129, 140, 248, 0.55); }
+
+/* ========== Glass Card System — Light ========== */
+.glass {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(24px) saturate(1.2);
+  -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  border: 1px solid rgba(165, 180, 252, 0.20);
+  border-radius: 20px;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 24px rgba(99, 102, 241, 0.06);
+}
+
+.glass:hover {
+  border-color: rgba(129, 140, 248, 0.35);
+  box-shadow: 0 8px 32px rgba(99, 102, 241, 0.10);
+}
+
+.glass-light {
+  background: rgba(255, 255, 255, 0.50);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(165, 180, 252, 0.15);
+  border-radius: 14px;
+  transition: all 0.3s ease;
+}
+
+.glass-light:hover {
+  background: rgba(255, 255, 255, 0.65);
+  border-color: rgba(165, 180, 252, 0.25);
+}
+
+/* ========== Stat Card — Light ========== */
+.stat-card {
+  background: rgba(255, 255, 255, 0.80);
+  backdrop-filter: blur(24px);
+  border: 1px solid rgba(165, 180, 252, 0.18);
+  border-radius: 20px;
+  padding: 1.5rem;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 16px rgba(99, 102, 241, 0.05);
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--card-accent, #818cf8), transparent);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(129, 140, 248, 0.35);
+  box-shadow: 0 20px 40px -12px rgba(99, 102, 241, 0.12);
+}
+
+.stat-card:hover::before {
+  opacity: 1;
+}
+
+/* ========== Glow Effects — Pastel ========== */
+.glow-primary {
+  box-shadow: 0 0 24px rgba(129, 140, 248, 0.18), 0 0 60px rgba(129, 140, 248, 0.06);
+}
+
+.glow-accent {
+  box-shadow: 0 0 24px rgba(52, 211, 153, 0.18), 0 0 60px rgba(52, 211, 153, 0.06);
+}
+
+.glow-purple {
+  box-shadow: 0 0 24px rgba(167, 139, 250, 0.18), 0 0 60px rgba(167, 139, 250, 0.06);
+}
+
+/* ========== Animations ========== */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-24px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(129, 140, 248, 0.12), 0 0 60px rgba(129, 140, 248, 0.04); }
+  50% { box-shadow: 0 0 30px rgba(129, 140, 248, 0.22), 0 0 80px rgba(129, 140, 248, 0.08); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* Stagger delay utilities */
+.delay-100 { animation-delay: 100ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-400 { animation-delay: 400ms; }
+
+/* ========== Loading Skeleton — Light ========== */
+.skeleton {
+  background: linear-gradient(90deg, rgba(226, 232, 240, 0.6) 25%, rgba(241, 245, 249, 0.8) 50%, rgba(226, 232, 240, 0.6) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 12px;
+}
+
+/* ========== Form Styles — Light ========== */
+.form-input {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1.5px solid rgba(165, 180, 252, 0.30);
+  border-radius: 12px;
+  color: #334155;
+  font-size: 0.875rem;
+  font-family: inherit;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+}
+
+.form-input:focus {
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.12), 0 0 20px rgba(129, 140, 248, 0.06);
+  background: #ffffff;
+}
+
+.form-input::placeholder {
+  color: #94a3b8;
+}
+
+.form-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 0.45rem;
+  letter-spacing: 0.02em;
+}
+
+/* ========== Button System — Pastel ========== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1.5rem;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: none;
+  outline: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 50%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.btn:hover::after {
+  opacity: 1;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #818cf8 0%, #6366f1 50%, #a78bfa 100%);
+  background-size: 200% 200%;
+  color: white;
+  box-shadow: 0 4px 16px rgba(129, 140, 248, 0.30);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(129, 140, 248, 0.40);
+  background-position: 100% 0;
+}
+
+.btn-accent {
+  background: linear-gradient(135deg, #34d399 0%, #10b981 50%, #6ee7b7 100%);
+  background-size: 200% 200%;
+  color: white;
+  box-shadow: 0 4px 16px rgba(52, 211, 153, 0.30);
+}
+
+.btn-accent:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(52, 211, 153, 0.40);
+  background-position: 100% 0;
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #fb7185, #f43f5e);
+  color: white;
+  box-shadow: 0 4px 16px rgba(251, 113, 133, 0.25);
+}
+
+.btn-danger:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(251, 113, 133, 0.40);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: #64748b;
+  border: 1.5px solid rgba(148, 163, 184, 0.25);
+}
+
+.btn-ghost:hover {
+  background: rgba(129, 140, 248, 0.08);
+  color: #6366f1;
+  border-color: rgba(129, 140, 248, 0.30);
+  transform: translateY(-1px);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* ========== Badge System — Pastel ========== */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.badge-primary {
+  background: rgba(129, 140, 248, 0.12);
+  color: #6366f1;
+  border: 1px solid rgba(129, 140, 248, 0.25);
+}
+
+.badge-accent {
+  background: rgba(52, 211, 153, 0.12);
+  color: #059669;
+  border: 1px solid rgba(52, 211, 153, 0.25);
+}
+
+.badge-warning {
+  background: rgba(251, 191, 36, 0.12);
+  color: #d97706;
+  border: 1px solid rgba(251, 191, 36, 0.25);
+}
+
+.badge-danger {
+  background: rgba(251, 113, 133, 0.12);
+  color: #e11d48;
+  border: 1px solid rgba(251, 113, 133, 0.25);
+}
+
+.badge-purple {
+  background: rgba(167, 139, 250, 0.12);
+  color: #7c3aed;
+  border: 1px solid rgba(167, 139, 250, 0.25);
+}
+
+/* ========== Select Styling — Light ========== */
+select.form-input {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2364748b' viewBox='0 0 16 16'%3E%3Cpath d='M8 12L2 6h12z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  padding-right: 2.5rem;
+}
+
+select.form-input option {
+  background: #ffffff;
+  color: #334155;
+}
+
+/* ========== Overlay / Modal — Light ========== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(100, 116, 139, 0.35);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 50;
+  padding: 1.5rem 1rem;
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+}
+
+.modal-overlay > * {
+  margin: auto;
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* ========== Gradient Text — Pastel ========== */
+.gradient-text {
+  background: linear-gradient(135deg, #818cf8 0%, #6366f1 30%, #a78bfa 60%, #34d399 100%);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradientShift 4s ease infinite;
+}
+
+/* ========== List Item Hover ========== */
+.list-item {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.list-item:hover {
+  transform: translateX(4px);
+  border-color: rgba(129, 140, 248, 0.3) !important;
+}
+
+/* ========== Calendar Cell — Light ========== */
+.calendar-cell {
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.calendar-cell:hover {
+  background: rgba(129, 140, 248, 0.08);
+}
+
+.calendar-cell.today {
+  background: rgba(129, 140, 248, 0.12);
+  border: 1px solid rgba(129, 140, 248, 0.25);
+}
+
+/* ========== Progress Bar — Light ========== */
+.progress-bar {
+  height: 6px;
+  background: rgba(226, 232, 240, 0.8);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #818cf8, #34d399);
+  border-radius: 999px;
+  transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ========== Divider — Light ========== */
+.divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(165, 180, 252, 0.25), transparent);
 }
