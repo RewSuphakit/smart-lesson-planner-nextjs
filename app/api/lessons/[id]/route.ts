@@ -4,9 +4,11 @@ import { requireAuth, AuthError } from '@/lib/auth';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    requireAuth(request);
+    const user = requireAuth(request);
     const { id } = await params;
-    const lesson = await prisma.lessonPlan.findUnique({ where: { id: Number(id) } });
+    const lesson = await prisma.lessonPlan.findFirst({
+      where: { id: Number(id), userId: user.id },
+    });
     if (!lesson) return NextResponse.json({ message: 'Lesson not found' }, { status: 404 });
     return NextResponse.json(lesson);
   } catch (error) {
@@ -17,9 +19,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    requireAuth(request);
+    const user = requireAuth(request);
     const { id } = await params;
     const body = await request.json();
+
+    // Check ownership first
+    const lesson = await prisma.lessonPlan.findFirst({
+      where: { id: Number(id), userId: user.id },
+    });
+    if (!lesson) return NextResponse.json({ message: 'Lesson not found' }, { status: 404 });
 
     const updateData: Record<string, unknown> = {};
     const allowedFields = ['title', 'subject', 'grade_level', 'duration', 'objectives', 'content', 'teaching_methods', 'materials', 'status'];
@@ -45,8 +53,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    requireAuth(request);
+    const user = requireAuth(request);
     const { id } = await params;
+
+    // Check ownership first
+    const lesson = await prisma.lessonPlan.findFirst({
+      where: { id: Number(id), userId: user.id },
+    });
+    if (!lesson) return NextResponse.json({ message: 'Lesson not found' }, { status: 404 });
+
     await prisma.lessonPlan.delete({ where: { id: Number(id) } });
     return NextResponse.json({ message: 'Lesson deleted' });
   } catch (error) {

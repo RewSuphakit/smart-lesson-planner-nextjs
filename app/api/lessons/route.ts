@@ -26,7 +26,24 @@ export async function GET(request: NextRequest) {
       prisma.lessonPlan.count({ where }),
     ]);
 
-    return NextResponse.json({ data, total, page, limit });
+    const mappedData = data.map(l => ({
+      id: l.id,
+      user_id: l.userId,
+      title: l.title,
+      subject: l.subject,
+      grade_level: l.gradeLevel,
+      duration: l.duration,
+      objectives: l.objectives,
+      content: l.content,
+      teaching_methods: l.teachingMethods,
+      materials: l.materials,
+      ai_generated: l.aiGenerated,
+      status: l.status,
+      created_at: l.createdAt,
+      updated_at: l.updatedAt
+    }));
+
+    return NextResponse.json({ data: mappedData, total, page, limit });
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
     console.error('Get lessons error:', error);

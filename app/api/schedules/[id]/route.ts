@@ -4,9 +4,15 @@ import { requireAuth, AuthError } from '@/lib/auth';
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    requireAuth(request);
+    const user = requireAuth(request);
     const { id } = await params;
     const body = await request.json();
+
+    // Check ownership
+    const schedule = await prisma.schedule.findFirst({
+      where: { id: Number(id), userId: user.id },
+    });
+    if (!schedule) return NextResponse.json({ message: 'Schedule not found' }, { status: 404 });
 
     const updateData: Record<string, unknown> = {};
     if (body.lesson_plan_id !== undefined) updateData.lessonPlanId = body.lesson_plan_id;
@@ -26,8 +32,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    requireAuth(request);
+    const user = requireAuth(request);
     const { id } = await params;
+
+    // Check ownership
+    const schedule = await prisma.schedule.findFirst({
+      where: { id: Number(id), userId: user.id },
+    });
+    if (!schedule) return NextResponse.json({ message: 'Schedule not found' }, { status: 404 });
+
     await prisma.schedule.delete({ where: { id: Number(id) } });
     return NextResponse.json({ message: 'Schedule deleted' });
   } catch (error) {

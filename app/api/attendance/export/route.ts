@@ -4,7 +4,7 @@ import { requireAuth, AuthError } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
-    requireAuth(request);
+    const user = requireAuth(request);
     const { searchParams } = new URL(request.url);
     const classroomId = searchParams.get('classroom_id');
     const startDate = searchParams.get('start_date');
@@ -13,6 +13,12 @@ export async function GET(request: NextRequest) {
     if (!classroomId) {
       return NextResponse.json({ message: 'classroom_id required' }, { status: 400 });
     }
+
+    // Verify classroom ownership
+    const classroom = await prisma.classroom.findFirst({
+      where: { id: Number(classroomId), userId: user.id }
+    });
+    if (!classroom) return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
 
     const where: Record<string, unknown> = { classroomId: Number(classroomId) };
     if (startDate) where.date = { ...(where.date as Record<string, unknown> || {}), gte: new Date(startDate) };
@@ -24,10 +30,10 @@ export async function GET(request: NextRequest) {
       orderBy: [{ date: 'asc' }, { student: { studentCode: 'asc' } }],
     });
 
-    // Format as CSV
-    const header = 'รหัสนักเรียน,ชื่อ-นามสกุล,วันที่,สถานะ\n';
+    // Format as CSV with UTF-8 BOM to prevent Thai encoding issues in Excel
+    const header = '\uFEFFรหัสนักเรียน,ชื่อ-นามสกุล,วันที่,สถานะ\n';
     const rows = records.map((r) =>
-      `${r.student.studentCode || ''},${r.student.name},${r.date.toISOString().split('T')[0]},${r.status}`
+      `"${r.student.studentCode || ''}","${r.student.name.replace(/"/g, '""')}","${r.date.toISOString().split('T')[0]}","${r.status}"`
     ).join('\n');
 
     return new NextResponse(header + rows, {

@@ -4,32 +4,97 @@ import { requireAuth, AuthError } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
-    requireAuth(request);
+    const user = requireAuth(request);
     const { searchParams } = new URL(request.url);
     const classroomId = searchParams.get('classroom_id');
     const date = searchParams.get('date');
     const studentId = searchParams.get('student_id');
+    const startDate = searchParams.get('start_date');
+    const endDate = searchParams.get('end_date');
 
     // Get attendance history for a student
     if (studentId && classroomId) {
+      // Validate ownership
+      const student = await prisma.student.findFirst({
+        where: { id: Number(studentId), userId: user.id },
+      });
+      if (!student) return NextResponse.json({ message: 'Student not found' }, { status: 404 });
+
       const records = await prisma.attendance.findMany({
         where: { studentId: Number(studentId), classroomId: Number(classroomId) },
         orderBy: { date: 'desc' },
       });
-      return NextResponse.json(records);
+      const mapped = records.map(r => ({
+        id: r.id,
+        student_id: r.studentId,
+        classroom_id: r.classroomId,
+        date: r.date,
+        status: r.status,
+        created_at: r.createdAt,
+        updated_at: r.updatedAt
+      }));
+      return NextResponse.json({ data: mapped });
+    }
+
+    // Get all records in a date range for a classroom (Matrix view)
+    if (classroomId && startDate && endDate) {
+      // Verify classroom ownership
+      const classroom = await prisma.classroom.findFirst({
+        where: { id: Number(classroomId), userId: user.id },
+      });
+      if (!classroom) return NextResponse.json({ message: 'Classroom not found' }, { status: 404 });
+
+      const records = await prisma.attendance.findMany({
+        where: {
+          classroomId: Number(classroomId),
+          date: {
+            gte: new Date(startDate),
+            lte: new Date(endDate),
+          },
+        },
+        orderBy: { date: 'asc' },
+      });
+      const mapped = records.map(r => ({
+        id: r.id,
+        student_id: r.studentId,
+        classroom_id: r.classroomId,
+        date: r.date,
+        status: r.status,
+        created_at: r.createdAt,
+        updated_at: r.updatedAt
+      }));
+      return NextResponse.json({ data: mapped });
     }
 
     // Get by date
     if (classroomId && date) {
+      // Verify classroom ownership
+      const classroom = await prisma.classroom.findFirst({
+        where: { id: Number(classroomId), userId: user.id },
+      });
+      if (!classroom) return NextResponse.json({ message: 'Classroom not found' }, { status: 404 });
+
       const records = await prisma.attendance.findMany({
         where: { classroomId: Number(classroomId), date: new Date(date) },
       });
-      return NextResponse.json(records);
+      const mapped = records.map(r => ({
+        id: r.id,
+        student_id: r.studentId,
+        classroom_id: r.classroomId,
+        date: r.date,
+        status: r.status,
+        created_at: r.createdAt,
+        updated_at: r.updatedAt
+      }));
+      return NextResponse.json({ data: mapped });
     }
 
     // Get stats
     if (classroomId) {
-      const classroom = await prisma.classroom.findUnique({ where: { id: Number(classroomId) } });
+      // Verify classroom ownership
+      const classroom = await prisma.classroom.findFirst({
+        where: { id: Number(classroomId), userId: user.id },
+      });
       if (!classroom) return NextResponse.json([], { status: 200 });
 
       const ratioLate = classroom.lateToAbsentRatio || 3;
@@ -76,10 +141,10 @@ export async function GET(request: NextRequest) {
         };
       });
 
-      return NextResponse.json(stats);
+      return NextResponse.json({ data: stats });
     }
 
-    return NextResponse.json([]);
+    return NextResponse.json({ data: [] });
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
     return NextResponse.json({ message: 'Failed to get attendance' }, { status: 500 });
@@ -88,11 +153,20 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    requireAuth(request);
+    const user = requireAuth(request);
     const body = await request.json();
 
     // Bulk mark attendance
     if (Array.isArray(body.records)) {
+      // Find unique classroom IDs and verify ownership
+      const classroomIds = Array.from(new Set(body.records.map((r: any) => Number(r.classroom_id)))) as number[];
+      for (const cid of classroomIds) {
+        const classroom = await prisma.classroom.findFirst({
+          where: { id: cid, userId: user.id }
+        });
+        if (!classroom) return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
+      }
+
       for (const record of body.records) {
         await prisma.attendance.upsert({
           where: {
@@ -115,6 +189,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Single mark
+    // Verify classroom ownership
+    const classroom = await prisma.classroom.findFirst({
+      where: { id: Number(body.classroom_id), userId: user.id }
+    });
+    if (!classroom) return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
+
     await prisma.attendance.upsert({
       where: {
         studentId_classroomId_date: {
@@ -142,15 +222,27 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    requireAuth(request);
+    const user = requireAuth(request);
     const { searchParams } = new URL(request.url);
     const classroomId = searchParams.get('classroom_id');
     const date = searchParams.get('date');
     const id = searchParams.get('id');
 
     if (id) {
+      // Verify ownership of the attendance record
+      const attendance = await prisma.attendance.findFirst({
+        where: { id: Number(id), classroom: { userId: user.id } }
+      });
+      if (!attendance) return NextResponse.json({ message: 'Attendance record not found' }, { status: 404 });
+
       await prisma.attendance.delete({ where: { id: Number(id) } });
     } else if (classroomId && date) {
+      // Verify classroom ownership
+      const classroom = await prisma.classroom.findFirst({
+        where: { id: Number(classroomId), userId: user.id }
+      });
+      if (!classroom) return NextResponse.json({ message: 'Classroom not found' }, { status: 404 });
+
       await prisma.attendance.deleteMany({
         where: { classroomId: Number(classroomId), date: new Date(date) },
       });

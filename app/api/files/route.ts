@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
       include: { lessonPlan: { select: { title: true } } },
       orderBy: { createdAt: 'desc' },
     });
-    return NextResponse.json(files);
+    return NextResponse.json({ data: files });
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
     return NextResponse.json({ message: 'Failed to get files' }, { status: 500 });

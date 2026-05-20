@@ -4,9 +4,15 @@ import { requireAuth, AuthError } from '@/lib/auth';
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    requireAuth(request);
+    const user = requireAuth(request);
     const { id } = await params;
     const body = await request.json();
+
+    // Check ownership
+    const evaluation = await prisma.evaluation.findFirst({
+      where: { id: Number(id), userId: user.id },
+    });
+    if (!evaluation) return NextResponse.json({ message: 'Evaluation not found' }, { status: 404 });
 
     const updateData: Record<string, unknown> = {};
     if (body.score !== undefined) updateData.score = body.score;
@@ -24,8 +30,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    requireAuth(request);
+    const user = requireAuth(request);
     const { id } = await params;
+
+    // Check ownership
+    const evaluation = await prisma.evaluation.findFirst({
+      where: { id: Number(id), userId: user.id },
+    });
+    if (!evaluation) return NextResponse.json({ message: 'Evaluation not found' }, { status: 404 });
+
     await prisma.evaluation.delete({ where: { id: Number(id) } });
     return NextResponse.json({ message: 'Evaluation deleted' });
   } catch (error) {
@@ -33,3 +46,4 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     return NextResponse.json({ message: 'Failed to delete evaluation' }, { status: 500 });
   }
 }
+

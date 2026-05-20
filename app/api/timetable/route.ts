@@ -9,7 +9,31 @@ export async function GET(request: NextRequest) {
       where: { userId: user.id },
       orderBy: [{ dayOfWeek: 'asc' }, { startPeriod: 'asc' }],
     });
-    return NextResponse.json(entries);
+    const mappedEntries = entries.map(e => ({
+      id: e.id,
+      day_of_week: e.dayOfWeek,
+      start_period: e.startPeriod,
+      end_period: e.endPeriod,
+      subject_code: e.subjectCode,
+      subject_name: e.subjectName,
+      room: e.room,
+      instructor: e.instructor,
+      group_name: e.groupName,
+      hours: e.hours,
+      entry_type: e.entryType,
+      color: e.color
+    }));
+    const summaryMap = new Map();
+    mappedEntries.forEach(e => {
+      if (!e.subject_code) return;
+      if (!summaryMap.has(e.subject_code)) {
+        summaryMap.set(e.subject_code, { subject_code: e.subject_code, subject_name: e.subject_name, total_hours: 0 });
+      }
+      summaryMap.get(e.subject_code).total_hours += e.hours;
+    });
+    const summary = Array.from(summaryMap.values());
+
+    return NextResponse.json({ data: { entries: mappedEntries, summary } });
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
     return NextResponse.json({ message: 'Failed to get timetable' }, { status: 500 });
@@ -68,7 +92,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(entry, { status: 201 });
+    return NextResponse.json({ data: entry }, { status: 201 });
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
     console.error('Create timetable error:', error);

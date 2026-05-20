@@ -16,7 +16,18 @@ export async function GET(request: NextRequest) {
       orderBy: { name: 'asc' },
     });
 
-    return NextResponse.json(students);
+    const mappedStudents = students.map(s => ({
+      id: s.id,
+      name: s.name,
+      student_code: s.studentCode,
+      grade_level: s.gradeLevel,
+      email: s.email,
+      classroom_id: s.classroomId,
+      midterm_score: s.midtermScore,
+      final_score: s.finalScore
+    }));
+
+    return NextResponse.json({ data: mappedStudents });
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
     return NextResponse.json({ message: 'Failed to get students' }, { status: 500 });
@@ -55,7 +66,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(student, { status: 201 });
+    return NextResponse.json({ data: student }, { status: 201 });
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
     console.error('Create student error:', error);
@@ -95,5 +106,39 @@ export async function PATCH(request: NextRequest) {
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
     return NextResponse.json({ message: 'Failed to update students' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const user = requireAuth(request);
+    const { searchParams } = new URL(request.url);
+    const classroomId = searchParams.get('classroom_id');
+    const idsParam = searchParams.get('ids');
+
+    // Case 1: Delete specific students by IDs list
+    if (idsParam) {
+      const ids = idsParam.split(',').map(Number).filter(id => !isNaN(id));
+      const result = await prisma.student.deleteMany({
+        where: {
+          id: { in: ids },
+          userId: user.id,
+        },
+      });
+      return NextResponse.json({ message: `Deleted ${result.count} students`, count: result.count });
+    }
+
+    // Case 2: Delete all students (optionally in a specific classroom)
+    const where: Record<string, unknown> = { userId: user.id };
+    if (classroomId) {
+      where.classroomId = Number(classroomId);
+    }
+
+    const result = await prisma.student.deleteMany({ where });
+    return NextResponse.json({ message: `Deleted ${result.count} students`, count: result.count });
+  } catch (error) {
+    if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+    console.error('Delete students error:', error);
+    return NextResponse.json({ message: 'Failed to delete students' }, { status: 500 });
   }
 }

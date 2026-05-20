@@ -4,9 +4,11 @@ import { requireAuth, AuthError } from '@/lib/auth';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    requireAuth(request);
+    const user = requireAuth(request);
     const { id } = await params;
-    const classroom = await prisma.classroom.findUnique({ where: { id: Number(id) } });
+    const classroom = await prisma.classroom.findFirst({
+      where: { id: Number(id), userId: user.id },
+    });
     if (!classroom) return NextResponse.json({ message: 'Not found' }, { status: 404 });
     return NextResponse.json(classroom);
   } catch (error) {
@@ -17,9 +19,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    requireAuth(request);
+    const user = requireAuth(request);
     const { id } = await params;
     const body = await request.json();
+
+    // Check ownership first
+    const classroom = await prisma.classroom.findFirst({
+      where: { id: Number(id), userId: user.id },
+    });
+    if (!classroom) return NextResponse.json({ message: 'Not found' }, { status: 404 });
 
     const updateData: Record<string, unknown> = {};
     const fieldMap: Record<string, string> = {
@@ -40,6 +48,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     await prisma.classroom.update({ where: { id: Number(id) }, data: updateData });
     return NextResponse.json({ message: 'Updated' });
   } catch (error) {
+    console.error('Update classroom error:', error);
     if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
     return NextResponse.json({ message: 'Failed' }, { status: 500 });
   }
@@ -47,8 +56,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    requireAuth(request);
+    const user = requireAuth(request);
     const { id } = await params;
+
+    // Check ownership first
+    const classroom = await prisma.classroom.findFirst({
+      where: { id: Number(id), userId: user.id },
+    });
+    if (!classroom) return NextResponse.json({ message: 'Not found' }, { status: 404 });
+
     await prisma.classroom.delete({ where: { id: Number(id) } });
     return NextResponse.json({ message: 'Deleted' });
   } catch (error) {
@@ -56,3 +72,4 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     return NextResponse.json({ message: 'Failed' }, { status: 500 });
   }
 }
+

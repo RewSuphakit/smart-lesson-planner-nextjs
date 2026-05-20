@@ -4,9 +4,15 @@ import { requireAuth, AuthError } from '@/lib/auth';
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    requireAuth(request);
+    const user = requireAuth(request);
     const { id } = await params;
     const body = await request.json();
+
+    // Check ownership
+    const student = await prisma.student.findFirst({
+      where: { id: Number(id), userId: user.id },
+    });
+    if (!student) return NextResponse.json({ message: 'Student not found' }, { status: 404 });
 
     const updateData: Record<string, unknown> = {};
     const fieldMap: Record<string, string> = {
@@ -29,8 +35,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    requireAuth(request);
+    const user = requireAuth(request);
     const { id } = await params;
+
+    // Check ownership
+    const student = await prisma.student.findFirst({
+      where: { id: Number(id), userId: user.id },
+    });
+    if (!student) return NextResponse.json({ message: 'Student not found' }, { status: 404 });
+
     await prisma.student.delete({ where: { id: Number(id) } });
     return NextResponse.json({ message: 'Student deleted' });
   } catch (error) {

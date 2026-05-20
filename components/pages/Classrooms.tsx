@@ -1,19 +1,39 @@
 'use client';
-// @ts-nocheck
-import { useState, useEffect } from 'react';
+
+import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import api from '@/services/api';
 import { Plus, Edit, Trash2, X, Loader2, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
+import axios from 'axios';
 
 const animalAvatars = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐧', '🐥', '🦉', '🦄', '🐙', '🐢', '🦖', '🦕', '🦦', '🦥'];
 
-function ClassroomCard({ c, i, colors, onEdit, onDelete }) {
+interface Classroom {
+  id: string;
+  name: string;
+  description?: string;
+  student_count?: number;
+  late_to_absent_ratio?: number;
+  leave_to_absent_ratio?: number;
+  total_classes?: number;
+  min_attendance_percent?: number;
+}
+
+interface ClassroomCardProps {
+  c: Classroom;
+  i: number;
+  colors: string[];
+  onEdit: (c: Classroom) => void;
+  onDelete: (id: string) => void;
+}
+
+function ClassroomCard({ c, i, colors, onEdit, onDelete }: ClassroomCardProps) {
   return (
     <div className="glass p-5 rounded-2xl flex flex-col h-full">
       <div className="flex items-start justify-between mb-4">
         <div className={'w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-2xl shadow-sm shrink-0'}>
-          {animalAvatars[(c.id || 0) % animalAvatars.length]}
+          {animalAvatars[Number(c.id || 0) % animalAvatars.length]}
         </div>
         <div className="flex gap-1">
           <button onClick={() => onEdit(c)} className="p-2 rounded-xl hover:bg-indigo-100 text-slate-600 hover:text-indigo-600 transition-all" title="แก้ไข">
@@ -45,10 +65,10 @@ function ClassroomCard({ c, i, colors, onEdit, onDelete }) {
 }
 
 export default function Classrooms() {
-  const [classrooms, setClassrooms] = useState([]);
+  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState(null);
+  const [editing, setEditing] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -66,20 +86,26 @@ export default function Classrooms() {
   const [periodsPerWeek, setPeriodsPerWeek] = useState(2);
   const [totalWeeks, setTotalWeeks] = useState(18);
 
-  useEffect(() => { fetchData(); }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async (signal?: AbortSignal) => {
     try {
-      const res = await api.get('/classrooms');
+      const res = await api.get('/classrooms', { signal });
       setClassrooms(res.data.data || []);
-    } catch {
-      toast.error('โหลดข้อมูลห้องเรียนไม่สำเร็จ');
+    } catch (err) {
+      if (!axios.isCancel(err)) {
+        toast.error('โหลดข้อมูลห้องเรียนไม่สำเร็จ');
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const handleSubmit = async (e) => {
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchData(controller.signal);
+    return () => controller.abort();
+  }, [fetchData]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
@@ -94,14 +120,14 @@ export default function Classrooms() {
       setEditing(null);
       setForm(emptyForm);
       fetchData();
-    } catch (err) {
+    } catch (err: any) {
       toast.error(err.response?.data?.message || 'บันทึกไม่สำเร็จ');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleEdit = (c) => {
+  const handleEdit = (c: Classroom) => {
     setForm({ 
       name: c.name, 
       description: c.description || '', 
@@ -114,7 +140,7 @@ export default function Classrooms() {
     setShowForm(true);
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: string | number) => {
     if (!confirm('ต้องการลบห้องเรียนนี้หรือไม่? ข้อมูลการเช็คชื่อจะถูกลบไปด้วย')) return;
     try {
       await api.delete('/classrooms/' + id);

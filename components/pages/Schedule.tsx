@@ -1,5 +1,5 @@
 'use client';
-// @ts-nocheck
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import api from '@/services/api';
@@ -14,12 +14,53 @@ import {
   UploadCloud, FileText, Table
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import axios from 'axios';
 
 const DAY_NAMES = ['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา'];
 const TIMETABLE_DAYS = ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์', 'อาทิตย์'];
 const PERIODS = Array.from({ length: 13 }, (_, i) => i + 1);
 
-function getMonthGrid(date) {
+interface ScheduleItem {
+  id: string | number;
+  lesson_plan_id: string | number;
+  lesson_title?: string;
+  scheduled_date: string;
+  start_time: string;
+  end_time: string;
+  notes?: string;
+  status: 'scheduled' | 'completed' | 'cancelled';
+}
+
+interface Lesson {
+  id: string | number;
+  title: string;
+}
+
+interface TimetableEntry {
+  id: string | number;
+  day_of_week: number;
+  start_period: number;
+  end_period: number;
+  subject_code: string;
+  subject_name?: string;
+  room?: string;
+  group_name?: string;
+  entry_type: 'lab' | 'activity' | 'homeroom' | 'theory' | string;
+  hours?: number;
+}
+
+interface TimetableSummaryItem {
+  subject_code: string;
+  subject_name: string;
+  total_hours: number;
+}
+
+interface HoverTooltip {
+  entry: TimetableEntry;
+  rect: DOMRect;
+}
+
+function getMonthGrid(date: Date) {
   const start = startOfWeek(startOfMonth(date), { weekStartsOn: 1 });
   const end   = endOfWeek(endOfMonth(date),     { weekStartsOn: 1 });
   const days  = [];
@@ -35,14 +76,14 @@ const STATUS_STYLE = {
 };
 const STATUS_LABEL = { scheduled: 'กำหนดสอน', completed: 'สอนแล้ว', cancelled: 'ยกเลิก' };
 
-function defaultForm(date) {
+function defaultForm(date: Date) {
   return {
     lesson_plan_id: '',
     scheduled_date: date ? format(date, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
     start_time: '09:00',
     end_time:   '10:00',
     notes:       '',
-    status:      'scheduled',
+    status:      'scheduled' as 'scheduled' | 'completed' | 'cancelled',
   };
 }
 
@@ -51,64 +92,78 @@ export default function Schedule() {
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDay,  setSelectedDay]  = useState(new Date());
-  const [schedules,    setSchedules]    = useState([]);
-  const [lessons,      setLessons]      = useState([]);
+  const [schedules,    setSchedules]    = useState<ScheduleItem[]>([]);
+  const [lessons,      setLessons]      = useState<Lesson[]>([]);
   
-  const [timetableEntries, setTimetableEntries] = useState([]);
-  const [timetableSummary, setTimetableSummary] = useState([]);
+  const [timetableEntries, setTimetableEntries] = useState<TimetableEntry[]>([]);
+  const [timetableSummary, setTimetableSummary] = useState<TimetableSummaryItem[]>([]);
   
   const [loading,      setLoading]      = useState(true);
   const [showForm,     setShowForm]     = useState(false);
-  const [editTarget,   setEditTarget]   = useState(null);
+  const [editTarget,   setEditTarget]   = useState<ScheduleItem | null>(null);
   const [form,         setForm]         = useState(() => defaultForm(new Date()));
   const [saving,       setSaving]       = useState(false);
 
   const [showUpload, setShowUpload] = useState(false);
-  const [uploadFile, setUploadFile] = useState(null);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [draggedEntry, setDraggedEntry] = useState(null);
-  const [dragType, setDragType] = useState(null);
-  const [dragOverCell, setDragOverCell] = useState(null);
-  const [hoverTooltip, setHoverTooltip] = useState(null);
+  const [draggedEntry, setDraggedEntry] = useState<TimetableEntry | null>(null);
+  const [dragType, setDragType] = useState<string | null>(null);
+  const [dragOverCell, setDragOverCell] = useState<string | null>(null);
+  const [hoverTooltip, setHoverTooltip] = useState<HoverTooltip | null>(null);
 
-  const fetchData = useCallback(async () => {
+  const [showAutoGenerate, setShowAutoGenerate] = useState(false);
+  const [autoGenerateStartDate, setAutoGenerateStartDate] = useState(() => format(startOfMonth(new Date()), 'yyyy-MM-dd'));
+  const [autoGenerating, setAutoGenerating] = useState(false);
+
+  const fetchData = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     try {
       if (activeTab === 'calendar') {
         const start = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
         const end   = format(endOfMonth(currentMonth),   'yyyy-MM-dd');
         const [schRes, lesRes] = await Promise.all([
-          api.get("/schedules?start=" + start + "&end=" + end),
-          api.get('/lessons'),
+          api.get("/schedules?start=" + start + "&end=" + end, { signal }),
+          api.get('/lessons', { signal }),
         ]);
         setSchedules(schRes.data.data || []);
         setLessons(lesRes.data.data   || []);
       } else {
-        const res = await api.get('/timetable');
-        setTimetableEntries(res.data.data?.entries || []);
-        setTimetableSummary(res.data.data?.summary || []);
+        const res = await api.get('/timetable', { signal });
+        const timetableData = res.data.data || {};
+        // Safely extract entries, ensuring we don't accidentally get Array.prototype.entries if data is an array
+        const entries = Array.isArray(timetableData.entries) ? timetableData.entries : [];
+        const summary = Array.isArray(timetableData.summary) ? timetableData.summary : [];
+        setTimetableEntries(entries);
+        setTimetableSummary(summary);
       }
-    } catch {
-      toast.error('โหลดข้อมูลไม่สำเร็จ');
+    } catch (err) {
+      if (!axios.isCancel(err)) {
+        toast.error('โหลดข้อมูลไม่สำเร็จ');
+      }
     } finally {
       setLoading(false);
     }
   }, [currentMonth, activeTab]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchData(controller.signal);
+    return () => controller.abort();
+  }, [fetchData]);
 
-  const openCreate = (day) => {
+  const openCreate = (day?: Date) => {
     setEditTarget(null);
     setForm(defaultForm(day || selectedDay));
     setShowForm(true);
   };
 
-  const openEdit = (sch) => {
+  const openEdit = (sch: ScheduleItem) => {
     setEditTarget(sch);
     setForm({
-      lesson_plan_id: sch.lesson_plan_id ?? '',
+      lesson_plan_id: sch.lesson_plan_id ? String(sch.lesson_plan_id) : '',
       scheduled_date: sch.scheduled_date?.slice(0, 10) ?? '',
       start_time:     sch.start_time?.slice(0, 5)      ?? '09:00',
       end_time:       sch.end_time?.slice(0, 5)        ?? '10:00',
@@ -120,7 +175,7 @@ export default function Schedule() {
 
   const closeForm = () => { setShowForm(false); setEditTarget(null); };
 
-  const handleScheduleSubmit = async (e) => {
+  const handleScheduleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.lesson_plan_id) return toast.error('กรุณาเลือกแผนการสอน');
     if (!form.scheduled_date) return toast.error('กรุณาเลือกวันที่');
@@ -136,14 +191,14 @@ export default function Schedule() {
       }
       closeForm();
       fetchData();
-    } catch (err) {
+    } catch (err: any) {
       toast.error(err.response?.data?.message || 'บันทึกไม่สำเร็จ');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDeleteSchedule = async (id) => {
+  const handleDeleteSchedule = async (id: string | number) => {
     if (!window.confirm('ต้องการลบตารางสอนนี้หรือไม่?')) return;
     try {
       await api.delete("/schedules/" + id);
@@ -154,18 +209,37 @@ export default function Schedule() {
     }
   };
 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
+  const handleAutoGenerateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!autoGenerateStartDate) return toast.error('กรุณาระบุวันเริ่มต้นภาคเรียน');
+    setAutoGenerating(true);
+    try {
+      const res = await api.post('/schedules', {
+        action: 'generate',
+        start_date: autoGenerateStartDate
+      });
+      toast.success(res.data.message || 'สร้างตารางสอนล่วงหน้าสำเร็จ');
+      setShowAutoGenerate(false);
+      fetchData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'สร้างตารางสอนล่วงหน้าไม่สำเร็จ');
+    } finally {
+      setAutoGenerating(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (file) setUploadFile(file);
   };
 
-  const handleUploadSubmit = async (e) => {
+  const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!uploadFile) return toast.error('กรุณาเลือกไฟล์');
     
     const formData = new FormData();
     formData.append('file', uploadFile);
-    formData.append('replace', true);
+    formData.append('replace', 'true');
     
     setUploading(true);
     try {
@@ -176,7 +250,7 @@ export default function Schedule() {
       setShowUpload(false);
       setUploadFile(null);
       fetchData();
-    } catch (err) {
+    } catch (err: any) {
       toast.error(err.response?.data?.message || 'อัพโหลดไม่สำเร็จ กรุณาตรวจสอบรูปแบบไฟล์');
     } finally {
       setUploading(false);
@@ -194,23 +268,25 @@ export default function Schedule() {
     }
   };
 
-  const handleDragStart = (e, entry, type = 'move') => {
+  const handleDragStart = (e: React.DragEvent, entry: TimetableEntry, type = 'move') => {
     setDraggedEntry(entry);
     setDragType(type);
     e.dataTransfer.effectAllowed = 'move';
     if (type === 'move') {
-      setTimeout(() => { if (e.target) e.target.style.opacity = '0.5'; }, 0);
+      const target = e.target as HTMLElement;
+      setTimeout(() => { if (target) target.style.opacity = '0.5'; }, 0);
     }
   };
 
-  const handleDragEnd = (e) => {
-    if (e.target) e.target.style.opacity = '1';
+  const handleDragEnd = (e: React.DragEvent) => {
+    const target = e.target as HTMLElement;
+    if (target) target.style.opacity = '1';
     setDraggedEntry(null);
     setDragType(null);
     setDragOverCell(null);
   };
 
-  const handleDragOver = (e, dayIdx, slotId) => {
+  const handleDragOver = (e: React.DragEvent, dayIdx: number, slotId: string | number) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     setDragOverCell(`${dayIdx}-${slotId}`);
@@ -220,7 +296,7 @@ export default function Schedule() {
     setDragOverCell(null);
   };
 
-  const handleDrop = async (e, dayIdx, slotId) => {
+  const handleDrop = async (e: React.DragEvent, dayIdx: number, slotId: string | number) => {
     e.preventDefault();
     setDragOverCell(null);
     if (!draggedEntry) return;
@@ -233,25 +309,25 @@ export default function Schedule() {
           setDragType(null);
           return;
         }
-        if (slotId < draggedEntry.start_period) {
+        if (Number(slotId) < draggedEntry.start_period) {
           toast.error('เวลาสิ้นสุดต้องไม่น้อยกว่าคาบเริ่มต้น');
           setDraggedEntry(null);
           setDragType(null);
           return;
         }
         await api.put(`/timetable/${draggedEntry.id}/resize`, {
-          end_period: slotId
+          end_period: Number(slotId)
         });
         toast.success('ปรับขนาดคาบเรียนสำเร็จ');
       } else {
         await api.put(`/timetable/${draggedEntry.id}/move`, {
           day_of_week: dayIdx,
-          start_period: slotId
+          start_period: Number(slotId)
         });
         toast.success('ย้ายตารางสอนสำเร็จ');
       }
       fetchData();
-    } catch (err) {
+    } catch (err: any) {
       toast.error(err.response?.data?.message || 'ทำรายการไม่สำเร็จ');
     }
     setDraggedEntry(null);
@@ -259,9 +335,9 @@ export default function Schedule() {
   };
 
   const days = getMonthGrid(currentMonth);
-  const schedulesForDay = (day) => schedules.filter(s => isSameDay(parseISO(s.scheduled_date?.slice(0, 10)), day));
+  const schedulesForDay = (day: Date) => schedules.filter(s => isSameDay(parseISO(s.scheduled_date?.slice(0, 10)), day));
   const selectedDaySchedules = schedulesForDay(selectedDay);
-  const getLessonTitle = (id) => lessons.find(l => l.id === id || l.id === Number(id))?.title || ("แผนที่ " + id);
+  const getLessonTitle = (id: string | number) => lessons.find(l => String(l.id) === String(id))?.title || ("แผนที่ " + id);
 
   const renderCalendar = () => (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6 animate-fade-in-up">
@@ -386,14 +462,14 @@ export default function Schedule() {
   );
 
   const renderTimetable = () => {
-    const entriesByDay = {};
+    const entriesByDay: Record<number, TimetableEntry[]> = {};
     for (let i = 0; i < 7; i++) entriesByDay[i] = [];
     
     timetableEntries.forEach(entry => {
       entriesByDay[entry.day_of_week].push(entry);
     });
 
-    const getBgColor = (type) => {
+    const getBgColor = (type?: string) => {
       if (type === 'lab') return 'bg-amber-100/80 border-amber-300 text-amber-800';
       if (type === 'activity') return 'bg-emerald-100/80 border-emerald-300 text-emerald-800';
       if (type === 'homeroom') return 'bg-rose-100/80 border-rose-300 text-rose-800';
@@ -417,7 +493,7 @@ export default function Schedule() {
       { id: 12, label: '12', start: '20:00', end: '21:00', isBreak: false },
     ];
 
-    const slotIndex = (slotId) => TIME_SLOTS.findIndex(s => s.id === slotId);
+    const slotIndex = (slotId: number | string) => TIME_SLOTS.findIndex(s => s.id === slotId);
     const gridCols = `100px repeat(${TIME_SLOTS.length}, 1fr)`;
 
     return (
@@ -466,7 +542,7 @@ export default function Schedule() {
 
                 {/* Day rows — each row is a position:relative container */}
                 {TIMETABLE_DAYS.map((dayName, dayIdx) => {
-                  const dayEntries = entriesByDay[dayIdx].sort((a,b) => a.start_period - b.start_period);
+                  const dayEntries = (entriesByDay[dayIdx] || []).sort((a: TimetableEntry, b: TimetableEntry) => Number(a.start_period) - Number(b.start_period));
                   if (dayEntries.length === 0 && dayIdx > 4) return null;
 
                   return (
@@ -513,7 +589,7 @@ export default function Schedule() {
                       })}
 
                       {/* Entry blocks — overlaid on same gridRow:1 with explicit gridColumn spans */}
-                      {dayEntries.map(entry => {
+                      {dayEntries.map((entry: TimetableEntry) => {
                         const startIdx = slotIndex(entry.start_period);
                         const endIdx = slotIndex(entry.end_period);
                         if (startIdx === -1) return null;
@@ -522,7 +598,7 @@ export default function Schedule() {
                         const gridColStart = startIdx + 2;
                         const gridColEnd = effectiveEndIdx + 3;
 
-                        const calcPeriodFromMouse = (e) => {
+                        const calcPeriodFromMouse = (e: React.MouseEvent<HTMLDivElement> | React.DragEvent<HTMLDivElement>) => {
                           const rect = e.currentTarget.getBoundingClientRect();
                           const x = e.clientX - rect.left;
                           const colWidth = rect.width / span;
@@ -621,6 +697,12 @@ export default function Schedule() {
           <h1 className="text-2xl font-bold text-slate-800 mb-1">ตารางสอน</h1>
           <p className="text-slate-500 text-sm">จัดการเวลาเรียนและการสอนของคุณ</p>
         </div>
+        <button 
+          onClick={() => setShowAutoGenerate(true)} 
+          className="btn btn-primary bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold flex items-center gap-2 border-0 shadow-lg shadow-indigo-200/50"
+        >
+          <Table className="w-4 h-4" /> สร้างแผนสอนล่วงหน้าอัตโนมัติ
+        </button>
       </div>
 
       <div className="flex p-1 bg-indigo-500/5 backdrop-blur-sm rounded-xl w-fit border border-indigo-500/10">
@@ -738,6 +820,63 @@ export default function Schedule() {
                     </>
                   ) : 'อัพโหลดและสร้างตาราง'}
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {showAutoGenerate && createPortal(
+        <div className="modal-overlay" onClick={() => setShowAutoGenerate(false)}>
+          <div className="glass w-full max-w-lg p-7 animate-fade-in-up" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-200">
+                  <Table className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-800">สร้างแผนการสอนล่วงหน้าอัตโนมัติ</h2>
+                  <p className="text-xs text-slate-400">ตามตารางเรียนประจำสัปดาห์และห้องเรียน</p>
+                </div>
+              </div>
+              <button onClick={() => setShowAutoGenerate(false)} className="p-2 hover:bg-slate-100 rounded-xl"><X className="w-5 h-5 text-slate-500" /></button>
+            </div>
+
+            <form onSubmit={handleAutoGenerateSubmit} className="space-y-5">
+              <div className="bg-gradient-to-r from-indigo-50/70 to-purple-50/70 rounded-2xl p-4 border border-indigo-100/50">
+                <p className="text-xs text-indigo-900 leading-relaxed font-semibold mb-2">
+                  💡 ระบบจะทำการคำนวณและป้อนแผนการสอนลงบนปฏิทินตลอดภาคเรียนให้โดยอัตโนมัติ:
+                </p>
+                <ul className="list-disc list-inside text-[0.7rem] text-slate-600 space-y-1">
+                  <li>จับคู่ห้องเรียนจาก <strong>ตารางเรียนประจำสัปดาห์ (Timetable)</strong></li>
+                  <li>คำนวณวันและเวลาสอนแต่ละสัปดาห์เรียงตามคาบเรียนล่วงหน้า</li>
+                  <li>จำนวนคาบเรียนที่สร้างจะอิงตาม <strong>จำนวนคาบทั้งหมด</strong> ที่ตั้งค่าในแต่ละห้องเรียน (วิชาแต่ละวิชาสอนจำนวนสัปดาห์ไม่เท่ากัน)</li>
+                  <li>เรียงลำดับแผนการสอนที่มีตามเนื้อหาคาบเรียนอัตโนมัติ</li>
+                </ul>
+              </div>
+
+              <div>
+                <label className="form-label text-slate-700 font-bold mb-1.5 block">วันเริ่มต้นภาคเรียน *</label>
+                <input 
+                  type="date" 
+                  value={autoGenerateStartDate} 
+                  onChange={e => setAutoGenerateStartDate(e.target.value)} 
+                  className="form-input text-lg py-2.5" 
+                  required 
+                />
+              </div>
+
+              <div className="flex gap-3 pt-3">
+                <button type="submit" disabled={autoGenerating} className="btn btn-primary flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 border-0 py-2.5 text-sm font-bold shadow-lg shadow-indigo-100">
+                  {autoGenerating ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      กำลังสร้างตารางสอนล่วงหน้า...
+                    </>
+                  ) : 'เริ่มต้นสร้างแผนการสอนล่วงหน้า'}
+                </button>
+                <button type="button" onClick={() => setShowAutoGenerate(false)} className="btn btn-ghost px-5 text-slate-600">ยกเลิก</button>
               </div>
             </form>
           </div>

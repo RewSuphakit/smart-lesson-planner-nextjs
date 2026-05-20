@@ -4,7 +4,7 @@ import { requireAuth, AuthError } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
-    requireAuth(request);
+    const user = requireAuth(request);
     const { searchParams } = new URL(request.url);
     const classroomId = searchParams.get('classroom_id');
 
@@ -12,19 +12,30 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'classroom_id required' }, { status: 400 });
     }
 
+    // Verify classroom ownership
+    const classroom = await prisma.classroom.findFirst({
+      where: { id: Number(classroomId), userId: user.id }
+    });
+    if (!classroom) return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
+
     // Get criteria
     if (searchParams.get('type') === 'criteria') {
       const criteria = await prisma.gradeCriteria.findMany({
         where: { classroomId: Number(classroomId) },
         orderBy: { minScore: 'desc' },
       });
-      return NextResponse.json(criteria);
+      const mappedCriteria = criteria.map(c => ({
+        id: c.id,
+        classroom_id: c.classroomId,
+        grade: c.grade,
+        min_score: Number(c.minScore),
+        created_at: c.createdAt,
+        updated_at: c.updatedAt
+      }));
+      return NextResponse.json({ data: mappedCriteria });
     }
 
     // Get report
-    const classroom = await prisma.classroom.findUnique({ where: { id: Number(classroomId) } });
-    if (!classroom) return NextResponse.json({ message: 'Classroom not found' }, { status: 404 });
-
     const weightAssign = Number(classroom.assignmentWeight ?? 10);
     const weightPostTest = Number(classroom.postTestWeight ?? 70);
     const weightAffective = Number(classroom.affectiveWeight ?? 20);
@@ -94,8 +105,13 @@ export async function GET(request: NextRequest) {
       const scaledMidterm = Math.round(preciseScaledMidterm);
       const scaledFinal = Math.round(preciseScaledFinal);
 
-      let affectiveScore = weightAffective;
-      affectiveScore = Math.max(0, weightAffective - (absentCount * 2) - (lateCount * 1));
+      // Use stored affective score if manually set, otherwise auto-calculate
+      let affectiveScore: number;
+      if (s.affectiveScore !== null && s.affectiveScore !== undefined) {
+        affectiveScore = Number(s.affectiveScore);
+      } else {
+        affectiveScore = Math.max(0, weightAffective - (absentCount * 2) - (lateCount * 1));
+      }
 
       const totalScore = scaledAssign + scaledPostTest + affectiveScore + scaledMidterm + scaledFinal;
       const percentage = totalScore;
@@ -138,7 +154,7 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return NextResponse.json(report);
+    return NextResponse.json({ data: report });
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
     console.error('Get grades error:', error);
@@ -148,24 +164,37 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    requireAuth(request);
+    const user = requireAuth(request);
+    const { searchParams } = new URL(request.url);
     const body = await request.json();
 
+    const classroomId = Number(body.classroom_id || searchParams.get('classroom_id'));
+    if (!classroomId) {
+      return NextResponse.json({ message: 'classroom_id required' }, { status: 400 });
+    }
+
+    // Verify classroom ownership
+    const classroom = await prisma.classroom.findFirst({
+      where: { id: classroomId, userId: user.id }
+    });
+    if (!classroom) return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
+
     // Save criteria
-    await prisma.gradeCriteria.deleteMany({ where: { classroomId: body.classroom_id } });
+    await prisma.gradeCriteria.deleteMany({ where: { classroomId: Number(classroomId) } });
 
     if (body.criteria && body.criteria.length > 0) {
       await prisma.gradeCriteria.createMany({
-        data: body.criteria.map((c: { grade: string; min_score: number }) => ({
-          classroomId: body.classroom_id,
+        data: body.criteria.map((c: { grade: string; min_score: any }) => ({
+          classroomId: Number(classroomId),
           grade: c.grade,
-          minScore: c.min_score,
+          minScore: isNaN(Number(c.min_score)) ? 0 : Number(c.min_score),
         })),
       });
     }
 
     return NextResponse.json({ message: 'Criteria saved' });
   } catch (error) {
+    console.error('Save criteria error:', error);
     if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
     return NextResponse.json({ message: 'Failed to save criteria' }, { status: 500 });
   }

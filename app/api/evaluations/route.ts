@@ -15,7 +15,18 @@ export async function GET(request: NextRequest) {
         include: { student: { select: { name: true, studentCode: true } } },
         orderBy: { student: { name: 'asc' } },
       });
-      return NextResponse.json(evaluations);
+      const mapped = evaluations.map(ev => ({
+        id: ev.id,
+        student_id: ev.studentId,
+        lesson_plan_id: ev.lessonPlanId,
+        score: ev.score,
+        max_score: ev.maxScore,
+        participation: ev.participation,
+        notes: ev.notes,
+        created_at: ev.createdAt,
+        student: { name: ev.student?.name, student_code: ev.student?.studentCode }
+      }));
+      return NextResponse.json({ data: mapped });
     }
 
     if (studentId) {
@@ -24,7 +35,18 @@ export async function GET(request: NextRequest) {
         include: { lessonPlan: { select: { title: true, subject: true } } },
         orderBy: { createdAt: 'desc' },
       });
-      return NextResponse.json(evaluations);
+      const mapped = evaluations.map(ev => ({
+        id: ev.id,
+        student_id: ev.studentId,
+        lesson_plan_id: ev.lessonPlanId,
+        score: ev.score,
+        max_score: ev.maxScore,
+        participation: ev.participation,
+        notes: ev.notes,
+        created_at: ev.createdAt,
+        lesson_plan: { title: ev.lessonPlan?.title, subject: ev.lessonPlan?.subject }
+      }));
+      return NextResponse.json({ data: mapped });
     }
 
     // Summary

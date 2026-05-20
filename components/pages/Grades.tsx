@@ -1,17 +1,70 @@
 'use client';
-// @ts-nocheck
-import { useState, useEffect, useMemo } from 'react';
+
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import api from '@/services/api';
 import { Loader2, BookOpen, Save, Settings, AlertCircle, TrendingUp, Plus, Trash2, FileSpreadsheet } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Pagination from '@/components/Pagination';
+import axios from 'axios';
+
+interface Classroom {
+  id: string;
+  name: string;
+  assignment_weight?: number;
+  post_test_weight?: number;
+  affective_weight?: number;
+  midterm_weight?: number;
+  final_weight?: number;
+  midterm_max_score?: number;
+  final_max_score?: number;
+}
+
+interface Criterion {
+  grade: string;
+  min_score: number;
+}
+
+interface ReportStudent {
+  student_id: string;
+  student_code?: string;
+  name: string;
+  raw_assign?: number;
+  max_assign?: number;
+  scaled_assign?: number;
+  precise_scaled_assign?: number;
+  raw_post_test?: number;
+  max_post_test?: number;
+  scaled_post_test?: number;
+  precise_scaled_post_test?: number;
+  midterm_score?: number | string;
+  scaled_midterm?: number;
+  precise_scaled_midterm?: number;
+  final_score?: number | string;
+  scaled_final?: number;
+  precise_scaled_final?: number;
+  affective_score?: number | string;
+  is_f?: boolean;
+  total_score?: string;
+  percentage?: string;
+  grade?: string;
+}
+
+interface Weights {
+  assignment_weight: number;
+  post_test_weight: number;
+  affective_weight: number;
+  midterm_weight: number;
+  final_weight: number;
+  midterm_max_score: number;
+  final_max_score: number;
+}
 
 export default function Grades() {
-  const [classrooms, setClassrooms] = useState([]);
-  const [selectedClass, setSelectedClass] = useState('');
-  const [report, setReport] = useState([]);
-  const [criteria, setCriteria] = useState([]);
-  const [weights, setWeights] = useState({
+  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
+  const [selectedClass, setSelectedClass] = useState<string>('');
+  const [report, setReport] = useState<ReportStudent[]>([]);
+  const [criteria, setCriteria] = useState<Criterion[]>([]);
+  const [weights, setWeights] = useState<Weights>({
     assignment_weight: 10,
     post_test_weight: 70,
     affective_weight: 20,
@@ -28,7 +81,7 @@ export default function Grades() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
 
-  const defaultCriteria = [
+  const defaultCriteria: Criterion[] = [
     { grade: '4', min_score: 80 },
     { grade: '3.5', min_score: 75 },
     { grade: '3', min_score: 70 },
@@ -39,47 +92,25 @@ export default function Grades() {
     { grade: '0', min_score: 0 },
   ];
 
-  useEffect(() => {
-    fetchClassrooms();
-  }, []);
-
-  useEffect(() => {
-    if (selectedClass) {
-      const c = classrooms.find(cl => cl.id === Number(selectedClass)) || classrooms.find(cl => cl.id === String(selectedClass));
-      if (c) {
-        setWeights({
-          assignment_weight: c.assignment_weight ?? 10,
-          post_test_weight: c.post_test_weight ?? 70,
-          affective_weight: c.affective_weight ?? 20,
-          midterm_weight: c.midterm_weight ?? 0,
-          final_weight: c.final_weight ?? 0,
-          midterm_max_score: c.midterm_max_score ?? 100,
-          final_max_score: c.final_max_score ?? 100
-        });
-      }
-      fetchGradesData();
-    } else {
-      setReport([]);
-      setCriteria([]);
-    }
-  }, [selectedClass]);
-
-  const fetchClassrooms = async () => {
+  const fetchClassrooms = useCallback(async (signal?: AbortSignal) => {
     try {
-      const res = await api.get('/classrooms');
+      const res = await api.get('/classrooms', { signal });
       setClassrooms(res.data.data || []);
-    } catch {
-      toast.error('โหลดข้อมูลห้องเรียนไม่สำเร็จ');
+    } catch (err) {
+      if (!axios.isCancel(err)) {
+        toast.error('โหลดข้อมูลห้องเรียนไม่สำเร็จ');
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const fetchGradesData = async () => {
+  const fetchGradesData = useCallback(async (signal?: AbortSignal) => {
+    if (!selectedClass) return;
     try {
       const [critRes, repRes] = await Promise.all([
-        api.get('/grades/criteria/' + selectedClass),
-        api.get('/grades/report/' + selectedClass)
+        api.get(`/grades?classroom_id=${selectedClass}&type=criteria`, { signal }),
+        api.get(`/grades?classroom_id=${selectedClass}`, { signal })
       ]);
 
       const loadedCriteria = critRes.data.data;
@@ -91,10 +122,41 @@ export default function Grades() {
 
       setReport(repRes.data.data || []);
       setCurrentPage(1);
-    } catch {
-      toast.error('โหลดข้อมูลผลการเรียนไม่สำเร็จ');
+    } catch (err) {
+      if (!axios.isCancel(err)) {
+        toast.error('โหลดข้อมูลผลการเรียนไม่สำเร็จ');
+      }
     }
-  };
+  }, [selectedClass]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchClassrooms(controller.signal);
+    return () => controller.abort();
+  }, [fetchClassrooms]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    if (selectedClass) {
+      const c = classrooms.find(cl => String(cl.id) === String(selectedClass));
+      if (c) {
+        setWeights({
+          assignment_weight: c.assignment_weight ?? 10,
+          post_test_weight: c.post_test_weight ?? 70,
+          affective_weight: c.affective_weight ?? 20,
+          midterm_weight: c.midterm_weight ?? 0,
+          final_weight: c.final_weight ?? 0,
+          midterm_max_score: c.midterm_max_score ?? 100,
+          final_max_score: c.final_max_score ?? 100
+        });
+      }
+      fetchGradesData(controller.signal);
+    } else {
+      setReport([]);
+      setCriteria([]);
+    }
+    return () => controller.abort();
+  }, [selectedClass, classrooms, fetchGradesData]);
 
   // Paginated report subset
   const paginatedReport = useMemo(() => {
@@ -102,17 +164,21 @@ export default function Grades() {
     return report.slice(start, start + itemsPerPage);
   }, [report, currentPage, itemsPerPage]);
 
-  const handleExamScoreChange = (studentId, field, value) => {
+  const handleExamScoreChange = (studentId: string, field: 'midterm_score' | 'final_score' | 'affective_score', value: string) => {
     setReport(prev => prev.map(student => {
       if (student.student_id === studentId) {
-        const updatedStudent = { ...student, [field]: value };
+        // Allow empty string so user can clear the input, otherwise convert to float
+        let valNum: number | string = value === '' ? '' : parseFloat(value);
+        if (typeof valNum === 'number' && valNum < 0) {
+          valNum = 0; // Prevent negative scores
+        }
+        const updatedStudent = { ...student, [field]: valNum };
         
         // Recalculate total score and percentage
-        const mScore = parseFloat(updatedStudent.midterm_score) || 0;
-        const fScore = parseFloat(updatedStudent.final_score) || 0;
-        const evalScore = parseFloat(updatedStudent.total_eval_score) || 0;
-        const scaledAssign = parseFloat(updatedStudent.scaled_assign) || 0;
-        const scaledPost = parseFloat(updatedStudent.scaled_post_test) || 0;
+        const mScore = Math.max(0, parseFloat(String(updatedStudent.midterm_score)) || 0);
+        const fScore = Math.max(0, parseFloat(String(updatedStudent.final_score)) || 0);
+        const scaledAssign = parseFloat(String(updatedStudent.scaled_assign ?? 0)) || 0;
+        const scaledPost = parseFloat(String(updatedStudent.scaled_post_test ?? 0)) || 0;
         
         // Calculate new scaled midterm and final
         const scaledMidterm = weights.midterm_max_score > 0 ? Math.round((mScore / weights.midterm_max_score) * weights.midterm_weight) : 0;
@@ -123,7 +189,7 @@ export default function Grades() {
         updatedStudent.scaled_final = scaledFinal;
         updatedStudent.precise_scaled_final = weights.final_max_score > 0 ? (fScore / weights.final_max_score) * weights.final_weight : 0;
 
-        const affective = parseFloat(updatedStudent.affective_score) || 0;
+        const affective = Math.max(0, parseFloat(String(updatedStudent.affective_score ?? 0)) || 0);
         
         const totalScore = scaledAssign + scaledPost + affective + scaledMidterm + scaledFinal;
         updatedStudent.total_score = totalScore.toFixed(2);
@@ -155,11 +221,13 @@ export default function Grades() {
     try {
       const scores = report.map(s => ({
         student_id: s.student_id,
-        midterm_score: parseFloat(s.midterm_score) || 0,
-        final_score: parseFloat(s.final_score) || 0
+        midterm_score: s.midterm_score === '' || s.midterm_score === undefined || s.midterm_score === null ? 0 : Number(s.midterm_score),
+        final_score: s.final_score === '' || s.final_score === undefined || s.final_score === null ? 0 : Number(s.final_score),
+        affective_score: s.affective_score === undefined || s.affective_score === null ? null : Number(s.affective_score)
       }));
       await api.put('/students/exams', { scores });
-      toast.success('บันทึกคะแนนสอบกลางภาค/ปลายภาคสำเร็จ');
+      toast.success('บันทึกคะแนนสอบและจิตพิสัยสำเร็จ');
+      fetchGradesData(); // Reload to refresh everything nicely and ensure page sync
     } catch {
       toast.error('บันทึกคะแนนสอบไม่สำเร็จ');
     } finally {
@@ -208,7 +276,7 @@ export default function Grades() {
     link.href = url;
     
     // Determine classroom name for filename
-    const c = classrooms.find(cl => cl.id === Number(selectedClass) || cl.id === String(selectedClass));
+    const c = classrooms.find(cl => String(cl.id) === String(selectedClass));
     const className = c ? c.name : 'Unknown';
     
     link.setAttribute('download', `คะแนน_${className}.csv`);
@@ -220,7 +288,7 @@ export default function Grades() {
   const handleSaveCriteria = async () => {
     setSaving(true);
     try {
-      await api.post('/grades/criteria/' + selectedClass, { criteria });
+      await api.post(`/grades?classroom_id=${selectedClass}&type=criteria`, { criteria });
       await api.put('/classrooms/' + selectedClass, {
         assignment_weight: Number(weights.assignment_weight),
         post_test_weight: Number(weights.post_test_weight),
@@ -241,7 +309,7 @@ export default function Grades() {
     }
   };
 
-  const handleCriteriaChange = (index, field, value) => {
+  const handleCriteriaChange = (index: number, field: keyof Criterion, value: string | number) => {
     const newCriteria = [...criteria];
     newCriteria[index] = { ...newCriteria[index], [field]: value };
     setCriteria(newCriteria);
@@ -251,11 +319,11 @@ export default function Grades() {
     setCriteria([...criteria, { grade: '', min_score: 0 }]);
   };
 
-  const removeCriteriaRow = (index) => {
+  const removeCriteriaRow = (index: number) => {
     setCriteria(criteria.filter((_, i) => i !== index));
   };
 
-  const getGradeStyle = (grade) => {
+  const getGradeStyle = (grade?: string) => {
     if (grade === '4' || grade === 'A') return '-white shadow-emerald-500/20';
     if (grade === '0' || grade === 'F') return '-white shadow-red-500/20';
     if (grade === 'ไม่มีเกรด') return 'bg-white text-slate-600';
@@ -315,7 +383,7 @@ export default function Grades() {
                 <input 
                   type="number" 
                   value={weights.assignment_weight} 
-                  onChange={e => setWeights({...weights, assignment_weight: e.target.value})}
+                  onChange={e => setWeights({...weights, assignment_weight: parseFloat(e.target.value) || 0})}
                   className="form-input text-center" 
                   placeholder="เช่น 20" 
                 />
@@ -325,7 +393,7 @@ export default function Grades() {
                 <input 
                   type="number" 
                   value={weights.post_test_weight} 
-                  onChange={e => setWeights({...weights, post_test_weight: e.target.value})}
+                  onChange={e => setWeights({...weights, post_test_weight: parseFloat(e.target.value) || 0})}
                   className="form-input text-center" 
                   placeholder="เช่น 30" 
                 />
@@ -335,7 +403,7 @@ export default function Grades() {
                 <input 
                   type="number" 
                   value={weights.midterm_weight} 
-                  onChange={e => setWeights({...weights, midterm_weight: e.target.value})}
+                  onChange={e => setWeights({...weights, midterm_weight: parseFloat(e.target.value) || 0})}
                   className="form-input text-center" 
                   placeholder="เช่น 20" 
                 />
@@ -345,7 +413,7 @@ export default function Grades() {
                 <input 
                   type="number" 
                   value={weights.final_weight} 
-                  onChange={e => setWeights({...weights, final_weight: e.target.value})}
+                  onChange={e => setWeights({...weights, final_weight: parseFloat(e.target.value) || 0})}
                   className="form-input text-center" 
                   placeholder="เช่น 20" 
                 />
@@ -355,7 +423,7 @@ export default function Grades() {
                 <input 
                   type="number" 
                   value={weights.affective_weight} 
-                  onChange={e => setWeights({...weights, affective_weight: e.target.value})}
+                  onChange={e => setWeights({...weights, affective_weight: parseFloat(e.target.value) || 0})}
                   className="form-input text-center" 
                   placeholder="เช่น 10" 
                 />
@@ -371,7 +439,7 @@ export default function Grades() {
                   <input 
                     type="number" 
                     value={weights.midterm_max_score} 
-                    onChange={e => setWeights({...weights, midterm_max_score: e.target.value})}
+                    onChange={e => setWeights({...weights, midterm_max_score: parseFloat(e.target.value) || 0})}
                     className="form-input text-center flex-1" 
                     placeholder="เช่น 100" 
                   />
@@ -381,7 +449,7 @@ export default function Grades() {
                   <input 
                     type="number" 
                     value={weights.final_max_score} 
-                    onChange={e => setWeights({...weights, final_max_score: e.target.value})}
+                    onChange={e => setWeights({...weights, final_max_score: parseFloat(e.target.value) || 0})}
                     className="form-input text-center flex-1" 
                     placeholder="เช่น 100" 
                   />
@@ -520,7 +588,7 @@ export default function Grades() {
               </button>
               <button onClick={saveExamScores} disabled={savingExams} className="btn btn-primary flex items-center gap-2">
                 {savingExams ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                บันทึกคะแนนสอบ
+                บันทึกคะแนนสอบ/จิตพิสัย
               </button>
             </div>
           </div>
@@ -577,7 +645,15 @@ export default function Grades() {
                       <div className="text-[10px] text-blue-400/60">ก่อนปัด: {Number(student.precise_scaled_final || 0).toFixed(3)}</div>
                     </td>
                     <td className="p-4 text-center">
-                      <div className="font-semibold text-pink-700">{Number(student.affective_score || 0).toFixed(1)}</div>
+                      <input 
+                        type="number" 
+                        value={student.affective_score ?? ''}
+                        onChange={e => handleExamScoreChange(student.student_id, 'affective_score', e.target.value)}
+                        className="form-input text-center py-1 w-16 mx-auto text-pink-700 font-bold mb-1" 
+                        placeholder="0"
+                        min="0"
+                        max={String(weights.affective_weight)}
+                      />
                       {student.is_f && <div className="text-xs text-red-400 mt-1">หมดสิทธิ์สอบ (F)</div>}
                     </td>
                     <td className="p-4 text-center">

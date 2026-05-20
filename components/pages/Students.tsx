@@ -1,32 +1,68 @@
 'use client';
-// @ts-nocheck
-import { useState, useEffect, useMemo } from 'react';
+
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import api from '@/services/api';
 import { Plus, Edit, Trash2, X, Users as UsersIcon, Loader2, Search, ClipboardCheck, ChevronDown, ChevronUp, GraduationCap, Award, Upload, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import Pagination from '@/components/Pagination';
+import axios from 'axios';
 
 const animalAvatars = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐧', '🐥', '🦉', '🦄', '🐙', '🐢', '🦖', '🦕', '🦦', '🦥'];
 
+interface Classroom {
+  id: string | number;
+  name: string;
+}
+
+interface Lesson {
+  id: string | number;
+  title: string;
+}
+
+interface Student {
+  id: string | number;
+  student_code?: string;
+  name: string;
+  grade_level?: string;
+  email?: string;
+  classroom_id?: string | number | null;
+}
+
+interface EvaluationRecord {
+  id: string | number;
+  lesson_title: string;
+  subject: string;
+  score: number;
+  max_score: number;
+  participation: string;
+}
+
+interface ImportRow {
+  student_code?: string;
+  name: string;
+  grade_level?: string;
+  email?: string;
+}
+
 export default function Students() {
-  const [students, setStudents] = useState([]);
-  const [lessons, setLessons] = useState([]);
-  const [classrooms, setClassrooms] = useState([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [loading, setLoading] = useState(true);
   
   const [showForm, setShowForm] = useState(false);
   const [showEvalForm, setShowEvalForm] = useState(false);
   const [showImportForm, setShowImportForm] = useState(false);
   
-  const [editing, setEditing] = useState(null);
+  const [editing, setEditing] = useState<string | number | null>(null);
   const [search, setSearch] = useState('');
   const [saving, setSaving] = useState(false);
-  const [expandedStudent, setExpandedStudent] = useState(null);
-  const [evaluations, setEvaluations] = useState({});
+  const [expandedStudent, setExpandedStudent] = useState<string | number | null>(null);
+  const [evaluations, setEvaluations] = useState<Record<string | number, EvaluationRecord[]>>({});
   const [filterClassroomId, setFilterClassroomId] = useState('');
-  const [selectedStudents, setSelectedStudents] = useState([]);
+  const [selectedStudents, setSelectedStudents] = useState<Array<string | number>>([]);
   const [bulkAssignClassroomId, setBulkAssignClassroomId] = useState('');
 
   // Pagination State
@@ -36,14 +72,46 @@ export default function Students() {
   const emptyForm = { name: '', student_code: '', grade_level: '', email: '', classroom_id: '' };
   const [form, setForm] = useState(emptyForm);
 
-  const emptyEvalForm = { student_id: '', lesson_plan_id: '', score: '', max_score: 100, participation: 'average', notes: '' };
-  const [evalForm, setEvalForm] = useState(emptyEvalForm);
+  interface EvalFormState {
+    student_id: string;
+    lesson_plan_id: string;
+    score: string | number;
+    max_score: number;
+    participation: string;
+    notes: string;
+  }
+
+  const emptyEvalForm: EvalFormState = { student_id: '', lesson_plan_id: '', score: '', max_score: 100, participation: 'average', notes: '' };
+  const [evalForm, setEvalForm] = useState<EvalFormState>(emptyEvalForm);
 
   // Import states
-  const [importData, setImportData] = useState([]);
+  const [importData, setImportData] = useState<ImportRow[]>([]);
   const [importClassroomId, setImportClassroomId] = useState('');
 
-  useEffect(() => { fetchData(); }, []);
+  const fetchData = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const [studRes, lessRes, classRes] = await Promise.all([
+        api.get('/students', { signal }),
+        api.get('/lessons', { signal }),
+        api.get('/classrooms', { signal })
+      ]);
+      setStudents(studRes.data.data || []);
+      setLessons(lessRes.data.data || []);
+      setClassrooms(classRes.data.data || []);
+    } catch (err) {
+      if (!axios.isCancel(err)) {
+        toast.error('โหลดข้อมูลไม่สำเร็จ');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchData(controller.signal);
+    return () => controller.abort();
+  }, [fetchData]);
 
   const handleExport = () => {
     if (filtered.length === 0) {
@@ -56,7 +124,7 @@ export default function Students() {
       'รหัสนักเรียน': s.student_code || '',
       'ชื่อ-นามสกุล': s.name || '',
       'ระดับชั้น': s.grade_level || '',
-      'ห้องเรียน': classrooms.find(c => c.id === s.classroom_id)?.name || 'ไม่ระบุ',
+      'ห้องเรียน': classrooms.find(c => String(c.id) === String(s.classroom_id))?.name || 'ไม่ระบุ',
       'อีเมล': s.email || ''
     }));
 
@@ -68,24 +136,14 @@ export default function Students() {
     XLSX.utils.book_append_sheet(wb, ws, "Students");
     
     // Generate file
-    const className = filterClassroomId ? classrooms.find(c => c.id === Number(filterClassroomId))?.name : 'ทั้งหมด';
+    const className = filterClassroomId ? classrooms.find(c => String(c.id) === String(filterClassroomId))?.name : 'ทั้งหมด';
     const fileName = `รายชื่อนักเรียน_${className}_${new Date().toISOString().split('T')[0]}.xlsx`;
     
     XLSX.writeFile(wb, fileName);
     toast.success('ส่งออกไฟล์เรียบร้อย');
   };
 
-  const fetchData = async () => {
-    try {
-      const [studRes, lessRes, classRes] = await Promise.all([api.get('/students'), api.get('/lessons'), api.get('/classrooms')]);
-      setStudents(studRes.data.data || []);
-      setLessons(lessRes.data.data || []);
-      setClassrooms(classRes.data.data || []);
-    } catch { toast.error('โหลดข้อมูลไม่สำเร็จ'); }
-    finally { setLoading(false); }
-  };
-
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
@@ -97,41 +155,51 @@ export default function Students() {
         toast.success('เพิ่มนักเรียนเรียบร้อย');
       }
       setShowForm(false); setEditing(null); setForm(emptyForm); fetchData();
-    } catch (err) { toast.error(err.response?.data?.message || 'บันทึกไม่สำเร็จ'); }
+    } catch (err: any) { toast.error(err.response?.data?.message || 'บันทึกไม่สำเร็จ'); }
     finally { setSaving(false); }
   };
 
-  const handleEdit = (s) => {
-    setForm({ name: s.name, student_code: s.student_code || '', grade_level: s.grade_level || '', email: s.email || '', classroom_id: s.classroom_id || '' });
+  const handleEdit = (s: Student) => {
+    setForm({
+      name: s.name,
+      student_code: s.student_code || '',
+      grade_level: s.grade_level || '',
+      email: s.email || '',
+      classroom_id: s.classroom_id ? String(s.classroom_id) : ''
+    });
     setEditing(s.id); setShowForm(true);
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: string | number) => {
     if (!confirm('ต้องการลบนักเรียนคนนี้หรือไม่?')) return;
     try { await api.delete('/students/' + id); toast.success('ลบนักเรียนแล้ว'); fetchData(); }
     catch { toast.error('ลบไม่สำเร็จ'); }
   };
 
-  const handleEvalSubmit = async (e) => {
+  const loadEvaluations = useCallback(async (studentId: string | number, signal?: AbortSignal) => {
+    try {
+      const { data } = await api.get('/evaluations/student/' + studentId, { signal });
+      setEvaluations(prev => ({ ...prev, [studentId]: data.data }));
+    } catch (err) {
+      if (!axios.isCancel(err)) {
+        // silent
+      }
+    }
+  }, []);
+
+  const handleEvalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
       await api.post('/evaluations', evalForm);
       toast.success('บันทึกผลการประเมินเรียบร้อย');
       setShowEvalForm(false); setEvalForm(emptyEvalForm);
-      if (expandedStudent) loadEvaluations(expandedStudent);
-    } catch (err) { toast.error(err.response?.data?.message || 'บันทึกไม่สำเร็จ'); }
+      if (expandedStudent !== null) loadEvaluations(expandedStudent);
+    } catch (err: any) { toast.error(err.response?.data?.message || 'บันทึกไม่สำเร็จ'); }
     finally { setSaving(false); }
   };
 
-  const loadEvaluations = async (studentId) => {
-    try {
-      const { data } = await api.get('/evaluations/student/' + studentId);
-      setEvaluations(prev => ({ ...prev, [studentId]: data.data }));
-    } catch { /* silent */ }
-  };
-
-  const handleDeleteEvaluation = async (evaluationId, studentId) => {
+  const handleDeleteEvaluation = async (evaluationId: string | number, studentId: string | number) => {
     if (!window.confirm('ยืนยันการลบผลการประเมินนี้?')) return;
     try {
       await api.delete('/evaluations/' + evaluationId);
@@ -142,12 +210,12 @@ export default function Students() {
     }
   };
 
-  const toggleExpand = (id) => {
+  const toggleExpand = (id: string | number) => {
     if (expandedStudent === id) { setExpandedStudent(null); }
     else { setExpandedStudent(id); if (!evaluations[id]) loadEvaluations(id); }
   };
 
-  const handleToggleSelect = (id) => {
+  const handleToggleSelect = (id: string | number) => {
     setSelectedStudents(prev => 
       prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id]
     );
@@ -182,19 +250,58 @@ export default function Students() {
     }
   };
 
+  const handleBulkDelete = async () => {
+    if (selectedStudents.length === 0) return;
+    if (!window.confirm(`ยืนยันการลบนักเรียนที่เลือกทั้งหมด ${selectedStudents.length} คนหรือไม่? (ข้อมูลคะแนนและการประเมินของนักเรียนจะถูกลบไปด้วย)`)) return;
+    setSaving(true);
+    try {
+      await api.delete(`/students?ids=${selectedStudents.join(',')}`);
+      toast.success('ลบนักเรียนที่เลือกเรียบร้อยแล้ว');
+      setSelectedStudents([]);
+      fetchData();
+    } catch {
+      toast.error('ลบไม่สำเร็จ');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    const isFiltered = !!filterClassroomId;
+    const targetClassName = isFiltered ? classrooms.find(c => String(c.id) === String(filterClassroomId))?.name || 'ห้องเรียนที่เลือก' : 'ทั้งหมด';
+    const msg = isFiltered 
+      ? `ยืนยันการลบนักเรียนทั้งหมดในห้องเรียน "${targetClassName}" ใช่หรือไม่? (ข้อมูลคะแนนและประวัติการประเมินของนักเรียนจะถูกลบไปด้วย)`
+      : `ยืนยันการลบนักเรียนทั้งหมด (${students.length} คน) ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้!`;
+      
+    if (!window.confirm(msg)) return;
+    setSaving(true);
+    try {
+      const url = isFiltered ? `/students?classroom_id=${filterClassroomId}` : '/students';
+      await api.delete(url);
+      toast.success('ลบนักเรียนเรียบร้อยแล้ว');
+      setSelectedStudents([]);
+      fetchData();
+    } catch {
+      toast.error('ลบไม่สำเร็จ');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // --- Bulk Import ---
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = (evt) => {
       try {
-        const bstr = evt.target.result;
+        const bstr = evt.target?.result;
+        if (typeof bstr !== 'string') return;
         const wb = XLSX.read(bstr, { type: 'binary' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws);
+        const data = XLSX.utils.sheet_to_json<any>(ws);
         
         // Map columns
         const mappedData = data.map(row => {
@@ -210,10 +317,10 @@ export default function Students() {
           }
 
           return {
-            student_code: row['รหัสนักเรียน'] || row['student_code'] || '',
-            name: fullName,
-            grade_level: row['ระดับชั้น'] || row['ชั้น'] || row['grade_level'] || '',
-            email: row['อีเมล'] || row['email'] || '',
+            student_code: String(row['รหัสนักเรียน'] || row['student_code'] || ''),
+            name: String(fullName),
+            grade_level: String(row['ระดับชั้น'] || row['ชั้น'] || row['grade_level'] || ''),
+            email: String(row['อีเมล'] || row['email'] || ''),
           };
         }).filter(item => item.name); // Require at least name
 
@@ -223,7 +330,7 @@ export default function Students() {
       }
     };
     reader.readAsBinaryString(file);
-    e.target.value = null; // reset
+    e.target.value = ''; // reset
   };
 
   const handleImportSubmit = async () => {
@@ -241,7 +348,7 @@ export default function Students() {
       setImportData([]);
       setImportClassroomId('');
       fetchData();
-    } catch (err) {
+    } catch (err: any) {
       toast.error(err.response?.data?.message || 'นำเข้าไม่สำเร็จ');
     } finally {
       setSaving(false);
@@ -250,7 +357,7 @@ export default function Students() {
 
   const filtered = students.filter(s => {
     const matchSearch = s.name?.toLowerCase().includes(search.toLowerCase()) || s.student_code?.toLowerCase().includes(search.toLowerCase());
-    const matchClass = filterClassroomId ? s.classroom_id === Number(filterClassroomId) : true;
+    const matchClass = filterClassroomId ? String(s.classroom_id) === String(filterClassroomId) : true;
     return matchSearch && matchClass;
   });
 
@@ -263,7 +370,7 @@ export default function Students() {
   // Reset to page 1 when filters change
   useEffect(() => { setCurrentPage(1); }, [search, filterClassroomId]);
 
-  const participationMap = {
+  const participationMap: Record<string, { label: string; badge: string }> = {
     excellent: { label: 'ดีเยี่ยม', badge: 'badge-accent' },
     good: { label: 'ดี', badge: 'badge-primary' },
     average: { label: 'ปานกลาง', badge: 'badge-warning' },
@@ -290,6 +397,16 @@ export default function Students() {
           <p className="text-slate-500 text-sm">ทั้งหมด {students.length} คน</p>
         </div>
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          {students.length > 0 && (
+            <button 
+              onClick={handleDeleteAll}
+              disabled={saving}
+              className="btn bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 flex-1 sm:flex-none flex items-center justify-center gap-1.5"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>ลบทั้งหมด</span>
+            </button>
+          )}
           <button onClick={handleExport} className="btn bg-emerald-600 hover:bg-emerald-500 text-slate-800 flex-1 sm:flex-none">
             ส่งออก (Excel)
           </button>
@@ -332,7 +449,7 @@ export default function Students() {
               ยกเลิก
             </button>
           </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <select 
               value={bulkAssignClassroomId} 
               onChange={e => setBulkAssignClassroomId(e.target.value)} 
@@ -345,9 +462,17 @@ export default function Students() {
             <button 
               onClick={handleBulkAssign}
               disabled={saving}
-              className="btn btn-primary"
+              className="btn btn-primary flex-1 sm:flex-none"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'ย้ายห้อง'}
+            </button>
+            <button 
+              onClick={handleBulkDelete}
+              disabled={saving}
+              className="btn bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 flex-1 sm:flex-none flex items-center justify-center gap-1.5"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              <span>ลบที่เลือก</span>
             </button>
           </div>
         </div>
@@ -400,19 +525,19 @@ export default function Students() {
                 />
               </label>
               <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-2xl shadow-sm shrink-0">
-                {animalAvatars[(student.id || 0) % animalAvatars.length]}
+                {animalAvatars[(Number(student.id) || 0) % animalAvatars.length]}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-slate-800 text-[0.95rem]">{student.name}</p>
                 <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-0.5">
                   {student.student_code && <span>รหัส: {student.student_code}</span>}
                   {student.grade_level && <span>ระดับ {student.grade_level}</span>}
-                  {student.classroom_id && <span>ห้อง: {classrooms.find(c => c.id === student.classroom_id)?.name || 'ไม่ทราบ'}</span>}
+                  {student.classroom_id && <span>ห้อง: {classrooms.find(c => String(c.id) === String(student.classroom_id))?.name || 'ไม่ทราบ'}</span>}
                   {student.email && <span>{student.email}</span>}
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                <button onClick={() => { setEvalForm({ ...emptyEvalForm, student_id: student.id }); setShowEvalForm(true); }}
+                <button onClick={() => { setEvalForm({ ...emptyEvalForm, student_id: String(student.id) }); setShowEvalForm(true); }}
                   className="p-2.5 rounded-xl hover:bg-emerald-500/10 text-slate-500 hover:text-emerald-400 transition-all" title="บันทึกผลประเมิน">
                   <Award className="w-4 h-4" />
                 </button>
@@ -620,8 +745,8 @@ export default function Students() {
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="form-label">คะแนนที่ได้</label><input type="number" value={evalForm.score} onChange={e => setEvalForm({...evalForm, score: e.target.value})} className="form-input" required id="eval-score" placeholder="0" /></div>
-                <div><label className="form-label">คะแนนเต็ม</label><input type="number" value={evalForm.max_score} onChange={e => setEvalForm({...evalForm, max_score: e.target.value})} className="form-input" id="eval-max-score" /></div>
+                <div><label className="form-label">คะแนนที่ได้</label><input type="number" value={evalForm.score} onChange={e => setEvalForm({...evalForm, score: parseFloat(e.target.value) || 0})} className="form-input" required id="eval-score" placeholder="0" /></div>
+                <div><label className="form-label">คะแนนเต็ม</label><input type="number" value={evalForm.max_score} onChange={e => setEvalForm({...evalForm, max_score: parseFloat(e.target.value) || 0})} className="form-input" id="eval-max-score" /></div>
               </div>
               <div>
                 <label className="form-label">ระดับการมีส่วนร่วม</label>

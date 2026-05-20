@@ -1,19 +1,34 @@
 'use client';
-// @ts-nocheck
-import { useState, useEffect, useMemo } from 'react';
+
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import api from '@/services/api';
 import { Plus, Search, Edit, Trash2, Download, Sparkles, Loader2, BookOpen, X, Wand2, Clock, GraduationCap, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Pagination from '@/components/Pagination';
+import axios from 'axios';
+
+interface Lesson {
+  id: string | number;
+  title: string;
+  subject: string;
+  grade_level: string;
+  duration: number;
+  objectives: string | string[];
+  content?: any;
+  teaching_methods?: string | string[];
+  materials?: string | string[];
+  status: 'draft' | 'published' | 'archived';
+  ai_generated?: boolean;
+}
 
 export default function LessonPlans() {
-  const [lessons, setLessons] = useState([]);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [showAI, setShowAI] = useState(false);
-  const [showDetail, setShowDetail] = useState(null);
-  const [editing, setEditing] = useState(null);
+  const [showDetail, setShowDetail] = useState<Lesson | null>(null);
+  const [editing, setEditing] = useState<string | number | null>(null);
   const [search, setSearch] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -21,31 +36,40 @@ export default function LessonPlans() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  const emptyForm = { title: '', subject: '', grade_level: '', duration: 60, objectives: '', content: '', teaching_methods: '', materials: '', status: 'draft' };
+  const emptyForm = { title: '', subject: '', grade_level: '', duration: 60, objectives: '', content: '', teaching_methods: '', materials: '', status: 'draft' as 'draft' | 'published' | 'archived' };
   const [form, setForm] = useState(emptyForm);
 
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
 
-  useEffect(() => { fetchLessons(); }, []);
-
-  const fetchLessons = async () => {
+  const fetchLessons = useCallback(async (signal?: AbortSignal) => {
     try {
-      const { data } = await api.get('/lessons');
+      const { data } = await api.get('/lessons', { signal });
       setLessons(data.data || []);
-    } catch { toast.error('โหลดแผนการสอนไม่สำเร็จ'); }
-    finally { setLoading(false); }
-  };
+    } catch (err) {
+      if (!axios.isCancel(err)) {
+        toast.error('โหลดแผนการสอนไม่สำเร็จ');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchLessons(controller.signal);
+    return () => controller.abort();
+  }, [fetchLessons]);
 
-  const handleSubmit = async (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
       const payload = {
         ...form,
-        duration: parseInt(form.duration),
+        duration: parseInt(String(form.duration)),
         objectives: form.objectives ? form.objectives.split('\n').filter(Boolean) : [],
         teaching_methods: form.teaching_methods ? form.teaching_methods.split('\n').filter(Boolean) : [],
         materials: form.materials ? form.materials.split('\n').filter(Boolean) : [],
@@ -61,12 +85,12 @@ export default function LessonPlans() {
       setEditing(null);
       setForm(emptyForm);
       fetchLessons();
-    } catch (err) {
+    } catch (err: any) {
       toast.error(err.response?.data?.message || 'บันทึกไม่สำเร็จ');
     } finally { setSaving(false); }
   };
 
-  const handleEdit = (lesson) => {
+  const handleEdit = (lesson: Lesson) => {
     setForm({
       title: lesson.title,
       subject: lesson.subject,
@@ -82,20 +106,22 @@ export default function LessonPlans() {
     setShowForm(true);
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: string | number) => {
     if (!confirm('ต้องการลบแผนการสอนนี้หรือไม่?')) return;
     try { await api.delete(`/lessons/${id}`); toast.success('ลบแผนการสอนแล้ว'); fetchLessons(); }
     catch { toast.error('ลบไม่สำเร็จ'); }
   };
 
-  const handleExportPDF = async (id) => {
+  const handleExportPDF = async (lesson: Lesson) => {
     try {
-      const response = await api.get(`/lessons/${id}/export-pdf`, { responseType: 'blob' });
+      const response = await api.get(`/lessons/${lesson.id}/export-pdf`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.download = `lesson-plan-${id}.pdf`;
+      link.setAttribute('download', `${lesson.title}.pdf`);
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
       toast.success('ส่งออก PDF สำเร็จ');
     } catch { toast.error('ส่งออก PDF ไม่สำเร็จ'); }
@@ -125,7 +151,7 @@ export default function LessonPlans() {
         ? '📋 สร้างแผนตัวอย่าง (Demo Mode) — ตรวจสอบและบันทึกได้เลย'
         : '✨ AI สร้างแผนการสอนเรียบร้อย! ตรวจสอบและบันทึกได้เลย'
       );
-    } catch (err) {
+    } catch (err: any) {
       toast.error(err.response?.data?.message || 'สร้างด้วย AI ไม่สำเร็จ');
     } finally { setAiLoading(false); }
   };
@@ -223,7 +249,7 @@ export default function LessonPlans() {
                 <button onClick={() => handleEdit(lesson)} className="p-2 rounded-lg hover:bg-indigo-500/20 text-slate-600 hover:text-indigo-700 transition-all" title="แก้ไข">
                   <Edit className="w-4 h-4" />
                 </button>
-                <button onClick={() => handleExportPDF(lesson.id)} className="p-2 rounded-lg hover:bg-emerald-500/20 text-slate-600 hover:text-emerald-700 transition-all" title="ส่งออก PDF">
+                <button onClick={() => handleExportPDF(lesson)} className="p-2 rounded-lg hover:bg-emerald-500/20 text-slate-600 hover:text-emerald-700 transition-all" title="ส่งออก PDF">
                   <Download className="w-4 h-4" />
                 </button>
                 <div className="w-px h-4 bg-white/10 mx-1"></div>

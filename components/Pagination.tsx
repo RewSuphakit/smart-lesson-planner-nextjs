@@ -1,5 +1,5 @@
 'use client';
-// @ts-nocheck
+
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 
 /**
@@ -11,6 +11,15 @@ import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-r
  * @param {number[]} pageSizeOptions - ตัวเลือกจำนวนต่อหน้า (optional)
  * @param {function} onPageSizeChange - callback เมื่อเปลี่ยนจำนวนต่อหน้า (optional)
  */
+interface PaginationProps {
+  currentPage: number;
+  totalItems: number;
+  itemsPerPage: number;
+  onPageChange: (page: number) => void;
+  pageSizeOptions?: number[];
+  onPageSizeChange?: (size: number) => void;
+}
+
 export default function Pagination({
   currentPage,
   totalItems,
@@ -18,7 +27,7 @@ export default function Pagination({
   onPageChange,
   pageSizeOptions = [10, 25, 50],
   onPageSizeChange,
-}) {
+}: PaginationProps) {
   const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
 
   // Clamp current page

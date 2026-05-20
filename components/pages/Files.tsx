@@ -1,33 +1,59 @@
 'use client';
-// @ts-nocheck
-import { useState, useEffect } from 'react';
+
+import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import api from '@/services/api';
 import { Upload, Trash2, Download, FileText, Image, File as FileIcon, Loader2, X, FolderOpen, Link2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import axios from 'axios';
+
+interface FileRecord {
+  id: string;
+  original_name: string;
+  mime_type: string;
+  size: number;
+  lesson_title?: string;
+}
+
+interface Lesson {
+  id: string;
+  title: string;
+}
 
 export default function Files() {
-  const [files, setFiles] = useState([]);
-  const [lessons, setLessons] = useState([]);
+  const [files, setFiles] = useState<FileRecord[]>([]);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [lessonId, setLessonId] = useState('');
   const [dragOver, setDragOver] = useState(false);
 
-  useEffect(() => { fetchData(); }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async (signal?: AbortSignal) => {
     try {
-      const [fileRes, lessRes] = await Promise.all([api.get('/files'), api.get('/lessons')]);
+      const [fileRes, lessRes] = await Promise.all([
+        api.get('/files', { signal }),
+        api.get('/lessons', { signal })
+      ]);
       setFiles(fileRes.data.data || []);
       setLessons(lessRes.data.data || []);
-    } catch { toast.error('โหลดไฟล์ไม่สำเร็จ'); }
-    finally { setLoading(false); }
-  };
+    } catch (err) {
+      if (!axios.isCancel(err)) {
+        toast.error('โหลดไฟล์ไม่สำเร็จ');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const handleUpload = async (e) => {
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchData(controller.signal);
+    return () => controller.abort();
+  }, [fetchData]);
+
+  const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedFile) return toast.error('กรุณาเลือกไฟล์');
     setUploading(true);
@@ -39,46 +65,50 @@ export default function Files() {
       toast.success('อัปโหลดไฟล์สำเร็จ');
       setShowUpload(false); setSelectedFile(null); setLessonId('');
       fetchData();
-    } catch (err) { toast.error(err.response?.data?.message || 'อัปโหลดไม่สำเร็จ'); }
+    } catch (err: any) { toast.error(err.response?.data?.message || 'อัปโหลดไม่สำเร็จ'); }
     finally { setUploading(false); }
   };
 
-  const handleDownload = async (id, name) => {
+  const handleDownload = async (id: string, name: string) => {
     try {
       const response = await api.get(`/files/download/${id}`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
-      link.href = url; link.download = name; link.click();
+      link.href = url;
+      link.setAttribute('download', name);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
       toast.success('ดาวน์โหลดสำเร็จ');
     } catch { toast.error('ดาวน์โหลดไม่สำเร็จ'); }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: string) => {
     if (!confirm('ต้องการลบไฟล์นี้หรือไม่?')) return;
     try { await api.delete(`/files/${id}`); toast.success('ลบไฟล์แล้ว'); fetchData(); }
     catch { toast.error('ลบไม่สำเร็จ'); }
   };
 
-  const getFileIcon = (mimeType) => {
+  const getFileIcon = (mimeType: string) => {
     if (mimeType?.startsWith('image/')) return <Image className="w-5 h-5 text-pink-400" />;
     if (mimeType === 'application/pdf') return <FileText className="w-5 h-5 text-red-400" />;
     return <FileIcon className="w-5 h-5 text-indigo-400" />;
   };
 
-  const getFileColor = (mimeType) => {
+  const getFileColor = (mimeType: string) => {
     if (mimeType?.startsWith('image/')) return 'from-pink-500/15 to-rose-500/15 border-pink-500/10';
     if (mimeType === 'application/pdf') return 'from-red-500/15 to-orange-500/15 border-red-500/10';
     return 'from-indigo-500/15 to-purple-500/15 border-indigo-500/10';
   };
 
-  const formatSize = (bytes) => {
+  const formatSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const handleDrop = (e) => {
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
     const file = e.dataTransfer.files[0];
@@ -194,7 +224,7 @@ export default function Files() {
                     </p>
                     {selectedFile && <p className="text-xs text-slate-600 mt-1">{formatSize(selectedFile.size)}</p>}
                   </div>
-                  <input type="file" className="hidden" onChange={e => setSelectedFile(e.target.files[0])} accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx" id="file-input" />
+                  <input type="file" className="hidden" onChange={e => { if (e.target.files?.[0]) setSelectedFile(e.target.files[0]); }} accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx" id="file-input" />
                 </label>
               </div>
 

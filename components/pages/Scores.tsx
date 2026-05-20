@@ -1,29 +1,67 @@
 'use client';
-// @ts-nocheck
-import { useState, useEffect } from 'react';
+
+import { useState, useEffect, useCallback } from 'react';
 import api from '@/services/api';
 import { Loader2, Save, FileText, Settings, Users, BookOpen, AlertCircle, Upload, Calculator, FileSpreadsheet } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
+import axios from 'axios';
+
+interface Classroom {
+  id: string | number;
+  name: string;
+}
+
+interface Student {
+  id: string | number;
+  student_code?: string;
+  name: string;
+  classroom_id?: string | number;
+}
+
+interface ScoreStructure {
+  lesson_number: number;
+  lesson_name: string;
+  max_assignment_score: number;
+  max_post_test_score: number;
+  hours: number;
+}
+
+interface StudentScoreEntry {
+  student_id: string | number;
+  student_name?: string;
+  lesson_number: number;
+  assignment_score?: number;
+  post_test_score?: number;
+}
+
+interface ScoreValue {
+  assignment_score: number | string;
+  post_test_score: number | string;
+}
+
+interface ScoresMap {
+  [studentId: string]: ScoreValue;
+}
 
 export default function Scores() {
-  const [classrooms, setClassrooms] = useState([]);
+  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [selectedClass, setSelectedClass] = useState('');
-  const [students, setStudents] = useState([]);
+  const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('entry'); // 'entry' or 'settings'
 
   // Settings State
-  const [structures, setStructures] = useState([]);
+  const [structures, setStructures] = useState<ScoreStructure[]>([]);
   const [structureSavedInDB, setStructureSavedInDB] = useState(false);
   
   // Entry State
   const [selectedLesson, setSelectedLesson] = useState('');
-  const [scores, setScores] = useState({}); // { student_id: { assignment_score: 10, post_test_score: 5 } }
+  const [scores, setScores] = useState<ScoresMap>({}); // { student_id: { assignment_score: 10, post_test_score: 5 } }
 
   // Bulk Import State
-  const [importData, setImportData] = useState([]);
+  const [importData, setImportData] = useState<StudentScoreEntry[]>([]);
   const [showImportPreview, setShowImportPreview] = useState(false);
   const [importType, setImportType] = useState('assignment');
 
@@ -33,46 +71,32 @@ export default function Scores() {
   const [theoryHoursPerWeek, setTheoryHoursPerWeek] = useState(1);
   const [practiceHoursPerWeek, setPracticeHoursPerWeek] = useState(2);
 
-  useEffect(() => {
-    fetchClassrooms();
-  }, []);
-
-  useEffect(() => {
-    if (selectedClass) {
-      fetchClassData();
-    } else {
-      setStudents([]);
-      setStructures([]);
-      setSelectedLesson('');
-      setScores({});
-    }
-  }, [selectedClass]);
-
-  useEffect(() => {
-    if (selectedLesson && selectedClass) {
-      fetchStudentScores();
-    } else {
-      setScores({});
-    }
-  }, [selectedLesson]);
-
-  const fetchClassrooms = async () => {
+  const fetchClassrooms = useCallback(async (signal?: AbortSignal) => {
     try {
-      const res = await api.get('/classrooms');
+      const res = await api.get('/classrooms', { signal });
       setClassrooms(res.data.data || []);
-    } catch {
-      toast.error('โหลดข้อมูลห้องเรียนไม่สำเร็จ');
+    } catch (err) {
+      if (!axios.isCancel(err)) {
+        toast.error('โหลดข้อมูลห้องเรียนไม่สำเร็จ');
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const fetchClassData = async () => {
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchClassrooms(controller.signal);
+    return () => controller.abort();
+  }, [fetchClassrooms]);
+
+  const fetchClassData = useCallback(async (signal?: AbortSignal) => {
+    if (!selectedClass) return;
     try {
-      const stuRes = await api.get('/students');
-      setStudents((stuRes.data.data || []).filter(s => s.classroom_id == selectedClass));
+      const stuRes = await api.get(`/students?classroom_id=${selectedClass}`, { signal });
+      setStudents(stuRes.data.data || []);
 
-      const structRes = await api.get(`/scores/structure/${selectedClass}`);
+      const structRes = await api.get(`/scores?classroom_id=${selectedClass}&type=structure`, { signal });
       const fetchedStructs = structRes.data.data || [];
       
       // Initialize 18 weeks if empty
@@ -97,43 +121,72 @@ export default function Scores() {
         setSelectedLesson('1');
       }
 
-    } catch {
-      toast.error('โหลดข้อมูลนักเรียนหรือโครงสร้างคะแนนไม่สำเร็จ');
+    } catch (err) {
+      if (!axios.isCancel(err)) {
+        toast.error('โหลดข้อมูลนักเรียนหรือโครงสร้างคะแนนไม่สำเร็จ');
+      }
     }
-  };
+  }, [selectedClass, selectedLesson]);
 
-  const fetchStudentScores = async () => {
+  useEffect(() => {
+    const controller = new AbortController();
+    if (selectedClass) {
+      fetchClassData(controller.signal);
+    } else {
+      setStudents([]);
+      setStructures([]);
+      setSelectedLesson('');
+      setScores({});
+    }
+    return () => controller.abort();
+  }, [selectedClass, fetchClassData]);
+
+  const fetchStudentScores = useCallback(async (signal?: AbortSignal) => {
+    if (!selectedClass || !selectedLesson) return;
     try {
-      const res = await api.get(`/scores/student/${selectedClass}/${selectedLesson}`);
-      const scoresMap = {};
-      (res.data.data || []).forEach(s => {
-        scoresMap[s.student_id] = {
+      const res = await api.get(`/scores?classroom_id=${selectedClass}&lesson_number=${selectedLesson}`, { signal });
+      const scoresMap: ScoresMap = {};
+      (res.data.data || []).forEach((s: any) => {
+        scoresMap[String(s.student_id)] = {
           assignment_score: s.assignment_score !== null ? s.assignment_score : '',
           post_test_score: s.post_test_score !== null ? s.post_test_score : ''
         };
       });
       setScores(scoresMap);
-    } catch {
-      toast.error('โหลดข้อมูลคะแนนนักเรียนไม่สำเร็จ');
+    } catch (err) {
+      if (!axios.isCancel(err)) {
+        toast.error('โหลดข้อมูลคะแนนนักเรียนไม่สำเร็จ');
+      }
     }
-  };
+  }, [selectedClass, selectedLesson]);
 
-  const handleStructureChange = (index, field, value) => {
+  useEffect(() => {
+    const controller = new AbortController();
+    if (selectedLesson && selectedClass) {
+      fetchStudentScores(controller.signal);
+    } else {
+      setScores({});
+    }
+    return () => controller.abort();
+  }, [selectedLesson, selectedClass, fetchStudentScores]);
+
+  const handleStructureChange = (index: number, field: keyof ScoreStructure, value: any) => {
     const newStructs = [...structures];
     newStructs[index] = { ...newStructs[index], [field]: value };
     setStructures(newStructs);
   };
 
   const saveStructure = async () => {
+    if (!selectedClass) return;
     setSaving(true);
     try {
-      await api.post('/scores/structure', {
+      await api.post(`/scores?classroom_id=${selectedClass}&type=structure`, {
         classroom_id: selectedClass,
         structures: structures.map(s => ({
           ...s,
-          max_assignment_score: parseFloat(s.max_assignment_score) || 0,
-          max_post_test_score: parseFloat(s.max_post_test_score) || 0,
-          hours: parseFloat(s.hours) || 0
+          max_assignment_score: parseFloat(String(s.max_assignment_score)) || 0,
+          max_post_test_score: parseFloat(String(s.max_post_test_score)) || 0,
+          hours: parseFloat(String(s.hours)) || 0
         }))
       });
       toast.success('บันทึกโครงสร้างคะแนนเรียบร้อย');
@@ -149,7 +202,7 @@ export default function Scores() {
   const calculateBlueprint = () => {
     let totalHours = 0;
     structures.forEach(s => {
-      totalHours += parseFloat(s.hours) || 0;
+      totalHours += parseFloat(String(s.hours)) || 0;
     });
 
     if (totalHours === 0) {
@@ -173,7 +226,7 @@ export default function Scores() {
     const targetTestTotal = totalAcademicScore - targetSkillTotal;
 
     const newStructs = structures.map((s, index) => {
-      const h = parseFloat(s.hours) || 0;
+      const h = parseFloat(String(s.hours)) || 0;
       const baseScore = (h / totalHours) * totalAcademicScore;
 
       let finalSkill, finalPostTest;
@@ -201,17 +254,18 @@ export default function Scores() {
     toast.success(`คำนวณสัดส่วนสำเร็จ! งานเก็บ(ทักษะ) = ${targetSkillTotal} | สอบ(พุทธิ) = ${targetTestTotal} | รวม = ${totalAcademicScore}`);
   };
 
-  const handleBlueprintImport = (e) => {
-    const file = e.target.files[0];
+  const handleBlueprintImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = (evt) => {
       try {
-        const bstr = evt.target.result;
+        const bstr = evt.target?.result;
+        if (!bstr) return;
         const wb = XLSX.read(bstr, { type: 'binary' });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
 
         let lessonCol = -1;
         let hoursCol = -1;
@@ -276,10 +330,10 @@ export default function Scores() {
       }
     };
     reader.readAsBinaryString(file);
-    e.target.value = null; // reset
+    e.target.value = ''; // reset
   };
 
-  const handleScoreChange = (studentId, field, value) => {
+  const handleScoreChange = (studentId: string | number, field: 'assignment_score' | 'post_test_score', value: string) => {
     setScores(prev => ({
       ...prev,
       [studentId]: {
@@ -298,7 +352,7 @@ export default function Scores() {
         post_test_score: scores[studentId].post_test_score
       }));
 
-      await api.post('/scores/student', {
+      await api.post(`/scores?classroom_id=${selectedClass}`, {
         classroom_id: selectedClass,
         lesson_number: selectedLesson,
         scores: scoresArray
@@ -311,8 +365,8 @@ export default function Scores() {
     }
   };
 
-  const handleScoreImport = (e, type) => {
-    const file = e.target.files[0];
+  const handleScoreImport = (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
+    const file = e.target.files?.[0];
     if (!file) return;
 
     setImportType(type);
@@ -320,19 +374,19 @@ export default function Scores() {
     const reader = new FileReader();
     reader.onload = (evt) => {
       try {
-        const bstr = evt.target.result;
+        const bstr = evt.target?.result;
+        if (!bstr) return;
         const wb = XLSX.read(bstr, { type: 'binary' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         
         // Read as 2D array to find the week numbers row easily
-        const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
         
         let headerRowIndex = -1;
-        let weekColumns = {}; // { '1': colIndex, '2': colIndex }
+        let weekColumns: { [key: string]: number } = {}; // { '1': colIndex, '2': colIndex }
         let idColIndex = -1;
         let nameColIndex = -1;
-        let prefixColIndex = -1;
         let lastNameColIndex = -1;
 
         // Try to find the row with '1', '2', '3' etc.
@@ -356,8 +410,6 @@ export default function Scores() {
                 nameColIndex = j;
               } else if (cell.includes('นามสกุล')) {
                 lastNameColIndex = j;
-              } else if (cell.includes('คำนำหน้า')) {
-                prefixColIndex = j;
               }
             }
             break;
@@ -373,7 +425,6 @@ export default function Scores() {
                 if (idColIndex === -1 && (cell.includes('เลข') || cell.includes('รหัส'))) idColIndex = j;
                 if (nameColIndex === -1 && (cell.includes('ชื่อ') && !cell.includes('นามสกุล'))) nameColIndex = j;
                 if (lastNameColIndex === -1 && cell.includes('นามสกุล')) lastNameColIndex = j;
-                if (prefixColIndex === -1 && cell.includes('นาย') || cell.includes('นาง')) prefixColIndex = j;
              }
            }
         }
@@ -383,7 +434,7 @@ export default function Scores() {
           return;
         }
 
-        const parsedScores = [];
+        const parsedScores: StudentScoreEntry[] = [];
 
         // Parse student rows below header
         for (let i = headerRowIndex + 1; i < data.length; i++) {
@@ -412,15 +463,15 @@ export default function Scores() {
               const colIdx = weekColumns[weekNum];
               const scoreVal = row[colIdx];
               if (scoreVal !== undefined && scoreVal !== null && scoreVal !== '') {
-                const scoreEntry = {
+                const scoreEntry: StudentScoreEntry = {
                   student_id: matchedStudent.id,
                   student_name: matchedStudent.name,
                   lesson_number: parseInt(weekNum),
                 };
                 if (type === 'assignment') {
-                  scoreEntry.assignment_score = parseFloat(scoreVal);
+                  scoreEntry.assignment_score = parseFloat(String(scoreVal));
                 } else if (type === 'post_test') {
-                  scoreEntry.post_test_score = parseFloat(scoreVal);
+                  scoreEntry.post_test_score = parseFloat(String(scoreVal));
                 }
                 parsedScores.push(scoreEntry);
               }
@@ -440,16 +491,21 @@ export default function Scores() {
       }
     };
     reader.readAsBinaryString(file);
-    e.target.value = null; // reset
+    e.target.value = ''; // reset
   };
 
   const submitBulkImport = async () => {
     setSaving(true);
     try {
-      await api.post('/scores/bulk-import', {
+      await api.post(`/scores?classroom_id=${selectedClass}`, {
         classroom_id: selectedClass,
         scores: importData.map(d => {
-          const entry = {
+          const entry: {
+            student_id: string | number;
+            lesson_number: number;
+            assignment_score?: number;
+            post_test_score?: number;
+          } = {
             student_id: d.student_id,
             lesson_number: d.lesson_number,
           };

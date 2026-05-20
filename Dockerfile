@@ -9,6 +9,16 @@ COPY prisma ./prisma/
 RUN npm ci
 
 # ================================
+# Stage 1.5: Production Dependencies
+# ================================
+FROM node:20-alpine AS deps-prod
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+COPY prisma ./prisma/
+RUN npm ci --omit=dev
+
+# ================================
 # Stage 2: Builder
 # ================================
 FROM node:20-alpine AS builder
@@ -43,6 +53,7 @@ RUN adduser --system --uid 1001 nextjs
 # Copy necessary files
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
+COPY --from=deps-prod /app/node_modules ./node_modules
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma

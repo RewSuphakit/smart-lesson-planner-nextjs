@@ -13,12 +13,25 @@ export async function GET(request: NextRequest) {
     });
 
     const result = classrooms.map((c) => ({
-      ...c,
+      id: c.id,
+      name: c.name,
+      description: c.description,
+      late_to_absent_ratio: c.lateToAbsentRatio,
+      leave_to_absent_ratio: c.leaveToAbsentRatio,
+      absent_to_f_ratio: c.absentToFRatio,
+      total_classes: c.totalClasses,
+      min_attendance_percent: c.minAttendancePercent,
       student_count: c._count.students,
-      _count: undefined,
+      assignment_weight: c.assignmentWeight ? Number(c.assignmentWeight) : 10,
+      post_test_weight: c.postTestWeight ? Number(c.postTestWeight) : 70,
+      affective_weight: c.affectiveWeight ? Number(c.affectiveWeight) : 20,
+      midterm_weight: c.midtermWeight ? Number(c.midtermWeight) : 0,
+      final_weight: c.finalWeight ? Number(c.finalWeight) : 0,
+      midterm_max_score: c.midtermMaxScore ? Number(c.midtermMaxScore) : 100,
+      final_max_score: c.finalMaxScore ? Number(c.finalMaxScore) : 100,
     }));
 
-    return NextResponse.json(result);
+    return NextResponse.json({ data: result });
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
     return NextResponse.json({ message: 'Failed to get classrooms' }, { status: 500 });
@@ -43,7 +56,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(classroom, { status: 201 });
+    return NextResponse.json({ data: classroom }, { status: 201 });
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
     return NextResponse.json({ message: 'Failed to create classroom' }, { status: 500 });

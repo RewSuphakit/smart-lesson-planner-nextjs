@@ -5,7 +5,7 @@ import { generateToken } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, name, role } = await request.json();
+    const { email, password, name } = await request.json();
 
     if (!email || !password || !name) {
       return NextResponse.json({ message: 'Email, password, and name are required' }, { status: 400 });
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
         email,
         password: hashedPassword,
         name,
-        role: role || 'teacher',
+        role: 'teacher',
       },
       select: { id: true, email: true, name: true, role: true, avatar: true },
     });

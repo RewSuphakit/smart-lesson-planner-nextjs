@@ -6,10 +6,10 @@ import path from 'path';
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    requireAuth(request);
+    const user = requireAuth(request);
     const { id } = await params;
 
-    const file = await prisma.file.findUnique({ where: { id: Number(id) } });
+    const file = await prisma.file.findFirst({ where: { id: Number(id), userId: user.id } });
     if (!file) return NextResponse.json({ message: 'File not found' }, { status: 404 });
 
     // Delete physical file
