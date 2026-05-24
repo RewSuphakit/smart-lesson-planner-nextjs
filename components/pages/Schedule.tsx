@@ -11,7 +11,7 @@ import { th } from 'date-fns/locale';
 import {
   ChevronLeft, ChevronRight, Plus, X, Loader2,
   Clock, Trash2, Calendar, BookOpen, Edit2, AlertCircle,
-  UploadCloud, FileText, Table
+  UploadCloud, FileText, Table, Link2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
@@ -22,18 +22,13 @@ const PERIODS = Array.from({ length: 13 }, (_, i) => i + 1);
 
 interface ScheduleItem {
   id: string | number;
-  lesson_plan_id: string | number;
-  lesson_title?: string;
+  lesson_title: string;
+  subject: string;
   scheduled_date: string;
   start_time: string;
   end_time: string;
   notes?: string;
   status: 'scheduled' | 'completed' | 'cancelled';
-}
-
-interface Lesson {
-  id: string | number;
-  title: string;
 }
 
 interface TimetableEntry {
@@ -47,6 +42,11 @@ interface TimetableEntry {
   group_name?: string;
   entry_type: 'lab' | 'activity' | 'homeroom' | 'theory' | string;
   hours?: number;
+  classroom_id?: number | null;
+  instructor?: string;
+  start_time?: string;
+  end_time?: string;
+  color?: string | null;
 }
 
 interface TimetableSummaryItem {
@@ -78,7 +78,8 @@ const STATUS_LABEL = { scheduled: 'กำหนดสอน', completed: 'สอ
 
 function defaultForm(date: Date) {
   return {
-    lesson_plan_id: '',
+    title: '',
+    subject: '',
     scheduled_date: date ? format(date, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
     start_time: '09:00',
     end_time:   '10:00',
@@ -93,7 +94,6 @@ export default function Schedule() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDay,  setSelectedDay]  = useState(new Date());
   const [schedules,    setSchedules]    = useState<ScheduleItem[]>([]);
-  const [lessons,      setLessons]      = useState<Lesson[]>([]);
   
   const [timetableEntries, setTimetableEntries] = useState<TimetableEntry[]>([]);
   const [timetableSummary, setTimetableSummary] = useState<TimetableSummaryItem[]>([]);
@@ -104,6 +104,26 @@ export default function Schedule() {
   const [form,         setForm]         = useState(() => defaultForm(new Date()));
   const [saving,       setSaving]       = useState(false);
 
+  // Weekly timetable modal states
+  const [showTimetableModal, setShowTimetableModal] = useState(false);
+  const [editTimetableTarget, setEditTimetableTarget] = useState<TimetableEntry | null>(null);
+  const [timetableForm, setTimetableForm] = useState({
+    day_of_week: 0,
+    start_period: 1,
+    end_period: 1,
+    start_time: '08:00',
+    end_time: '09:00',
+    subject_code: '',
+    subject_name: '',
+    room: '',
+    group_name: '',
+    instructor: '',
+    entry_type: 'theory',
+    color: '#3b82f6',
+    classroom_id: '' as string | number
+  });
+  const [savingTimetable, setSavingTimetable] = useState(false);
+
   const [showUpload, setShowUpload] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -113,10 +133,158 @@ export default function Schedule() {
   const [dragType, setDragType] = useState<string | null>(null);
   const [dragOverCell, setDragOverCell] = useState<string | null>(null);
   const [hoverTooltip, setHoverTooltip] = useState<HoverTooltip | null>(null);
+  const [classroomsList, setClassroomsList] = useState<Array<{ id: string; name: string }>>([]);
 
   const [showAutoGenerate, setShowAutoGenerate] = useState(false);
   const [autoGenerateStartDate, setAutoGenerateStartDate] = useState(() => format(startOfMonth(new Date()), 'yyyy-MM-dd'));
   const [autoGenerating, setAutoGenerating] = useState(false);
+
+  // Fetch classrooms list for linking
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get('/classrooms');
+        setClassroomsList(res.data.data || []);
+      } catch { /* ignore */ }
+    })();
+  }, []);
+
+  const PERIOD_TIMES: Record<number, { start: string; end: string }> = {
+    0:  { start: '07:30', end: '08:00' },
+    1:  { start: '08:00', end: '09:00' },
+    2:  { start: '09:00', end: '10:00' },
+    3:  { start: '10:00', end: '11:00' },
+    4:  { start: '11:00', end: '12:00' },
+    5:  { start: '13:00', end: '14:00' },
+    6:  { start: '14:00', end: '15:00' },
+    7:  { start: '15:00', end: '16:00' },
+    8:  { start: '16:00', end: '17:00' },
+    9:  { start: '17:00', end: '18:00' },
+    10: { start: '18:00', end: '19:00' },
+    11: { start: '19:00', end: '20:00' },
+    12: { start: '20:00', end: '21:00' },
+  };
+
+  const openCreateTimetable = (dayIdx: number, periodId: number | string) => {
+    const period = typeof periodId === 'number' ? periodId : 1;
+    const defaultTime = PERIOD_TIMES[period] || { start: '08:00', end: '09:00' };
+    
+    setEditTimetableTarget(null);
+    setTimetableForm({
+      day_of_week: dayIdx,
+      start_period: period,
+      end_period: period,
+      start_time: defaultTime.start,
+      end_time: defaultTime.end,
+      subject_code: '',
+      subject_name: '',
+      room: '',
+      group_name: '',
+      instructor: '',
+      entry_type: 'theory',
+      color: '#3b82f6',
+      classroom_id: ''
+    });
+    setShowTimetableModal(true);
+  };
+
+  const openEditTimetable = (entry: TimetableEntry) => {
+    setEditTimetableTarget(entry);
+    setTimetableForm({
+      day_of_week: entry.day_of_week,
+      start_period: entry.start_period,
+      end_period: entry.end_period,
+      start_time: entry.start_time || PERIOD_TIMES[entry.start_period]?.start || '08:00',
+      end_time: entry.end_time || PERIOD_TIMES[entry.end_period]?.end || '09:00',
+      subject_code: entry.subject_code || '',
+      subject_name: entry.subject_name || '',
+      room: entry.room || '',
+      group_name: entry.group_name || '',
+      instructor: entry.instructor || '',
+      entry_type: entry.entry_type || 'theory',
+      color: entry.color || '#3b82f6',
+      classroom_id: entry.classroom_id !== null && entry.classroom_id !== undefined ? entry.classroom_id : ''
+    });
+    setShowTimetableModal(true);
+  };
+
+  const handlePeriodChange = (field: 'start_period' | 'end_period', val: number) => {
+    setTimetableForm(prev => {
+      const nextForm = { ...prev, [field]: val };
+      
+      // Keep start <= end
+      if (field === 'start_period' && nextForm.start_period > nextForm.end_period) {
+        nextForm.end_period = nextForm.start_period;
+      } else if (field === 'end_period' && nextForm.end_period < nextForm.start_period) {
+        nextForm.start_period = nextForm.end_period;
+      }
+      
+      // Auto set times based on start/end periods
+      const startT = PERIOD_TIMES[nextForm.start_period]?.start;
+      const endT = PERIOD_TIMES[nextForm.end_period]?.end;
+      
+      if (startT) nextForm.start_time = startT;
+      if (endT) nextForm.end_time = endT;
+      
+      return nextForm;
+    });
+  };
+
+  const handleTimetableSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!timetableForm.subject_code.trim()) return toast.error('กรุณากรอกรหัสวิชา');
+    if (Number(timetableForm.start_period) > Number(timetableForm.end_period)) return toast.error('คาบเรียนสิ้นสุดต้องไม่น้อยกว่าคาบเรียนเริ่มต้น');
+    if (timetableForm.start_time >= timetableForm.end_time) return toast.error('เวลาสิ้นสุดต้องมากกว่าเวลาเริ่มต้น');
+
+    setSavingTimetable(true);
+    try {
+      const payload = {
+        day_of_week: Number(timetableForm.day_of_week),
+        start_period: Number(timetableForm.start_period),
+        end_period: Number(timetableForm.end_period),
+        start_time: timetableForm.start_time,
+        end_time: timetableForm.end_time,
+        subject_code: timetableForm.subject_code.trim(),
+        subject_name: timetableForm.subject_name.trim() || null,
+        room: timetableForm.room.trim() || null,
+        group_name: timetableForm.group_name.trim() || null,
+        instructor: timetableForm.instructor.trim() || null,
+        entry_type: timetableForm.entry_type,
+        color: timetableForm.color || null,
+        classroom_id: timetableForm.classroom_id ? Number(timetableForm.classroom_id) : null
+      };
+
+      if (editTimetableTarget) {
+        await api.put(`/timetable/${editTimetableTarget.id}`, payload);
+        toast.success('อัปเดตคาบเรียนเรียบร้อย');
+      } else {
+        await api.post('/timetable', payload);
+        toast.success('เพิ่มคาบเรียนเรียบร้อย');
+      }
+      setShowTimetableModal(false);
+      setEditTimetableTarget(null);
+      fetchData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'บันทึกคาบเรียนไม่สำเร็จ');
+    } finally {
+      setSavingTimetable(false);
+    }
+  };
+
+  const handleDeleteTimetableEntry = async () => {
+    if (!editTimetableTarget) return;
+    if (!window.confirm('ต้องการลบคาบเรียนนี้ใช่หรือไม่?')) return;
+    
+    try {
+      await api.delete(`/timetable/${editTimetableTarget.id}`);
+      toast.success('ลบคาบเรียนแล้ว');
+      setShowTimetableModal(false);
+      setEditTimetableTarget(null);
+      fetchData();
+    } catch {
+      toast.error('ลบคาบเรียนไม่สำเร็จ');
+    }
+  };
 
   const fetchData = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -124,12 +292,8 @@ export default function Schedule() {
       if (activeTab === 'calendar') {
         const start = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
         const end   = format(endOfMonth(currentMonth),   'yyyy-MM-dd');
-        const [schRes, lesRes] = await Promise.all([
-          api.get("/schedules?start=" + start + "&end=" + end, { signal }),
-          api.get('/lessons', { signal }),
-        ]);
+        const schRes = await api.get("/schedules?start=" + start + "&end=" + end, { signal });
         setSchedules(schRes.data.data || []);
-        setLessons(lesRes.data.data   || []);
       } else {
         const res = await api.get('/timetable', { signal });
         const timetableData = res.data.data || {};
@@ -163,7 +327,8 @@ export default function Schedule() {
   const openEdit = (sch: ScheduleItem) => {
     setEditTarget(sch);
     setForm({
-      lesson_plan_id: sch.lesson_plan_id ? String(sch.lesson_plan_id) : '',
+      title:          sch.lesson_title ?? '',
+      subject:        sch.subject ?? '',
       scheduled_date: sch.scheduled_date?.slice(0, 10) ?? '',
       start_time:     sch.start_time?.slice(0, 5)      ?? '09:00',
       end_time:       sch.end_time?.slice(0, 5)        ?? '10:00',
@@ -177,14 +342,21 @@ export default function Schedule() {
 
   const handleScheduleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.lesson_plan_id) return toast.error('กรุณาเลือกแผนการสอน');
+    if (!form.title.trim()) return toast.error('กรุณากรอกหัวข้อที่สอน');
+    if (!form.subject.trim()) return toast.error('กรุณากรอกวิชาที่สอน');
     if (!form.scheduled_date) return toast.error('กรุณาเลือกวันที่');
     if (form.start_time >= form.end_time) return toast.error('เวลาสิ้นสุดต้องมากกว่าเวลาเริ่มต้น');
     setSaving(true);
     try {
       if (editTarget) {
-        await api.put("/schedules/" + editTarget.id, form);
-        toast.success('อัปเดตตารางสอนเรียบร้อย');
+        if (typeof editTarget.id === 'string' && editTarget.id.startsWith('virtual_')) {
+          // If editing a virtual slot, convert it to a concrete schedule via POST
+          await api.post('/schedules', form);
+          toast.success('บันทึกคาบสอนจากตารางเรียนประจำสัปดาห์แล้ว');
+        } else {
+          await api.put("/schedules/" + editTarget.id, form);
+          toast.success('อัปเดตตารางสอนเรียบร้อย');
+        }
       } else {
         await api.post('/schedules', form);
         toast.success('เพิ่มตารางสอนเรียบร้อย');
@@ -199,13 +371,35 @@ export default function Schedule() {
   };
 
   const handleDeleteSchedule = async (id: string | number) => {
-    if (!window.confirm('ต้องการลบตารางสอนนี้หรือไม่?')) return;
+    const isVirtual = typeof id === 'string' && id.startsWith('virtual_');
+    const confirmMsg = isVirtual 
+      ? 'ต้องการยกเลิกการเรียนการสอนสำหรับคาบเรียนจำลองนี้ใช่หรือไม่? (จะบันทึกสถานะ "ยกเลิก" ลงในปฏิทิน)' 
+      : 'ต้องการลบตารางสอนนี้หรือไม่?';
+      
+    if (!window.confirm(confirmMsg)) return;
+    
     try {
-      await api.delete("/schedules/" + id);
-      toast.success('ลบตารางสอนแล้ว');
+      if (isVirtual) {
+        const item = schedules.find(s => s.id === id);
+        if (!item) return toast.error('ไม่พบข้อมูลคาบเรียนจำลอง');
+        
+        await api.post('/schedules', {
+          title: item.lesson_title,
+          subject: item.subject,
+          scheduled_date: item.scheduled_date.slice(0, 10),
+          start_time: item.start_time.slice(0, 5),
+          end_time: item.end_time.slice(0, 5),
+          notes: item.notes || '',
+          status: 'cancelled',
+        });
+        toast.success('ยกเลิกคาบสอนแล้ว');
+      } else {
+        await api.delete("/schedules/" + id);
+        toast.success('ลบตารางสอนแล้ว');
+      }
       fetchData();
-    } catch {
-      toast.error('ลบไม่สำเร็จ');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'ทำรายการไม่สำเร็จ');
     }
   };
 
@@ -337,7 +531,7 @@ export default function Schedule() {
   const days = getMonthGrid(currentMonth);
   const schedulesForDay = (day: Date) => schedules.filter(s => isSameDay(parseISO(s.scheduled_date?.slice(0, 10)), day));
   const selectedDaySchedules = schedulesForDay(selectedDay);
-  const getLessonTitle = (id: string | number) => lessons.find(l => String(l.id) === String(id))?.title || ("แผนที่ " + id);
+
 
   const renderCalendar = () => (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6 animate-fade-in-up">
@@ -405,7 +599,7 @@ export default function Schedule() {
                     <div className="mt-1 space-y-0.5">
                       {daySchs.slice(0, 2).map((s, j) => (
                         <div key={j} className={"text-[0.55rem] font-medium leading-tight rounded-[4px] px-1.5 py-0.5 truncate border backdrop-blur-md " + (STATUS_STYLE[s.status] || STATUS_STYLE.scheduled)}>
-                          {s.start_time?.slice(0, 5)} {s.lesson_title}
+                          {s.start_time?.slice(0, 5)} {s.lesson_title} ({s.subject})
                         </div>
                       ))}
                       {daySchs.length > 2 && <div className="text-[0.55rem] text-slate-500 pl-1">+{daySchs.length - 2}</div>}
@@ -446,7 +640,8 @@ export default function Schedule() {
                       <span className="text-xs font-bold bg-indigo-50 px-2 py-1 rounded-md">{sch.start_time?.slice(0, 5)} - {sch.end_time?.slice(0, 5)}</span>
                       <span className={"text-[0.65rem] font-bold px-2 py-1 rounded-md " + STATUS_STYLE[sch.status]}>{STATUS_LABEL[sch.status]}</span>
                     </div>
-                    <p className="text-sm font-bold text-slate-800">{sch.lesson_title || getLessonTitle(sch.lesson_plan_id)}</p>
+                    <p className="text-sm font-bold text-slate-800">{sch.lesson_title}</p>
+                    <p className="text-xs text-slate-500 mt-1">วิชา: {sch.subject}</p>
                   </div>
                   <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={() => openEdit(sch)} className="p-1.5 rounded-md hover:bg-indigo-100 text-slate-600"><Edit2 className="w-3.5 h-3.5" /></button>
@@ -579,11 +774,12 @@ export default function Schedule() {
                         return (
                           <div
                             key={`bg-${slot.id}`}
-                            className={`border border-slate-200 min-h-[60px] transition-colors ${isDragOver ? 'bg-indigo-50 border-indigo-300 ring-2 ring-indigo-200 ring-inset z-[5]' : ''}`}
+                            className={`border border-slate-200 min-h-[60px] transition-colors cursor-pointer hover:bg-indigo-50/30 ${isDragOver ? 'bg-indigo-50 border-indigo-300 ring-2 ring-indigo-200 ring-inset z-[5]' : ''}`}
                             style={{ gridRow: 1, gridColumn: colPos }}
                             onDragOver={(e) => handleDragOver(e, dayIdx, slot.id)}
                             onDragLeave={handleDragLeave}
                             onDrop={(e) => handleDrop(e, dayIdx, slot.id)}
+                            onClick={() => openCreateTimetable(dayIdx, slot.id)}
                           />
                         );
                       })}
@@ -609,10 +805,12 @@ export default function Schedule() {
                         return (
                           <div
                             key={entry.id}
-                            className={`border rounded-md m-[2px] relative group transition-transform hover:scale-[1.03] z-10 hover:z-50 ${getBgColor(entry.entry_type)}`}
+                            className={`border rounded-md m-[2px] relative group transition-transform hover:scale-[1.03] z-10 hover:z-50 cursor-pointer ${entry.color ? '' : getBgColor(entry.entry_type)}`}
                             style={{
                               gridColumn: `${gridColStart} / ${gridColEnd}`,
                               gridRow: 1,
+                              backgroundColor: entry.color ? `${entry.color}1c` : undefined, // 11% opacity
+                              borderColor: entry.color ? entry.color : undefined,
                             }}
                             onDragOver={(e) => {
                               if (!draggedEntry) return;
@@ -628,10 +826,17 @@ export default function Schedule() {
                               if (period !== undefined) handleDrop(e, dayIdx, period);
                             }}
                             onMouseEnter={(e) => {
-                              const rect = e.currentTarget.getBoundingClientRect();
-                              setHoverTooltip({ entry, rect });
+                              if (!showTimetableModal) {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                setHoverTooltip({ entry, rect });
+                              }
                             }}
                             onMouseLeave={() => setHoverTooltip(null)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditTimetable(entry);
+                              setHoverTooltip(null);
+                            }}
                           >
                             <div 
                               className="w-full h-full p-2 text-center cursor-grab active:cursor-grabbing flex flex-col justify-center min-h-[56px]"
@@ -639,10 +844,21 @@ export default function Schedule() {
                               onDragStart={(e) => handleDragStart(e, entry, 'move')}
                               onDragEnd={handleDragEnd}
                             >
-                              <div className="text-[0.7rem] font-bold truncate" title={entry.subject_code}>
+                              <div 
+                                className="text-[0.7rem] font-bold truncate" 
+                                title={entry.subject_code}
+                                style={{ color: entry.color ? entry.color : undefined }}
+                              >
                                 {entry.subject_code}
                               </div>
-                              {entry.room && <div className="text-[0.6rem] opacity-75 truncate">({entry.room}) {entry.group_name}</div>}
+                              {entry.room && (
+                                <div 
+                                  className="text-[0.6rem] opacity-80 truncate"
+                                  style={{ color: entry.color ? entry.color : undefined }}
+                                >
+                                  ({entry.room}) {entry.group_name}
+                                </div>
+                              )}
                             </div>
                             
                             {/* Resize Handle */}
@@ -738,18 +954,26 @@ export default function Schedule() {
             </div>
             <form onSubmit={handleScheduleSubmit} className="space-y-4">
               <div>
-                <label className="form-label">แผนการสอน *</label>
-                {lessons.length === 0 ? (
-                  <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-50">
-                    <AlertCircle className="w-4 h-4 text-amber-500" />
-                    <p className="text-xs text-amber-700">ไม่มีแผนการสอน</p>
-                  </div>
-                ) : (
-                  <select value={form.lesson_plan_id} onChange={e => setForm(f => ({ ...f, lesson_plan_id: e.target.value }))} className="form-input" required>
-                    <option value="">เลือกแผนการสอน...</option>
-                    {lessons.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
-                  </select>
-                )}
+                <label className="form-label">วิชาที่สอน *</label>
+                <input 
+                  type="text" 
+                  value={form.subject} 
+                  onChange={e => setForm(f => ({ ...f, subject: e.target.value }))} 
+                  className="form-input" 
+                  placeholder="เช่น คณิตศาสตร์, ภาษาอังกฤษ" 
+                  required 
+                />
+              </div>
+              <div>
+                <label className="form-label">หัวข้อที่สอน *</label>
+                <input 
+                  type="text" 
+                  value={form.title} 
+                  onChange={e => setForm(f => ({ ...f, title: e.target.value }))} 
+                  className="form-input" 
+                  placeholder="เช่น การบวกเลข, Present Simple Tense" 
+                  required 
+                />
               </div>
               <div>
                 <label className="form-label">วันที่ *</label>
@@ -766,7 +990,7 @@ export default function Schedule() {
                 </div>
               </div>
               <div className="flex gap-3 pt-4">
-                <button type="submit" disabled={saving || lessons.length===0} className="btn btn-primary flex-1">
+                <button type="submit" disabled={saving} className="btn btn-primary flex-1">
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : editTarget ? 'บันทึก' : 'เพิ่ม'}
                 </button>
                 <button type="button" onClick={closeForm} className="btn btn-ghost px-5">ยกเลิก</button>
@@ -846,14 +1070,22 @@ export default function Schedule() {
             <form onSubmit={handleAutoGenerateSubmit} className="space-y-5">
               <div className="bg-gradient-to-r from-indigo-50/70 to-purple-50/70 rounded-2xl p-4 border border-indigo-100/50">
                 <p className="text-xs text-indigo-900 leading-relaxed font-semibold mb-2">
-                  💡 ระบบจะทำการคำนวณและป้อนแผนการสอนลงบนปฏิทินตลอดภาคเรียนให้โดยอัตโนมัติ:
+                  💡 ระบบจะสร้างแผนการสอนลงปฏิทินตลอดภาคเรียนอัตโนมัติ:
                 </p>
                 <ul className="list-disc list-inside text-[0.7rem] text-slate-600 space-y-1">
-                  <li>จับคู่ห้องเรียนจาก <strong>ตารางเรียนประจำสัปดาห์ (Timetable)</strong></li>
-                  <li>คำนวณวันและเวลาสอนแต่ละสัปดาห์เรียงตามคาบเรียนล่วงหน้า</li>
-                  <li>จำนวนคาบเรียนที่สร้างจะอิงตาม <strong>จำนวนคาบทั้งหมด</strong> ที่ตั้งค่าในแต่ละห้องเรียน (วิชาแต่ละวิชาสอนจำนวนสัปดาห์ไม่เท่ากัน)</li>
-                  <li>เรียงลำดับแผนการสอนที่มีตามเนื้อหาคาบเรียนอัตโนมัติ</li>
+                  <li>ใช้คาบเรียนที่ <strong>เชื่อมกับห้องเรียน</strong> แล้วเท่านั้น</li>
+                  <li>คำนวณวันและเวลาสอนแต่ละสัปดาห์ตามตารางเรียน</li>
+                  <li>จำนวนคาบตาม <strong>จำนวนคาบทั้งหมด</strong> ที่ตั้งค่าไว้ในห้องเรียน</li>
                 </ul>
+                <div className="mt-3 space-y-1">
+                  <p className="text-xs text-emerald-700 font-semibold">✅ คาบที่เชื่อมแล้ว: {timetableEntries.filter(e => e.classroom_id).length} รายการ</p>
+                  {timetableEntries.filter(e => !e.classroom_id).length > 0 && (
+                    <p className="text-xs text-amber-600 font-semibold">⚠️ ยังไม่เชื่อม: {timetableEntries.filter(e => !e.classroom_id).length} รายการ — คลิกที่คาบในตารางเพื่อเชื่อม</p>
+                  )}
+                  {timetableEntries.filter(e => e.classroom_id).length === 0 && (
+                    <p className="text-xs text-red-600 font-bold mt-1">❌ ยังไม่มีคาบที่เชื่อมกับห้องเรียน — ต้องเชื่อมก่อนจึงจะสร้างได้</p>
+                  )}
+                </div>
               </div>
 
               <div>
@@ -884,7 +1116,7 @@ export default function Schedule() {
         document.body
       )}
 
-      {hoverTooltip && !draggedEntry && createPortal(
+      {hoverTooltip && !draggedEntry && !showTimetableModal && createPortal(
         <div 
           className="fixed z-[9999] w-48 bg-white shadow-xl rounded-lg p-3 border border-slate-100 text-left pointer-events-none"
           style={{
@@ -898,6 +1130,231 @@ export default function Schedule() {
           <p className="text-[0.65rem] text-slate-500">ห้อง: {hoverTooltip.entry.room || '-'}</p>
           <p className="text-[0.65rem] text-slate-500">กลุ่ม: {hoverTooltip.entry.group_name || '-'}</p>
           <p className="text-[0.65rem] text-slate-500">คาบ: {hoverTooltip.entry.start_period} - {hoverTooltip.entry.end_period} ({hoverTooltip.entry.hours || (hoverTooltip.entry.end_period - hoverTooltip.entry.start_period + 1)} ชม.)</p>
+          <p className="text-[0.6rem] text-indigo-500 mt-1">คลิกเพื่อแก้ไข/ลบคาบเรียน</p>
+        </div>,
+        document.body
+      )}
+
+      {/* Timetable Entry Modal */}
+      {showTimetableModal && createPortal(
+        <div className="modal-overlay" onClick={() => { setShowTimetableModal(false); setEditTimetableTarget(null); }}>
+          <div className="glass w-full max-w-lg p-7 animate-fade-in-up max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-200">
+                  <Table className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-800">
+                    {editTimetableTarget ? 'แก้ไขคาบเรียนตารางสอน' : 'เพิ่มคาบเรียนในตาราง'}
+                  </h2>
+                  <p className="text-xs text-slate-400">กำหนดรายละเอียดคาบเรียนสำหรับตารางเรียนประจำสัปดาห์</p>
+                </div>
+              </div>
+              <button onClick={() => { setShowTimetableModal(false); setEditTimetableTarget(null); }} className="p-2 hover:bg-indigo-50 rounded-xl">
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+
+            <form onSubmit={handleTimetableSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="form-label text-slate-700 font-bold mb-1.5 block">รหัสวิชา *</label>
+                  <input
+                    type="text"
+                    value={timetableForm.subject_code}
+                    onChange={e => setTimetableForm(f => ({ ...f, subject_code: e.target.value }))}
+                    className="form-input"
+                    placeholder="เช่น ค21101"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="form-label text-slate-700 font-bold mb-1.5 block">ชื่อวิชา</label>
+                  <input
+                    type="text"
+                    value={timetableForm.subject_name}
+                    onChange={e => setTimetableForm(f => ({ ...f, subject_name: e.target.value }))}
+                    className="form-input"
+                    placeholder="เช่น คณิตศาสตร์"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="form-label text-slate-700 font-bold mb-1.5 block">วันในสัปดาห์ *</label>
+                  <select
+                    value={timetableForm.day_of_week}
+                    onChange={e => setTimetableForm(f => ({ ...f, day_of_week: Number(e.target.value) }))}
+                    className="form-input"
+                    required
+                  >
+                    {TIMETABLE_DAYS.map((day, idx) => (
+                      <option key={idx} value={idx}>{day}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label text-slate-700 font-bold mb-1.5 block">ประเภทวิชา *</label>
+                  <select
+                    value={timetableForm.entry_type}
+                    onChange={e => setTimetableForm(f => ({ ...f, entry_type: e.target.value }))}
+                    className="form-input"
+                    required
+                  >
+                    <option value="theory">ทฤษฎี (Theory)</option>
+                    <option value="lab">ปฏิบัติ (Lab)</option>
+                    <option value="activity">กิจกรรม (Activity)</option>
+                    <option value="homeroom">โฮมรูม (Homeroom)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="form-label text-slate-700 font-bold mb-1.5 block">คาบเริ่มต้น *</label>
+                  <select
+                    value={timetableForm.start_period}
+                    onChange={e => handlePeriodChange('start_period', Number(e.target.value))}
+                    className="form-input"
+                    required
+                  >
+                    <option value="0">คาบกิจกรรม (07:30 - 08:00)</option>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map(p => (
+                      <option key={p} value={p}>คาบที่ {p}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label text-slate-700 font-bold mb-1.5 block">คาบสิ้นสุด *</label>
+                  <select
+                    value={timetableForm.end_period}
+                    onChange={e => handlePeriodChange('end_period', Number(e.target.value))}
+                    className="form-input"
+                    required
+                  >
+                    <option value="0">คาบกิจกรรม (07:30 - 08:00)</option>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map(p => (
+                      <option key={p} value={p}>คาบที่ {p}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="form-label text-slate-700 font-bold mb-1.5 block">เวลาเริ่มต้น *</label>
+                  <input
+                    type="time"
+                    value={timetableForm.start_time}
+                    onChange={e => setTimetableForm(f => ({ ...f, start_time: e.target.value }))}
+                    className="form-input"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="form-label text-slate-700 font-bold mb-1.5 block">เวลาสิ้นสุด *</label>
+                  <input
+                    type="time"
+                    value={timetableForm.end_time}
+                    onChange={e => setTimetableForm(f => ({ ...f, end_time: e.target.value }))}
+                    className="form-input"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="form-label text-slate-700 font-bold mb-1.5 block">ห้องเรียน (สถานที่)</label>
+                  <input
+                    type="text"
+                    value={timetableForm.room}
+                    onChange={e => setTimetableForm(f => ({ ...f, room: e.target.value }))}
+                    className="form-input"
+                    placeholder="เช่น 311"
+                  />
+                </div>
+                <div>
+                  <label className="form-label text-slate-700 font-bold mb-1.5 block">กลุ่มเรียน / ชั้นเรียน</label>
+                  <input
+                    type="text"
+                    value={timetableForm.group_name}
+                    onChange={e => setTimetableForm(f => ({ ...f, group_name: e.target.value }))}
+                    className="form-input"
+                    placeholder="เช่น ม.1/1"
+                  />
+                </div>
+                <div>
+                  <label className="form-label text-slate-700 font-bold mb-1.5 block">ผู้สอน</label>
+                  <input
+                    type="text"
+                    value={timetableForm.instructor}
+                    onChange={e => setTimetableForm(f => ({ ...f, instructor: e.target.value }))}
+                    className="form-input"
+                    placeholder="เช่น ครูสมชาย"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="form-label text-slate-700 font-bold mb-1.5 block">เชื่อมห้องเรียนในระบบ</label>
+                  <select
+                    value={timetableForm.classroom_id}
+                    onChange={e => setTimetableForm(f => ({ ...f, classroom_id: e.target.value }))}
+                    className="form-input"
+                  >
+                    <option value="">-- ไม่เชื่อม --</option>
+                    {classroomsList.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label text-slate-700 font-bold mb-1.5 block">สีประจำวิชา</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={timetableForm.color || '#3b82f6'}
+                      onChange={e => setTimetableForm(f => ({ ...f, color: e.target.value }))}
+                      className="w-10 h-10 border border-slate-200 rounded-lg cursor-pointer p-0"
+                    />
+                    <span className="text-xs text-slate-500 font-mono">
+                      {timetableForm.color || '#3b82f6'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t border-slate-100 mt-6">
+                <button type="submit" disabled={savingTimetable} className="btn btn-primary flex-1">
+                  {savingTimetable ? <Loader2 className="w-4 h-4 animate-spin" /> : editTimetableTarget ? 'บันทึกการแก้ไข' : 'เพิ่มคาบเรียน'}
+                </button>
+                {editTimetableTarget && (
+                  <button
+                    type="button"
+                    onClick={handleDeleteTimetableEntry}
+                    className="btn border border-red-200 text-red-500 hover:bg-red-50 px-4"
+                    title="ลบคาบเรียนนี้"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowTimetableModal(false);
+                    setEditTimetableTarget(null);
+                  }}
+                  className="btn btn-ghost px-5"
+                >
+                  ยกเลิก
+                </button>
+              </div>
+            </form>
+          </div>
         </div>,
         document.body
       )}

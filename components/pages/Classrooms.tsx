@@ -128,12 +128,29 @@ export default function Classrooms() {
   };
 
   const handleEdit = (c: Classroom) => {
+    const total = c.total_classes || 40;
+    let weeks = 18;
+    let periods = Math.round(total / 18) || 1;
+    if (total % 18 === 0) {
+      periods = total / 18;
+    } else {
+      for (let w = 15; w <= 20; w++) {
+        if (total % w === 0) {
+          weeks = w;
+          periods = total / w;
+          break;
+        }
+      }
+    }
+    setPeriodsPerWeek(periods);
+    setTotalWeeks(weeks);
+
     setForm({ 
       name: c.name, 
       description: c.description || '', 
       late_to_absent_ratio: c.late_to_absent_ratio || 3,
       leave_to_absent_ratio: c.leave_to_absent_ratio || 2,
-      total_classes: c.total_classes || 40,
+      total_classes: total,
       min_attendance_percent: c.min_attendance_percent || 80
     });
     setEditing(c.id);
@@ -176,7 +193,13 @@ export default function Classrooms() {
           <p className="text-slate-500 text-sm">ทั้งหมด {classrooms.length} ห้อง</p>
         </div>
         <button
-          onClick={() => { setForm(emptyForm); setEditing(null); setShowForm(true); }}
+          onClick={() => {
+            setForm(emptyForm);
+            setEditing(null);
+            setPeriodsPerWeek(2);
+            setTotalWeeks(18);
+            setShowForm(true);
+          }}
           className="btn btn-primary"
         >
           <Plus className="w-4 h-4" /> สร้างห้องเรียน

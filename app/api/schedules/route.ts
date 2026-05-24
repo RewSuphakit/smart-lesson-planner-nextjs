@@ -13,31 +13,86 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'Start and end dates required' }, { status: 400 });
     }
 
-    const schedules = await prisma.schedule.findMany({
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    // Normalize boundaries in UTC
+    const startUtc = new Date(Date.UTC(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0));
+    const endUtc = new Date(Date.UTC(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999));
+
+    // Get weekly schedules
+    const weeklySchedules = await prisma.weeklySchedule.findMany({
+      where: { userId: user.id },
+    });
+
+    // Get concrete schedules
+    const concreteSchedules = await prisma.schedule.findMany({
       where: {
         userId: user.id,
-        scheduledDate: { gte: new Date(startDate), lte: new Date(endDate) },
-      },
-      include: {
-        lessonPlan: { select: { title: true, subject: true, gradeLevel: true, duration: true } },
+        scheduledDate: { gte: startUtc, lte: endUtc },
       },
       orderBy: [{ scheduledDate: 'asc' }, { startTime: 'asc' }],
     });
 
-    const mappedSchedules = schedules.map(s => ({
+    const mappedConcrete = concreteSchedules.map(s => ({
       id: s.id,
-      lesson_plan_id: s.lessonPlanId,
-      lesson_title: s.lessonPlan?.title,
-      scheduled_date: s.scheduledDate,
+      lesson_title: s.title,
+      subject: s.subject,
+      scheduled_date: s.scheduledDate.toISOString(),
       start_time: s.startTime.toISOString().split('T')[1],
       end_time: s.endTime.toISOString().split('T')[1],
       notes: s.notes,
       status: s.status
     }));
 
-    return NextResponse.json({ data: mappedSchedules });
+    const resultSchedules: any[] = [];
+    let current = new Date(startUtc);
+
+    while (current <= endUtc) {
+      const dateStr = current.toISOString().split('T')[0];
+      const jsDay = current.getUTCDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+      const dbDay = jsDay === 0 ? 6 : jsDay - 1; // 0 = Mon, ..., 6 = Sun
+
+      const dayWeeklySlots = weeklySchedules.filter(ws => ws.dayOfWeek === dbDay);
+      const dayConcrete = mappedConcrete.filter(c => c.scheduled_date.startsWith(dateStr));
+
+      for (const slot of dayWeeklySlots) {
+        const slotStartStr = slot.startTime ? slot.startTime.toISOString().split('T')[1] : '08:30:00.000Z';
+        const slotEndStr = slot.endTime ? slot.endTime.toISOString().split('T')[1] : '10:30:00.000Z';
+
+        const slotStartMs = slot.startTime ? slot.startTime.getTime() : new Date(`1970-01-01T08:30:00.000Z`).getTime();
+        const slotEndMs = slot.endTime ? slot.endTime.getTime() : new Date(`1970-01-01T10:30:00.000Z`).getTime();
+
+        // Check for time overlap in the same day
+        const overlapping = dayConcrete.find(c => {
+          const cStartMs = new Date(`1970-01-01T${c.start_time}`).getTime();
+          const cEndMs = new Date(`1970-01-01T${c.end_time}`).getTime();
+          return (cStartMs < slotEndMs) && (cEndMs > slotStartMs);
+        });
+
+        if (!overlapping) {
+          resultSchedules.push({
+            id: `virtual_${slot.id}_${dateStr}`,
+            lesson_title: slot.subjectName || slot.subjectCode || 'วิชาทั่วไป',
+            subject: slot.subjectName || slot.subjectCode || 'วิชาทั่วไป',
+            scheduled_date: `${dateStr}T12:00:00.000Z`, // Middle of the day for calendar parsing
+            start_time: slotStartStr,
+            end_time: slotEndStr,
+            notes: `ตารางเรียนประจำสัปดาห์ (ห้อง: ${slot.room || '-'})`,
+            status: 'scheduled',
+          });
+        }
+      }
+
+      current.setUTCDate(current.getUTCDate() + 1);
+    }
+
+    // Combined virtual and concrete schedules
+    const data = [...resultSchedules, ...mappedConcrete];
+    return NextResponse.json({ data });
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+    console.error('Get schedules error:', error);
     return NextResponse.json({ message: 'Failed to get schedules' }, { status: 500 });
   }
 }
@@ -58,11 +113,19 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ message: 'รูปแบบวันเริ่มต้นภาคเรียนไม่ถูกต้อง' }, { status: 400 });
       }
 
-      // Fetch classrooms, weekly schedules and lesson plans
+      // Fetch classrooms, weekly schedules (with classroomId)
       const classrooms = await prisma.classroom.findMany({ where: { userId: user.id } });
-      const weeklySchedules = await prisma.weeklySchedule.findMany({ where: { userId: user.id } });
-      const userLessons = await prisma.lessonPlan.findMany({ where: { userId: user.id } });
+      const weeklySchedules = await prisma.weeklySchedule.findMany({
+        where: { userId: user.id, classroomId: { not: null } },
+      });
 
+      if (weeklySchedules.length === 0) {
+        return NextResponse.json({
+          message: 'ไม่พบคาบเรียนที่เชื่อมกับห้องเรียน กรุณาไปตั้งค่าที่เมนู "ตารางเรียน" → คลิกที่คาบ → เลือกห้องเรียน',
+        }, { status: 400 });
+      }
+
+      // Track how many schedules generated per classroom
       const classroomCounts: Record<number, number> = {};
       for (const room of classrooms) {
         classroomCounts[room.id] = 0;
@@ -70,64 +133,39 @@ export async function POST(request: NextRequest) {
 
       const schedulesToCreate: any[] = [];
       let currentDate = new Date(startDate);
-      const maxDays = 365; // safety limit to prevent infinite loops
+      const maxDays = 365;
       let daysProcessed = 0;
 
+      // Get unique classroomIds from timetable
+      const linkedClassroomIds = [...new Set(weeklySchedules.map(ws => ws.classroomId!))];
+      const linkedClassrooms = classrooms.filter(c => linkedClassroomIds.includes(c.id));
+
       while (daysProcessed < maxDays) {
-        const roomsToProcess = classrooms.filter(room => 
-          weeklySchedules.some(ws => ws.groupName && ws.groupName.trim().toLowerCase() === room.name.trim().toLowerCase())
-        );
-
-        if (roomsToProcess.length === 0) break;
-
-        const allDone = roomsToProcess.every(room => classroomCounts[room.id] >= room.totalClasses);
+        const allDone = linkedClassrooms.every(room => classroomCounts[room.id] >= room.totalClasses);
         if (allDone) break;
 
         const jsDay = currentDate.getDay();
-        const dbDay = jsDay === 0 ? 6 : jsDay - 1;
+        const dbDay = jsDay === 0 ? 6 : jsDay - 1; // Convert: Sun=6, Mon=0, etc.
 
         const daySlots = weeklySchedules.filter(ws => ws.dayOfWeek === dbDay);
 
         for (const slot of daySlots) {
-          if (!slot.groupName) continue;
-          const room = classrooms.find(c => c.name.trim().toLowerCase() === slot.groupName!.trim().toLowerCase());
+          const room = classrooms.find(c => c.id === slot.classroomId);
           if (!room) continue;
 
           if (classroomCounts[room.id] >= room.totalClasses) continue;
 
-          const matchingLessons = userLessons.filter(l => 
-            l.subject.trim().toLowerCase() === (slot.subjectName || '').trim().toLowerCase() ||
-            l.subject.trim().toLowerCase() === (slot.subjectCode || '').trim().toLowerCase()
-          );
-
-          let lessonPlanId: number;
-          if (matchingLessons.length > 0) {
-            const idx = classroomCounts[room.id] % matchingLessons.length;
-            lessonPlanId = matchingLessons[idx].id;
-          } else if (userLessons.length > 0) {
-            lessonPlanId = userLessons[0].id;
-          } else {
-            const defaultLesson = await prisma.lessonPlan.create({
-              data: {
-                userId: user.id,
-                title: `แผนการสอน: ${slot.subjectName || slot.subjectCode || 'วิชาทั่วไป'}`,
-                subject: slot.subjectName || slot.subjectCode || 'วิชาทั่วไป',
-                gradeLevel: room.name,
-                duration: slot.hours * 50,
-                status: 'draft',
-              }
-            });
-            userLessons.push(defaultLesson);
-            lessonPlanId = defaultLesson.id;
-          }
+          const title = slot.subjectName || slot.subjectCode || 'วิชาทั่วไป';
+          const subject = slot.subjectName || slot.subjectCode || 'วิชาทั่วไป';
 
           schedulesToCreate.push({
             userId: user.id,
-            lessonPlanId,
+            title,
+            subject,
             scheduledDate: new Date(currentDate),
             startTime: slot.startTime ? new Date(slot.startTime) : new Date(`1970-01-01T08:30:00`),
             endTime: slot.endTime ? new Date(slot.endTime) : new Date(`1970-01-01T10:30:00`),
-            notes: `สร้างอัตโนมัติจากคาบ ${slot.subjectCode || ''} ${slot.subjectName || ''}`,
+            notes: `สร้างอัตโนมัติ: ${slot.subjectCode || ''} ${slot.subjectName || ''} — ${room.name}`,
             status: 'scheduled'
           });
 
@@ -159,11 +197,13 @@ export async function POST(request: NextRequest) {
     const schedule = await prisma.schedule.create({
       data: {
         userId: user.id,
-        lessonPlanId: body.lesson_plan_id,
+        title: body.title,
+        subject: body.subject,
         scheduledDate: new Date(body.scheduled_date),
         startTime: new Date(`1970-01-01T${body.start_time}`),
         endTime: new Date(`1970-01-01T${body.end_time}`),
         notes: body.notes || null,
+        status: body.status || 'scheduled',
       },
     });
 

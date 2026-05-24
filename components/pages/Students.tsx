@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import api from '@/services/api';
-import { Plus, Edit, Trash2, X, Users as UsersIcon, Loader2, Search, ClipboardCheck, ChevronDown, ChevronUp, GraduationCap, Award, Upload, CheckCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Users as UsersIcon, Loader2, Search, GraduationCap, Upload, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import Pagination from '@/components/Pagination';
@@ -16,11 +16,6 @@ interface Classroom {
   name: string;
 }
 
-interface Lesson {
-  id: string | number;
-  title: string;
-}
-
 interface Student {
   id: string | number;
   student_code?: string;
@@ -28,15 +23,6 @@ interface Student {
   grade_level?: string;
   email?: string;
   classroom_id?: string | number | null;
-}
-
-interface EvaluationRecord {
-  id: string | number;
-  lesson_title: string;
-  subject: string;
-  score: number;
-  max_score: number;
-  participation: string;
 }
 
 interface ImportRow {
@@ -48,19 +34,15 @@ interface ImportRow {
 
 export default function Students() {
   const [students, setStudents] = useState<Student[]>([]);
-  const [lessons, setLessons] = useState<Lesson[]>([]);
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [loading, setLoading] = useState(true);
   
   const [showForm, setShowForm] = useState(false);
-  const [showEvalForm, setShowEvalForm] = useState(false);
   const [showImportForm, setShowImportForm] = useState(false);
   
   const [editing, setEditing] = useState<string | number | null>(null);
   const [search, setSearch] = useState('');
   const [saving, setSaving] = useState(false);
-  const [expandedStudent, setExpandedStudent] = useState<string | number | null>(null);
-  const [evaluations, setEvaluations] = useState<Record<string | number, EvaluationRecord[]>>({});
   const [filterClassroomId, setFilterClassroomId] = useState('');
   const [selectedStudents, setSelectedStudents] = useState<Array<string | number>>([]);
   const [bulkAssignClassroomId, setBulkAssignClassroomId] = useState('');
@@ -72,31 +54,17 @@ export default function Students() {
   const emptyForm = { name: '', student_code: '', grade_level: '', email: '', classroom_id: '' };
   const [form, setForm] = useState(emptyForm);
 
-  interface EvalFormState {
-    student_id: string;
-    lesson_plan_id: string;
-    score: string | number;
-    max_score: number;
-    participation: string;
-    notes: string;
-  }
-
-  const emptyEvalForm: EvalFormState = { student_id: '', lesson_plan_id: '', score: '', max_score: 100, participation: 'average', notes: '' };
-  const [evalForm, setEvalForm] = useState<EvalFormState>(emptyEvalForm);
-
   // Import states
   const [importData, setImportData] = useState<ImportRow[]>([]);
   const [importClassroomId, setImportClassroomId] = useState('');
 
   const fetchData = useCallback(async (signal?: AbortSignal) => {
     try {
-      const [studRes, lessRes, classRes] = await Promise.all([
+      const [studRes, classRes] = await Promise.all([
         api.get('/students', { signal }),
-        api.get('/lessons', { signal }),
         api.get('/classrooms', { signal })
       ]);
       setStudents(studRes.data.data || []);
-      setLessons(lessRes.data.data || []);
       setClassrooms(classRes.data.data || []);
     } catch (err) {
       if (!axios.isCancel(err)) {
@@ -176,44 +144,7 @@ export default function Students() {
     catch { toast.error('ลบไม่สำเร็จ'); }
   };
 
-  const loadEvaluations = useCallback(async (studentId: string | number, signal?: AbortSignal) => {
-    try {
-      const { data } = await api.get('/evaluations/student/' + studentId, { signal });
-      setEvaluations(prev => ({ ...prev, [studentId]: data.data }));
-    } catch (err) {
-      if (!axios.isCancel(err)) {
-        // silent
-      }
-    }
-  }, []);
 
-  const handleEvalSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      await api.post('/evaluations', evalForm);
-      toast.success('บันทึกผลการประเมินเรียบร้อย');
-      setShowEvalForm(false); setEvalForm(emptyEvalForm);
-      if (expandedStudent !== null) loadEvaluations(expandedStudent);
-    } catch (err: any) { toast.error(err.response?.data?.message || 'บันทึกไม่สำเร็จ'); }
-    finally { setSaving(false); }
-  };
-
-  const handleDeleteEvaluation = async (evaluationId: string | number, studentId: string | number) => {
-    if (!window.confirm('ยืนยันการลบผลการประเมินนี้?')) return;
-    try {
-      await api.delete('/evaluations/' + evaluationId);
-      toast.success('ลบผลการประเมินเรียบร้อย');
-      loadEvaluations(studentId);
-    } catch {
-      toast.error('ลบผลการประเมินไม่สำเร็จ');
-    }
-  };
-
-  const toggleExpand = (id: string | number) => {
-    if (expandedStudent === id) { setExpandedStudent(null); }
-    else { setExpandedStudent(id); if (!evaluations[id]) loadEvaluations(id); }
-  };
 
   const handleToggleSelect = (id: string | number) => {
     setSelectedStudents(prev => 
@@ -370,12 +301,7 @@ export default function Students() {
   // Reset to page 1 when filters change
   useEffect(() => { setCurrentPage(1); }, [search, filterClassroomId]);
 
-  const participationMap: Record<string, { label: string; badge: string }> = {
-    excellent: { label: 'ดีเยี่ยม', badge: 'badge-accent' },
-    good: { label: 'ดี', badge: 'badge-primary' },
-    average: { label: 'ปานกลาง', badge: 'badge-warning' },
-    poor: { label: 'ต้องปรับปรุง', badge: 'badge-danger' }
-  };
+
 
   const avatarColors = [
     'from-indigo-500 to-purple-600',
@@ -537,60 +463,14 @@ export default function Students() {
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                <button onClick={() => { setEvalForm({ ...emptyEvalForm, student_id: String(student.id) }); setShowEvalForm(true); }}
-                  className="p-2.5 rounded-xl hover:bg-emerald-500/10 text-slate-500 hover:text-emerald-400 transition-all" title="บันทึกผลประเมิน">
-                  <Award className="w-4 h-4" />
-                </button>
                 <button onClick={() => handleEdit(student)} className="p-2.5 rounded-xl hover:bg-indigo-500/10 text-slate-500 hover:text-indigo-700 transition-all" title="แก้ไข">
                   <Edit className="w-4 h-4" />
                 </button>
                 <button onClick={() => handleDelete(student.id)} className="p-2.5 rounded-xl hover:bg-red-500/10 text-slate-500 hover:text-red-400 transition-all" title="ลบ">
                   <Trash2 className="w-4 h-4" />
                 </button>
-                <button onClick={() => toggleExpand(student.id)} className="p-2.5 rounded-xl hover:bg-indigo-50 text-slate-500 transition-all">
-                  {expandedStudent === student.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                </button>
               </div>
             </div>
-
-            {/* Evaluation History */}
-            {expandedStudent === student.id && (
-              <div className="border-t border-white/[0.04] px-4 py-4 bg-[rgba(10,14,26,0.4)]">
-                <h4 className="text-xs font-semibold text-slate-500 mb-3 flex items-center gap-2">
-                  <ClipboardCheck className="w-3.5 h-3.5" /> ประวัติการประเมิน
-                </h4>
-                {evaluations[student.id]?.length > 0 ? (
-                  <div className="space-y-2">
-                    {evaluations[student.id].map((ev, j) => (
-                      <div key={j} className="glass-light p-3.5 flex items-center justify-between rounded-xl">
-                        <div>
-                          <p className="text-sm font-medium text-slate-800">{ev.lesson_title}</p>
-                          <p className="text-xs text-slate-500 mt-0.5">{ev.subject}</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="text-right">
-                            <p className="text-sm font-bold text-indigo-700">{ev.score}/{ev.max_score}</p>
-                            <p className="text-[0.6rem] text-slate-600">{Math.round((ev.score / ev.max_score) * 100)}%</p>
-                          </div>
-                          <span className={'badge ' + (participationMap[ev.participation]?.badge || 'badge-primary')}>
-                            {participationMap[ev.participation]?.label || ev.participation}
-                          </span>
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); handleDeleteEvaluation(ev.id, student.id); }}
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all ml-1"
-                            title="ลบการประเมินนี้"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-slate-600 py-2">ยังไม่มีผลการประเมิน</p>
-                )}
-              </div>
-            )}
           </div>
         ))}
       </div>
@@ -720,52 +600,6 @@ export default function Students() {
         document.body
       )}
 
-      {/* Evaluation Form Modal */}
-      {showEvalForm && createPortal(
-        <div className="modal-overlay" onClick={() => setShowEvalForm(false)}>
-          <div className="glass w-full max-w-md p-7 animate-fade-in-up" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                  <Award className="w-5 h-5 text-slate-800" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-slate-800">บันทึกผลการประเมิน</h2>
-                  <p className="text-xs text-slate-500">ประเมินผลการเรียนรู้ของนักเรียน</p>
-                </div>
-              </div>
-              <button onClick={() => setShowEvalForm(false)} className="p-2 hover:bg-indigo-50 rounded-xl"><X className="w-5 h-5 text-slate-500" /></button>
-            </div>
-            <form onSubmit={handleEvalSubmit} className="space-y-4">
-              <div>
-                <label className="form-label">แผนการสอน</label>
-                <select value={evalForm.lesson_plan_id} onChange={e => setEvalForm({...evalForm, lesson_plan_id: e.target.value})} className="form-input" required id="eval-lesson">
-                  <option value="">เลือกแผนการสอน...</option>
-                  {lessons.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="form-label">คะแนนที่ได้</label><input type="number" value={evalForm.score} onChange={e => setEvalForm({...evalForm, score: parseFloat(e.target.value) || 0})} className="form-input" required id="eval-score" placeholder="0" /></div>
-                <div><label className="form-label">คะแนนเต็ม</label><input type="number" value={evalForm.max_score} onChange={e => setEvalForm({...evalForm, max_score: parseFloat(e.target.value) || 0})} className="form-input" id="eval-max-score" /></div>
-              </div>
-              <div>
-                <label className="form-label">ระดับการมีส่วนร่วม</label>
-                <select value={evalForm.participation} onChange={e => setEvalForm({...evalForm, participation: e.target.value})} className="form-input" id="eval-participation">
-                  <option value="excellent">ดีเยี่ยม</option>
-                  <option value="good">ดี</option>
-                  <option value="average">ปานกลาง</option>
-                  <option value="poor">ต้องปรับปรุง</option>
-                </select>
-              </div>
-              <div><label className="form-label">หมายเหตุ</label><textarea value={evalForm.notes} onChange={e => setEvalForm({...evalForm, notes: e.target.value})} className="form-input min-h-[60px]" placeholder="บันทึกเพิ่มเติม (ไม่บังคับ)" id="eval-notes" /></div>
-              <button type="submit" disabled={saving} className="btn btn-accent w-full py-3" id="eval-save-btn">
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Award className="w-4 h-4" /> บันทึกผลประเมิน</>}
-              </button>
-            </form>
-          </div>
-        </div>,
-        document.body
-      )}
     </div>
   );
 }

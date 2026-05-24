@@ -10,6 +10,7 @@ import axios from 'axios';
 interface Classroom {
   id: string | number;
   name: string;
+  total_classes?: number;
 }
 
 interface Student {
@@ -99,34 +100,72 @@ export default function Scores() {
       const structRes = await api.get(`/scores?classroom_id=${selectedClass}&type=structure`, { signal });
       const fetchedStructs = structRes.data.data || [];
       
-      // Initialize 18 weeks if empty
+      // Calculate target weeks based on total_classes of the selected classroom
+      const classroomObj = classrooms.find(c => String(c.id) === String(selectedClass));
+      const total = classroomObj?.total_classes || 40;
+      let targetWeeks = 18;
+      if (total % 18 !== 0) {
+        for (let w = 15; w <= 20; w++) {
+          if (total % w === 0) {
+            targetWeeks = w;
+            break;
+          }
+        }
+      }
+      console.log('fetchClassData DEBUG:', { selectedClass, classroomObj, total, targetWeeks });
+
+      // Initialize structures to have exactly targetWeeks items
+      let finalStructs = [];
       if (fetchedStructs.length === 0) {
-        const defaultStructs = Array.from({ length: 18 }, (_, i) => ({
+        finalStructs = Array.from({ length: targetWeeks }, (_, i) => ({
           lesson_number: i + 1,
           lesson_name: `บทที่/สัปดาห์ที่ ${i + 1}`,
           max_assignment_score: 10,
           max_post_test_score: 10,
           hours: 0
         }));
-        setStructures(defaultStructs);
         setStructureSavedInDB(false);
       } else {
-        setStructures(fetchedStructs);
+        // Adjust length of fetchedStructs to match targetWeeks
+        let adjustedStructs = [...fetchedStructs];
+        if (adjustedStructs.length > targetWeeks) {
+          adjustedStructs = adjustedStructs.slice(0, targetWeeks);
+        } else if (adjustedStructs.length < targetWeeks) {
+          const diff = targetWeeks - adjustedStructs.length;
+          const startNum = adjustedStructs.length + 1;
+          const padding = Array.from({ length: diff }, (_, i) => ({
+            lesson_number: startNum + i,
+            lesson_name: `บทที่/สัปดาห์ที่ ${startNum + i}`,
+            max_assignment_score: 10,
+            max_post_test_score: 10,
+            hours: 0
+          }));
+          adjustedStructs = [...adjustedStructs, ...padding];
+        }
+        finalStructs = adjustedStructs;
         setStructureSavedInDB(true);
       }
+      setStructures(finalStructs);
       
-      if (fetchedStructs.length > 0 && !selectedLesson) {
-        setSelectedLesson(fetchedStructs[0].lesson_number.toString());
-      } else if (!selectedLesson) {
-        setSelectedLesson('1');
+      let initialLesson = selectedLesson;
+      if (finalStructs.length > 0) {
+        const hasLesson = finalStructs.some(s => s.lesson_number.toString() === initialLesson);
+        if (!hasLesson || parseInt(initialLesson) > targetWeeks) {
+          initialLesson = finalStructs[0].lesson_number.toString();
+        }
+      } else {
+        if (!initialLesson || parseInt(initialLesson) > targetWeeks) {
+          initialLesson = '1';
+        }
       }
+      setSelectedLesson(initialLesson);
 
     } catch (err) {
       if (!axios.isCancel(err)) {
         toast.error('โหลดข้อมูลนักเรียนหรือโครงสร้างคะแนนไม่สำเร็จ');
       }
     }
-  }, [selectedClass, selectedLesson]);
+  }, [selectedClass, selectedLesson, classrooms]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -300,7 +339,7 @@ export default function Scores() {
           const lessonNumRaw = String(row[lessonCol] || '').trim();
           const lessonNum = parseInt(lessonNumRaw);
           
-          if (!isNaN(lessonNum) && lessonNum > 0 && lessonNum <= 18) {
+          if (!isNaN(lessonNum) && lessonNum > 0 && lessonNum <= structures.length) {
             const index = newStructs.findIndex(s => s.lesson_number === lessonNum);
             if (index !== -1) {
               const skillScore = parseFloat(row[skillCol]) || 0;

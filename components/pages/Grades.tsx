@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import api from '@/services/api';
-import { Loader2, BookOpen, Save, Settings, AlertCircle, TrendingUp, Plus, Trash2, FileSpreadsheet } from 'lucide-react';
+import { Loader2, BookOpen, Save, Settings, AlertCircle, TrendingUp, Plus, Trash2, FileSpreadsheet, Printer, Zap, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Pagination from '@/components/Pagination';
 import axios from 'axios';
@@ -47,6 +47,10 @@ interface ReportStudent {
   total_score?: string;
   percentage?: string;
   grade?: string;
+  absent_count?: number;
+  late_count?: number;
+  max_allowed_absences?: number;
+  remaining_absences?: number;
 }
 
 interface Weights {
@@ -233,6 +237,126 @@ export default function Grades() {
     } finally {
       setSavingExams(false);
     }
+  };
+
+  // Auto calculate affective scores from attendance data
+  const autoCalculateAffective = () => {
+    let count = 0;
+    setReport(prev => prev.map(student => {
+      const absent = student.absent_count || 0;
+      const late = student.late_count || 0;
+      const autoScore = Math.max(0, weights.affective_weight - (absent * 2) - (late * 1));
+      const updatedStudent = { ...student, affective_score: autoScore };
+
+      // Recalculate total
+      const scaledAssign = parseFloat(String(updatedStudent.scaled_assign ?? 0)) || 0;
+      const scaledPost = parseFloat(String(updatedStudent.scaled_post_test ?? 0)) || 0;
+      const scaledMidterm = parseFloat(String(updatedStudent.scaled_midterm ?? 0)) || 0;
+      const scaledFinal = parseFloat(String(updatedStudent.scaled_final ?? 0)) || 0;
+      const totalScore = scaledAssign + scaledPost + autoScore + scaledMidterm + scaledFinal;
+      updatedStudent.total_score = totalScore.toFixed(2);
+      updatedStudent.percentage = totalScore.toFixed(2);
+
+      // Recalculate grade
+      let finalGrade = null;
+      if (updatedStudent.is_f) {
+        finalGrade = 'F';
+      } else {
+        for (const c of criteria) {
+          if (totalScore >= Number(c.min_score)) {
+            finalGrade = c.grade;
+            break;
+          }
+        }
+      }
+      updatedStudent.grade = finalGrade || 'ไม่มีเกรด';
+      count++;
+      return updatedStudent;
+    }));
+    toast.success(`คำนวณจิตพิสัยอัตโนมัติเสร็จ ${count} คน`);
+  };
+
+  // Print PDF report
+  const printReport = () => {
+    const classroomName = classrooms.find(c => String(c.id) === String(selectedClass))?.name || '';
+    // Grade distribution
+    const gradeCounts: Record<string, number> = {};
+    let passCount = 0, failCount = 0;
+    let totalScoreSum = 0;
+    report.forEach(s => {
+      const g = s.grade || 'ไม่มีเกรด';
+      gradeCounts[g] = (gradeCounts[g] || 0) + 1;
+      const sc = parseFloat(String(s.total_score)) || 0;
+      totalScoreSum += sc;
+      if (g === '0' || g === 'F' || g === 'ไม่มีเกรด') failCount++;
+      else passCount++;
+    });
+    const avg = report.length > 0 ? (totalScoreSum / report.length).toFixed(2) : '0';
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) { toast.error('ไม่สามารถเปิดหน้าต่างพิมพ์ได้'); return; }
+    printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>รายงานผลการเรียน ${classroomName}</title>
+    <style>
+      body { font-family: 'Sarabun', 'Segoe UI', sans-serif; padding: 20px; color: #333; }
+      h1 { text-align: center; font-size: 18px; margin-bottom: 4px; }
+      h2 { text-align: center; font-size: 14px; font-weight: normal; color: #666; margin-bottom: 16px; }
+      table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 16px; }
+      th, td { border: 1px solid #ccc; padding: 4px 6px; text-align: center; }
+      th { background: #f0f0f0; font-weight: bold; }
+      td.name { text-align: left; }
+      .fail { background: #fee2e2; }
+      .stats { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 12px; }
+      .stat-card { border: 1px solid #ddd; border-radius: 6px; padding: 8px 12px; min-width: 100px; }
+      .stat-label { font-size: 10px; color: #666; }
+      .stat-value { font-size: 16px; font-weight: bold; }
+      .grade-dist { margin-top: 12px; }
+      .grade-dist td { padding: 3px 8px; }
+      @media print { body { margin: 0; } }
+    </style></head><body>
+    <h1>รายงานผลการเรียน</h1>
+    <h2>ห้องเรียน: ${classroomName} | จำนวน ${report.length} คน</h2>
+    <table>
+      <thead><tr>
+        <th>ลำดับ</th><th>รหัส</th><th>ชื่อ-นามสกุล</th>
+        <th>งานเก็บ (${weights.assignment_weight})</th>
+        <th>สอบย่อย (${weights.post_test_weight})</th>
+        <th>กลางภาค (${weights.midterm_weight})</th>
+        <th>ปลายภาค (${weights.final_weight})</th>
+        <th>จิตพิสัย (${weights.affective_weight})</th>
+        <th>รวม</th><th>เกรด</th>
+      </tr></thead>
+      <tbody>${report.map((s, i) => {
+        const isFail = s.grade === '0' || s.grade === 'F' || s.is_f;
+        return `<tr class="${isFail ? 'fail' : ''}">
+          <td>${i + 1}</td>
+          <td>${s.student_code || '-'}</td>
+          <td class="name">${s.name}</td>
+          <td>${Number(s.scaled_assign || 0).toFixed(0)}</td>
+          <td>${Number(s.scaled_post_test || 0).toFixed(0)}</td>
+          <td>${Number(s.scaled_midterm || 0).toFixed(0)}</td>
+          <td>${Number(s.scaled_final || 0).toFixed(0)}</td>
+          <td>${Number(s.affective_score || 0).toFixed(1)}</td>
+          <td><strong>${Number(s.total_score || 0).toFixed(1)}</strong></td>
+          <td><strong>${s.grade}</strong></td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>
+    <div class="stats">
+      <div class="stat-card"><div class="stat-label">คะแนนเฉลี่ย</div><div class="stat-value">${avg}</div></div>
+      <div class="stat-card"><div class="stat-label">ผ่าน</div><div class="stat-value" style="color:green">${passCount} คน</div></div>
+      <div class="stat-card"><div class="stat-label">ไม่ผ่าน</div><div class="stat-value" style="color:red">${failCount} คน</div></div>
+    </div>
+    <h3 style="margin-top:16px;font-size:13px">การกระจายเกรด</h3>
+    <table class="grade-dist" style="width:auto">
+      <thead><tr><th>เกรด</th><th>จำนวน (คน)</th><th>ร้อยละ</th></tr></thead>
+      <tbody>${Object.entries(gradeCounts).map(([g, c]) =>
+        `<tr><td><strong>${g}</strong></td><td>${c}</td><td>${(c / report.length * 100).toFixed(1)}%</td></tr>`
+      ).join('')}</tbody>
+    </table>
+    </body></html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => { printWindow.print(); }, 500);
   };
 
   const exportCSV = () => {
@@ -581,10 +705,18 @@ export default function Grades() {
               <TrendingUp className="w-5 h-5 text-emerald-400" />
               <h3 className="text-lg font-bold text-slate-800">สรุปผลการเรียน ({report.length} คน)</h3>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <button onClick={exportCSV} className="btn bg-emerald-500/20 text-emerald-700 hover:bg-emerald-500/30 flex items-center gap-2">
                 <FileSpreadsheet className="w-4 h-4" />
                 Export CSV
+              </button>
+              <button onClick={printReport} className="btn bg-violet-500/20 text-violet-700 hover:bg-violet-500/30 flex items-center gap-2">
+                <Printer className="w-4 h-4" />
+                พิมพ์รายงาน PDF
+              </button>
+              <button onClick={autoCalculateAffective} className="btn bg-amber-500/20 text-amber-700 hover:bg-amber-500/30 flex items-center gap-2">
+                <Zap className="w-4 h-4" />
+                คำนวณจิตพิสัยอัตโนมัติ
               </button>
               <button onClick={saveExamScores} disabled={savingExams} className="btn btn-primary flex items-center gap-2">
                 {savingExams ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
@@ -608,10 +740,32 @@ export default function Grades() {
                 </tr>
               </thead>
               <tbody>
-                {paginatedReport.map((student) => (
-                  <tr key={student.student_id} className="border-b border-indigo-100 hover:bg-indigo-50/50 transition-colors">
+                {paginatedReport.map((student) => {
+                  const totalScore = parseFloat(String(student.total_score)) || 0;
+                  const isAtRisk = !student.is_f && (totalScore < 50 || (student.remaining_absences !== undefined && student.remaining_absences <= 2 && student.remaining_absences >= 0));
+                  return (
+                  <tr key={student.student_id} className={`border-b border-indigo-100 hover:bg-indigo-50/50 transition-colors ${student.is_f ? 'bg-red-50/60' : isAtRisk ? 'bg-amber-50/60' : ''}`}>
                     <td className="p-4 text-slate-600 text-sm">{student.student_code || '-'}</td>
-                    <td className="p-4 font-medium text-slate-800">{student.name}</td>
+                    <td className="p-4 font-medium text-slate-800">
+                      <div className="flex items-center gap-2">
+                        {student.name}
+                        {student.is_f && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-600 text-[10px] font-bold shrink-0">
+                            <AlertTriangle className="w-3 h-3" /> หมดสิทธิ์สอบ
+                          </span>
+                        )}
+                        {isAtRisk && student.remaining_absences !== undefined && student.remaining_absences <= 2 && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold shrink-0">
+                            <AlertCircle className="w-3 h-3" /> ขาดได้อีก {student.remaining_absences} ครั้ง
+                          </span>
+                        )}
+                        {isAtRisk && totalScore < 50 && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 text-rose-600 text-[10px] font-bold shrink-0">
+                            <AlertCircle className="w-3 h-3" /> คะแนนต่ำ
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="p-4 text-center">
                       <div className="font-bold text-emerald-700 text-lg">{Number(student.scaled_assign || 0).toFixed(0)}</div>
                       <div className="text-[10px] text-emerald-400/60 mb-1">ก่อนปัด: {Number(student.precise_scaled_assign || 0).toFixed(3)}</div>
@@ -672,7 +826,8 @@ export default function Grades() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -24,13 +24,6 @@ enum ScheduleStatus {
   cancelled
 }
 
-enum Participation {
-  excellent
-  good
-  average
-  poor
-}
-
 enum AttendanceStatus {
   present
   late
@@ -57,48 +50,20 @@ model User {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  lessonPlans LessonPlan[]
   schedules   Schedule[]
   students    Student[]
-  evaluations Evaluation[]
-  files       File[]
   classrooms  Classroom[]
   weeklySchedules WeeklySchedule[]
 
   @@map("users")
 }
 
-// ==================== Lesson Plans ====================
-model LessonPlan {
-  id              Int          @id @default(autoincrement())
-  userId          Int          @map("user_id")
-  title           String       @db.VarChar(255)
-  subject         String       @db.VarChar(255)
-  gradeLevel      String       @map("grade_level") @db.VarChar(100)
-  duration        Int
-  objectives      String?      @db.Text
-  content         String?      @db.Text
-  teachingMethods String?      @map("teaching_methods") @db.Text
-  materials       String?      @db.Text
-  aiGenerated     Boolean      @default(false) @map("ai_generated")
-  status          LessonStatus @default(draft)
-  createdAt       DateTime     @default(now()) @map("created_at")
-  updatedAt       DateTime     @updatedAt @map("updated_at")
-
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  schedules   Schedule[]
-  evaluations Evaluation[]
-  files       File[]
-
-  @@index([userId], map: "idx_lesson_plans_user")
-  @@map("lesson_plans")
-}
-
 // ==================== Schedules ====================
 model Schedule {
   id            Int            @id @default(autoincrement())
   userId        Int            @map("user_id")
-  lessonPlanId  Int            @map("lesson_plan_id")
+  title         String         @default("") @db.VarChar(255)
+  subject       String         @default("") @db.VarChar(255)
   scheduledDate DateTime       @map("scheduled_date") @db.Date
   startTime     DateTime       @map("start_time") @db.Time(0)
   endTime       DateTime       @map("end_time") @db.Time(0)
@@ -108,7 +73,6 @@ model Schedule {
   updatedAt     DateTime       @updatedAt @map("updated_at")
 
   user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  lessonPlan LessonPlan @relation(fields: [lessonPlanId], references: [id], onDelete: Cascade)
 
   @@index([userId], map: "idx_schedules_user")
   @@index([scheduledDate], map: "idx_schedules_date")
@@ -142,6 +106,7 @@ model Classroom {
   gradeCriteria   GradeCriteria[]
   scoreStructures ScoreStructure[]
   studentScores   StudentScore[]
+  weeklySchedules WeeklySchedule[]
 
   @@map("classrooms")
 }
@@ -163,53 +128,11 @@ model Student {
 
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   classroom     Classroom?     @relation(fields: [classroomId], references: [id], onDelete: SetNull)
-  evaluations   Evaluation[]
   attendance    Attendance[]
   studentScores StudentScore[]
 
   @@index([userId], map: "idx_students_user")
   @@map("students")
-}
-
-// ==================== Evaluations ====================
-model Evaluation {
-  id           Int           @id @default(autoincrement())
-  studentId    Int           @map("student_id")
-  lessonPlanId Int           @map("lesson_plan_id")
-  userId       Int           @map("user_id")
-  score        Decimal?      @db.Decimal(5, 2)
-  maxScore     Decimal?      @default(100) @map("max_score") @db.Decimal(5, 2)
-  participation Participation @default(average)
-  notes        String?       @db.Text
-  createdAt    DateTime      @default(now()) @map("created_at")
-  updatedAt    DateTime      @updatedAt @map("updated_at")
-
-  student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  lessonPlan LessonPlan @relation(fields: [lessonPlanId], references: [id], onDelete: Cascade)
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([studentId], map: "idx_evaluations_student")
-  @@index([lessonPlanId], map: "idx_evaluations_lesson")
-  @@map("evaluations")
-}
-
-// ==================== Files ====================
-model File {
-  id           Int      @id @default(autoincrement())
-  userId       Int      @map("user_id")
-  lessonPlanId Int?     @map("lesson_plan_id")
-  filename     String   @db.VarChar(255)
-  originalName String   @map("original_name") @db.VarChar(255)
-  mimeType     String   @map("mime_type") @db.VarChar(100)
-  size         Int
-  path         String   @db.VarChar(500)
-  createdAt    DateTime @default(now()) @map("created_at")
-
-  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  lessonPlan LessonPlan? @relation(fields: [lessonPlanId], references: [id], onDelete: SetNull)
-
-  @@index([lessonPlanId], map: "idx_files_lesson")
-  @@map("files")
 }
 
 // ==================== Attendance ====================
@@ -298,10 +221,12 @@ model WeeklySchedule {
   hours         Int       @default(1)
   entryType     EntryType @default(lecture) @map("entry_type")
   color         String?   @db.VarChar(20)
+  classroomId    Int?      @map("classroom_id")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  classroom Classroom? @relation(fields: [classroomId], references: [id], onDelete: SetNull)
 
   @@index([userId], map: "idx_timetable_user")
   @@index([dayOfWeek], map: "idx_timetable_day")

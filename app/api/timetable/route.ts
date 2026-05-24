@@ -2,6 +2,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError } from '@/lib/auth';
 
+const PERIOD_TIMES: Record<number, { start: string; end: string }> = {
+  0:  { start: '07:30', end: '08:00' },
+  1:  { start: '08:00', end: '09:00' },
+  2:  { start: '09:00', end: '10:00' },
+  3:  { start: '10:00', end: '11:00' },
+  4:  { start: '11:00', end: '12:00' },
+  5:  { start: '13:00', end: '14:00' },
+  6:  { start: '14:00', end: '15:00' },
+  7:  { start: '15:00', end: '16:00' },
+  8:  { start: '16:00', end: '17:00' },
+  9:  { start: '17:00', end: '18:00' },
+  10: { start: '18:00', end: '19:00' },
+  11: { start: '19:00', end: '20:00' },
+  12: { start: '20:00', end: '21:00' },
+};
+
 export async function GET(request: NextRequest) {
   try {
     const user = requireAuth(request);
@@ -9,20 +25,26 @@ export async function GET(request: NextRequest) {
       where: { userId: user.id },
       orderBy: [{ dayOfWeek: 'asc' }, { startPeriod: 'asc' }],
     });
-    const mappedEntries = entries.map(e => ({
-      id: e.id,
-      day_of_week: e.dayOfWeek,
-      start_period: e.startPeriod,
-      end_period: e.endPeriod,
-      subject_code: e.subjectCode,
-      subject_name: e.subjectName,
-      room: e.room,
-      instructor: e.instructor,
-      group_name: e.groupName,
-      hours: e.hours,
-      entry_type: e.entryType,
-      color: e.color
-    }));
+    const mappedEntries = entries.map(e => {
+      const hours = e.startPeriod === 0 ? 0 : (e.endPeriod - e.startPeriod + 1);
+      return {
+        id: e.id,
+        day_of_week: e.dayOfWeek,
+        start_period: e.startPeriod,
+        end_period: e.endPeriod,
+        start_time: e.startTime ? e.startTime.toISOString().split('T')[1].slice(0, 5) : null,
+        end_time: e.endTime ? e.endTime.toISOString().split('T')[1].slice(0, 5) : null,
+        subject_code: e.subjectCode,
+        subject_name: e.subjectName,
+        room: e.room,
+        instructor: e.instructor,
+        group_name: e.groupName,
+        hours: hours,
+        entry_type: e.entryType,
+        color: e.color,
+        classroom_id: e.classroomId
+      };
+    });
     const summaryMap = new Map();
     mappedEntries.forEach(e => {
       if (!e.subject_code) return;
@@ -47,48 +69,64 @@ export async function POST(request: NextRequest) {
 
     // Bulk create
     if (Array.isArray(body.entries)) {
-      const data = body.entries.map((e: Record<string, unknown>) => ({
-        userId: user.id,
-        timetableName: (e.timetable_name as string) || 'ตารางสอน',
-        semester: (e.semester as string) || null,
-        dayOfWeek: e.day_of_week as number,
-        startPeriod: e.start_period as number,
-        endPeriod: e.end_period as number,
-        startTime: e.start_time ? new Date(`1970-01-01T${e.start_time}`) : null,
-        endTime: e.end_time ? new Date(`1970-01-01T${e.end_time}`) : null,
-        subjectCode: (e.subject_code as string) || null,
-        subjectName: (e.subject_name as string) || null,
-        room: (e.room as string) || null,
-        instructor: (e.instructor as string) || null,
-        groupName: (e.group_name as string) || null,
-        hours: (e.hours as number) ?? 1,
-        entryType: (e.entry_type as string) || 'lecture',
-        color: (e.color as string) || null,
-      }));
+      const data = body.entries.map((e: Record<string, unknown>) => {
+        const startPeriod = Number(e.start_period);
+        const endPeriod = Number(e.end_period);
+        const hours = startPeriod === 0 ? 0 : (endPeriod - startPeriod + 1);
+        const startTimeStr = (e.start_time as string) || PERIOD_TIMES[startPeriod]?.start;
+        const endTimeStr = (e.end_time as string) || PERIOD_TIMES[endPeriod]?.end;
+
+        return {
+          userId: user.id,
+          timetableName: (e.timetable_name as string) || 'ตารางสอน',
+          semester: (e.semester as string) || null,
+          dayOfWeek: e.day_of_week as number,
+          startPeriod,
+          endPeriod,
+          startTime: startTimeStr ? new Date(`1970-01-01T${startTimeStr}`) : null,
+          endTime: endTimeStr ? new Date(`1970-01-01T${endTimeStr}`) : null,
+          subjectCode: (e.subject_code as string) || null,
+          subjectName: (e.subject_name as string) || null,
+          room: (e.room as string) || null,
+          instructor: (e.instructor as string) || null,
+          groupName: (e.group_name as string) || null,
+          hours,
+          entryType: (e.entry_type as string) || 'lecture',
+          color: (e.color as string) || null,
+          classroomId: e.classroom_id ? Number(e.classroom_id) : null,
+        };
+      });
 
       await prisma.weeklySchedule.createMany({ data });
       return NextResponse.json({ message: 'Timetable entries created' }, { status: 201 });
     }
 
     // Single create
+    const startPeriod = Number(body.start_period);
+    const endPeriod = Number(body.end_period);
+    const hours = startPeriod === 0 ? 0 : (endPeriod - startPeriod + 1);
+    const startTimeStr = body.start_time || PERIOD_TIMES[startPeriod]?.start;
+    const endTimeStr = body.end_time || PERIOD_TIMES[endPeriod]?.end;
+
     const entry = await prisma.weeklySchedule.create({
       data: {
         userId: user.id,
         timetableName: body.timetable_name || 'ตารางสอน',
         semester: body.semester || null,
-        dayOfWeek: body.day_of_week,
-        startPeriod: body.start_period,
-        endPeriod: body.end_period,
-        startTime: body.start_time ? new Date(`1970-01-01T${body.start_time}`) : null,
-        endTime: body.end_time ? new Date(`1970-01-01T${body.end_time}`) : null,
+        dayOfWeek: Number(body.day_of_week),
+        startPeriod,
+        endPeriod,
+        startTime: startTimeStr ? new Date(`1970-01-01T${startTimeStr}`) : null,
+        endTime: endTimeStr ? new Date(`1970-01-01T${endTimeStr}`) : null,
         subjectCode: body.subject_code || null,
         subjectName: body.subject_name || null,
         room: body.room || null,
         instructor: body.instructor || null,
         groupName: body.group_name || null,
-        hours: body.hours ?? 1,
+        hours,
         entryType: body.entry_type || 'lecture',
         color: body.color || null,
+        classroomId: body.classroom_id ? Number(body.classroom_id) : null,
       },
     });
 

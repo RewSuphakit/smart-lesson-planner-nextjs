@@ -11,6 +11,20 @@ import {
 import toast from 'react-hot-toast';
 import axios from 'axios';
 
+interface TimetableEntry {
+  id: number;
+  day_of_week: number;
+  start_period: number;
+  end_period: number;
+  subject_name?: string;
+  subject_code?: string;
+  room?: string;
+  group_name?: string;
+  classroom_id?: number;
+  hours: number;
+  entry_type: string;
+}
+
 interface Classroom {
   id: string;
   name: string;
@@ -81,6 +95,11 @@ export default function Attendance() {
   const [exportEndDate, setExportEndDate] = useState('');
   const [exporting, setExporting] = useState(false);
 
+
+
+  // Today's timetable entries
+  const [todayEntries, setTodayEntries] = useState<TimetableEntry[]>([]);
+
   const cellPopoverRef = useRef<HTMLDivElement>(null);
 
   // Close cell editing popover when clicking outside
@@ -107,6 +126,27 @@ export default function Attendance() {
     }
   }, []);
 
+  // Fetch timetable to show today's classes
+  useEffect(() => {
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const res = await api.get('/timetable', { signal: controller.signal });
+        const allEntries: TimetableEntry[] = res.data.data?.entries || [];
+        // Convert JS getDay() (0=Sun..6=Sat) to schema (0=Mon..6=Sun)
+        const jsDay = new Date().getDay();
+        const schemaDayOfWeek = (jsDay + 6) % 7;
+        const today = allEntries.filter(e => e.day_of_week === schemaDayOfWeek);
+        setTodayEntries(today);
+      } catch (err) {
+        if (!axios.isCancel(err)) {
+          console.error('Failed to fetch timetable for today:', err);
+        }
+      }
+    })();
+    return () => controller.abort();
+  }, []);
+
   const fetchStudentsAndAttendance = useCallback(async (signal?: AbortSignal) => {
     if (!selectedClass) return;
     try {
@@ -120,7 +160,7 @@ export default function Attendance() {
       const newAtt: Record<string, string> = {};
       classStudents.forEach((s: Student) => {
         const found = existing.find((e: any) => String(e.student_id) === String(s.id));
-        newAtt[s.id] = found ? found.status : 'present';
+        newAtt[s.id] = found ? found.status : '';
       });
       setAttendance(newAtt);
 
@@ -174,12 +214,22 @@ export default function Attendance() {
     return () => controller.abort();
   }, [selectedClass, activeTab, matrixStartDate, matrixEndDate, fetchMatrixData]);
 
+
+
   const handleStatusChange = (studentId: string, status: string) => {
     setAttendance(prev => ({ ...prev, [studentId]: status }));
   };
 
   const handleSave = async () => {
     if (!selectedClass || students.length === 0) return;
+
+    // Check if there are any students without a status
+    const uncheckedStudents = students.filter(s => !attendance[s.id]);
+    if (uncheckedStudents.length > 0) {
+      toast.error(`กรุณาเช็คชื่อนักเรียนให้ครบทุกคนก่อนบันทึก (เหลืออีก ${uncheckedStudents.length} คน)`);
+      return;
+    }
+
     setSaving(true);
 
     const records = Object.entries(attendance).map(([student_id, status]) => ({
@@ -499,6 +549,56 @@ export default function Attendance() {
         )}
       </div>
 
+      {/* Today's Classes from Timetable */}
+      {todayEntries.length > 0 && (
+        <div className="glass p-5 rounded-2xl border border-white/40 shadow-xl shadow-indigo-100/20">
+          <div className="flex items-center gap-2 mb-3">
+            <CalendarIcon className="w-5 h-5 text-emerald-500" />
+            <h3 className="text-sm font-bold text-slate-700">📅 คาบเรียนวันนี้ ({new Date().toLocaleDateString('th-TH', { weekday: 'long' })})</h3>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {todayEntries.map((entry) => {
+              const matchedClassroom = entry.classroom_id ? classrooms.find(c => String(c.id) === String(entry.classroom_id)) : null;
+              const isActive = matchedClassroom && String(matchedClassroom.id) === selectedClass;
+              const periodLabel = entry.start_period === entry.end_period ? `คาบ ${entry.start_period}` : `คาบ ${entry.start_period}-${entry.end_period}`;
+              return (
+                <button
+                  key={entry.id}
+                  onClick={() => {
+                    if (matchedClassroom) {
+                      setSelectedClass(String(matchedClassroom.id));
+                      setDate(new Date().toISOString().split('T')[0]);
+                      setActiveTab('daily');
+                    }
+                  }}
+                  disabled={!matchedClassroom}
+                  className={`px-4 py-2.5 rounded-xl border text-left transition-all duration-200 ${
+                    isActive
+                      ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg shadow-emerald-200'
+                      : matchedClassroom
+                        ? 'bg-white hover:bg-emerald-50 border-emerald-200 text-slate-700 hover:border-emerald-400 hover:shadow-md cursor-pointer'
+                        : 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                  }`}
+                >
+                  <div className="font-bold text-sm">{entry.subject_name || 'ไม่ระบุวิชา'}</div>
+                  <div className={`text-xs mt-0.5 ${isActive ? 'text-emerald-100' : 'text-slate-500'}`}>
+                    {periodLabel} · {entry.room || '-'}
+                    {matchedClassroom && <span className="ml-1">· {matchedClassroom.name}</span>}
+                    {!matchedClassroom && <span className="ml-1 text-amber-500">· ยังไม่เชื่อมห้องเรียน</span>}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          {todayEntries.some(e => !e.classroom_id) && (
+            <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
+              <AlertCircle className="w-3 h-3" />
+              บางคาบยังไม่ได้เชื่อมกับห้องเรียน — ไปตั้งค่าที่เมนู "ตารางเรียน"
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Classroom selector card */}
       <div className="glass p-5 rounded-2xl flex flex-col md:flex-row gap-5 items-center justify-between border border-white/40 shadow-xl shadow-indigo-100/20">
         <div className="w-full md:w-2/3">
@@ -810,6 +910,7 @@ export default function Attendance() {
 
                 {/* Sticky Save Bar */}
                 <div className="p-4 border-t border-indigo-50/50 bg-indigo-50/30 flex justify-end gap-3">
+
                   <button
                     onClick={handleResetDraft}
                     className="px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold hover:bg-slate-50 transition-all duration-200"
@@ -1225,6 +1326,7 @@ export default function Attendance() {
         </div>,
         document.body
       )}
+
     </div>
   );
 }

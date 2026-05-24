@@ -17,13 +17,11 @@ const animalAvatars = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '
 const navItems = [
   { path: '/', icon: LayoutDashboard, label: 'แดชบอร์ด' },
   { path: '/classrooms', icon: Presentation, label: 'ห้องเรียน' },
-  { path: '/lessons', icon: BookOpen, label: 'แผนการสอน' },
   { path: '/schedule', icon: Calendar, label: 'ตารางสอน' },
   { path: '/students', icon: Users, label: 'นักเรียน' },
   { path: '/attendance', icon: CheckCircle, label: 'เช็คชื่อ' },
   { path: '/scores', icon: CheckSquare, label: 'คะแนนรายสัปดาห์' },
   { path: '/grades', icon: Award, label: 'ตัดเกรด' },
-  { path: '/files', icon: FileText, label: 'ไฟล์เอกสาร' },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

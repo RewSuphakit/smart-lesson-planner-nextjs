@@ -44,9 +44,24 @@ export async function GET(request: NextRequest) {
     const maxMidtermScore = Number(classroom.midtermMaxScore ?? 100);
     const maxFinalScore = Number(classroom.finalMaxScore ?? 100);
 
-    // Get max possible scores from score_structures
+    // Get target weeks based on totalClasses
+    const total = classroom.totalClasses || 40;
+    let targetWeeks = 18;
+    if (total % 18 !== 0) {
+      for (let w = 15; w <= 20; w++) {
+        if (total % w === 0) {
+          targetWeeks = w;
+          break;
+        }
+      }
+    }
+
+    // Get max possible scores from score_structures up to targetWeeks
     const structureAgg = await prisma.scoreStructure.aggregate({
-      where: { classroomId: Number(classroomId) },
+      where: { 
+        classroomId: Number(classroomId),
+        lessonNumber: { lte: targetWeeks }
+      },
       _sum: { maxAssignmentScore: true, maxPostTestScore: true },
     });
     const maxAssignRaw = Number(structureAgg._sum.maxAssignmentScore ?? 0);
@@ -57,7 +72,6 @@ export async function GET(request: NextRequest) {
       where: { classroomId: Number(classroomId) },
       include: {
         studentScores: true,
-        evaluations: true,
         attendance: { where: { classroomId: Number(classroomId) } },
       },
     });
@@ -89,9 +103,13 @@ export async function GET(request: NextRequest) {
       const totalConverted = absentCount + convertedFromLate + convertedFromLeave;
       const isF = totalConverted > maxAllowedAbsences;
 
-      // Score calculation
-      const sumAssignRaw = s.studentScores.reduce((acc, sc) => acc + Number(sc.assignmentScore ?? 0), 0);
-      const sumPostTestRaw = s.studentScores.reduce((acc, sc) => acc + Number(sc.postTestScore ?? 0), 0);
+      // Score calculation up to targetWeeks
+      const sumAssignRaw = s.studentScores
+        .filter(sc => sc.lessonNumber <= targetWeeks)
+        .reduce((acc, sc) => acc + Number(sc.assignmentScore ?? 0), 0);
+      const sumPostTestRaw = s.studentScores
+        .filter(sc => sc.lessonNumber <= targetWeeks)
+        .reduce((acc, sc) => acc + Number(sc.postTestScore ?? 0), 0);
       const midtermScore = Number(s.midtermScore ?? 0);
       const finalScore = Number(s.finalScore ?? 0);
 
@@ -151,6 +169,10 @@ export async function GET(request: NextRequest) {
         percentage: percentage.toFixed(2),
         grade: finalGrade || 'ไม่มีเกรด',
         is_f: isF,
+        absent_count: absentCount,
+        late_count: lateCount,
+        max_allowed_absences: maxAllowedAbsences,
+        remaining_absences: maxAllowedAbsences - totalConverted,
       };
     });
 
