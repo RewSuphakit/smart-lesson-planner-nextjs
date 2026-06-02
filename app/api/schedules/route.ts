@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAuth, AuthError } from '@/lib/auth';
+import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -45,8 +45,18 @@ export async function GET(request: NextRequest) {
       status: s.status
     }));
 
-    const resultSchedules: any[] = [];
-    let current = new Date(startUtc);
+    interface VirtualSchedule {
+      id: string;
+      lesson_title: string;
+      subject: string;
+      scheduled_date: string;
+      start_time: string;
+      end_time: string;
+      notes: string;
+      status: string;
+    }
+    const resultSchedules: VirtualSchedule[] = [];
+    const current = new Date(startUtc);
 
     while (current <= endUtc) {
       const dateStr = current.toISOString().split('T')[0];
@@ -91,7 +101,7 @@ export async function GET(request: NextRequest) {
     const data = [...resultSchedules, ...mappedConcrete];
     return NextResponse.json({ data });
   } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+    if (error instanceof AuthError) return handleAuthError();
     console.error('Get schedules error:', error);
     return NextResponse.json({ message: 'Failed to get schedules' }, { status: 500 });
   }
@@ -125,14 +135,34 @@ export async function POST(request: NextRequest) {
         }, { status: 400 });
       }
 
+      // BUG-14: Delete existing auto-generated schedules for the user to prevent duplicates
+      await prisma.schedule.deleteMany({
+        where: {
+          userId: user.id,
+          notes: {
+            startsWith: 'สร้างอัตโนมัติ:',
+          },
+        },
+      });
+
       // Track how many schedules generated per classroom
       const classroomCounts: Record<number, number> = {};
       for (const room of classrooms) {
         classroomCounts[room.id] = 0;
       }
 
-      const schedulesToCreate: any[] = [];
-      let currentDate = new Date(startDate);
+      interface ScheduleInput {
+        userId: number;
+        title: string;
+        subject: string;
+        scheduledDate: Date;
+        startTime: Date;
+        endTime: Date;
+        notes: string;
+        status: string;
+      }
+      const schedulesToCreate: ScheduleInput[] = [];
+      const currentDate = new Date(startDate);
       const maxDays = 365;
       let daysProcessed = 0;
 
@@ -209,7 +239,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ data: schedule }, { status: 201 });
   } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+    if (error instanceof AuthError) return handleAuthError();
     console.error('Create schedule error:', error);
     return NextResponse.json({ message: 'Failed to create schedule' }, { status: 500 });
   }

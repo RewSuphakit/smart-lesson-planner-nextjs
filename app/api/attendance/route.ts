@@ -158,8 +158,15 @@ export async function POST(request: NextRequest) {
 
     // Bulk mark attendance
     if (Array.isArray(body.records)) {
+      interface RecordInput {
+        student_id: number;
+        classroom_id: number;
+        date: string;
+        status: 'present' | 'late' | 'absent' | 'leave';
+      }
+      const records = body.records as RecordInput[];
       // Find unique classroom IDs and verify ownership
-      const classroomIds = Array.from(new Set(body.records.map((r: any) => Number(r.classroom_id)))) as number[];
+      const classroomIds = Array.from(new Set(records.map(r => Number(r.classroom_id)))) as number[];
       for (const cid of classroomIds) {
         const classroom = await prisma.classroom.findFirst({
           where: { id: cid, userId: user.id }
@@ -167,7 +174,19 @@ export async function POST(request: NextRequest) {
         if (!classroom) return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
       }
 
-      for (const record of body.records) {
+      // Verify student ownership for all students in the request
+      const studentIds = Array.from(new Set(records.map(r => Number(r.student_id)))) as number[];
+      const ownedStudents = await prisma.student.findMany({
+        where: { id: { in: studentIds }, userId: user.id },
+        select: { id: true },
+      });
+      const ownedStudentIds = new Set(ownedStudents.map(s => s.id));
+      const unauthorizedIds = studentIds.filter(id => !ownedStudentIds.has(id));
+      if (unauthorizedIds.length > 0) {
+        return NextResponse.json({ message: 'Some students not found or unauthorized' }, { status: 403 });
+      }
+
+      for (const record of records) {
         await prisma.attendance.upsert({
           where: {
             studentId_classroomId_date: {

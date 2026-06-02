@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAuth, AuthError } from '@/lib/auth';
+import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,6 +10,47 @@ export async function GET(request: NextRequest) {
 
     const where: Record<string, unknown> = { userId: user.id };
     if (classroomId) where.classroomId = Number(classroomId);
+
+    const pageStr = searchParams.get('page');
+    const limitStr = searchParams.get('limit');
+
+    if (pageStr || limitStr) {
+      const page = Math.max(1, parseInt(pageStr || '1') || 1);
+      const limit = Math.max(1, parseInt(limitStr || '25') || 25);
+      const skip = (page - 1) * limit;
+
+      const [total, students] = await Promise.all([
+        prisma.student.count({ where }),
+        prisma.student.findMany({
+          where,
+          orderBy: { name: 'asc' },
+          skip,
+          take: limit,
+        }),
+      ]);
+
+      const mappedStudents = students.map(s => ({
+        id: s.id,
+        name: s.name,
+        student_code: s.studentCode,
+        grade_level: s.gradeLevel,
+        email: s.email,
+        classroom_id: s.classroomId,
+        midterm_score: s.midtermScore ? Number(s.midtermScore) : null,
+        final_score: s.finalScore ? Number(s.finalScore) : null,
+        affective_score: s.affectiveScore ? Number(s.affectiveScore) : null,
+      }));
+
+      return NextResponse.json({
+        data: mappedStudents,
+        meta: {
+          total,
+          page,
+          limit,
+          total_pages: Math.ceil(total / limit),
+        },
+      });
+    }
 
     const students = await prisma.student.findMany({
       where,
@@ -23,13 +64,14 @@ export async function GET(request: NextRequest) {
       grade_level: s.gradeLevel,
       email: s.email,
       classroom_id: s.classroomId,
-      midterm_score: s.midtermScore,
-      final_score: s.finalScore
+      midterm_score: s.midtermScore ? Number(s.midtermScore) : null,
+      final_score: s.finalScore ? Number(s.finalScore) : null,
+      affective_score: s.affectiveScore ? Number(s.affectiveScore) : null,
     }));
 
     return NextResponse.json({ data: mappedStudents });
   } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+    if (error instanceof AuthError) return handleAuthError();
     return NextResponse.json({ message: 'Failed to get students' }, { status: 500 });
   }
 }
@@ -68,7 +110,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ data: student }, { status: 201 });
   } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+    if (error instanceof AuthError) return handleAuthError();
     console.error('Create student error:', error);
     return NextResponse.json({ message: 'Failed to create student' }, { status: 500 });
   }
@@ -88,23 +130,29 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ message: 'Students updated' });
     }
 
-    // Bulk update exams
+    // Bulk update exams — verify ownership + only update provided fields
     if (Array.isArray(body.scores)) {
       for (const score of body.scores) {
-        await prisma.student.update({
-          where: { id: score.student_id },
-          data: {
-            midtermScore: score.midterm_score || 0,
-            finalScore: score.final_score || 0,
-          },
-        });
+        const dataToUpdate: Record<string, unknown> = {};
+        if (score.midterm_score !== undefined) {
+          dataToUpdate.midtermScore = score.midterm_score === '' || score.midterm_score === null ? null : Number(score.midterm_score);
+        }
+        if (score.final_score !== undefined) {
+          dataToUpdate.finalScore = score.final_score === '' || score.final_score === null ? null : Number(score.final_score);
+        }
+        if (Object.keys(dataToUpdate).length > 0) {
+          await prisma.student.updateMany({
+            where: { id: score.student_id, userId: user.id },
+            data: dataToUpdate,
+          });
+        }
       }
       return NextResponse.json({ message: 'Scores updated' });
     }
 
     return NextResponse.json({ message: 'Invalid request' }, { status: 400 });
   } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+    if (error instanceof AuthError) return handleAuthError();
     return NextResponse.json({ message: 'Failed to update students' }, { status: 500 });
   }
 }
@@ -137,7 +185,7 @@ export async function DELETE(request: NextRequest) {
     const result = await prisma.student.deleteMany({ where });
     return NextResponse.json({ message: `Deleted ${result.count} students`, count: result.count });
   } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+    if (error instanceof AuthError) return handleAuthError();
     console.error('Delete students error:', error);
     return NextResponse.json({ message: 'Failed to delete students' }, { status: 500 });
   }

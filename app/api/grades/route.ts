@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAuth, AuthError } from '@/lib/auth';
+import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -44,17 +44,13 @@ export async function GET(request: NextRequest) {
     const maxMidtermScore = Number(classroom.midtermMaxScore ?? 100);
     const maxFinalScore = Number(classroom.finalMaxScore ?? 100);
 
-    // Get target weeks based on totalClasses
-    const total = classroom.totalClasses || 40;
-    let targetWeeks = 18;
-    if (total % 18 !== 0) {
-      for (let w = 15; w <= 20; w++) {
-        if (total % w === 0) {
-          targetWeeks = w;
-          break;
-        }
-      }
-    }
+    // BUG-11 fix: Get actual max lesson number from score structures
+    // instead of guessing from totalClasses
+    const maxLessonAgg = await prisma.scoreStructure.aggregate({
+      where: { classroomId: Number(classroomId) },
+      _max: { lessonNumber: true },
+    });
+    const targetWeeks = maxLessonAgg._max.lessonNumber || 18;
 
     // Get max possible scores from score_structures up to targetWeeks
     const structureAgg = await prisma.scoreStructure.aggregate({
@@ -91,10 +87,9 @@ export async function GET(request: NextRequest) {
 
     const report = students.map((s) => {
       // Attendance stats
-      let presentCount = 0, lateCount = 0, absentCount = 0, leaveCount = 0;
+      let lateCount = 0, absentCount = 0, leaveCount = 0;
       for (const a of s.attendance) {
-        if (a.status === 'present') presentCount++;
-        else if (a.status === 'late') lateCount++;
+        if (a.status === 'late') lateCount++;
         else if (a.status === 'absent') absentCount++;
         else if (a.status === 'leave') leaveCount++;
       }
@@ -124,6 +119,8 @@ export async function GET(request: NextRequest) {
       const scaledFinal = Math.round(preciseScaledFinal);
 
       // Use stored affective score if manually set, otherwise auto-calculate
+      // BUG-19 note: Formula deducts 2 points per absence + 1 per late from weightAffective (default 20).
+      // This is intentionally strict for Thai vocational education attendance policies.
       let affectiveScore: number;
       if (s.affectiveScore !== null && s.affectiveScore !== undefined) {
         affectiveScore = Number(s.affectiveScore);
@@ -132,7 +129,10 @@ export async function GET(request: NextRequest) {
       }
 
       const totalScore = scaledAssign + scaledPostTest + affectiveScore + scaledMidterm + scaledFinal;
-      const percentage = totalScore;
+      // BUG-10 fix: Calculate actual percentage based on total weight sum
+      // When weights sum to 100 this is equivalent, but handles edge cases
+      const totalWeightSum = weightAssign + weightPostTest + weightAffective + weightMidterm + weightFinal;
+      const percentage = totalWeightSum > 0 ? (totalScore / totalWeightSum) * 100 : 0;
 
       let finalGrade: string | null = null;
       if (isF) {
@@ -178,7 +178,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ data: report });
   } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+    if (error instanceof AuthError) return handleAuthError();
     console.error('Get grades error:', error);
     return NextResponse.json({ message: 'Failed to get grades' }, { status: 500 });
   }
@@ -206,7 +206,7 @@ export async function POST(request: NextRequest) {
 
     if (body.criteria && body.criteria.length > 0) {
       await prisma.gradeCriteria.createMany({
-        data: body.criteria.map((c: { grade: string; min_score: any }) => ({
+        data: body.criteria.map((c: { grade: string; min_score: string | number }) => ({
           classroomId: Number(classroomId),
           grade: c.grade,
           minScore: isNaN(Number(c.min_score)) ? 0 : Number(c.min_score),
@@ -217,7 +217,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Criteria saved' });
   } catch (error) {
     console.error('Save criteria error:', error);
-    if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+    if (error instanceof AuthError) return handleAuthError();
     return NextResponse.json({ message: 'Failed to save criteria' }, { status: 500 });
   }
 }

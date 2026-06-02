@@ -1,24 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAuth, AuthError } from '@/lib/auth';
+import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-
-// ─── Period time mapping ────────────────────────────────────────────────────
-const PERIOD_TIMES: Record<number, { start: string; end: string }> = {
-  0:  { start: '07:30', end: '08:00' },
-  1:  { start: '08:00', end: '09:00' },
-  2:  { start: '09:00', end: '10:00' },
-  3:  { start: '10:00', end: '11:00' },
-  4:  { start: '11:00', end: '12:00' },
-  5:  { start: '13:00', end: '14:00' },
-  6:  { start: '14:00', end: '15:00' },
-  7:  { start: '15:00', end: '16:00' },
-  8:  { start: '16:00', end: '17:00' },
-  9:  { start: '17:00', end: '18:00' },
-  10: { start: '18:00', end: '19:00' },
-  11: { start: '19:00', end: '20:00' },
-  12: { start: '20:00', end: '21:00' },
-};
+// @ts-expect-error - pdf-parse lacks official type declarations
+import pdfParse from 'pdf-parse';
+import { PERIOD_TIMES } from '@/lib/constants';
 
 const DAY_MAP: Record<string, number> = {
   'จันทร์': 0, 'วันจันทร์': 0, 'mon': 0, 'monday': 0,
@@ -106,8 +92,6 @@ function parseCSV(content: string, userId: number) {
 }
 
 async function parsePDF(buffer: Buffer, userId: number) {
-  // @ts-ignore
-  const pdfParse = require('pdf-parse');
   const data = await pdfParse(buffer);
   const text = data.text;
   const lines = text.split(/\r?\n/).filter((l: string) => l.trim());
@@ -235,17 +219,17 @@ async function parseImageWithAI(buffer: Buffer, mimeType: string, userId: number
 
   try {
     let result = null;
-    let retries = 3;
+    const retries = 3;
     let delayMs = 1500;
-    let lastError: any = null;
+    let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         result = await model.generateContent([prompt, ...imageParts]);
         break; // Success!
-      } catch (error: any) {
-        lastError = error;
-        console.warn(`Gemini API call failed (Attempt ${attempt}/${retries}). Error: ${error.message || error}`);
+      } catch (error: unknown) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.warn(`Gemini API call failed (Attempt ${attempt}/${retries}). Error: ${lastError.message}`);
         if (attempt < retries) {
           await new Promise(resolve => setTimeout(resolve, delayMs));
           delayMs *= 2; // Exponential backoff
@@ -271,7 +255,7 @@ async function parseImageWithAI(buffer: Buffer, mimeType: string, userId: number
       const endP = item.end_period !== undefined && item.end_period !== null ? parseInt(item.end_period) : startP;
       
       // Normalize entry type to match MySQL enum constraints: 'lecture' | 'lab' | 'activity' | 'homeroom'
-      let rawType = (item.entry_type || 'lecture').toLowerCase().trim();
+      const rawType = (item.entry_type || 'lecture').toLowerCase().trim();
       let normalizedType = 'lecture';
       if (rawType === 'lab' || rawType.includes('lab') || rawType.includes('ปฏิบัติ')) {
         normalizedType = 'lab';
@@ -299,9 +283,10 @@ async function parseImageWithAI(buffer: Buffer, mimeType: string, userId: number
     }
     
     return entries;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Gemini AI Parsing Error:", error);
-    throw new Error('AI ไม่สามารถวิเคราะห์ตารางสอนจากรูปภาพนี้ได้: ' + (error.message || 'Unknown'));
+    const msg = error instanceof Error ? error.message : 'Unknown';
+    throw new Error('AI ไม่สามารถวิเคราะห์ตารางสอนจากรูปภาพนี้ได้: ' + msg);
   }
 }
 
@@ -318,7 +303,26 @@ export async function POST(request: NextRequest) {
     const mime = file.type;
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    let entries: any[] = [];
+
+    interface TimetableEntryInput {
+      userId: number;
+      dayOfWeek: number;
+      startPeriod: number;
+      endPeriod: number;
+      startTime: Date | null;
+      endTime: Date | null;
+      subjectCode: string | null;
+      subjectName: string | null;
+      room: string | null;
+      instructor: string | null;
+      groupName: string | null;
+      hours: number;
+      entryType: string;
+      timetableName?: string;
+      semester?: string | null;
+    }
+
+    let entries: TimetableEntryInput[] = [];
 
     if (mime === 'text/csv' || mime === 'application/vnd.ms-excel' || file.name.endsWith('.csv')) {
       const content = buffer.toString('utf-8');
@@ -354,9 +358,10 @@ export async function POST(request: NextRequest) {
       message: `นำเข้าตารางสอนสำเร็จ ${created.count} รายการ`,
       data: { count: created.count },
     }, { status: 201 });
-  } catch (error: any) {
-    if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+  } catch (error: unknown) {
+    if (error instanceof AuthError) return handleAuthError();
     console.error('Timetable upload error:', error);
-    return NextResponse.json({ message: error.message || 'อัพโหลดไม่สำเร็จ' }, { status: 500 });
+    const msg = error instanceof Error ? error.message : 'อัพโหลดไม่สำเร็จ';
+    return NextResponse.json({ message: msg }, { status: 500 });
   }
 }

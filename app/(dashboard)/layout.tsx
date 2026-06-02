@@ -6,7 +6,8 @@ import { useAuth } from '@/context/AuthContext';
 import {
   LayoutDashboard, BookOpen, Calendar, Users,
   FileText, LogOut, Menu, GraduationCap,
-  Presentation, CheckCircle, Award, CheckSquare
+  Presentation, CheckCircle, Award, CheckSquare,
+  Smile
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
@@ -20,6 +21,7 @@ const navItems = [
   { path: '/schedule', icon: Calendar, label: 'ตารางสอน' },
   { path: '/students', icon: Users, label: 'นักเรียน' },
   { path: '/attendance', icon: CheckCircle, label: 'เช็คชื่อ' },
+  { path: '/affective', icon: Smile, label: 'คะแนนจิตพิสัย' },
   { path: '/scores', icon: CheckSquare, label: 'คะแนนรายสัปดาห์' },
   { path: '/grades', icon: Award, label: 'ตัดเกรด' },
 ];

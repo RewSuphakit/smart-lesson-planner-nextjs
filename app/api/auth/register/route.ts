@@ -5,11 +5,13 @@ import { generateToken } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, name } = await request.json();
+    const { email, password, name, role } = await request.json();
 
     if (!email || !password || !name) {
       return NextResponse.json({ message: 'Email, password, and name are required' }, { status: 400 });
     }
+
+    const validRole = (role === 'admin' || role === 'teacher') ? role : 'teacher';
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
@@ -23,7 +25,7 @@ export async function POST(request: NextRequest) {
         email,
         password: hashedPassword,
         name,
-        role: 'teacher',
+        role: validRole,
       },
       select: { id: true, email: true, name: true, role: true, avatar: true },
     });

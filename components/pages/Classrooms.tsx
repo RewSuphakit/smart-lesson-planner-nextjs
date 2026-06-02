@@ -36,10 +36,20 @@ function ClassroomCard({ c, i, colors, onEdit, onDelete }: ClassroomCardProps) {
           {animalAvatars[Number(c.id || 0) % animalAvatars.length]}
         </div>
         <div className="flex gap-1">
-          <button onClick={() => onEdit(c)} className="p-2 rounded-xl hover:bg-indigo-100 text-slate-600 hover:text-indigo-600 transition-all" title="แก้ไข">
+          <button 
+            onClick={() => onEdit(c)} 
+            className="p-2 rounded-xl hover:bg-indigo-100 text-slate-600 hover:text-indigo-600 transition-all" 
+            title="แก้ไข"
+            aria-label={`แก้ไขห้องเรียน ${c.name}`}
+          >
             <Edit className="w-4 h-4" />
           </button>
-          <button onClick={() => onDelete(c.id)} className="p-2 rounded-xl hover:bg-rose-100 text-slate-600 hover:text-rose-600 transition-all" title="ลบ">
+          <button 
+            onClick={() => onDelete(c.id)} 
+            className="p-2 rounded-xl hover:bg-rose-100 text-slate-600 hover:text-rose-600 transition-all" 
+            title="ลบ"
+            aria-label={`ลบห้องเรียน ${c.name}`}
+          >
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
@@ -213,6 +223,8 @@ export default function Classrooms() {
           onChange={e => setSearch(e.target.value)}
           className="form-input pl-11"
           placeholder="ค้นหาห้องเรียน..."
+          id="search-classrooms"
+          aria-label="ค้นหาห้องเรียน"
         />
       </div>
 
@@ -253,8 +265,9 @@ export default function Classrooms() {
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="form-label">ชื่อห้องเรียน/วิชา</label>
+                <label className="form-label" htmlFor="classroom-name">ชื่อห้องเรียน/วิชา</label>
                 <input
+                  id="classroom-name"
                   value={form.name}
                   onChange={e => setForm({ ...form, name: e.target.value })}
                   className="form-input"
@@ -263,8 +276,9 @@ export default function Classrooms() {
                 />
               </div>
               <div>
-                <label className="form-label">รายละเอียด (ไม่บังคับ)</label>
+                <label className="form-label" htmlFor="classroom-desc">รายละเอียด (ไม่บังคับ)</label>
                 <textarea
+                  id="classroom-desc"
                   value={form.description}
                   onChange={e => setForm({ ...form, description: e.target.value })}
                   className="form-input"
@@ -273,8 +287,9 @@ export default function Classrooms() {
                 />
               </div>
               <div>
-                <label className="form-label">กฎ: สายกี่ครั้งนับเป็นขาด 1 ครั้ง</label>
+                <label className="form-label" htmlFor="classroom-late-ratio">กฎ: สายกี่ครั้งนับเป็นขาด 1 ครั้ง</label>
                 <input
+                  id="classroom-late-ratio"
                   type="number"
                   min="1"
                   max="10"
@@ -286,8 +301,9 @@ export default function Classrooms() {
                 <p className="text-xs text-slate-500 mt-1">ค่าเริ่มต้น: 3 (สาย 3 ครั้ง = ขาด 1 ครั้ง)</p>
               </div>
               <div>
-                <label className="form-label">กฎ: ลากี่ครั้งนับเป็นขาด 1 ครั้ง</label>
+                <label className="form-label" htmlFor="classroom-leave-ratio">กฎ: ลากี่ครั้งนับเป็นขาด 1 ครั้ง</label>
                 <input
+                  id="classroom-leave-ratio"
                   type="number"
                   min="1"
                   max="10"
@@ -300,8 +316,9 @@ export default function Classrooms() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="form-label">คาบเรียน/สัปดาห์</label>
+                  <label className="form-label" htmlFor="classroom-periods">คาบเรียน/สัปดาห์</label>
                   <input
+                    id="classroom-periods"
                     type="number"
                     min="1"
                     max="10"
@@ -316,8 +333,9 @@ export default function Classrooms() {
                   />
                 </div>
                 <div>
-                  <label className="form-label">จำนวนสัปดาห์/เทอม</label>
+                  <label className="form-label" htmlFor="classroom-weeks">จำนวนสัปดาห์/เทอม</label>
                   <input
+                    id="classroom-weeks"
                     type="number"
                     min="1"
                     max="40"
@@ -337,8 +355,9 @@ export default function Classrooms() {
               </div>
               
               <div>
-                <label className="form-label">เวลาเรียนขั้นต่ำที่มีสิทธิ์สอบ (%)</label>
+                <label className="form-label" htmlFor="classroom-min-attendance">เวลาเรียนขั้นต่ำที่มีสิทธิ์สอบ (%)</label>
                 <input
+                  id="classroom-min-attendance"
                   type="number"
                   min="1"
                   max="100"

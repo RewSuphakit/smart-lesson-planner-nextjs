@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAuth, AuthError } from '@/lib/auth';
+import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+    if (error instanceof AuthError) return handleAuthError();
     return NextResponse.json({ message: 'Failed to export' }, { status: 500 });
   }
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAuth, AuthError } from '@/lib/auth';
+import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -42,26 +42,26 @@ export async function GET(request: NextRequest) {
       }),
     ]);
 
-    // Fetch scores per classroom
-    const scoresData: any[] = [];
-    for (const classroom of classrooms) {
-      const scores = await prisma.studentScore.findMany({
-        where: { classroomId: classroom.id },
-        include: {
-          student: { select: { name: true, studentCode: true } },
-        },
-      });
-      for (const score of scores) {
-        scoresData.push({
-          classroom_name: classroom.name,
-          student_code: score.student?.studentCode || '',
-          student_name: score.student?.name || '',
-          lesson_number: score.lessonNumber,
-          assignment_score: score.assignmentScore,
-          post_test_score: score.postTestScore,
-        });
-      }
-    }
+    // BUG-06 fix: Fetch all scores in one query instead of N+1 loop
+    const classroomIds = classrooms.map(c => c.id);
+    const allScores = classroomIds.length > 0
+      ? await prisma.studentScore.findMany({
+          where: { classroomId: { in: classroomIds } },
+          include: {
+            student: { select: { name: true, studentCode: true } },
+            classroom: { select: { name: true } },
+          },
+        })
+      : [];
+
+    const scoresData = allScores.map(score => ({
+      classroom_name: score.classroom?.name || '',
+      student_code: score.student?.studentCode || '',
+      student_name: score.student?.name || '',
+      lesson_number: score.lessonNumber,
+      assignment_score: score.assignmentScore !== null ? Number(score.assignmentScore) : null,
+      post_test_score: score.postTestScore !== null ? Number(score.postTestScore) : null,
+    }));
 
     // Format data for export
     const exportData = {
@@ -130,7 +130,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ data: exportData });
   } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+    if (error instanceof AuthError) return handleAuthError();
     console.error('Export error:', error);
     return NextResponse.json({ message: 'Failed to export data' }, { status: 500 });
   }

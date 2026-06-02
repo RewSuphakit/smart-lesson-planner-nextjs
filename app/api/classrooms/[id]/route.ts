@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAuth, AuthError } from '@/lib/auth';
+import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (!classroom) return NextResponse.json({ message: 'Not found' }, { status: 404 });
     return NextResponse.json(classroom);
   } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+    if (error instanceof AuthError) return handleAuthError();
     return NextResponse.json({ message: 'Failed' }, { status: 500 });
   }
 }
@@ -49,7 +49,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ message: 'Updated' });
   } catch (error) {
     console.error('Update classroom error:', error);
-    if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+    if (error instanceof AuthError) return handleAuthError();
     return NextResponse.json({ message: 'Failed' }, { status: 500 });
   }
 }
@@ -68,7 +68,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     await prisma.classroom.delete({ where: { id: Number(id) } });
     return NextResponse.json({ message: 'Deleted' });
   } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+    if (error instanceof AuthError) return handleAuthError();
     return NextResponse.json({ message: 'Failed' }, { status: 500 });
   }
 }

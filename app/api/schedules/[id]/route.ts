@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAuth, AuthError } from '@/lib/auth';
+import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -26,7 +26,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     await prisma.schedule.update({ where: { id: Number(id) }, data: updateData });
     return NextResponse.json({ message: 'Schedule updated' });
   } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+    if (error instanceof AuthError) return handleAuthError();
     return NextResponse.json({ message: 'Failed to update schedule' }, { status: 500 });
   }
 }
@@ -45,7 +45,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     await prisma.schedule.delete({ where: { id: Number(id) } });
     return NextResponse.json({ message: 'Schedule deleted' });
   } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+    if (error instanceof AuthError) return handleAuthError();
     return NextResponse.json({ message: 'Failed to delete schedule' }, { status: 500 });
   }
 }

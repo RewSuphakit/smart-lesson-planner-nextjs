@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAuth, AuthError } from '@/lib/auth';
+import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -104,8 +104,11 @@ export async function GET(request: NextRequest) {
 
     const pendingTasks: PendingTask[] = [];
 
-    // Check today's timetable vs attendance
-    const jsDay = new Date().getDay(); // 0=Sun..6=Sat
+    // Use Thai timezone (UTC+7) to determine "today"
+    const nowUtc = new Date();
+    const thaiOffsetMs = 7 * 60 * 60 * 1000;
+    const nowThai = new Date(nowUtc.getTime() + thaiOffsetMs);
+    const jsDay = nowThai.getUTCDay(); // 0=Sun..6=Sat in Thai time
     const schemaDayOfWeek = (jsDay + 6) % 7; // 0=Mon..6=Sun
 
     const todayTimetable = await prisma.weeklySchedule.findMany({
@@ -113,22 +116,33 @@ export async function GET(request: NextRequest) {
       include: { classroom: true },
     });
 
-    const todayDateStr = new Date().toISOString().split('T')[0];
+    // Thai date string in YYYY-MM-DD
+    const todayDateStr = nowThai.toISOString().split('T')[0];
     const todayDate = new Date(todayDateStr);
+
+    // BUG-07 fix: batch attendance count instead of N+1 loop
+    const classroomIdsToCheck = todayTimetable
+      .filter(e => e.classroomId && e.classroom)
+      .map(e => e.classroomId!);
+    const uniqueClassroomIds = [...new Set(classroomIdsToCheck)];
+
+    const attendanceCounts = uniqueClassroomIds.length > 0
+      ? await prisma.attendance.groupBy({
+          by: ['classroomId'],
+          where: {
+            classroomId: { in: uniqueClassroomIds },
+            date: todayDate,
+          },
+          _count: true,
+        })
+      : [];
+
+    const classroomHasAttendance = new Set(attendanceCounts.map(a => a.classroomId));
 
     for (const entry of todayTimetable) {
       if (!entry.classroomId || !entry.classroom) continue;
 
-      // Check if any attendance records exist for this classroom today
-      const attendanceCount = await prisma.attendance.count({
-        where: {
-          classroomId: entry.classroomId,
-          date: todayDate,
-        },
-      });
-
-      if (attendanceCount === 0) {
-        // Only add if not already in pendingTasks for this classroom
+      if (!classroomHasAttendance.has(entry.classroomId)) {
         if (!pendingTasks.some(t => t.classroom_name === entry.classroom!.name && t.type === 'attendance')) {
           pendingTasks.push({
             type: 'attendance',
@@ -150,7 +164,7 @@ export async function GET(request: NextRequest) {
       }
     });
   } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+    if (error instanceof AuthError) return handleAuthError();
     return NextResponse.json({ message: 'Failed to get dashboard' }, { status: 500 });
   }
 }

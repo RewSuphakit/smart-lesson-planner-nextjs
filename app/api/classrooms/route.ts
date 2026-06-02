@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAuth, AuthError } from '@/lib/auth';
+import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ data: result });
   } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+    if (error instanceof AuthError) return handleAuthError();
     return NextResponse.json({ message: 'Failed to get classrooms' }, { status: 500 });
   }
 }
@@ -42,6 +42,10 @@ export async function POST(request: NextRequest) {
   try {
     const user = requireAuth(request);
     const body = await request.json();
+
+    if (!body.name || typeof body.name !== 'string' || !body.name.trim()) {
+      return NextResponse.json({ message: 'Classroom name is required' }, { status: 400 });
+    }
 
     const classroom = await prisma.classroom.create({
       data: {
@@ -58,7 +62,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ data: classroom }, { status: 201 });
   } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+    if (error instanceof AuthError) return handleAuthError();
     return NextResponse.json({ message: 'Failed to create classroom' }, { status: 500 });
   }
 }

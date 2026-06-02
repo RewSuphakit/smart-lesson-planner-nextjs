@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAuth, AuthError } from '@/lib/auth';
+import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 
 export async function PUT(request: NextRequest) {
   try {
@@ -40,7 +40,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ message: 'Exams updated successfully' });
   } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+    if (error instanceof AuthError) return handleAuthError();
     console.error('Update exams error:', error);
     return NextResponse.json({ message: 'Failed to update exams' }, { status: 500 });
   }

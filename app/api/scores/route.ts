@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAuth, AuthError } from '@/lib/auth';
+import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
     }));
     return NextResponse.json({ data: mappedScores });
   } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+    if (error instanceof AuthError) return handleAuthError();
     return NextResponse.json({ message: 'Failed to get scores' }, { status: 500 });
   }
 }
@@ -126,7 +126,21 @@ export async function POST(request: NextRequest) {
 
     // Save student scores (single lesson)
     if (body.scores && body.lesson_number !== undefined) {
-      for (const score of body.scores) {
+      interface ScoreInput {
+        student_id: number | string;
+        assignment_score: number | string | null;
+        post_test_score: number | string | null;
+      }
+      const scores = body.scores as ScoreInput[];
+      const studentIds = scores.map(s => Number(s.student_id));
+      const ownedStudents = await prisma.student.findMany({
+        where: { id: { in: studentIds }, userId: user.id },
+        select: { id: true },
+      });
+      const ownedStudentIds = new Set(ownedStudents.map(s => s.id));
+
+      for (const score of scores) {
+        if (!ownedStudentIds.has(Number(score.student_id))) continue; // Skip unauthorized
         await prisma.studentScore.upsert({
           where: {
             studentId_classroomId_lessonNumber: {
@@ -181,7 +195,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ message: 'Invalid request' }, { status: 400 });
   } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+    if (error instanceof AuthError) return handleAuthError();
     console.error('Save scores error:', error);
     return NextResponse.json({ message: 'Failed to save scores' }, { status: 500 });
   }

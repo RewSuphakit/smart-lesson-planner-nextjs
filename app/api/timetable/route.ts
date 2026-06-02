@@ -1,22 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAuth, AuthError } from '@/lib/auth';
-
-const PERIOD_TIMES: Record<number, { start: string; end: string }> = {
-  0:  { start: '07:30', end: '08:00' },
-  1:  { start: '08:00', end: '09:00' },
-  2:  { start: '09:00', end: '10:00' },
-  3:  { start: '10:00', end: '11:00' },
-  4:  { start: '11:00', end: '12:00' },
-  5:  { start: '13:00', end: '14:00' },
-  6:  { start: '14:00', end: '15:00' },
-  7:  { start: '15:00', end: '16:00' },
-  8:  { start: '16:00', end: '17:00' },
-  9:  { start: '17:00', end: '18:00' },
-  10: { start: '18:00', end: '19:00' },
-  11: { start: '19:00', end: '20:00' },
-  12: { start: '20:00', end: '21:00' },
-};
+import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
+import { PERIOD_TIMES } from '@/lib/constants';
 
 export async function GET(request: NextRequest) {
   try {
@@ -57,7 +42,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ data: { entries: mappedEntries, summary } });
   } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+    if (error instanceof AuthError) return handleAuthError();
     return NextResponse.json({ message: 'Failed to get timetable' }, { status: 500 });
   }
 }
@@ -132,7 +117,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ data: entry }, { status: 201 });
   } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+    if (error instanceof AuthError) return handleAuthError();
     console.error('Create timetable error:', error);
     return NextResponse.json({ message: 'Failed to create timetable' }, { status: 500 });
   }
@@ -144,7 +129,7 @@ export async function DELETE(request: NextRequest) {
     await prisma.weeklySchedule.deleteMany({ where: { userId: user.id } });
     return NextResponse.json({ message: 'Timetable cleared' });
   } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+    if (error instanceof AuthError) return handleAuthError();
     return NextResponse.json({ message: 'Failed to clear timetable' }, { status: 500 });
   }
 }

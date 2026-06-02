@@ -349,12 +349,21 @@ export default function Students() {
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative w-full sm:w-64">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-          <input value={search} onChange={e => setSearch(e.target.value)} className="form-input pl-11" placeholder="ค้นหานักเรียน..." id="student-search" />
+          <input 
+            value={search} 
+            onChange={e => setSearch(e.target.value)} 
+            className="form-input pl-11" 
+            placeholder="ค้นหานักเรียน..." 
+            id="student-search" 
+            aria-label="ค้นหานักเรียน"
+          />
         </div>
         <select 
           value={filterClassroomId} 
           onChange={e => setFilterClassroomId(e.target.value)} 
           className="form-input w-full sm:w-64"
+          id="filter-classroom"
+          aria-label="กรองตามห้องเรียน"
         >
           <option value="">-- ทุกห้องเรียน --</option>
           {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -380,6 +389,8 @@ export default function Students() {
               value={bulkAssignClassroomId} 
               onChange={e => setBulkAssignClassroomId(e.target.value)} 
               className="form-input flex-1 sm:flex-none"
+              id="bulk-assign-classroom"
+              aria-label="เลือกห้องเรียนเป้าหมายสำหรับนักเรียนที่เลือก"
             >
               <option value="">-- เลือกห้องเรียนเป้าหมาย --</option>
               <option value="null">ไม่มีห้องเรียน (ลอยแพ)</option>
@@ -408,15 +419,16 @@ export default function Students() {
       {filtered.length > 0 && (
         <div className="flex items-center px-2 py-1 gap-3">
           <label className="flex items-center gap-2 cursor-pointer group">
-            <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${selectedStudents.length === filtered.length ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600 group-hover:border-indigo-400 bg-indigo-50'}`}>
-              {selectedStudents.length === filtered.length && <CheckCircle className="w-3.5 h-3.5 text-slate-800" />}
-            </div>
             <input 
               type="checkbox" 
-              className="hidden"
+              className="sr-only peer"
               checked={selectedStudents.length === filtered.length}
               onChange={handleSelectAll}
+              aria-label="เลือกทั้งหมดบนหน้าจอนี้"
             />
+            <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all peer-focus:ring-2 peer-focus:ring-indigo-500 ${selectedStudents.length === filtered.length ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600 group-hover:border-indigo-400 bg-indigo-50'}`}>
+              {selectedStudents.length === filtered.length && <CheckCircle className="w-3.5 h-3.5 text-slate-800" />}
+            </div>
             <span className="text-sm text-slate-600 group-hover:text-slate-700">เลือกทั้งหมดบนหน้าจอนี้</span>
           </label>
         </div>
@@ -440,15 +452,16 @@ export default function Students() {
           >
             <div className="p-4 flex items-center gap-4">
               <label className="cursor-pointer group flex-shrink-0">
-                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${selectedStudents.includes(student.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600 group-hover:border-indigo-400 bg-indigo-50'}`}>
-                  {selectedStudents.includes(student.id) && <CheckCircle className="w-3.5 h-3.5 text-slate-800" />}
-                </div>
                 <input 
                   type="checkbox" 
-                  className="hidden"
+                  className="sr-only peer"
                   checked={selectedStudents.includes(student.id)}
                   onChange={() => handleToggleSelect(student.id)}
+                  aria-label={`เลือกนักเรียน ${student.name}`}
                 />
+                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all peer-focus:ring-2 peer-focus:ring-indigo-500 ${selectedStudents.includes(student.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600 group-hover:border-indigo-400 bg-indigo-50'}`}>
+                  {selectedStudents.includes(student.id) && <CheckCircle className="w-3.5 h-3.5 text-slate-800" />}
+                </div>
               </label>
               <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-2xl shadow-sm shrink-0">
                 {animalAvatars[(Number(student.id) || 0) % animalAvatars.length]}
@@ -463,10 +476,20 @@ export default function Students() {
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                <button onClick={() => handleEdit(student)} className="p-2.5 rounded-xl hover:bg-indigo-500/10 text-slate-500 hover:text-indigo-700 transition-all" title="แก้ไข">
+                <button 
+                  onClick={() => handleEdit(student)} 
+                  className="p-2.5 rounded-xl hover:bg-indigo-500/10 text-slate-500 hover:text-indigo-700 transition-all" 
+                  title="แก้ไข"
+                  aria-label={`แก้ไขข้อมูลของ ${student.name}`}
+                >
                   <Edit className="w-4 h-4" />
                 </button>
-                <button onClick={() => handleDelete(student.id)} className="p-2.5 rounded-xl hover:bg-red-500/10 text-slate-500 hover:text-red-400 transition-all" title="ลบ">
+                <button 
+                  onClick={() => handleDelete(student.id)} 
+                  className="p-2.5 rounded-xl hover:bg-red-500/10 text-slate-500 hover:text-red-400 transition-all" 
+                  title="ลบ"
+                  aria-label={`ลบข้อมูลของ ${student.name}`}
+                >
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
@@ -500,13 +523,56 @@ export default function Students() {
               <button onClick={() => setShowForm(false)} className="p-2 hover:bg-indigo-50 rounded-xl"><X className="w-5 h-5 text-slate-500" /></button>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div><label className="form-label">ชื่อ-นามสกุล</label><input value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="form-input" required id="student-name" placeholder="กรอกชื่อ-นามสกุล" /></div>
-              <div><label className="form-label">รหัสนักเรียน</label><input value={form.student_code} onChange={e => setForm({...form, student_code: e.target.value})} className="form-input" id="student-code" placeholder="เช่น 65010001" /></div>
-              <div><label className="form-label">ระดับชั้น</label><input value={form.grade_level} onChange={e => setForm({...form, grade_level: e.target.value})} className="form-input" id="student-grade" placeholder="เช่น ม.3 หรือ ปวช.1" /></div>
-              <div><label className="form-label">อีเมล</label><input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} className="form-input" id="student-email" placeholder="student@email.com (ไม่บังคับ)" /></div>
               <div>
-                <label className="form-label">ห้องเรียน</label>
-                <select value={form.classroom_id} onChange={e => setForm({...form, classroom_id: e.target.value})} className="form-input">
+                <label className="form-label" htmlFor="student-name">ชื่อ-นามสกุล</label>
+                <input 
+                  value={form.name} 
+                  onChange={e => setForm({...form, name: e.target.value})} 
+                  className="form-input" 
+                  required 
+                  id="student-name" 
+                  placeholder="กรอกชื่อ-นามสกุล" 
+                />
+              </div>
+              <div>
+                <label className="form-label" htmlFor="student-code">รหัสนักเรียน</label>
+                <input 
+                  value={form.student_code} 
+                  onChange={e => setForm({...form, student_code: e.target.value})} 
+                  className="form-input" 
+                  id="student-code" 
+                  placeholder="เช่น 65010001" 
+                />
+              </div>
+              <div>
+                <label className="form-label" htmlFor="student-grade">ระดับชั้น</label>
+                <input 
+                  value={form.grade_level} 
+                  onChange={e => setForm({...form, grade_level: e.target.value})} 
+                  className="form-input" 
+                  id="student-grade" 
+                  placeholder="เช่น ม.3 หรือ ปวช.1" 
+                />
+              </div>
+              <div>
+                <label className="form-label" htmlFor="student-email">อีเมล</label>
+                <input 
+                  type="email" 
+                  value={form.email} 
+                  onChange={e => setForm({...form, email: e.target.value})} 
+                  className="form-input" 
+                  id="student-email" 
+                  placeholder="student@email.com (ไม่บังคับ)" 
+                />
+              </div>
+              <div>
+                <label className="form-label" htmlFor="student-classroom">ห้องเรียน</label>
+                <select 
+                  value={form.classroom_id} 
+                  onChange={e => setForm({...form, classroom_id: e.target.value})} 
+                  className="form-input"
+                  id="student-classroom"
+                >
                   <option value="">-- ไม่ระบุห้องเรียน --</option>
                   {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
@@ -544,6 +610,8 @@ export default function Students() {
                   accept=".xlsx, .xls, .csv" 
                   onChange={handleFileUpload} 
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  id="import-file-input"
+                  aria-label="อัปโหลดไฟล์ Excel หรือ CSV"
                 />
                 <Upload className="w-8 h-8 text-slate-500 mx-auto mb-3" />
                 <p className="text-slate-700 font-medium">คลิกเพื่อเลือกไฟล์ หรือลากไฟล์มาวาง</p>
@@ -555,8 +623,13 @@ export default function Students() {
                   <div className="flex items-center justify-between">
                     <h3 className="font-semibold text-emerald-400">พบข้อมูล {importData.length} รายการ</h3>
                     <div className="flex items-center gap-2">
-                      <label className="text-sm text-slate-600">นำเข้าห้อง:</label>
-                      <select value={importClassroomId} onChange={e => setImportClassroomId(e.target.value)} className="form-input py-1.5 text-sm w-48">
+                      <label className="text-sm text-slate-600" htmlFor="import-classroom">นำเข้าห้อง:</label>
+                      <select 
+                        value={importClassroomId} 
+                        onChange={e => setImportClassroomId(e.target.value)} 
+                        className="form-input py-1.5 text-sm w-48"
+                        id="import-classroom"
+                      >
                         <option value="">-- ไม่ระบุห้องเรียน --</option>
                         {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </select>

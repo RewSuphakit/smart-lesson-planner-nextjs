@@ -60,6 +60,7 @@ export default function Pagination({
         </span>
         {onPageSizeChange && (
           <select
+            aria-label="จำนวนรายการต่อหน้า"
             value={itemsPerPage}
             onChange={(e) => onPageSizeChange(Number(e.target.value))}
             className="bg-white border border-indigo-200/40 text-slate-600 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-indigo-400"
@@ -77,6 +78,7 @@ export default function Pagination({
       <div className="flex items-center gap-1">
         {/* First */}
         <button
+          aria-label="หน้าแรก"
           onClick={() => onPageChange(1)}
           disabled={page === 1}
           className="p-1.5 rounded-lg text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
@@ -87,6 +89,7 @@ export default function Pagination({
 
         {/* Previous */}
         <button
+          aria-label="หน้าก่อน"
           onClick={() => onPageChange(page - 1)}
           disabled={page === 1}
           className="p-1.5 rounded-lg text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
@@ -112,6 +115,7 @@ export default function Pagination({
 
         {/* Next */}
         <button
+          aria-label="หน้าถัดไป"
           onClick={() => onPageChange(page + 1)}
           disabled={page === totalPages}
           className="p-1.5 rounded-lg text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
@@ -122,6 +126,7 @@ export default function Pagination({
 
         {/* Last */}
         <button
+          aria-label="หน้าสุดท้าย"
           onClick={() => onPageChange(totalPages)}
           disabled={page === totalPages}
           className="p-1.5 rounded-lg text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"

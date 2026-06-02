@@ -15,7 +15,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'No students provided' }, { status: 400 });
     }
 
-    const data = students.map((s: any) => ({
+    interface StudentBulkInput {
+      name: string;
+      student_code?: string;
+      grade_level?: string;
+      email?: string;
+      classroom_id?: number | string;
+    }
+
+    const data = (students as StudentBulkInput[]).map((s) => ({
       userId: user.id,
       name: s.name,
       studentCode: s.student_code || null,
