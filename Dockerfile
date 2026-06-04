@@ -19,6 +19,16 @@ COPY prisma ./prisma/
 RUN npm ci --omit=dev
 
 # ================================
+# Stage 1.7: Migration Builder
+# ================================
+FROM node:20-alpine AS migration-builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+ENV DATABASE_URL="mysql://mariadb:WAQnqzyxpPb7D5wpXhcbbtRdNeI0TUI0w67RevIFE8WQZbDkgHQ61SV8I5Jpw8U9@185.241.210.72:5433/smart_lesson_planner"
+RUN npx prisma generate
+
+# ================================
 # Stage 2: Builder
 # ================================
 FROM node:20-alpine AS builder
@@ -28,8 +38,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Set dummy variables for build time
-ENV DATABASE_URL="mysql://root:password@localhost:3306/dummy"
-ENV JWT_SECRET="dummy"
+ENV DATABASE_URL="mysql://mariadb:WAQnqzyxpPb7D5wpXhcbbtRdNeI0TUI0w67RevIFE8WQZbDkgHQ61SV8I5Jpw8U9@185.241.210.72:5433/smart_lesson_planner"
+ENV JWT_SECRET="change-this-to-a-secure-secret-key"
 
 # Generate Prisma client
 RUN npx prisma generate
