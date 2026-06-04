@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { ScheduleStatus } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 
@@ -159,7 +160,7 @@ export async function POST(request: NextRequest) {
         startTime: Date;
         endTime: Date;
         notes: string;
-        status: string;
+        status: ScheduleStatus;
       }
       const schedulesToCreate: ScheduleInput[] = [];
       const currentDate = new Date(startDate);
