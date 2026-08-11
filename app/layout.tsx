@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from '@/context/AuthContext';
+import QueryProvider from '@/components/QueryProvider';
 
 export const metadata: Metadata = {
   title: 'Smart Lesson Planner — ระบบวางแผนการสอนอัจฉริยะ',
@@ -16,23 +17,25 @@ export default function RootLayout({
   return (
     <html lang="th" className="h-full antialiased">
       <body className="min-h-full flex flex-col">
-        <AuthProvider>
-          <Toaster
-            position="top-right"
-            toastOptions={{
-              style: {
-                background: '#ffffff',
-                color: '#334155',
-                border: '1px solid rgba(165, 180, 252, 0.4)',
-                borderRadius: '12px',
-                boxShadow: '0 4px 12px rgba(99, 102, 241, 0.08)',
-              },
-              success: { iconTheme: { primary: '#10b981', secondary: '#fff' } },
-              error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
-            }}
-          />
-          {children}
-        </AuthProvider>
+        <QueryProvider>
+          <AuthProvider>
+            <Toaster
+              position="top-right"
+              toastOptions={{
+                style: {
+                  background: '#ffffff',
+                  color: '#334155',
+                  border: '1px solid rgba(165, 180, 252, 0.4)',
+                  borderRadius: '12px',
+                  boxShadow: '0 4px 12px rgba(99, 102, 241, 0.08)',
+                },
+                success: { iconTheme: { primary: '#10b981', secondary: '#fff' } },
+                error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
+              }}
+            />
+            {children}
+          </AuthProvider>
+        </QueryProvider>
       </body>
     </html>
   );

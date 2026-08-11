@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
@@ -14,7 +15,6 @@ import {
   UploadCloud, FileText, Table, Link2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import axios from 'axios';
 
 const DAY_NAMES = ['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา'];
 const TIMETABLE_DAYS = ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์', 'อาทิตย์'];
@@ -89,20 +89,16 @@ function defaultForm(date: Date) {
 }
 
 export default function Schedule() {
+  const queryClient = useQueryClient();
+
   const [activeTab, setActiveTab] = useState('calendar');
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDay,  setSelectedDay]  = useState(new Date());
-  const [schedules,    setSchedules]    = useState<ScheduleItem[]>([]);
   
-  const [timetableEntries, setTimetableEntries] = useState<TimetableEntry[]>([]);
-  const [timetableSummary, setTimetableSummary] = useState<TimetableSummaryItem[]>([]);
-  
-  const [loading,      setLoading]      = useState(true);
   const [showForm,     setShowForm]     = useState(false);
   const [editTarget,   setEditTarget]   = useState<ScheduleItem | null>(null);
   const [form,         setForm]         = useState(() => defaultForm(new Date()));
-  const [saving,       setSaving]       = useState(false);
 
   // Weekly timetable modal states
   const [showTimetableModal, setShowTimetableModal] = useState(false);
@@ -122,32 +118,60 @@ export default function Schedule() {
     color: '#3b82f6',
     classroom_id: '' as string | number
   });
-  const [savingTimetable, setSavingTimetable] = useState(false);
 
   const [showUpload, setShowUpload] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [draggedEntry, setDraggedEntry] = useState<TimetableEntry | null>(null);
   const [dragType, setDragType] = useState<string | null>(null);
   const [dragOverCell, setDragOverCell] = useState<string | null>(null);
   const [hoverTooltip, setHoverTooltip] = useState<HoverTooltip | null>(null);
-  const [classroomsList, setClassroomsList] = useState<Array<{ id: string; name: string }>>([]);
 
   const [showAutoGenerate, setShowAutoGenerate] = useState(false);
   const [autoGenerateStartDate, setAutoGenerateStartDate] = useState(() => format(startOfMonth(new Date()), 'yyyy-MM-dd'));
-  const [autoGenerating, setAutoGenerating] = useState(false);
 
-  // Fetch classrooms list for linking
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await api.get('/classrooms');
-        setClassroomsList(res.data.data || []);
-      } catch { /* ignore */ }
-    })();
-  }, []);
+  // ─── Query: ดึงข้อมูลห้องเรียน ───
+  const { data: classroomsList = [] } = useQuery<Array<{ id: string; name: string }>>({
+    queryKey: ['classrooms'],
+    queryFn: async () => {
+      const res = await api.get('/classrooms');
+      return res.data.data || [];
+    }
+  });
+
+  // ─── Query: ดึงข้อมูลตารางสอน (Calendar) ───
+  const startStr = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
+  const endStr   = format(endOfMonth(currentMonth),   'yyyy-MM-dd');
+  
+  const { data: schedules = [], isLoading: loadingSchedules } = useQuery<ScheduleItem[]>({
+    queryKey: ['schedules', startStr, endStr],
+    queryFn: async () => {
+      const res = await api.get("/schedules?start=" + startStr + "&end=" + endStr);
+      return res.data.data || [];
+    }
+  });
+
+  // ─── Query: ดึงข้อมูลตารางเรียนรายสัปดาห์ (Timetable) ───
+  const { data: timetableData = { entries: [], summary: [] }, isLoading: loadingTimetable } = useQuery<{
+    entries: TimetableEntry[];
+    summary: TimetableSummaryItem[];
+  }>({
+    queryKey: ['timetable'],
+    queryFn: async () => {
+      const res = await api.get('/timetable');
+      const data = res.data.data || {};
+      return {
+        entries: Array.isArray(data.entries) ? data.entries : [],
+        summary: Array.isArray(data.summary) ? data.summary : []
+      };
+    }
+  });
+
+  const timetableEntries = timetableData.entries;
+  const timetableSummary = timetableData.summary;
+
+  const loading = activeTab === 'calendar' ? loadingSchedules : loadingTimetable;
 
   const PERIOD_TIMES: Record<number, { start: string; end: string }> = {
     0:  { start: '07:30', end: '08:00' },
@@ -230,93 +254,74 @@ export default function Schedule() {
     });
   };
 
-  const handleTimetableSubmit = async (e: React.FormEvent) => {
+  // ─── Mutation: จัดการคาบเรียนตารางเรียนรายสัปดาห์ (Timetable Entry) ───
+  const timetableMutation = useMutation({
+    mutationFn: async (payload: any) => {
+      if (editTimetableTarget) {
+        return api.put(`/timetable/${editTimetableTarget.id}`, payload);
+      } else {
+        return api.post('/timetable', payload);
+      }
+    },
+    onSuccess: () => {
+      toast.success(editTimetableTarget ? 'อัปเดตคาบเรียนเรียบร้อย' : 'เพิ่มคาบเรียนเรียบร้อย');
+      setShowTimetableModal(false);
+      setEditTimetableTarget(null);
+      queryClient.invalidateQueries({ queryKey: ['timetable'] });
+      queryClient.invalidateQueries({ queryKey: ['schedules'] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || 'บันทึกคาบเรียนไม่สำเร็จ');
+    }
+  });
+
+  const handleTimetableSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!timetableForm.subject_code.trim()) return toast.error('กรุณากรอกรหัสวิชา');
     if (Number(timetableForm.start_period) > Number(timetableForm.end_period)) return toast.error('คาบเรียนสิ้นสุดต้องไม่น้อยกว่าคาบเรียนเริ่มต้น');
     if (timetableForm.start_time >= timetableForm.end_time) return toast.error('เวลาสิ้นสุดต้องมากกว่าเวลาเริ่มต้น');
 
-    setSavingTimetable(true);
-    try {
-      const payload = {
-        day_of_week: Number(timetableForm.day_of_week),
-        start_period: Number(timetableForm.start_period),
-        end_period: Number(timetableForm.end_period),
-        start_time: timetableForm.start_time,
-        end_time: timetableForm.end_time,
-        subject_code: timetableForm.subject_code.trim(),
-        subject_name: timetableForm.subject_name.trim() || null,
-        room: timetableForm.room.trim() || null,
-        group_name: timetableForm.group_name.trim() || null,
-        instructor: timetableForm.instructor.trim() || null,
-        entry_type: timetableForm.entry_type,
-        color: timetableForm.color || null,
-        classroom_id: timetableForm.classroom_id ? Number(timetableForm.classroom_id) : null
-      };
+    const payload = {
+      day_of_week: Number(timetableForm.day_of_week),
+      start_period: Number(timetableForm.start_period),
+      end_period: Number(timetableForm.end_period),
+      start_time: timetableForm.start_time,
+      end_time: timetableForm.end_time,
+      subject_code: timetableForm.subject_code.trim(),
+      subject_name: timetableForm.subject_name.trim() || null,
+      room: timetableForm.room.trim() || null,
+      group_name: timetableForm.group_name.trim() || null,
+      instructor: timetableForm.instructor.trim() || null,
+      entry_type: timetableForm.entry_type,
+      color: timetableForm.color || null,
+      classroom_id: timetableForm.classroom_id ? Number(timetableForm.classroom_id) : null
+    };
 
-      if (editTimetableTarget) {
-        await api.put(`/timetable/${editTimetableTarget.id}`, payload);
-        toast.success('อัปเดตคาบเรียนเรียบร้อย');
-      } else {
-        await api.post('/timetable', payload);
-        toast.success('เพิ่มคาบเรียนเรียบร้อย');
-      }
-      setShowTimetableModal(false);
-      setEditTimetableTarget(null);
-      fetchData();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'บันทึกคาบเรียนไม่สำเร็จ');
-    } finally {
-      setSavingTimetable(false);
-    }
+    timetableMutation.mutate(payload);
   };
 
-  const handleDeleteTimetableEntry = async () => {
-    if (!editTimetableTarget) return;
-    if (!window.confirm('ต้องการลบคาบเรียนนี้ใช่หรือไม่?')) return;
-    
-    try {
-      await api.delete(`/timetable/${editTimetableTarget.id}`);
+  // ─── Mutation: ลบคาบเรียนจากตารางเรียน ───
+  const deleteTimetableMutation = useMutation({
+    mutationFn: async (id: string | number) => {
+      return api.delete(`/timetable/${id}`);
+    },
+    onSuccess: () => {
       toast.success('ลบคาบเรียนแล้ว');
       setShowTimetableModal(false);
       setEditTimetableTarget(null);
-      fetchData();
-    } catch {
+      queryClient.invalidateQueries({ queryKey: ['timetable'] });
+      queryClient.invalidateQueries({ queryKey: ['schedules'] });
+    },
+    onError: () => {
       toast.error('ลบคาบเรียนไม่สำเร็จ');
     }
+  });
+
+  const handleDeleteTimetableEntry = () => {
+    if (!editTimetableTarget) return;
+    if (!window.confirm('ต้องการลบคาบเรียนนี้ใช่หรือไม่?')) return;
+    deleteTimetableMutation.mutate(editTimetableTarget.id);
   };
-
-  const fetchData = useCallback(async (signal?: AbortSignal) => {
-    setLoading(true);
-    try {
-      if (activeTab === 'calendar') {
-        const start = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
-        const end   = format(endOfMonth(currentMonth),   'yyyy-MM-dd');
-        const schRes = await api.get("/schedules?start=" + start + "&end=" + end, { signal });
-        setSchedules(schRes.data.data || []);
-      } else {
-        const res = await api.get('/timetable', { signal });
-        const timetableData = res.data.data || {};
-        // Safely extract entries, ensuring we don't accidentally get Array.prototype.entries if data is an array
-        const entries = Array.isArray(timetableData.entries) ? timetableData.entries : [];
-        const summary = Array.isArray(timetableData.summary) ? timetableData.summary : [];
-        setTimetableEntries(entries);
-        setTimetableSummary(summary);
-      }
-    } catch (err) {
-      if (!axios.isCancel(err)) {
-        toast.error('โหลดข้อมูลไม่สำเร็จ');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [currentMonth, activeTab]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    fetchData(controller.signal);
-    return () => controller.abort();
-  }, [fetchData]);
 
   const openCreate = (day?: Date) => {
     setEditTarget(null);
@@ -340,50 +345,44 @@ export default function Schedule() {
 
   const closeForm = () => { setShowForm(false); setEditTarget(null); };
 
-  const handleScheduleSubmit = async (e: React.FormEvent) => {
+  // ─── Mutation: จัดการตารางสอน (Calendar Schedule) ───
+  const scheduleMutation = useMutation({
+    mutationFn: async (payload: typeof form) => {
+      if (editTarget) {
+        if (typeof editTarget.id === 'string' && editTarget.id.startsWith('virtual_')) {
+          return api.post('/schedules', payload);
+        } else {
+          return api.put("/schedules/" + editTarget.id, payload);
+        }
+      } else {
+        return api.post('/schedules', payload);
+      }
+    },
+    onSuccess: () => {
+      toast.success(editTarget ? (typeof editTarget.id === 'string' && editTarget.id.startsWith('virtual_') ? 'บันทึกคาบสอนจากตารางเรียนประจำสัปดาห์แล้ว' : 'อัปเดตตารางสอนเรียบร้อย') : 'เพิ่มตารางสอนเรียบร้อย');
+      closeForm();
+      queryClient.invalidateQueries({ queryKey: ['schedules'] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || 'บันทึกไม่สำเร็จ');
+    }
+  });
+
+  const handleScheduleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title.trim()) return toast.error('กรุณากรอกหัวข้อที่สอน');
     if (!form.subject.trim()) return toast.error('กรุณากรอกวิชาที่สอน');
     if (!form.scheduled_date) return toast.error('กรุณาเลือกวันที่');
     if (form.start_time >= form.end_time) return toast.error('เวลาสิ้นสุดต้องมากกว่าเวลาเริ่มต้น');
-    setSaving(true);
-    try {
-      if (editTarget) {
-        if (typeof editTarget.id === 'string' && editTarget.id.startsWith('virtual_')) {
-          // If editing a virtual slot, convert it to a concrete schedule via POST
-          await api.post('/schedules', form);
-          toast.success('บันทึกคาบสอนจากตารางเรียนประจำสัปดาห์แล้ว');
-        } else {
-          await api.put("/schedules/" + editTarget.id, form);
-          toast.success('อัปเดตตารางสอนเรียบร้อย');
-        }
-      } else {
-        await api.post('/schedules', form);
-        toast.success('เพิ่มตารางสอนเรียบร้อย');
-      }
-      closeForm();
-      fetchData();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'บันทึกไม่สำเร็จ');
-    } finally {
-      setSaving(false);
-    }
+    scheduleMutation.mutate(form);
   };
 
-  const handleDeleteSchedule = async (id: string | number) => {
-    const isVirtual = typeof id === 'string' && id.startsWith('virtual_');
-    const confirmMsg = isVirtual 
-      ? 'ต้องการยกเลิกการเรียนการสอนสำหรับคาบเรียนจำลองนี้ใช่หรือไม่? (จะบันทึกสถานะ "ยกเลิก" ลงในปฏิทิน)' 
-      : 'ต้องการลบตารางสอนนี้หรือไม่?';
-      
-    if (!window.confirm(confirmMsg)) return;
-    
-    try {
+  // ─── Mutation: ลบตารางสอน ───
+  const deleteScheduleMutation = useMutation({
+    mutationFn: async ({ id, isVirtual, item }: { id: string | number; isVirtual: boolean; item?: ScheduleItem }) => {
       if (isVirtual) {
-        const item = schedules.find(s => s.id === id);
-        if (!item) return toast.error('ไม่พบข้อมูลคาบเรียนจำลอง');
-        
-        await api.post('/schedules', {
+        if (!item) throw new Error('ไม่พบข้อมูลคาบเรียนจำลอง');
+        return api.post('/schedules', {
           title: item.lesson_title,
           subject: item.subject,
           scheduled_date: item.scheduled_date.slice(0, 10),
@@ -392,34 +391,53 @@ export default function Schedule() {
           notes: item.notes || '',
           status: 'cancelled',
         });
-        toast.success('ยกเลิกคาบสอนแล้ว');
       } else {
-        await api.delete("/schedules/" + id);
-        toast.success('ลบตารางสอนแล้ว');
+        return api.delete("/schedules/" + id);
       }
-      fetchData();
-    } catch (err: any) {
+    },
+    onSuccess: (_, variables) => {
+      toast.success(variables.isVirtual ? 'ยกเลิกคาบสอนแล้ว' : 'ลบตารางสอนแล้ว');
+      queryClient.invalidateQueries({ queryKey: ['schedules'] });
+    },
+    onError: (err: any) => {
       toast.error(err.response?.data?.message || 'ทำรายการไม่สำเร็จ');
     }
+  });
+
+  const handleDeleteSchedule = (id: string | number) => {
+    const isVirtual = typeof id === 'string' && id.startsWith('virtual_');
+    const confirmMsg = isVirtual 
+      ? 'ต้องการยกเลิกการเรียนการสอนสำหรับคาบเรียนจำลองนี้ใช่หรือไม่? (จะบันทึกสถานะ "ยกเลิก" ลงในปฏิทิน)' 
+      : 'ต้องการลบตารางสอนนี้หรือไม่?';
+      
+    if (!window.confirm(confirmMsg)) return;
+
+    const item = isVirtual ? schedules.find(s => s.id === id) : undefined;
+    deleteScheduleMutation.mutate({ id, isVirtual, item });
   };
 
-  const handleAutoGenerateSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!autoGenerateStartDate) return toast.error('กรุณาระบุวันเริ่มต้นภาคเรียน');
-    setAutoGenerating(true);
-    try {
-      const res = await api.post('/schedules', {
+  // ─── Mutation: สร้างแผนตารางสอนอัตโนมัติ ───
+  const autoGenerateMutation = useMutation({
+    mutationFn: async (startDate: string) => {
+      return api.post('/schedules', {
         action: 'generate',
-        start_date: autoGenerateStartDate
+        start_date: startDate
       });
+    },
+    onSuccess: (res) => {
       toast.success(res.data.message || 'สร้างตารางสอนล่วงหน้าสำเร็จ');
       setShowAutoGenerate(false);
-      fetchData();
-    } catch (err: any) {
+      queryClient.invalidateQueries({ queryKey: ['schedules'] });
+    },
+    onError: (err: any) => {
       toast.error(err.response?.data?.message || 'สร้างตารางสอนล่วงหน้าไม่สำเร็จ');
-    } finally {
-      setAutoGenerating(false);
     }
+  });
+
+  const handleAutoGenerateSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!autoGenerateStartDate) return toast.error('กรุณาระบุวันเริ่มต้นภาคเรียน');
+    autoGenerateMutation.mutate(autoGenerateStartDate);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -427,7 +445,26 @@ export default function Schedule() {
     if (file) setUploadFile(file);
   };
 
-  const handleUploadSubmit = async (e: React.FormEvent) => {
+  // ─── Mutation: อัพโหลดไฟล์ตารางสอน ───
+  const timetableUploadMutation = useMutation({
+    mutationFn: async (formData: FormData) => {
+      return api.post('/timetable/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+    },
+    onSuccess: (res) => {
+      toast.success(res.data.message || 'อัพโหลดสำเร็จ');
+      setShowUpload(false);
+      setUploadFile(null);
+      queryClient.invalidateQueries({ queryKey: ['timetable'] });
+      queryClient.invalidateQueries({ queryKey: ['schedules'] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || 'อัพโหลดไม่สำเร็จ กรุณาตรวจสอบรูปแบบไฟล์');
+    }
+  });
+
+  const handleUploadSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!uploadFile) return toast.error('กรุณาเลือกไฟล์');
     
@@ -435,31 +472,27 @@ export default function Schedule() {
     formData.append('file', uploadFile);
     formData.append('replace', 'true');
     
-    setUploading(true);
-    try {
-      const res = await api.post('/timetable/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      toast.success(res.data.message || 'อัพโหลดสำเร็จ');
-      setShowUpload(false);
-      setUploadFile(null);
-      fetchData();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'อัพโหลดไม่สำเร็จ กรุณาตรวจสอบรูปแบบไฟล์');
-    } finally {
-      setUploading(false);
-    }
+    timetableUploadMutation.mutate(formData);
   };
 
-  const clearTimetable = async () => {
-    if (!window.confirm('ต้องการลบตารางสอนทั้งหมดใช่หรือไม่?')) return;
-    try {
-      await api.delete('/timetable/clear');
+  // ─── Mutation: ล้างข้อมูลตารางเรียน ───
+  const clearTimetableMutation = useMutation({
+    mutationFn: async () => {
+      return api.delete('/timetable/clear');
+    },
+    onSuccess: () => {
       toast.success('ล้างตารางสอนแล้ว');
-      fetchData();
-    } catch {
+      queryClient.invalidateQueries({ queryKey: ['timetable'] });
+      queryClient.invalidateQueries({ queryKey: ['schedules'] });
+    },
+    onError: () => {
       toast.error('ทำรายการไม่สำเร็จ');
     }
+  });
+
+  const clearTimetable = () => {
+    if (!window.confirm('ต้องการลบตารางสอนทั้งหมดใช่หรือไม่?')) return;
+    clearTimetableMutation.mutate();
   };
 
   const handleDragStart = (e: React.DragEvent, entry: TimetableEntry, type = 'move') => {
@@ -490,39 +523,56 @@ export default function Schedule() {
     setDragOverCell(null);
   };
 
-  const handleDrop = async (e: React.DragEvent, dayIdx: number, slotId: string | number) => {
+  // ─── Mutations: ย้ายและปรับขนาดคาบเรียน ───
+  const moveTimetableMutation = useMutation({
+    mutationFn: async ({ id, day_of_week, start_period }: { id: string | number; day_of_week: number; start_period: number }) => {
+      return api.put(`/timetable/${id}/move`, { day_of_week, start_period });
+    },
+    onSuccess: () => {
+      toast.success('ย้ายตารางสอนสำเร็จ');
+      queryClient.invalidateQueries({ queryKey: ['timetable'] });
+      queryClient.invalidateQueries({ queryKey: ['schedules'] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || 'ทำรายการไม่สำเร็จ');
+    }
+  });
+
+  const resizeTimetableMutation = useMutation({
+    mutationFn: async ({ id, end_period }: { id: string | number; end_period: number }) => {
+      return api.put(`/timetable/${id}/resize`, { end_period });
+    },
+    onSuccess: () => {
+      toast.success('ปรับขนาดคาบเรียนสำเร็จ');
+      queryClient.invalidateQueries({ queryKey: ['timetable'] });
+      queryClient.invalidateQueries({ queryKey: ['schedules'] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || 'ทำรายการไม่สำเร็จ');
+    }
+  });
+
+  const handleDrop = (e: React.DragEvent, dayIdx: number, slotId: string | number) => {
     e.preventDefault();
     setDragOverCell(null);
     if (!draggedEntry) return;
 
-    try {
-      if (dragType === 'resize') {
-        if (dayIdx !== draggedEntry.day_of_week) {
-          toast.error('ไม่สามารถยืดคาบเรียนข้ามวันได้');
-          setDraggedEntry(null);
-          setDragType(null);
-          return;
-        }
-        if (Number(slotId) < draggedEntry.start_period) {
-          toast.error('เวลาสิ้นสุดต้องไม่น้อยกว่าคาบเริ่มต้น');
-          setDraggedEntry(null);
-          setDragType(null);
-          return;
-        }
-        await api.put(`/timetable/${draggedEntry.id}/resize`, {
-          end_period: Number(slotId)
-        });
-        toast.success('ปรับขนาดคาบเรียนสำเร็จ');
-      } else {
-        await api.put(`/timetable/${draggedEntry.id}/move`, {
-          day_of_week: dayIdx,
-          start_period: Number(slotId)
-        });
-        toast.success('ย้ายตารางสอนสำเร็จ');
+    if (dragType === 'resize') {
+      if (dayIdx !== draggedEntry.day_of_week) {
+        toast.error('ไม่สามารถยืดคาบเรียนข้ามวันได้');
+        setDraggedEntry(null);
+        setDragType(null);
+        return;
       }
-      fetchData();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'ทำรายการไม่สำเร็จ');
+      if (Number(slotId) < draggedEntry.start_period) {
+        toast.error('เวลาสิ้นสุดต้องไม่น้อยกว่าคาบเริ่มต้น');
+        setDraggedEntry(null);
+        setDragType(null);
+        return;
+      }
+      resizeTimetableMutation.mutate({ id: draggedEntry.id, end_period: Number(slotId) });
+    } else {
+      moveTimetableMutation.mutate({ id: draggedEntry.id, day_of_week: dayIdx, start_period: Number(slotId) });
     }
     setDraggedEntry(null);
     setDragType(null);
@@ -531,6 +581,11 @@ export default function Schedule() {
   const days = getMonthGrid(currentMonth);
   const schedulesForDay = (day: Date) => schedules.filter(s => isSameDay(parseISO(s.scheduled_date?.slice(0, 10)), day));
   const selectedDaySchedules = schedulesForDay(selectedDay);
+
+  const saving = scheduleMutation.isPending;
+  const savingTimetable = timetableMutation.isPending || deleteTimetableMutation.isPending;
+  const uploading = timetableUploadMutation.isPending;
+  const autoGenerating = autoGenerateMutation.isPending;
 
 
   const renderCalendar = () => (

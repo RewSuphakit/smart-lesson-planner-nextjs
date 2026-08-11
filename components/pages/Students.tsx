@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
 import { Plus, Edit, Trash2, X, Users as UsersIcon, Loader2, Search, GraduationCap, Upload, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import Pagination from '@/components/Pagination';
-import axios from 'axios';
 
 const animalAvatars = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐧', '🐥', '🦉', '🦄', '🐙', '🐢', '🦖', '🦕', '🦦', '🦥'];
 
@@ -33,16 +33,13 @@ interface ImportRow {
 }
 
 export default function Students() {
-  const [students, setStudents] = useState<Student[]>([]);
-  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
-  const [loading, setLoading] = useState(true);
-  
+  const queryClient = useQueryClient();
+
   const [showForm, setShowForm] = useState(false);
   const [showImportForm, setShowImportForm] = useState(false);
   
   const [editing, setEditing] = useState<string | number | null>(null);
   const [search, setSearch] = useState('');
-  const [saving, setSaving] = useState(false);
   const [filterClassroomId, setFilterClassroomId] = useState('');
   const [selectedStudents, setSelectedStudents] = useState<Array<string | number>>([]);
   const [bulkAssignClassroomId, setBulkAssignClassroomId] = useState('');
@@ -58,28 +55,128 @@ export default function Students() {
   const [importData, setImportData] = useState<ImportRow[]>([]);
   const [importClassroomId, setImportClassroomId] = useState('');
 
-  const fetchData = useCallback(async (signal?: AbortSignal) => {
-    try {
-      const [studRes, classRes] = await Promise.all([
-        api.get('/students', { signal }),
-        api.get('/classrooms', { signal })
-      ]);
-      setStudents(studRes.data.data || []);
-      setClassrooms(classRes.data.data || []);
-    } catch (err) {
-      if (!axios.isCancel(err)) {
-        toast.error('โหลดข้อมูลไม่สำเร็จ');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // ─── Query: ดึงข้อมูลนักเรียน ───
+  const { data: students = [], isLoading: loadingStudents } = useQuery<Student[]>({
+    queryKey: ['students'],
+    queryFn: async () => {
+      const res = await api.get('/students');
+      return res.data.data || [];
+    },
+  });
 
-  useEffect(() => {
-    const controller = new AbortController();
-    fetchData(controller.signal);
-    return () => controller.abort();
-  }, [fetchData]);
+  // ─── Query: ดึงข้อมูลห้องเรียน (shared cache) ───
+  const { data: classrooms = [], isLoading: loadingClassrooms } = useQuery<Classroom[]>({
+    queryKey: ['classrooms'],
+    queryFn: async () => {
+      const res = await api.get('/classrooms');
+      return res.data.data || [];
+    },
+  });
+
+  const isLoading = loadingStudents || loadingClassrooms;
+
+  // ─── Mutation: สร้าง/แก้ไขนักเรียน ───
+  const saveMutation = useMutation({
+    mutationFn: async (payload: typeof form) => {
+      if (editing) {
+        return api.put('/students/' + editing, payload);
+      } else {
+        return api.post('/students', payload);
+      }
+    },
+    onSuccess: () => {
+      toast.success(editing ? 'อัปเดตข้อมูลนักเรียนเรียบร้อย' : 'เพิ่มนักเรียนเรียบร้อย');
+      setShowForm(false);
+      setEditing(null);
+      setForm(emptyForm);
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['classrooms'] });
+    },
+    onError: (err: { response?: { data?: { message?: string } } }) => {
+      toast.error(err.response?.data?.message || 'บันทึกไม่สำเร็จ');
+    },
+  });
+
+  // ─── Mutation: ลบนักเรียนรายคน ───
+  const deleteMutation = useMutation({
+    mutationFn: (id: string | number) => api.delete('/students/' + id),
+    onSuccess: () => {
+      toast.success('ลบนักเรียนแล้ว');
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['classrooms'] });
+    },
+    onError: () => {
+      toast.error('ลบไม่สำเร็จ');
+    },
+  });
+
+  // ─── Mutation: ย้ายห้องเรียนแบบ bulk ───
+  const bulkAssignMutation = useMutation({
+    mutationFn: () => api.put('/students/bulk-classroom', {
+      studentIds: selectedStudents,
+      classroomId: bulkAssignClassroomId === 'null' ? null : bulkAssignClassroomId
+    }),
+    onSuccess: () => {
+      toast.success('ย้ายห้องเรียนเรียบร้อย');
+      setSelectedStudents([]);
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['classrooms'] });
+    },
+    onError: () => {
+      toast.error('ย้ายห้องเรียนไม่สำเร็จ');
+    },
+  });
+
+  // ─── Mutation: ลบนักเรียนที่เลือก (bulk) ───
+  const bulkDeleteMutation = useMutation({
+    mutationFn: () => api.delete(`/students?ids=${selectedStudents.join(',')}`),
+    onSuccess: () => {
+      toast.success('ลบนักเรียนที่เลือกเรียบร้อยแล้ว');
+      setSelectedStudents([]);
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['classrooms'] });
+    },
+    onError: () => {
+      toast.error('ลบไม่สำเร็จ');
+    },
+  });
+
+  // ─── Mutation: ลบทั้งหมด ───
+  const deleteAllMutation = useMutation({
+    mutationFn: (classroomId?: string) => {
+      const url = classroomId ? `/students?classroom_id=${classroomId}` : '/students';
+      return api.delete(url);
+    },
+    onSuccess: () => {
+      toast.success('ลบนักเรียนเรียบร้อยแล้ว');
+      setSelectedStudents([]);
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['classrooms'] });
+    },
+    onError: () => {
+      toast.error('ลบไม่สำเร็จ');
+    },
+  });
+
+  // ─── Mutation: นำเข้า bulk ───
+  const importMutation = useMutation({
+    mutationFn: async (payload: Array<ImportRow & { classroom_id: string | null }>) => {
+      return api.post('/students/bulk', { students: payload });
+    },
+    onSuccess: (res) => {
+      toast.success(res.data.message || 'นำเข้านักเรียนสำเร็จ');
+      setShowImportForm(false);
+      setImportData([]);
+      setImportClassroomId('');
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['classrooms'] });
+    },
+    onError: (err: { response?: { data?: { message?: string } } }) => {
+      toast.error(err.response?.data?.message || 'นำเข้าไม่สำเร็จ');
+    },
+  });
+
+  const isMutating = saveMutation.isPending || deleteMutation.isPending || bulkAssignMutation.isPending || bulkDeleteMutation.isPending || deleteAllMutation.isPending || importMutation.isPending;
 
   const handleExport = () => {
     if (filtered.length === 0) {
@@ -87,7 +184,6 @@ export default function Students() {
       return;
     }
     
-    // Format data for Excel
     const exportData = filtered.map(s => ({
       'รหัสนักเรียน': s.student_code || '',
       'ชื่อ-นามสกุล': s.name || '',
@@ -96,14 +192,10 @@ export default function Students() {
       'อีเมล': s.email || ''
     }));
 
-    // Create worksheet
     const ws = XLSX.utils.json_to_sheet(exportData);
-    
-    // Create workbook
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Students");
     
-    // Generate file
     const className = filterClassroomId ? classrooms.find(c => String(c.id) === String(filterClassroomId))?.name : 'ทั้งหมด';
     const fileName = `รายชื่อนักเรียน_${className}_${new Date().toISOString().split('T')[0]}.xlsx`;
     
@@ -111,20 +203,9 @@ export default function Students() {
     toast.success('ส่งออกไฟล์เรียบร้อย');
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
-    try {
-      if (editing) {
-        await api.put('/students/' + editing, form);
-        toast.success('อัปเดตข้อมูลนักเรียนเรียบร้อย');
-      } else {
-        await api.post('/students', form);
-        toast.success('เพิ่มนักเรียนเรียบร้อย');
-      }
-      setShowForm(false); setEditing(null); setForm(emptyForm); fetchData();
-    } catch (err: any) { toast.error(err.response?.data?.message || 'บันทึกไม่สำเร็จ'); }
-    finally { setSaving(false); }
+    saveMutation.mutate(form);
   };
 
   const handleEdit = (s: Student) => {
@@ -138,13 +219,10 @@ export default function Students() {
     setEditing(s.id); setShowForm(true);
   };
 
-  const handleDelete = async (id: string | number) => {
+  const handleDelete = (id: string | number) => {
     if (!confirm('ต้องการลบนักเรียนคนนี้หรือไม่?')) return;
-    try { await api.delete('/students/' + id); toast.success('ลบนักเรียนแล้ว'); fetchData(); }
-    catch { toast.error('ลบไม่สำเร็จ'); }
+    deleteMutation.mutate(id);
   };
-
-
 
   const handleToggleSelect = (id: string | number) => {
     setSelectedStudents(prev => 
@@ -160,44 +238,21 @@ export default function Students() {
     }
   };
 
-  const handleBulkAssign = async () => {
+  const handleBulkAssign = () => {
     if (!bulkAssignClassroomId) {
       toast.error('กรุณาเลือกห้องเรียนปลายทาง');
       return;
     }
-    setSaving(true);
-    try {
-      await api.put('/students/bulk-classroom', {
-        studentIds: selectedStudents,
-        classroomId: bulkAssignClassroomId === 'null' ? null : bulkAssignClassroomId
-      });
-      toast.success('ย้ายห้องเรียนเรียบร้อย');
-      setSelectedStudents([]);
-      fetchData();
-    } catch {
-      toast.error('ย้ายห้องเรียนไม่สำเร็จ');
-    } finally {
-      setSaving(false);
-    }
+    bulkAssignMutation.mutate();
   };
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = () => {
     if (selectedStudents.length === 0) return;
     if (!window.confirm(`ยืนยันการลบนักเรียนที่เลือกทั้งหมด ${selectedStudents.length} คนหรือไม่? (ข้อมูลคะแนนและการประเมินของนักเรียนจะถูกลบไปด้วย)`)) return;
-    setSaving(true);
-    try {
-      await api.delete(`/students?ids=${selectedStudents.join(',')}`);
-      toast.success('ลบนักเรียนที่เลือกเรียบร้อยแล้ว');
-      setSelectedStudents([]);
-      fetchData();
-    } catch {
-      toast.error('ลบไม่สำเร็จ');
-    } finally {
-      setSaving(false);
-    }
+    bulkDeleteMutation.mutate();
   };
 
-  const handleDeleteAll = async () => {
+  const handleDeleteAll = () => {
     const isFiltered = !!filterClassroomId;
     const targetClassName = isFiltered ? classrooms.find(c => String(c.id) === String(filterClassroomId))?.name || 'ห้องเรียนที่เลือก' : 'ทั้งหมด';
     const msg = isFiltered 
@@ -205,18 +260,7 @@ export default function Students() {
       : `ยืนยันการลบนักเรียนทั้งหมด (${students.length} คน) ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้!`;
       
     if (!window.confirm(msg)) return;
-    setSaving(true);
-    try {
-      const url = isFiltered ? `/students?classroom_id=${filterClassroomId}` : '/students';
-      await api.delete(url);
-      toast.success('ลบนักเรียนเรียบร้อยแล้ว');
-      setSelectedStudents([]);
-      fetchData();
-    } catch {
-      toast.error('ลบไม่สำเร็จ');
-    } finally {
-      setSaving(false);
-    }
+    deleteAllMutation.mutate(isFiltered ? filterClassroomId : undefined);
   };
 
   // --- Bulk Import ---
@@ -232,16 +276,13 @@ export default function Students() {
         const wb = XLSX.read(bstr, { type: 'binary' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json<any>(ws);
+        const data = XLSX.utils.sheet_to_json<Record<string, string>>(ws);
         
-        // Map columns
         const mappedData = data.map(row => {
-          // Get values or empty string
           const prefix = row['คำนำหน้า'] || '';
           const firstName = row['ชื่อ'] || row['name'] || '';
           const lastName = row['นามสกุล'] || '';
           
-          // Combine prefix, first name, and last name
           let fullName = row['ชื่อ-นามสกุล'] || '';
           if (!fullName && firstName) {
             fullName = `${prefix} ${firstName} ${lastName}`.trim().replace(/\s+/g, ' ');
@@ -253,44 +294,33 @@ export default function Students() {
             grade_level: String(row['ระดับชั้น'] || row['ชั้น'] || row['grade_level'] || ''),
             email: String(row['อีเมล'] || row['email'] || ''),
           };
-        }).filter(item => item.name); // Require at least name
+        }).filter(item => item.name);
 
         setImportData(mappedData);
-      } catch (err) {
+      } catch {
         toast.error('ไม่สามารถอ่านไฟล์ได้ กรุณาตรวจสอบรูปแบบไฟล์');
       }
     };
     reader.readAsBinaryString(file);
-    e.target.value = ''; // reset
+    e.target.value = '';
   };
 
-  const handleImportSubmit = async () => {
+  const handleImportSubmit = () => {
     if (importData.length === 0) return;
-    setSaving(true);
-    try {
-      const payload = importData.map(d => ({
-        ...d,
-        classroom_id: importClassroomId || null
-      }));
-      
-      const res = await api.post('/students/bulk', { students: payload });
-      toast.success(res.data.message || 'นำเข้านักเรียนสำเร็จ');
-      setShowImportForm(false);
-      setImportData([]);
-      setImportClassroomId('');
-      fetchData();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'นำเข้าไม่สำเร็จ');
-    } finally {
-      setSaving(false);
-    }
+    const payload = importData.map(d => ({
+      ...d,
+      classroom_id: importClassroomId || null
+    }));
+    importMutation.mutate(payload);
   };
 
-  const filtered = students.filter(s => {
-    const matchSearch = s.name?.toLowerCase().includes(search.toLowerCase()) || s.student_code?.toLowerCase().includes(search.toLowerCase());
-    const matchClass = filterClassroomId ? String(s.classroom_id) === String(filterClassroomId) : true;
-    return matchSearch && matchClass;
-  });
+  const filtered = useMemo(() => {
+    return students.filter(s => {
+      const matchSearch = s.name?.toLowerCase().includes(search.toLowerCase()) || s.student_code?.toLowerCase().includes(search.toLowerCase());
+      const matchClass = filterClassroomId ? String(s.classroom_id) === String(filterClassroomId) : true;
+      return matchSearch && matchClass;
+    });
+  }, [students, search, filterClassroomId]);
 
   // Paginated subset
   const paginatedStudents = useMemo(() => {
@@ -298,21 +328,15 @@ export default function Students() {
     return filtered.slice(start, start + itemsPerPage);
   }, [filtered, currentPage, itemsPerPage]);
 
-  // Reset to page 1 when filters change
-  useEffect(() => { setCurrentPage(1); }, [search, filterClassroomId]);
+  // Reset to page 1 when filters change — derived from useMemo instead of useEffect
+  const prevFilterKey = `${search}|${filterClassroomId}`;
+  const [lastFilterKey, setLastFilterKey] = useState(prevFilterKey);
+  if (prevFilterKey !== lastFilterKey) {
+    setLastFilterKey(prevFilterKey);
+    setCurrentPage(1);
+  }
 
-
-
-  const avatarColors = [
-    'from-indigo-500 to-purple-600',
-    'from-emerald-500 to-teal-600',
-    'from-amber-500 to-orange-600',
-    'from-rose-500 to-pink-600',
-    'from-cyan-500 to-blue-600',
-    'from-violet-500 to-purple-600',
-  ];
-
-  if (loading) return <div className="space-y-4">{[1,2,3].map(i => <div key={i} className="skeleton h-24 rounded-2xl" />)}</div>;
+  if (isLoading) return <div className="space-y-4">{[1,2,3].map(i => <div key={i} className="skeleton h-24 rounded-2xl" />)}</div>;
 
   return (
     <div className="space-y-6 animate-fade-in-up">
@@ -326,7 +350,7 @@ export default function Students() {
           {students.length > 0 && (
             <button 
               onClick={handleDeleteAll}
-              disabled={saving}
+              disabled={isMutating}
               className="btn bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 flex-1 sm:flex-none flex items-center justify-center gap-1.5"
             >
               <Trash2 className="w-4 h-4" />
@@ -398,17 +422,17 @@ export default function Students() {
             </select>
             <button 
               onClick={handleBulkAssign}
-              disabled={saving}
+              disabled={isMutating}
               className="btn btn-primary flex-1 sm:flex-none"
             >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'ย้ายห้อง'}
+              {bulkAssignMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'ย้ายห้อง'}
             </button>
             <button 
               onClick={handleBulkDelete}
-              disabled={saving}
+              disabled={isMutating}
               className="btn bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 flex-1 sm:flex-none flex items-center justify-center gap-1.5"
             >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              {bulkDeleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
               <span>ลบที่เลือก</span>
             </button>
           </div>
@@ -577,8 +601,8 @@ export default function Students() {
                   {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
-              <button type="submit" disabled={saving} className="btn btn-primary w-full py-3" id="student-save-btn">
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : editing ? 'อัปเดต' : <><Plus className="w-4 h-4" /> เพิ่มนักเรียน</>}
+              <button type="submit" disabled={saveMutation.isPending} className="btn btn-primary w-full py-3" id="student-save-btn">
+                {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : editing ? 'อัปเดต' : <><Plus className="w-4 h-4" /> เพิ่มนักเรียน</>}
               </button>
             </form>
           </div>
@@ -662,8 +686,8 @@ export default function Students() {
                     )}
                   </div>
                   
-                  <button onClick={handleImportSubmit} disabled={saving} className="btn btn-primary w-full py-3">
-                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'ยืนยันการนำเข้าข้อมูล'}
+                  <button onClick={handleImportSubmit} disabled={importMutation.isPending} className="btn btn-primary w-full py-3">
+                    {importMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'ยืนยันการนำเข้าข้อมูล'}
                   </button>
                 </div>
               )}

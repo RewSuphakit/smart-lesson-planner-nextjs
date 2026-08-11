@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
+import { ClassroomSchema, validateRequestBody } from '@/lib/validation';
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,22 +42,45 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const user = requireAuth(request);
-    const body = await request.json();
-
-    if (!body.name || typeof body.name !== 'string' || !body.name.trim()) {
-      return NextResponse.json({ message: 'Classroom name is required' }, { status: 400 });
+    const validation = await validateRequestBody(request, ClassroomSchema);
+    if (!validation.success) {
+      return validation.response;
     }
+
+    const {
+      name,
+      description,
+      late_to_absent_ratio,
+      leave_to_absent_ratio,
+      absent_to_f_ratio,
+      total_classes,
+      min_attendance_percent,
+      assignment_weight,
+      post_test_weight,
+      affective_weight,
+      midterm_weight,
+      final_weight,
+      midterm_max_score,
+      final_max_score,
+    } = validation.data;
 
     const classroom = await prisma.classroom.create({
       data: {
         userId: user.id,
-        name: body.name,
-        description: body.description || null,
-        lateToAbsentRatio: body.late_to_absent_ratio ?? 3,
-        leaveToAbsentRatio: body.leave_to_absent_ratio ?? 2,
-        absentToFRatio: body.absent_to_f_ratio ?? 4,
-        totalClasses: body.total_classes ?? 40,
-        minAttendancePercent: body.min_attendance_percent ?? 80,
+        name,
+        description: description || null,
+        lateToAbsentRatio: late_to_absent_ratio,
+        leaveToAbsentRatio: leave_to_absent_ratio,
+        absentToFRatio: absent_to_f_ratio,
+        totalClasses: total_classes,
+        minAttendancePercent: min_attendance_percent,
+        assignmentWeight: assignment_weight,
+        postTestWeight: post_test_weight,
+        affectiveWeight: affective_weight,
+        midtermWeight: midterm_weight,
+        finalWeight: final_weight,
+        midtermMaxScore: midterm_max_score,
+        finalMaxScore: final_max_score,
       },
     });
 

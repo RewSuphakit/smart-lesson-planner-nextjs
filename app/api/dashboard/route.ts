@@ -6,13 +6,22 @@ export async function GET(request: NextRequest) {
   try {
     const user = requireAuth(request);
 
+    // Use Thai timezone (UTC+7) to determine "today"
+    const nowUtc = new Date();
+    const thaiOffsetMs = 7 * 60 * 60 * 1000;
+    const nowThai = new Date(nowUtc.getTime() + thaiOffsetMs);
+    const jsDay = nowThai.getUTCDay(); // 0=Sun..6=Sat in Thai time
+    const schemaDayOfWeek = (jsDay + 6) % 7; // 0=Mon..6=Sun
+    const todayDateStr = nowThai.toISOString().split('T')[0];
+    const todayDate = new Date(todayDateStr);
+
     const [classroomCount, studentCount, upcomingSchedulesRaw] = await Promise.all([
       prisma.classroom.count({ where: { userId: user.id } }),
       prisma.student.count({ where: { userId: user.id } }),
       prisma.schedule.findMany({
         where: {
           userId: user.id,
-          scheduledDate: { gte: new Date() },
+          scheduledDate: { gte: todayDate },
           status: 'scheduled',
         },
         orderBy: [{ scheduledDate: 'asc' }, { startTime: 'asc' }],
@@ -104,21 +113,12 @@ export async function GET(request: NextRequest) {
 
     const pendingTasks: PendingTask[] = [];
 
-    // Use Thai timezone (UTC+7) to determine "today"
-    const nowUtc = new Date();
-    const thaiOffsetMs = 7 * 60 * 60 * 1000;
-    const nowThai = new Date(nowUtc.getTime() + thaiOffsetMs);
-    const jsDay = nowThai.getUTCDay(); // 0=Sun..6=Sat in Thai time
-    const schemaDayOfWeek = (jsDay + 6) % 7; // 0=Mon..6=Sun
-
     const todayTimetable = await prisma.weeklySchedule.findMany({
       where: { userId: user.id, dayOfWeek: schemaDayOfWeek },
       include: { classroom: true },
     });
 
-    // Thai date string in YYYY-MM-DD
-    const todayDateStr = nowThai.toISOString().split('T')[0];
-    const todayDate = new Date(todayDateStr);
+
 
     // BUG-07 fix: batch attendance count instead of N+1 loop
     const classroomIdsToCheck = todayTimetable

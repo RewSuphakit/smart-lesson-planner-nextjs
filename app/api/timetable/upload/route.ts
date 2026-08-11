@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { EntryType } from '@prisma/client';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 // @ts-expect-error - pdf-parse lacks official type declarations
@@ -24,7 +25,8 @@ const TYPE_MAP: Record<string, string> = {
 };
 
 function parseCSV(content: string, userId: number) {
-  const lines = content.split(/\r?\n/).filter(l => l.trim());
+  const cleanContent = content.startsWith('\uFEFF') ? content.slice(1) : content;
+  const lines = cleanContent.split(/\r?\n/).filter(l => l.trim());
   if (lines.length < 2) throw new Error('ไฟล์ CSV ต้องมีอย่างน้อย 2 บรรทัด (header + data)');
 
   const firstLine = lines[0];
@@ -70,7 +72,7 @@ function parseCSV(content: string, userId: number) {
     const hours = endPeriod - startPeriod + 1;
 
     const typeStr = (headerMap.entry_type !== undefined ? cols[headerMap.entry_type] : '') || '';
-    const entryType = TYPE_MAP[typeStr.toLowerCase()] || 'lecture';
+    const entryType = (TYPE_MAP[typeStr.toLowerCase()] || 'lecture') as EntryType;
 
     entries.push({
       userId,
@@ -94,6 +96,131 @@ function parseCSV(content: string, userId: number) {
 async function parsePDF(buffer: Buffer, userId: number) {
   const data = await pdfParse(buffer);
   const text = data.text;
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.warn('⚠️ ไม่พบ GEMINI_API_KEY — กำลังใช้ Regex fallback สำหรับ PDF');
+    return parsePDFRegexFallback(text, userId);
+  }
+
+  try {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+    const prompt = `
+      คุณเป็นผู้เชี่ยวชาญการอ่านตารางสอนของสถาบันอาชีวศึกษาไทย
+      หน้าที่ของคุณคือสกัดข้อมูลตารางสอนจากข้อความดิบ (Raw Text) ที่ดึงมาจากไฟล์ตารางสอน PDF ให้ถูกต้อง 100%
+      
+      ข้อความดิบที่ดึงมาจาก PDF มีดังนี้:
+      """
+      ${text}
+      """
+      
+      ให้วิเคราะห์ข้อความและแยกแยะวิชาเรียนในแต่ละวัน โดยยึดหลักเกณฑ์ดังนี้:
+      1. วันในสัปดาห์ (day_of_week):
+         - 0 = วันจันทร์, 1 = วันอังคาร, 2 = วันพุธ, 3 = วันพฤหัสบดี, 4 = วันศุกร์, 5 = วันเสาร์, 6 = วันอาทิตย์
+      2. เวลาและคาบเรียน:
+         - กิจกรรมหน้าเสาธง/โฮมรูม ให้เริ่มที่คาบ 0 สิ้นสุดที่คาบ 0 (start_period: 0, end_period: 0)
+         - คาบ 1: 08:00 - 09:00
+         - คาบ 2: 09:00 - 10:00
+         - คาบ 3: 10:00 - 11:00
+         - คาบ 4: 11:00 - 12:00
+         - คาบ 5: 13:00 - 14:00
+         - คาบ 6: 14:00 - 15:00
+         - คาบ 7: 15:00 - 16:00
+         - คาบ 8: 16:00 - 17:00
+         - คาบ 9: 17:00 - 18:00
+         - คาบ 10: 18:00 - 19:00
+         - คาบ 11: 19:00 - 20:00
+      3. ค้นหารหัสวิชา (รูปแบบ 5 หลักขีด 4 หลัก เช่น 21909-2011) และจับคู่กับชื่อวิชา ห้องเรียน กลุ่มเรียน และอาจารย์ผู้สอน
+      4. แปลงข้อมูลทั้งหมดเป็น JSON array ตามโครงสร้างนี้เท่านั้น:
+      [
+        {
+          "day_of_week": number,
+          "start_period": number,
+          "end_period": number,
+          "subject_code": string or null,
+          "subject_name": string or null,
+          "room": string or null,
+          "group_name": string or null,
+          "instructor": string or null,
+          "entry_type": "lecture" | "lab" | "activity" | "homeroom"
+        }
+      ]
+      ห้ามมีคำอธิบายประกอบ ให้ตอบกลับมาเป็น JSON array ล้วนๆ ที่สามารถใช้อ้างอิงและ JSON.parse() ได้ทันที
+    `;
+
+    let result = null;
+    const retries = 3;
+    let delayMs = 1500;
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        result = await model.generateContent([prompt]);
+        break; // Success!
+      } catch (error: unknown) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.warn(`Gemini API PDF parsing failed (Attempt ${attempt}/${retries}). Error: ${lastError.message}`);
+        if (attempt < retries) {
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+          delayMs *= 2;
+        }
+      }
+    }
+
+    if (!result) {
+      throw new Error(`Gemini API ไม่ตอบสนอง: ${lastError?.message}`);
+    }
+
+    const responseText = result.response.text();
+    const jsonStr = responseText.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+    const data = JSON.parse(jsonStr);
+    
+    if (!Array.isArray(data)) {
+      throw new Error("รูปแบบข้อมูลที่ AI ส่งกลับมาไม่ใช่ Array");
+    }
+
+    const entries = [];
+    for (const item of data) {
+      const startP = item.start_period !== undefined && item.start_period !== null ? parseInt(item.start_period) : 1;
+      const endP = item.end_period !== undefined && item.end_period !== null ? parseInt(item.end_period) : startP;
+      
+      const rawType = (item.entry_type || 'lecture').toLowerCase().trim();
+      let normalizedType = 'lecture';
+      if (rawType === 'lab' || rawType.includes('lab') || rawType.includes('ปฏิบัติ')) {
+        normalizedType = 'lab';
+      } else if (rawType === 'activity' || rawType.includes('activity') || rawType.includes('กิจกรรม') || rawType.includes('ลูกเสือ')) {
+        normalizedType = 'activity';
+      } else if (rawType === 'homeroom' || rawType.includes('homeroom') || rawType.includes('โฮมรูม') || rawType.includes('เข้าแถว') || rawType.includes('เสาธง')) {
+        normalizedType = 'homeroom';
+      }
+
+      entries.push({
+        userId,
+        dayOfWeek: Number(item.day_of_week),
+        startPeriod: startP,
+        endPeriod: endP,
+        startTime: PERIOD_TIMES[startP]?.start ? new Date(`1970-01-01T${PERIOD_TIMES[startP].start}`) : null,
+        endTime: PERIOD_TIMES[endP]?.end ? new Date(`1970-01-01T${PERIOD_TIMES[endP].end}`) : null,
+        subjectCode: item.subject_code || null,
+        subjectName: item.subject_name || null,
+        room: item.room || null,
+        instructor: item.instructor || null,
+        groupName: item.group_name || null,
+        hours: startP === 0 ? 0 : (endP - startP + 1),
+        entryType: normalizedType as EntryType,
+      });
+    }
+
+    return entries;
+  } catch (error) {
+    console.error("Failed to parse PDF with Gemini AI, falling back to regex:", error);
+    return parsePDFRegexFallback(text, userId);
+  }
+}
+
+function parsePDFRegexFallback(text: string, userId: number) {
   const lines = text.split(/\r?\n/).filter((l: string) => l.trim());
   const entries = [];
   const dayPatterns = Object.keys(DAY_MAP);
@@ -114,19 +241,20 @@ async function parsePDF(buffer: Buffer, userId: number) {
         const afterCode = trimmed.split(code)[1] || '';
         const parts = afterCode.trim().split(/\s{2,}/);
         entries.push({
-          userId,
-          dayOfWeek: currentDay,
-          startPeriod: 1,
-          endPeriod: 1,
-          startTime: new Date(`1970-01-01T${PERIOD_TIMES[1].start}`),
-          endTime: new Date(`1970-01-01T${PERIOD_TIMES[1].end}`),
-          subjectCode: code,
-          subjectName: parts[0]?.trim() || null,
-          room: parts[1]?.trim() || null,
-          groupName: parts[2]?.trim() || null,
-          hours: 1,
-          entryType: 'lecture',
-        });
+        userId,
+        dayOfWeek: currentDay,
+        startPeriod: 1,
+        endPeriod: 1,
+        startTime: new Date(`1970-01-01T${PERIOD_TIMES[1].start}`),
+        endTime: new Date(`1970-01-01T${PERIOD_TIMES[1].end}`),
+        subjectCode: code,
+        subjectName: parts[0]?.trim() || null,
+        room: parts[1]?.trim() || null,
+        instructor: null,
+        groupName: parts[2]?.trim() || null,
+        hours: 1,
+        entryType: 'lecture' as EntryType,
+      });
       }
     }
   }
@@ -278,7 +406,7 @@ async function parseImageWithAI(buffer: Buffer, mimeType: string, userId: number
         instructor: item.instructor || null,
         groupName: item.group_name || null,
         hours: startP === 0 ? 0 : (endP - startP + 1),
-        entryType: normalizedType,
+        entryType: normalizedType as EntryType,
       });
     }
     
@@ -317,7 +445,7 @@ export async function POST(request: NextRequest) {
       instructor: string | null;
       groupName: string | null;
       hours: number;
-      entryType: string;
+      entryType: EntryType;
       timetableName?: string;
       semester?: string | null;
     }

@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import prisma from '@/lib/prisma';
-import { generateToken } from '@/lib/auth';
+import { generateToken, setAuthCookie } from '@/lib/auth';
+import { LoginSchema, validateRequestBody } from '@/lib/validation';
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password } = await request.json();
-
-    if (!email || !password) {
-      return NextResponse.json({ message: 'Email and password are required' }, { status: 400 });
+    const validation = await validateRequestBody(request, LoginSchema);
+    if (!validation.success) {
+      return validation.response;
     }
+
+    const { email, password } = validation.data;
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
@@ -27,11 +29,14 @@ export async function POST(request: NextRequest) {
 
     const token = generateToken(user);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       message: 'Login successful',
       token,
       user: { id: user.id, email: user.email, name: user.name, role: user.role, avatar: user.avatar },
     });
+
+    setAuthCookie(response, token);
+    return response;
   } catch (error) {
     console.error('Login error:', error);
     return NextResponse.json({ message: 'Login failed' }, { status: 500 });

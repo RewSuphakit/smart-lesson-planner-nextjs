@@ -196,6 +196,14 @@ body::before {
   outline: none;
 }
 
+.form-input.pl-9 {
+  padding-left: 2.25rem !important;
+}
+
+.form-input.pl-11 {
+  padding-left: 2.75rem !important;
+}
+
 .form-input:focus {
   border-color: #818cf8;
   box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.12), 0 0 20px rgba(129, 140, 248, 0.06);

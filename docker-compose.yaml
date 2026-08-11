@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: runner
     ports:
       - "${PORT:-3000}:3000"
     depends_on:
@@ -32,7 +33,7 @@ services:
         condition: service_healthy
     environment:
       - DATABASE_URL=${DATABASE_URL:-mysql://root:smartplanner2024@mysql:3306/smart_lesson_planner}
-    command: npx prisma db push --accept-data-loss
+    command: npx prisma db push
     networks:
       - coolify
     restart: "no"

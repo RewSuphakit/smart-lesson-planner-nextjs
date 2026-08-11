@@ -12,16 +12,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'classroom_id required' }, { status: 400 });
     }
 
+    const numericClassroomId = Number(classroomId);
+
     // Verify classroom ownership
     const classroom = await prisma.classroom.findFirst({
-      where: { id: Number(classroomId), userId: user.id }
+      where: { id: numericClassroomId, userId: user.id }
     });
     if (!classroom) return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
 
     // Get criteria
     if (searchParams.get('type') === 'criteria') {
       const criteria = await prisma.gradeCriteria.findMany({
-        where: { classroomId: Number(classroomId) },
+        where: { classroomId: numericClassroomId },
         orderBy: { minScore: 'desc' },
       });
       const mappedCriteria = criteria.map(c => ({
@@ -35,7 +37,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ data: mappedCriteria });
     }
 
-    // Get report
+    // Get report weights & settings
     const weightAssign = Number(classroom.assignmentWeight ?? 10);
     const weightPostTest = Number(classroom.postTestWeight ?? 70);
     const weightAffective = Number(classroom.affectiveWeight ?? 20);
@@ -44,10 +46,9 @@ export async function GET(request: NextRequest) {
     const maxMidtermScore = Number(classroom.midtermMaxScore ?? 100);
     const maxFinalScore = Number(classroom.finalMaxScore ?? 100);
 
-    // BUG-11 fix: Get actual max lesson number from score structures
-    // instead of guessing from totalClasses
+    // Get actual max lesson number from score structures
     const maxLessonAgg = await prisma.scoreStructure.aggregate({
-      where: { classroomId: Number(classroomId) },
+      where: { classroomId: numericClassroomId },
       _max: { lessonNumber: true },
     });
     const targetWeeks = maxLessonAgg._max.lessonNumber || 18;
@@ -55,7 +56,7 @@ export async function GET(request: NextRequest) {
     // Get max possible scores from score_structures up to targetWeeks
     const structureAgg = await prisma.scoreStructure.aggregate({
       where: { 
-        classroomId: Number(classroomId),
+        classroomId: numericClassroomId,
         lessonNumber: { lte: targetWeeks }
       },
       _sum: { maxAssignmentScore: true, maxPostTestScore: true },
@@ -63,18 +64,19 @@ export async function GET(request: NextRequest) {
     const maxAssignRaw = Number(structureAgg._sum.maxAssignmentScore ?? 0);
     const maxPostTestRaw = Number(structureAgg._sum.maxPostTestScore ?? 0);
 
-    // Get students with scores
+    // Get students with scores and attendance
     const students = await prisma.student.findMany({
-      where: { classroomId: Number(classroomId) },
+      where: { classroomId: numericClassroomId },
       include: {
         studentScores: true,
-        attendance: { where: { classroomId: Number(classroomId) } },
+        attendance: { where: { classroomId: numericClassroomId } },
       },
+      orderBy: [{ studentCode: 'asc' }, { name: 'asc' }],
     });
 
     // Get criteria
     const criteria = await prisma.gradeCriteria.findMany({
-      where: { classroomId: Number(classroomId) },
+      where: { classroomId: numericClassroomId },
       orderBy: { minScore: 'desc' },
     });
 
@@ -84,6 +86,8 @@ export async function GET(request: NextRequest) {
     const totalClasses = classroom.totalClasses || 40;
     const minAttPercent = classroom.minAttendancePercent || 80;
     const maxAllowedAbsences = Math.floor(totalClasses * ((100 - minAttPercent) / 100));
+
+    const totalWeightSum = weightAssign + weightPostTest + weightAffective + weightMidterm + weightFinal;
 
     const report = students.map((s) => {
       // Attendance stats
@@ -113,30 +117,23 @@ export async function GET(request: NextRequest) {
       const preciseScaledMidterm = maxMidtermScore > 0 ? (midtermScore / maxMidtermScore) * weightMidterm : 0;
       const preciseScaledFinal = maxFinalScore > 0 ? (finalScore / maxFinalScore) * weightFinal : 0;
 
-      const scaledAssign = Math.round(preciseScaledAssign);
-      const scaledPostTest = Math.round(preciseScaledPostTest);
-      const scaledMidterm = Math.round(preciseScaledMidterm);
-      const scaledFinal = Math.round(preciseScaledFinal);
-
-      // Use stored affective score if manually set, otherwise auto-calculate
-      // BUG-19 note: Formula deducts 2 points per absence + 1 per late from weightAffective (default 20).
-      // This is intentionally strict for Thai vocational education attendance policies.
+      // Affective score calculation:
+      // If s.affectiveScore is explicitly set by teacher in database, use it directly (clamped to weightAffective).
+      // Otherwise, calculate dynamically from attendance penalty (2 pts per absence, 1 pt per late).
       let affectiveScore: number;
       if (s.affectiveScore !== null && s.affectiveScore !== undefined) {
-        affectiveScore = Number(s.affectiveScore);
+        affectiveScore = Math.min(weightAffective, Math.max(0, Number(s.affectiveScore)));
       } else {
-        affectiveScore = Math.max(0, weightAffective - (absentCount * 2) - (lateCount * 1));
+        const attendancePenalty = (absentCount * 2) + (lateCount * 1);
+        affectiveScore = Math.max(0, weightAffective - attendancePenalty);
       }
 
-      const totalScore = scaledAssign + scaledPostTest + affectiveScore + scaledMidterm + scaledFinal;
-      // BUG-10 fix: Calculate actual percentage based on total weight sum
-      // When weights sum to 100 this is equivalent, but handles edge cases
-      const totalWeightSum = weightAssign + weightPostTest + weightAffective + weightMidterm + weightFinal;
-      const percentage = totalWeightSum > 0 ? (totalScore / totalWeightSum) * 100 : 0;
+      const totalScorePrecise = preciseScaledAssign + preciseScaledPostTest + affectiveScore + preciseScaledMidterm + preciseScaledFinal;
+      const percentage = totalWeightSum > 0 ? (totalScorePrecise / totalWeightSum) * 100 : 0;
 
       let finalGrade: string | null = null;
       if (isF) {
-        finalGrade = 'F';
+        finalGrade = 'มส';
       } else {
         for (const c of criteria) {
           if (percentage >= Number(c.minScore)) {
@@ -155,16 +152,17 @@ export async function GET(request: NextRequest) {
         raw_assign: sumAssignRaw,
         max_assign: maxAssignRaw,
         precise_scaled_assign: preciseScaledAssign,
-        scaled_assign: scaledAssign,
+        scaled_assign: Math.round(preciseScaledAssign),
         raw_post_test: sumPostTestRaw,
         max_post_test: maxPostTestRaw,
         precise_scaled_post_test: preciseScaledPostTest,
-        scaled_post_test: scaledPostTest,
+        scaled_post_test: Math.round(preciseScaledPostTest),
         precise_scaled_midterm: preciseScaledMidterm,
-        scaled_midterm: scaledMidterm,
+        scaled_midterm: Math.round(preciseScaledMidterm),
         precise_scaled_final: preciseScaledFinal,
-        scaled_final: scaledFinal,
-        total_score: totalScore,
+        scaled_final: Math.round(preciseScaledFinal),
+        total_score_precise: totalScorePrecise,
+        total_score: Math.round(totalScorePrecise),
         affective_score: affectiveScore,
         percentage: percentage.toFixed(2),
         grade: finalGrade || 'ไม่มีเกรด',
@@ -176,7 +174,19 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return NextResponse.json({ data: report });
+    return NextResponse.json({
+      data: report,
+      weights: {
+        assignment_weight: weightAssign,
+        post_test_weight: weightPostTest,
+        affective_weight: weightAffective,
+        midterm_weight: weightMidterm,
+        final_weight: weightFinal,
+        midterm_max_score: maxMidtermScore,
+        final_max_score: maxFinalScore,
+        total_weight_sum: totalWeightSum,
+      }
+    });
   } catch (error) {
     if (error instanceof AuthError) return handleAuthError();
     console.error('Get grades error:', error);
@@ -221,3 +231,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Failed to save criteria' }, { status: 500 });
   }
 }
+

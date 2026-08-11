@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
 import { createPortal } from 'react-dom';
 import { 
@@ -9,7 +10,80 @@ import {
   Search, Check, Grid, List, RefreshCw
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import axios from 'axios';
+
+interface MemoizedAttendanceCellProps {
+  status: string | null;
+  isEditing: boolean;
+  onEditClick: () => void;
+  onStatusSelect: (status: string) => void;
+  popoverRef?: React.RefObject<HTMLDivElement | null>;
+}
+
+const MemoizedAttendanceCell = memo(({ status, isEditing, onEditClick, onStatusSelect, popoverRef }: MemoizedAttendanceCellProps) => {
+  return (
+    <td className="p-2 border-r border-indigo-100/40 text-center relative h-14 min-w-[80px]">
+      {!status ? (
+        <button 
+          onClick={onEditClick}
+          className="w-8 h-8 rounded-full border border-dashed border-slate-300 hover:border-indigo-400 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 flex items-center justify-center mx-auto transition-all text-xs font-semibold touch-manipulation"
+          title="คลิกเพื่อลงชื่อย้อนหลัง"
+        >
+          +
+        </button>
+      ) : (
+        <button
+          onClick={onEditClick}
+          className={`w-14 py-1.5 rounded-xl text-[10px] font-bold mx-auto flex items-center justify-center border transition-all hover:scale-105 touch-manipulation ${
+            status === 'present' ? 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100' :
+            status === 'late' ? 'bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100' :
+            status === 'absent' ? 'bg-red-50 border-red-200 text-red-500 hover:bg-red-100' :
+            'bg-blue-50 border-blue-200 text-blue-500 hover:bg-blue-100'
+          }`}
+        >
+          {status === 'present' ? 'มา' : status === 'late' ? 'สาย' : status === 'absent' ? 'ขาด' : 'ลา'}
+        </button>
+      )}
+
+      {isEditing && (
+        <div 
+          ref={popoverRef}
+          className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-1 bg-white p-2 rounded-xl border border-indigo-100 shadow-xl flex items-center gap-1.5 animate-scale-up"
+        >
+          <button 
+            onClick={() => onStatusSelect('present')}
+            className="w-7 h-7 rounded-lg bg-emerald-500 text-white font-bold text-xs flex items-center justify-center hover:bg-emerald-600 shadow-sm touch-manipulation"
+            title="มาเรียน"
+          >
+            มา
+          </button>
+          <button 
+            onClick={() => onStatusSelect('late')}
+            className="w-7 h-7 rounded-lg bg-amber-500 text-white font-bold text-xs flex items-center justify-center hover:bg-amber-600 shadow-sm touch-manipulation"
+            title="สาย"
+          >
+            สาย
+          </button>
+          <button 
+            onClick={() => onStatusSelect('absent')}
+            className="w-7 h-7 rounded-lg bg-red-500 text-white font-bold text-xs flex items-center justify-center hover:bg-red-600 shadow-sm touch-manipulation"
+            title="ขาด"
+          >
+            ขาด
+          </button>
+          <button 
+            onClick={() => onStatusSelect('leave')}
+            className="w-7 h-7 rounded-lg bg-blue-500 text-white font-bold text-xs flex items-center justify-center hover:bg-blue-600 shadow-sm touch-manipulation"
+            title="ลา"
+          >
+            ลา
+          </button>
+        </div>
+      )}
+    </td>
+  );
+});
+
+MemoizedAttendanceCell.displayName = 'MemoizedAttendanceCell';
 
 interface TimetableEntry {
   id: number;
@@ -60,14 +134,13 @@ interface StudentStats {
 }
 
 export default function Attendance() {
-  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
+  const queryClient = useQueryClient();
+
   const [selectedClass, setSelectedClass] = useState<string>('');
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [students, setStudents] = useState<Student[]>([]);
   const [attendance, setAttendance] = useState<Record<string, string>>({});
   const [stats, setStats] = useState<StudentStats[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
   // Auto-Save state
@@ -129,14 +202,10 @@ export default function Attendance() {
     return d.toISOString().split('T')[0];
   });
   const [matrixEndDate, setMatrixEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [matrixRecords, setMatrixRecords] = useState<AttendanceRecord[]>([]);
-  const [matrixLoading, setMatrixLoading] = useState(false);
   const [matrixEditingCell, setMatrixEditingCell] = useState<{ studentId: string; date: string } | null>(null);
   
   // History Modal state
   const [historyStudent, setHistoryStudent] = useState<Student | null>(null);
-  const [historyData, setHistoryData] = useState<AttendanceRecord[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
   
   // Export Modal state
   const [showExportModal, setShowExportModal] = useState(false);
@@ -144,10 +213,94 @@ export default function Attendance() {
   const [exportEndDate, setExportEndDate] = useState('');
   const [exporting, setExporting] = useState(false);
 
-  // Today's timetable entries
-  const [todayEntries, setTodayEntries] = useState<TimetableEntry[]>([]);
-
   const cellPopoverRef = useRef<HTMLDivElement>(null);
+
+  // ─── Query: ดึงข้อมูลห้องเรียน (shared cache) ───
+  const { data: classrooms = [], isLoading: loadingClassrooms } = useQuery<Classroom[]>({
+    queryKey: ['classrooms'],
+    queryFn: async () => {
+      const res = await api.get('/classrooms');
+      return res.data.data || [];
+    }
+  });
+
+  // ─── Query: ดึงข้อมูลตารางเรียน (Timetable today entries) ───
+  const { data: todayEntries = [] } = useQuery<TimetableEntry[]>({
+    queryKey: ['timetable-today'],
+    queryFn: async () => {
+      const res = await api.get('/timetable');
+      const allEntries: TimetableEntry[] = res.data.data?.entries || [];
+      const jsDay = new Date().getDay();
+      const schemaDayOfWeek = (jsDay + 6) % 7;
+      return allEntries.filter(e => e.day_of_week === schemaDayOfWeek);
+    }
+  });
+
+  // ─── Query: ดึงข้อมูลการเช็คชื่อวันนี้ + นักเรียน + สถิติ ───
+  const { data: attendanceData, isLoading: loadingAttendance } = useQuery({
+    queryKey: ['attendance-data', selectedClass, date],
+    queryFn: async () => {
+      const [stuRes, attRes, statsRes] = await Promise.all([
+        api.get(`/students?classroom_id=${selectedClass}`),
+        api.get(`/attendance?classroom_id=${selectedClass}&date=${date}`),
+        api.get(`/attendance?classroom_id=${selectedClass}`)
+      ]);
+      
+      const classStudents = stuRes.data.data || [];
+      const existing = attRes.data.data || [];
+      
+      const newAtt: Record<string, string> = {};
+      classStudents.forEach((s: Student) => {
+        const found = existing.find((e: { student_id: string | number }) => String(e.student_id) === String(s.id));
+        newAtt[s.id] = found ? found.status : '';
+      });
+
+      return {
+        students: classStudents,
+        attendance: newAtt,
+        stats: statsRes.data.data || []
+      };
+    },
+    enabled: !!selectedClass
+  });
+
+  // Sync daily query data to local editing states
+  useEffect(() => {
+    if (attendanceData) {
+      setStudents(attendanceData.students);
+      setAttendance(attendanceData.attendance);
+      setStats(attendanceData.stats);
+    }
+  }, [attendanceData]);
+
+  // Reset local state if no class is selected
+  useEffect(() => {
+    if (!selectedClass) {
+      setStudents([]);
+      setAttendance({});
+      setStats([]);
+    }
+  }, [selectedClass]);
+
+  // ─── Query: ดึงข้อมูล Matrix ย้อนหลัง ───
+  const { data: matrixRecords = [], isLoading: loadingMatrix } = useQuery<AttendanceRecord[]>({
+    queryKey: ['attendance-matrix', selectedClass, matrixStartDate, matrixEndDate],
+    queryFn: async () => {
+      const res = await api.get(`/attendance?classroom_id=${selectedClass}&start_date=${matrixStartDate}&end_date=${matrixEndDate}`);
+      return res.data.data || [];
+    },
+    enabled: !!selectedClass && activeTab === 'matrix'
+  });
+
+  // ─── Query: ดึงข้อมูลประวัติการเช็คชื่อรายบุคคล ───
+  const { data: historyData = [], isLoading: loadingHistory } = useQuery<AttendanceRecord[]>({
+    queryKey: ['attendance-history', selectedClass, historyStudent?.id],
+    queryFn: async () => {
+      const res = await api.get(`/attendance?student_id=${historyStudent?.id}&classroom_id=${selectedClass}`);
+      return res.data.data || [];
+    },
+    enabled: !!selectedClass && !!historyStudent?.id
+  });
 
   // Close cell editing popover when clicking outside
   useEffect(() => {
@@ -160,145 +313,62 @@ export default function Attendance() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const fetchClassrooms = useCallback(async (signal?: AbortSignal) => {
-    try {
-      const res = await api.get('/classrooms', { signal });
-      setClassrooms(res.data.data || []);
-    } catch (err) {
-      if (!axios.isCancel(err)) {
-        toast.error('โหลดข้อมูลห้องเรียนไม่สำเร็จ');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // (Queries defined above)
 
-  // Fetch timetable to show today's classes
-  useEffect(() => {
-    const controller = new AbortController();
-    (async () => {
-      try {
-        const res = await api.get('/timetable', { signal: controller.signal });
-        const allEntries: TimetableEntry[] = res.data.data?.entries || [];
-        // Convert JS getDay() (0=Sun..6=Sat) to schema (0=Mon..6=Sun)
-        const jsDay = new Date().getDay();
-        const schemaDayOfWeek = (jsDay + 6) % 7;
-        const today = allEntries.filter(e => e.day_of_week === schemaDayOfWeek);
-        setTodayEntries(today);
-      } catch (err) {
-        if (!axios.isCancel(err)) {
-          console.error('Failed to fetch timetable for today:', err);
-        }
-      }
-    })();
-    return () => controller.abort();
-  }, []);
 
-  const fetchStudentsAndAttendance = useCallback(async (signal?: AbortSignal) => {
-    if (!selectedClass) return;
-    try {
-      const stuRes = await api.get(`/students?classroom_id=${selectedClass}`, { signal });
-      const classStudents = stuRes.data.data || [];
-      setStudents(classStudents);
 
-      const attRes = await api.get(`/attendance?classroom_id=${selectedClass}&date=${date}`, { signal });
-      const existing = attRes.data.data || [];
-
-      const newAtt: Record<string, string> = {};
-      classStudents.forEach((s: Student) => {
-        const found = existing.find((e: any) => String(e.student_id) === String(s.id));
-        newAtt[s.id] = found ? found.status : '';
+  // ─── Mutation: บันทึกการเข้าเรียนรายบุคคล (Auto Save) ───
+  const singleStatusMutation = useMutation({
+    mutationFn: async ({ studentId, status }: { studentId: string; status: string }) => {
+      return api.post('/attendance', {
+        student_id: Number(studentId),
+        classroom_id: Number(selectedClass),
+        date: date,
+        status: status
       });
-      setAttendance(newAtt);
-
-      const statsRes = await api.get(`/attendance?classroom_id=${selectedClass}`, { signal });
-      setStats(statsRes.data.data || []);
-    } catch (err) {
-      if (!axios.isCancel(err)) {
-        toast.error('โหลดข้อมูลการเช็คชื่อไม่สำเร็จ');
-      }
-    }
-  }, [selectedClass, date]);
-
-  const fetchMatrixData = useCallback(async (signal?: AbortSignal) => {
-    if (!selectedClass || activeTab !== 'matrix') return;
-    setMatrixLoading(true);
-    try {
-      const res = await api.get(`/attendance?classroom_id=${selectedClass}&start_date=${matrixStartDate}&end_date=${matrixEndDate}`, { signal });
-      setMatrixRecords(res.data.data || []);
-    } catch (err) {
-      if (!axios.isCancel(err)) {
-        toast.error('โหลดข้อมูลประวัติย้อนหลังไม่สำเร็จ');
-      }
-    } finally {
-      setMatrixLoading(false);
-    }
-  }, [selectedClass, activeTab, matrixStartDate, matrixEndDate]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    fetchClassrooms(controller.signal);
-    return () => controller.abort();
-  }, [fetchClassrooms]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    if (selectedClass) {
-      fetchStudentsAndAttendance(controller.signal);
-    } else {
-      setStudents([]);
-      setAttendance({});
-      setStats([]);
-    }
-    return () => controller.abort();
-  }, [selectedClass, date, fetchStudentsAndAttendance]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    if (selectedClass && activeTab === 'matrix') {
-      fetchMatrixData(controller.signal);
-    }
-    return () => controller.abort();
-  }, [selectedClass, activeTab, matrixStartDate, matrixEndDate, fetchMatrixData]);
-
-
-
-  const handleStatusChange = async (studentId: string, status: string) => {
-    setAttendance(prev => ({ ...prev, [studentId]: status }));
-
-    if (autoSave) {
+    },
+    onMutate: () => {
       setAutoSaveStatus('saving');
-      try {
-        await api.post('/attendance', {
-          student_id: Number(studentId),
-          classroom_id: Number(selectedClass),
-          date: date,
-          status: status
-        });
-        setAutoSaveStatus('saved');
-        
-        // Refresh stats in background to keep graphs updated
-        const statsRes = await api.get(`/attendance?classroom_id=${selectedClass}`);
-        setStats(statsRes.data.data || []);
-      } catch (err) {
-        console.error(err);
-        setAutoSaveStatus('error');
-        toast.error('บันทึกอัตโนมัติไม่สำเร็จ');
-      }
+    },
+    onSuccess: () => {
+      setAutoSaveStatus('saved');
+      queryClient.invalidateQueries({ queryKey: ['attendance-data', selectedClass] });
+    },
+    onError: () => {
+      setAutoSaveStatus('error');
+      toast.error('บันทึกอัตโนมัติไม่สำเร็จ');
+    }
+  });
+
+  const handleStatusChange = (studentId: string, status: string) => {
+    setAttendance(prev => ({ ...prev, [studentId]: status }));
+    if (autoSave) {
+      singleStatusMutation.mutate({ studentId, status });
     }
   };
 
-  const handleSave = async () => {
+  // ─── Mutation: บันทึกข้อมูลการเข้าเรียนด้วยตนเอง (Manual Save) ───
+  const saveMutation = useMutation({
+    mutationFn: async (records: any[]) => {
+      return api.post('/attendance', { records });
+    },
+    onSuccess: () => {
+      toast.success('บันทึกการเช็คชื่อเรียบร้อยแล้ว');
+      queryClient.invalidateQueries({ queryKey: ['attendance-data', selectedClass, date] });
+    },
+    onError: () => {
+      toast.error('บันทึกไม่สำเร็จ');
+    }
+  });
+
+  const handleSave = () => {
     if (!selectedClass || students.length === 0) return;
 
-    // Check if there are any students without a status
     const uncheckedStudents = students.filter(s => !attendance[s.id]);
     if (uncheckedStudents.length > 0) {
       toast.error(`กรุณาเช็คชื่อนักเรียนให้ครบทุกคนก่อนบันทึก (เหลืออีก ${uncheckedStudents.length} คน)`);
       return;
     }
-
-    setSaving(true);
 
     const records = Object.entries(attendance).map(([student_id, status]) => ({
       student_id: Number(student_id),
@@ -307,24 +377,13 @@ export default function Attendance() {
       status: status
     }));
 
-    try {
-      await api.post('/attendance', {
-        records
-      });
-      toast.success('บันทึกการเช็คชื่อเรียบร้อยแล้ว');
-      fetchStudentsAndAttendance();
-    } catch {
-      toast.error('บันทึกไม่สำเร็จ');
-    } finally {
-      setSaving(false);
-    }
+    saveMutation.mutate(records);
   };
 
-  const handleMatrixCellUpdate = async (studentId: string, dateStr: string, status: string) => {
-    setMatrixEditingCell(null);
-    const toastId = toast.loading('กำลังบันทึกข้อมูลย้อนหลัง...');
-    try {
-      await api.post('/attendance', {
+  // ─── Mutation: อัปเดตข้อมูลเข้าเรียน Matrix ───
+  const matrixCellUpdateMutation = useMutation({
+    mutationFn: async ({ studentId, dateStr, status }: { studentId: string; dateStr: string; status: string }) => {
+      return api.post('/attendance', {
         records: [{
           student_id: Number(studentId),
           classroom_id: Number(selectedClass),
@@ -332,34 +391,45 @@ export default function Attendance() {
           status: status
         }]
       });
-      toast.success('อัปเดตข้อมูลการเข้าเรียนเรียบร้อย', { id: toastId });
-      
-      // Refresh statistics and matrix data
-      fetchMatrixData();
-      fetchStudentsAndAttendance();
-    } catch {
-      toast.error('อัปเดตไม่สำเร็จ', { id: toastId });
+    },
+    onSuccess: (_, variables) => {
+      toast.success('อัปเดตข้อมูลการเข้าเรียนเรียบร้อย');
+      queryClient.invalidateQueries({ queryKey: ['attendance-matrix', selectedClass, matrixStartDate, matrixEndDate] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-data', selectedClass] });
+    },
+    onError: () => {
+      toast.error('อัปเดตไม่สำเร็จ');
     }
+  });
+
+  const handleMatrixCellUpdate = (studentId: string, dateStr: string, status: string) => {
+    setMatrixEditingCell(null);
+    matrixCellUpdateMutation.mutate({ studentId, dateStr, status });
   };
 
-  const handleMatrixCellDelete = async (studentId: string, dateStr: string) => {
+  // ─── Mutation: ลบข้อมูลเข้าเรียน Matrix ───
+  const matrixCellDeleteMutation = useMutation({
+    mutationFn: async (recordId: string) => {
+      return api.delete(`/attendance?id=${recordId}`);
+    },
+    onSuccess: () => {
+      toast.success('ลบข้อมูลการเข้าเรียนเรียบร้อย');
+      queryClient.invalidateQueries({ queryKey: ['attendance-matrix', selectedClass, matrixStartDate, matrixEndDate] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-data', selectedClass] });
+    },
+    onError: () => {
+      toast.error('ลบข้อมูลไม่สำเร็จ');
+    }
+  });
+
+  const handleMatrixCellDelete = (studentId: string, dateStr: string) => {
     setMatrixEditingCell(null);
-    // Find record ID
     const record = matrixRecords.find(r => 
       (String(r.student_id) === String(studentId)) && 
       new Date(r.date).toISOString().split('T')[0] === dateStr
     );
     if (!record) return;
-    
-    const toastId = toast.loading('กำลังลบข้อมูลย้อนหลัง...');
-    try {
-      await api.delete(`/attendance?id=${record.id}`);
-      toast.success('ลบข้อมูลการเข้าเรียนเรียบร้อย', { id: toastId });
-      fetchMatrixData();
-      fetchStudentsAndAttendance();
-    } catch {
-      toast.error('ลบข้อมูลไม่สำเร็จ', { id: toastId });
-    }
+    matrixCellDeleteMutation.mutate(record.id);
   };
 
   const getStudentStats = (studentId: string) => {
@@ -386,36 +456,41 @@ export default function Attendance() {
     );
   };
 
-  const fetchHistory = async (student: Student) => {
-    setHistoryStudent(student);
-    setHistoryLoading(true);
-    setHistoryData([]);
-    try {
-      const res = await api.get(`/attendance?student_id=${student.id}&classroom_id=${selectedClass}`);
-      setHistoryData(res.data.data || []);
-    } catch {
-      toast.error('โหลดประวัติการเช็คชื่อไม่สำเร็จ');
-    } finally {
-      setHistoryLoading(false);
-    }
-  };
-
-  const handleDeleteHistory = async (recordId: string) => {
-    if (!confirm('ต้องการลบประวัติการเช็คชื่อนี้หรือไม่?')) return;
-    try {
-      await api.delete(`/attendance?id=${recordId}`);
+  // ─── Mutation: ลบประวัติการเช็คชื่อรายคน ───
+  const deleteHistoryMutation = useMutation({
+    mutationFn: async (recordId: string) => {
+      return api.delete(`/attendance?id=${recordId}`);
+    },
+    onSuccess: () => {
       toast.success('ลบประวัติเรียบร้อยแล้ว');
-      if (historyStudent) {
-        const res = await api.get(`/attendance?student_id=${historyStudent.id}&classroom_id=${selectedClass}`);
-        setHistoryData(res.data.data || []);
-      }
-      fetchStudentsAndAttendance();
-    } catch {
+      queryClient.invalidateQueries({ queryKey: ['attendance-history', selectedClass, historyStudent?.id] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-data', selectedClass] });
+    },
+    onError: () => {
       toast.error('ลบประวัติไม่สำเร็จ');
     }
+  });
+
+  const handleDeleteHistory = (recordId: string) => {
+    if (!confirm('ต้องการลบประวัติการเช็คชื่อนี้หรือไม่?')) return;
+    deleteHistoryMutation.mutate(recordId);
   };
 
-  const handleClearData = async () => {
+  // ─── Mutation: ล้างข้อมูลการเข้าเรียน ───
+  const clearDataMutation = useMutation({
+    mutationFn: async () => {
+      return api.delete(`/attendance?classroom_id=${selectedClass}&date=${date}`);
+    },
+    onSuccess: () => {
+      toast.success('ล้างข้อมูลการเช็คชื่อของวันนี้เรียบร้อยแล้ว');
+      queryClient.invalidateQueries({ queryKey: ['attendance-data', selectedClass, date] });
+    },
+    onError: () => {
+      toast.error('ล้างข้อมูลไม่สำเร็จ');
+    }
+  });
+
+  const handleClearData = () => {
     if (!selectedClass || students.length === 0) return;
     
     const dateObj = new Date(date);
@@ -424,17 +499,7 @@ export default function Attendance() {
     if (!confirm(`ยืนยันการล้างข้อมูล?\n\nคุณต้องการลบข้อมูลการเช็คชื่อของทุกคนในห้องนี้\nสำหรับวันที่ "${formattedDateForConfirm}" ใช่หรือไม่?\n\n(การกระทำนี้ไม่สามารถย้อนกลับได้)`)) {
       return;
     }
-
-    setSaving(true);
-    try {
-      await api.delete(`/attendance?classroom_id=${selectedClass}&date=${date}`);
-      toast.success('ล้างข้อมูลการเช็คชื่อของวันนี้เรียบร้อยแล้ว');
-      fetchStudentsAndAttendance();
-    } catch {
-      toast.error('ล้างข้อมูลไม่สำเร็จ');
-    } finally {
-      setSaving(false);
-    }
+    clearDataMutation.mutate();
   };
 
   const handleExportCSV = async () => {
@@ -490,8 +555,25 @@ export default function Attendance() {
     }
   };
 
-  // Quick Action: Mark all students
-  const handleMarkAll = async (status: string) => {
+  // ─── Mutation: เลือกสถานะทั้งหมด ───
+  const markAllMutation = useMutation({
+    mutationFn: async ({ status, records }: { status: string; records: any[] }) => {
+      return api.post('/attendance', { records });
+    },
+    onMutate: () => {
+      setAutoSaveStatus('saving');
+    },
+    onSuccess: () => {
+      setAutoSaveStatus('saved');
+      queryClient.invalidateQueries({ queryKey: ['attendance-data', selectedClass, date] });
+    },
+    onError: () => {
+      setAutoSaveStatus('error');
+      toast.error('บันทึกอัตโนมัติไม่สำเร็จ');
+    }
+  });
+
+  const handleMarkAll = (status: string) => {
     const newAtt = { ...attendance };
     filteredStudents.forEach(student => {
       newAtt[student.id] = status;
@@ -500,34 +582,20 @@ export default function Attendance() {
     toast.success(`เลือก ${status === 'present' ? 'มาเรียน' : status === 'absent' ? 'ขาด' : status === 'late' ? 'สาย' : 'ลา'} ให้กับรายชื่อที่แสดงอยู่`);
 
     if (autoSave) {
-      setAutoSaveStatus('saving');
       const records = filteredStudents.map(student => ({
         student_id: Number(student.id),
         classroom_id: Number(selectedClass),
         date: date,
         status: status
       }));
-
-      try {
-        await api.post('/attendance', {
-          records
-        });
-        setAutoSaveStatus('saved');
-        
-        // Refresh stats in background to keep graphs updated
-        const statsRes = await api.get(`/attendance?classroom_id=${selectedClass}`);
-        setStats(statsRes.data.data || []);
-      } catch (err) {
-        console.error(err);
-        setAutoSaveStatus('error');
-        toast.error('บันทึกอัตโนมัติไม่สำเร็จ');
-      }
+      markAllMutation.mutate({ status, records });
     }
   };
 
-  // Reset/Clear attendance state for unsaved changes
   const handleResetDraft = () => {
-    fetchStudentsAndAttendance();
+    if (attendanceData) {
+      setAttendance(attendanceData.attendance);
+    }
     toast.success('คืนค่าการกรอกข้อมูลแล้ว');
   };
 
@@ -598,6 +666,11 @@ export default function Attendance() {
     month: 'long',
     day: 'numeric',
   });
+
+  const loading = loadingClassrooms || (!!selectedClass && loadingAttendance);
+  const saving = saveMutation.isPending || clearDataMutation.isPending || markAllMutation.isPending;
+  const matrixLoading = loadingMatrix;
+  const historyLoading = loadingHistory;
 
   if (loading) return (
     <div className="flex flex-col items-center justify-center h-96 space-y-4">
@@ -945,7 +1018,7 @@ export default function Attendance() {
                                 </div>
                                 <span className="font-semibold text-slate-800">{student.name}</span>
                                 <button 
-                                  onClick={() => fetchHistory(student)} 
+                                  onClick={() => setHistoryStudent(student)} 
                                   className="p-1 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-100/50 transition-all" 
                                   title="ดูประวัติการมาเรียนอย่างละเอียด"
                                 >
@@ -1184,7 +1257,7 @@ export default function Attendance() {
                                 idx % 2 === 0 ? 'bg-white/20' : 'bg-transparent'
                               }`}
                             >
-                              <td className="p-4 font-semibold text-slate-800 text-sm sticky left-0 bg-white/95 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.05)] border-r border-indigo-100 flex items-center gap-2 h-14 overflow-hidden text-ellipsis whitespace-nowrap">
+                              <td className="p-4 font-semibold text-slate-800 text-sm sticky left-0 bg-white/95 backdrop-blur-md z-20 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)] border-r border-indigo-100 flex items-center gap-2 h-14 overflow-hidden text-ellipsis whitespace-nowrap">
                                 <div className="w-6 h-6 rounded-full bg-indigo-50 text-indigo-600 font-bold text-[10px] flex items-center justify-center flex-shrink-0">
                                   {student.name.charAt(0)}
                                 </div>
@@ -1207,78 +1280,14 @@ export default function Attendance() {
                                 const isEditing = matrixEditingCell?.studentId === student.id && matrixEditingCell?.date === dateStr;
 
                                 return (
-                                  <td 
-                                    key={dateStr} 
-                                    className="p-2 border-r border-indigo-100/40 text-center relative h-14"
-                                  >
-                                    {!status ? (
-                                      <button 
-                                        onClick={() => setMatrixEditingCell({ studentId: student.id, date: dateStr })}
-                                        className="w-8 h-8 rounded-full border border-dashed border-slate-300 hover:border-indigo-400 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 flex items-center justify-center mx-auto transition-all text-xs font-semibold"
-                                        title="คลิกเพื่อลงชื่อย้อนหลัง"
-                                      >
-                                        +
-                                      </button>
-                                    ) : (
-                                      <button
-                                        onClick={() => setMatrixEditingCell({ studentId: student.id, date: dateStr })}
-                                        className={`w-14 py-1.5 rounded-xl text-[10px] font-bold mx-auto flex items-center justify-center border transition-all hover:scale-105 ${
-                                          status === 'present' ? 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100' :
-                                          status === 'late' ? 'bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100' :
-                                          status === 'absent' ? 'bg-red-50 border-red-200 text-red-500 hover:bg-red-100' :
-                                          'bg-blue-50 border-blue-200 text-blue-500 hover:bg-blue-100' // leave
-                                        }`}
-                                      >
-                                        {status === 'present' ? 'มา' : status === 'late' ? 'สาย' : status === 'absent' ? 'ขาด' : 'ลา'}
-                                      </button>
-                                    )}
-
-                                    {/* Inline cell edit popover */}
-                                    {isEditing && (
-                                      <div 
-                                        ref={cellPopoverRef}
-                                        className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-1 bg-white p-2 rounded-xl border border-indigo-100 shadow-xl flex items-center gap-1.5 animate-scale-up"
-                                      >
-                                        <button 
-                                          onClick={() => handleMatrixCellUpdate(student.id, dateStr, 'present')}
-                                          className="w-7 h-7 rounded-lg bg-emerald-500 text-white font-bold text-xs flex items-center justify-center hover:bg-emerald-600 shadow-sm"
-                                          title="มาเรียน"
-                                        >
-                                          มา
-                                        </button>
-                                        <button 
-                                          onClick={() => handleMatrixCellUpdate(student.id, dateStr, 'late')}
-                                          className="w-7 h-7 rounded-lg bg-amber-500 text-white font-bold text-xs flex items-center justify-center hover:bg-amber-600 shadow-sm"
-                                          title="สาย"
-                                        >
-                                          สาย
-                                        </button>
-                                        <button 
-                                          onClick={() => handleMatrixCellUpdate(student.id, dateStr, 'absent')}
-                                          className="w-7 h-7 rounded-lg bg-red-500 text-white font-bold text-xs flex items-center justify-center hover:bg-red-600 shadow-sm"
-                                          title="ขาด"
-                                        >
-                                          ขาด
-                                        </button>
-                                        <button 
-                                          onClick={() => handleMatrixCellUpdate(student.id, dateStr, 'leave')}
-                                          className="w-7 h-7 rounded-lg bg-blue-500 text-white font-bold text-xs flex items-center justify-center hover:bg-blue-600 shadow-sm"
-                                          title="ลา"
-                                        >
-                                          ลา
-                                        </button>
-                                        {record && (
-                                          <button 
-                                            onClick={() => handleMatrixCellDelete(student.id, dateStr)}
-                                            className="w-7 h-7 rounded-lg bg-slate-100 text-red-500 border border-red-100 font-bold text-xs flex items-center justify-center hover:bg-red-50 shadow-sm"
-                                            title="ลบสถิตินี้ออก"
-                                          >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                          </button>
-                                        )}
-                                      </div>
-                                    )}
-                                  </td>
+                                  <MemoizedAttendanceCell
+                                    key={dateStr}
+                                    status={status}
+                                    isEditing={isEditing}
+                                    onEditClick={() => setMatrixEditingCell({ studentId: student.id, date: dateStr })}
+                                    onStatusSelect={statusVal => handleMatrixCellUpdate(student.id, dateStr, statusVal)}
+                                    popoverRef={isEditing ? cellPopoverRef : undefined}
+                                  />
                                 );
                               })}
                             </tr>

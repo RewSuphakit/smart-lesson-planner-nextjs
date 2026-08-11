@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
+import { CreateStudentSchema, BulkCreateStudentSchema, validateRequestBody } from '@/lib/validation';
 
 export async function GET(request: NextRequest) {
   try {
@@ -79,16 +80,21 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const user = requireAuth(request);
-    const body = await request.json();
+    const body = await request.clone().json().catch(() => null);
 
     // Bulk create
-    if (Array.isArray(body.students)) {
-      const data = body.students.map((s: Record<string, unknown>) => ({
+    if (body && Array.isArray(body.students)) {
+      const validation = await validateRequestBody(request, BulkCreateStudentSchema);
+      if (!validation.success) {
+        return validation.response;
+      }
+
+      const data = validation.data.students.map(s => ({
         userId: user.id,
-        name: s.name as string,
-        studentCode: (s.student_code as string) || null,
-        gradeLevel: (s.grade_level as string) || null,
-        email: (s.email as string) || null,
+        name: s.name,
+        studentCode: s.student_code || null,
+        gradeLevel: s.grade_level || null,
+        email: s.email || null,
         classroomId: s.classroom_id ? Number(s.classroom_id) : null,
       }));
 
@@ -97,14 +103,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Single create
+    const validation = await validateRequestBody(request, CreateStudentSchema);
+    if (!validation.success) {
+      return validation.response;
+    }
+
     const student = await prisma.student.create({
       data: {
         userId: user.id,
-        name: body.name,
-        studentCode: body.student_code || null,
-        gradeLevel: body.grade_level || null,
-        email: body.email || null,
-        classroomId: body.classroom_id ? Number(body.classroom_id) : null,
+        name: validation.data.name,
+        studentCode: validation.data.student_code || null,
+        gradeLevel: validation.data.grade_level || null,
+        email: validation.data.email || null,
+        classroomId: validation.data.classroom_id ? Number(validation.data.classroom_id) : null,
       },
     });
 

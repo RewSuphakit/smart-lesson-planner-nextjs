@@ -149,6 +149,8 @@ model Attendance {
   classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, classroomId, date], map: "unique_attendance")
+  @@index([classroomId], map: "idx_attendance_classroom")
+  @@index([studentId], map: "idx_attendance_student")
   @@map("attendance")
 }
 
@@ -163,6 +165,7 @@ model GradeCriteria {
 
   classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
 
+  @@index([classroomId], map: "idx_grade_criteria_classroom")
   @@map("grade_criteria")
 }
 
@@ -181,6 +184,7 @@ model ScoreStructure {
   classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
 
   @@unique([classroomId, lessonNumber], map: "unique_lesson")
+  @@index([classroomId], map: "idx_score_structures_classroom")
   @@map("score_structures")
 }
 
@@ -199,6 +203,8 @@ model StudentScore {
   classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, classroomId, lessonNumber], map: "unique_student_score")
+  @@index([classroomId], map: "idx_student_scores_classroom")
+  @@index([studentId], map: "idx_student_scores_student")
   @@map("student_scores")
 }
 

@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import prisma from '@/lib/prisma';
-import { generateToken } from '@/lib/auth';
+import { generateToken, setAuthCookie } from '@/lib/auth';
+import { RegisterSchema, validateRequestBody } from '@/lib/validation';
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, name, role } = await request.json();
-
-    if (!email || !password || !name) {
-      return NextResponse.json({ message: 'Email, password, and name are required' }, { status: 400 });
+    const validation = await validateRequestBody(request, RegisterSchema);
+    if (!validation.success) {
+      return validation.response;
     }
 
-    const validRole = (role === 'admin' || role === 'teacher') ? role : 'teacher';
+    const { email, password, name, role } = validation.data;
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
@@ -25,18 +25,21 @@ export async function POST(request: NextRequest) {
         email,
         password: hashedPassword,
         name,
-        role: validRole,
+        role: role || 'teacher',
       },
       select: { id: true, email: true, name: true, role: true, avatar: true },
     });
 
     const token = generateToken(user);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       message: 'Registration successful',
       token,
       user,
     }, { status: 201 });
+
+    setAuthCookie(response, token);
+    return response;
   } catch (error) {
     console.error('Register error:', error);
     return NextResponse.json({ message: 'Registration failed' }, { status: 500 });

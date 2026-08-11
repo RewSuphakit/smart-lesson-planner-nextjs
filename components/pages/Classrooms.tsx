@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
 import { Plus, Edit, Trash2, X, Loader2, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
-import axios from 'axios';
 
 const animalAvatars = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐧', '🐥', '🦉', '🦄', '🐙', '🐢', '🦖', '🦕', '🦦', '🦥'];
 
@@ -75,12 +75,11 @@ function ClassroomCard({ c, i, colors, onEdit, onDelete }: ClassroomCardProps) {
 }
 
 export default function Classrooms() {
-  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [saving, setSaving] = useState(false);
 
   const emptyForm = { 
     name: '', 
@@ -96,45 +95,51 @@ export default function Classrooms() {
   const [periodsPerWeek, setPeriodsPerWeek] = useState(2);
   const [totalWeeks, setTotalWeeks] = useState(18);
 
-  const fetchData = useCallback(async (signal?: AbortSignal) => {
-    try {
-      const res = await api.get('/classrooms', { signal });
-      setClassrooms(res.data.data || []);
-    } catch (err) {
-      if (!axios.isCancel(err)) {
-        toast.error('โหลดข้อมูลห้องเรียนไม่สำเร็จ');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // ─── Query: ดึงข้อมูลห้องเรียน ───
+  const { data: classrooms = [], isLoading } = useQuery<Classroom[]>({
+    queryKey: ['classrooms'],
+    queryFn: async () => {
+      const res = await api.get('/classrooms');
+      return res.data.data || [];
+    },
+  });
 
-  useEffect(() => {
-    const controller = new AbortController();
-    fetchData(controller.signal);
-    return () => controller.abort();
-  }, [fetchData]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
+  // ─── Mutation: สร้าง/แก้ไขห้องเรียน ───
+  const saveMutation = useMutation({
+    mutationFn: async (payload: typeof form) => {
       if (editing) {
-        await api.put('/classrooms/' + editing, form);
-        toast.success('อัปเดตข้อมูลห้องเรียนเรียบร้อย');
+        return api.put('/classrooms/' + editing, payload);
       } else {
-        await api.post('/classrooms', form);
-        toast.success('เพิ่มห้องเรียนเรียบร้อย');
+        return api.post('/classrooms', payload);
       }
+    },
+    onSuccess: () => {
+      toast.success(editing ? 'อัปเดตข้อมูลห้องเรียนเรียบร้อย' : 'เพิ่มห้องเรียนเรียบร้อย');
       setShowForm(false);
       setEditing(null);
       setForm(emptyForm);
-      fetchData();
-    } catch (err: any) {
+      queryClient.invalidateQueries({ queryKey: ['classrooms'] });
+    },
+    onError: (err: { response?: { data?: { message?: string } } }) => {
       toast.error(err.response?.data?.message || 'บันทึกไม่สำเร็จ');
-    } finally {
-      setSaving(false);
-    }
+    },
+  });
+
+  // ─── Mutation: ลบห้องเรียน ───
+  const deleteMutation = useMutation({
+    mutationFn: (id: string | number) => api.delete('/classrooms/' + id),
+    onSuccess: () => {
+      toast.success('ลบห้องเรียนแล้ว');
+      queryClient.invalidateQueries({ queryKey: ['classrooms'] });
+    },
+    onError: () => {
+      toast.error('ลบไม่สำเร็จ');
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    saveMutation.mutate(form);
   };
 
   const handleEdit = (c: Classroom) => {
@@ -167,15 +172,9 @@ export default function Classrooms() {
     setShowForm(true);
   };
 
-  const handleDelete = async (id: string | number) => {
+  const handleDelete = (id: string | number) => {
     if (!confirm('ต้องการลบห้องเรียนนี้หรือไม่? ข้อมูลการเช็คชื่อจะถูกลบไปด้วย')) return;
-    try {
-      await api.delete('/classrooms/' + id);
-      toast.success('ลบห้องเรียนแล้ว');
-      fetchData();
-    } catch {
-      toast.error('ลบไม่สำเร็จ');
-    }
+    deleteMutation.mutate(id);
   };
 
   const filtered = classrooms.filter(c => c.name?.toLowerCase().includes(search.toLowerCase()));
@@ -189,7 +188,7 @@ export default function Classrooms() {
     'from-cyan-500 to-blue-600',
   ];
 
-  if (loading) return (
+  if (isLoading) return (
     <div className="space-y-4">
       {[1, 2, 3].map(i => <div key={i} className="skeleton h-40 rounded-2xl" />)}
     </div>
@@ -370,8 +369,8 @@ export default function Classrooms() {
                   ค่าเริ่มต้น: 80% (ขาดได้ไม่เกิน {Math.floor(form.total_classes * ((100 - form.min_attendance_percent) / 100))} คาบ)
                 </p>
               </div>
-              <button type="submit" disabled={saving} className="btn btn-primary w-full py-3">
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : editing ? 'อัปเดต' : 'สร้างห้องเรียน'}
+              <button type="submit" disabled={saveMutation.isPending} className="btn btn-primary w-full py-3">
+                {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : editing ? 'อัปเดต' : 'สร้างห้องเรียน'}
               </button>
             </form>
           </div>

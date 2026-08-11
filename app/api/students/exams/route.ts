@@ -7,11 +7,26 @@ export async function PUT(request: NextRequest) {
     const user = requireAuth(request);
     const body = await request.json();
 
+    const { searchParams } = new URL(request.url);
+    const type = searchParams.get('type') || 'final';
+
     if (!Array.isArray(body.scores)) {
       return NextResponse.json({ message: 'Invalid scores format' }, { status: 400 });
     }
 
     for (const score of body.scores) {
+      const student = await prisma.student.findUnique({
+        where: { id: Number(score.student_id) },
+        include: {
+          classroom: true,
+          attendance: true,
+        },
+      });
+
+      if (!student || student.userId !== user.id) {
+        continue;
+      }
+
       const dataToUpdate: Record<string, unknown> = {};
       if (score.midterm_score !== undefined) {
         dataToUpdate.midtermScore = score.midterm_score === '' ? null : Number(score.midterm_score);
@@ -20,21 +35,18 @@ export async function PUT(request: NextRequest) {
         dataToUpdate.finalScore = score.final_score === '' ? null : Number(score.final_score);
       }
       if (score.affective_score !== undefined) {
-        dataToUpdate.affectiveScore = score.affective_score === '' ? null : Number(score.affective_score);
+        if (score.affective_score === '' || score.affective_score === null) {
+          dataToUpdate.affectiveScore = null;
+        } else {
+          dataToUpdate.affectiveScore = Math.max(0, Number(score.affective_score));
+        }
       }
 
       if (Object.keys(dataToUpdate).length > 0) {
-        // Find student first to verify ownership
-        const student = await prisma.student.findUnique({
-          where: { id: score.student_id },
+        await prisma.student.update({
+          where: { id: student.id },
+          data: dataToUpdate,
         });
-
-        if (student && student.userId === user.id) {
-          await prisma.student.update({
-            where: { id: score.student_id },
-            data: dataToUpdate,
-          });
-        }
       }
     }
 

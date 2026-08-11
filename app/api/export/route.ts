@@ -80,15 +80,32 @@ export async function GET(request: NextRequest) {
         late_to_absent_ratio: c.lateToAbsentRatio,
         leave_to_absent_ratio: c.leaveToAbsentRatio,
       })),
-      students: students.map(s => ({
-        id: s.id,
-        student_code: s.studentCode || '',
-        name: s.name,
-        classroom: s.classroom?.name || '',
-        midterm_score: s.midtermScore,
-        final_score: s.finalScore,
-        affective_score: s.affectiveScore,
-      })),
+      students: students.map(s => {
+        const cId = s.classroomId || s.classroom?.id;
+        const studentAttendance = attendance.filter(a => a.studentId === s.id && (cId ? a.classroomId === cId : true));
+        let absentCount = 0, lateCount = 0;
+        for (const a of studentAttendance) {
+          if (a.status === 'absent') absentCount++;
+          else if (a.status === 'late') lateCount++;
+        }
+        const classroom = classrooms.find(c => c.id === cId);
+        const weightAffective = classroom?.affectiveWeight ? Number(classroom.affectiveWeight) : 20;
+        const attendancePenalty = (absentCount * 2) + (lateCount * 1);
+        const baseAffective = s.affectiveScore !== null && s.affectiveScore !== undefined
+          ? Number(s.affectiveScore)
+          : weightAffective;
+        const finalAffectiveScore = Math.min(weightAffective, Math.max(0, baseAffective - attendancePenalty));
+
+        return {
+          id: s.id,
+          student_code: s.studentCode || '',
+          name: s.name,
+          classroom: s.classroom?.name || '',
+          midterm_score: s.midtermScore,
+          final_score: s.finalScore,
+          affective_score: finalAffectiveScore,
+        };
+      }),
       attendance: attendance.map(a => ({
         student_code: a.student?.studentCode || '',
         student_name: a.student?.name || '',
