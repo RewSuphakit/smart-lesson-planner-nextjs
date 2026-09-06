@@ -7,9 +7,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const user = requireAuth(request);
     const { id } = await params;
+    const numericId = Number(id);
+    if (isNaN(numericId) || numericId <= 0) {
+      return NextResponse.json({ message: 'Invalid timetable ID' }, { status: 400 });
+    }
+
     const body = await request.json();
 
-    const entry = await prisma.weeklySchedule.findUnique({ where: { id: Number(id) } });
+    const entry = await prisma.weeklySchedule.findUnique({ where: { id: numericId } });
     if (!entry || entry.userId !== user.id) {
       return NextResponse.json({ message: 'Entry not found' }, { status: 404 });
     }
@@ -24,10 +29,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const hours = startPeriod === 0 ? 0 : (endPeriod - startPeriod + 1);
     
     const endTimeStr = PERIOD_TIMES[endPeriod]?.end;
-    const endTime = endTimeStr ? new Date(`1970-01-01T${endTimeStr}`) : null;
+    const endTime = endTimeStr ? new Date(`1970-01-01T${endTimeStr}.000Z`) : null;
 
     await prisma.weeklySchedule.update({
-      where: { id: Number(id) },
+      where: { id: numericId },
       data: {
         endPeriod,
         hours,

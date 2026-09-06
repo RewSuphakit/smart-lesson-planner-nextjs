@@ -17,6 +17,21 @@ export async function GET(request: NextRequest) {
     const start = new Date(startDate);
     const end = new Date(endDate);
 
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return NextResponse.json({ message: 'Invalid start or end date format' }, { status: 400 });
+    }
+
+    if (start > end) {
+      return NextResponse.json({ message: 'Start date cannot be after end date' }, { status: 400 });
+    }
+
+    // Guard against unbounded loop DoS: cap date range to maximum 366 days
+    const diffMs = Math.abs(end.getTime() - start.getTime());
+    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+    if (diffDays > 366) {
+      return NextResponse.json({ message: 'Date range cannot exceed 366 days' }, { status: 400 });
+    }
+
     // Normalize boundaries in UTC
     const startUtc = new Date(Date.UTC(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0));
     const endUtc = new Date(Date.UTC(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999));
@@ -136,16 +151,6 @@ export async function POST(request: NextRequest) {
         }, { status: 400 });
       }
 
-      // BUG-14: Delete existing auto-generated schedules for the user to prevent duplicates
-      await prisma.schedule.deleteMany({
-        where: {
-          userId: user.id,
-          notes: {
-            startsWith: 'สร้างอัตโนมัติ:',
-          },
-        },
-      });
-
       // Track how many schedules generated per classroom
       const classroomCounts: Record<number, number> = {};
       for (const room of classrooms) {
@@ -194,8 +199,8 @@ export async function POST(request: NextRequest) {
             title,
             subject,
             scheduledDate: new Date(currentDate),
-            startTime: slot.startTime ? new Date(slot.startTime) : new Date(`1970-01-01T08:30:00`),
-            endTime: slot.endTime ? new Date(slot.endTime) : new Date(`1970-01-01T10:30:00`),
+            startTime: slot.startTime ? new Date(slot.startTime) : new Date(`1970-01-01T08:30:00.000Z`),
+            endTime: slot.endTime ? new Date(slot.endTime) : new Date(`1970-01-01T10:30:00.000Z`),
             notes: `สร้างอัตโนมัติ: ${slot.subjectCode || ''} ${slot.subjectName || ''} — ${room.name}`,
             status: 'scheduled'
           });
@@ -207,11 +212,20 @@ export async function POST(request: NextRequest) {
         daysProcessed++;
       }
 
-      if (schedulesToCreate.length > 0) {
-        await prisma.schedule.createMany({
-          data: schedulesToCreate
-        });
-      }
+      // Execute delete existing and create new atomically in a transaction to prevent data loss
+      await prisma.$transaction([
+        prisma.schedule.deleteMany({
+          where: {
+            userId: user.id,
+            notes: {
+              startsWith: 'สร้างอัตโนมัติ:',
+            },
+          },
+        }),
+        ...(schedulesToCreate.length > 0
+          ? [prisma.schedule.createMany({ data: schedulesToCreate })]
+          : []),
+      ]);
 
       const summary = classrooms.map(room => ({
         classroom_name: room.name,
@@ -225,14 +239,21 @@ export async function POST(request: NextRequest) {
       }, { status: 201 });
     }
 
+    const toUtcTime = (timeStr: string) => {
+      const clean = timeStr.trim();
+      const parts = clean.split(':');
+      const formatted = parts.length === 2 ? `${clean}:00` : clean;
+      return new Date(`1970-01-01T${formatted}.000Z`);
+    };
+
     const schedule = await prisma.schedule.create({
       data: {
         userId: user.id,
         title: body.title,
         subject: body.subject,
         scheduledDate: new Date(body.scheduled_date),
-        startTime: new Date(`1970-01-01T${body.start_time}`),
-        endTime: new Date(`1970-01-01T${body.end_time}`),
+        startTime: toUtcTime(body.start_time),
+        endTime: toUtcTime(body.end_time),
         notes: body.notes || null,
         status: body.status || 'scheduled',
       },

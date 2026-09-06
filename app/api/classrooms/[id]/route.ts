@@ -6,11 +6,33 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const user = requireAuth(request);
     const { id } = await params;
+    const numericId = Number(id);
+    if (isNaN(numericId) || numericId <= 0) {
+      return NextResponse.json({ message: 'Invalid classroom ID' }, { status: 400 });
+    }
+
     const classroom = await prisma.classroom.findFirst({
-      where: { id: Number(id), userId: user.id },
+      where: { id: numericId, userId: user.id },
     });
     if (!classroom) return NextResponse.json({ message: 'Not found' }, { status: 404 });
-    return NextResponse.json(classroom);
+    const formatted = {
+      id: classroom.id,
+      name: classroom.name,
+      description: classroom.description,
+      late_to_absent_ratio: classroom.lateToAbsentRatio,
+      leave_to_absent_ratio: classroom.leaveToAbsentRatio,
+      absent_to_f_ratio: classroom.absentToFRatio,
+      total_classes: classroom.totalClasses,
+      min_attendance_percent: classroom.minAttendancePercent,
+      assignment_weight: classroom.assignmentWeight ? Number(classroom.assignmentWeight) : 10,
+      post_test_weight: classroom.postTestWeight ? Number(classroom.postTestWeight) : 70,
+      affective_weight: classroom.affectiveWeight ? Number(classroom.affectiveWeight) : 20,
+      midterm_weight: classroom.midtermWeight ? Number(classroom.midtermWeight) : 0,
+      final_weight: classroom.finalWeight ? Number(classroom.finalWeight) : 0,
+      midterm_max_score: classroom.midtermMaxScore ? Number(classroom.midtermMaxScore) : 100,
+      final_max_score: classroom.finalMaxScore ? Number(classroom.finalMaxScore) : 100,
+    };
+    return NextResponse.json({ data: formatted });
   } catch (error) {
     if (error instanceof AuthError) return handleAuthError();
     return NextResponse.json({ message: 'Failed' }, { status: 500 });
@@ -21,11 +43,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const user = requireAuth(request);
     const { id } = await params;
+    const numericId = Number(id);
+    if (isNaN(numericId) || numericId <= 0) {
+      return NextResponse.json({ message: 'Invalid classroom ID' }, { status: 400 });
+    }
+
     const body = await request.json();
 
     // Check ownership first
     const classroom = await prisma.classroom.findFirst({
-      where: { id: Number(id), userId: user.id },
+      where: { id: numericId, userId: user.id },
     });
     if (!classroom) return NextResponse.json({ message: 'Not found' }, { status: 404 });
 
@@ -45,7 +72,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       if (body[key] !== undefined) updateData[prismaKey] = body[key];
     }
 
-    await prisma.classroom.update({ where: { id: Number(id) }, data: updateData });
+    await prisma.classroom.update({ where: { id: numericId }, data: updateData });
     return NextResponse.json({ message: 'Updated' });
   } catch (error) {
     console.error('Update classroom error:', error);
@@ -58,14 +85,18 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   try {
     const user = requireAuth(request);
     const { id } = await params;
+    const numericId = Number(id);
+    if (isNaN(numericId) || numericId <= 0) {
+      return NextResponse.json({ message: 'Invalid classroom ID' }, { status: 400 });
+    }
 
     // Check ownership first
     const classroom = await prisma.classroom.findFirst({
-      where: { id: Number(id), userId: user.id },
+      where: { id: numericId, userId: user.id },
     });
     if (!classroom) return NextResponse.json({ message: 'Not found' }, { status: 404 });
 
-    await prisma.classroom.delete({ where: { id: Number(id) } });
+    await prisma.classroom.delete({ where: { id: numericId } });
     return NextResponse.json({ message: 'Deleted' });
   } catch (error) {
     if (error instanceof AuthError) return handleAuthError();

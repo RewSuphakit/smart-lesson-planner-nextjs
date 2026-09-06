@@ -7,28 +7,56 @@ import { createPortal } from 'react-dom';
 import { 
   Loader2, Users, Save, Calendar as CalendarIcon, CheckCircle, Clock, XCircle, 
   FileText, AlertCircle, X, History, Trash2, Download, ChevronLeft, ChevronRight, 
-  Search, Check, Grid, List, RefreshCw
+  Search, Check, Grid, List, RefreshCw, Sparkles, Filter, ArrowRight, RotateCcw,
+  FileSpreadsheet, Upload
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import AttendanceCsvModal from '@/components/AttendanceCsvModal';
+import AttendanceImportModal from '@/components/AttendanceImportModal';
+
+import { getThaiHolidays, checkThaiHoliday, HolidayInfo } from '@/lib/thaiHolidays';
+
+const THAI_MONTHS_SHORT = [
+  'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+  'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
+];
+
+const getSchemaDayOfWeek = (dateStr: string): number => {
+  const jsDay = new Date(dateStr).getDay();
+  return (jsDay + 6) % 7; // 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
+};
 
 interface MemoizedAttendanceCellProps {
   status: string | null;
   isEditing: boolean;
   onEditClick: () => void;
   onStatusSelect: (status: string) => void;
+  onDeleteClick?: () => void;
   popoverRef?: React.RefObject<HTMLDivElement | null>;
+  holiday?: HolidayInfo | null;
 }
 
-const MemoizedAttendanceCell = memo(({ status, isEditing, onEditClick, onStatusSelect, popoverRef }: MemoizedAttendanceCellProps) => {
+const MemoizedAttendanceCell = memo(({ status, isEditing, onEditClick, onStatusSelect, onDeleteClick, popoverRef, holiday }: MemoizedAttendanceCellProps) => {
+  const isGovHoliday = holiday?.type === 'government';
+  const isWeekend = holiday?.type === 'weekend';
+
   return (
-    <td className="p-2 border-r border-indigo-100/40 text-center relative h-14 min-w-[80px]">
+    <td className={`p-2 border-r border-indigo-100/40 text-center relative h-14 min-w-[80px] transition-colors ${
+      isGovHoliday ? 'bg-amber-50/40' : isWeekend ? 'bg-slate-50/50' : ''
+    }`}>
       {!status ? (
         <button 
           onClick={onEditClick}
-          className="w-8 h-8 rounded-full border border-dashed border-slate-300 hover:border-indigo-400 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 flex items-center justify-center mx-auto transition-all text-xs font-semibold touch-manipulation"
-          title="คลิกเพื่อลงชื่อย้อนหลัง"
+          className={`w-8 h-8 rounded-full border flex items-center justify-center mx-auto transition-all text-xs font-semibold touch-manipulation ${
+            isGovHoliday
+              ? 'border-amber-300 bg-amber-100/80 text-amber-800 hover:bg-amber-200 hover:border-amber-400 shadow-sm'
+              : isWeekend
+              ? 'border-slate-200 bg-slate-100/80 text-slate-400 hover:bg-slate-200'
+              : 'border-dashed border-slate-300 hover:border-indigo-400 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600'
+          }`}
+          title={holiday ? `วันหยุด: ${holiday.name} (คลิกเพื่อลงชื่อย้อนหลัง)` : 'คลิกเพื่อลงชื่อย้อนหลัง'}
         >
-          +
+          {isGovHoliday ? '🏖️' : '+'}
         </button>
       ) : (
         <button
@@ -77,6 +105,15 @@ const MemoizedAttendanceCell = memo(({ status, isEditing, onEditClick, onStatusS
           >
             ลา
           </button>
+          {status && onDeleteClick && (
+            <button 
+              onClick={onDeleteClick}
+              className="w-7 h-7 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 font-bold text-xs flex items-center justify-center border border-red-200 shadow-sm touch-manipulation"
+              title="ลบ/ยกเลิกการเช็คชื่อช่องนี้"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       )}
     </td>
@@ -84,6 +121,360 @@ const MemoizedAttendanceCell = memo(({ status, isEditing, onEditClick, onStatusS
 });
 
 MemoizedAttendanceCell.displayName = 'MemoizedAttendanceCell';
+
+interface ThaiDateRangePickerProps {
+  startDate: string;
+  endDate: string;
+  onChange: (start: string, end: string) => void;
+  matrixDatesCount: number;
+}
+
+const ThaiDateRangePicker = memo(({ startDate, endDate, onChange, matrixDatesCount }: ThaiDateRangePickerProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+
+  const now = new Date();
+  const [viewYear, setViewYear] = useState(now.getFullYear());
+  const [viewMonth, setViewMonth] = useState(now.getMonth());
+
+  const [draftStart, setDraftStart] = useState(startDate);
+  const [draftEnd, setDraftEnd] = useState(endDate);
+  const [pickingStep, setPickingStep] = useState<'start' | 'end'>('start');
+
+  const updatePosition = useCallback(() => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      const popoverWidth = window.innerWidth < 640 ? 320 : 360;
+      let left = rect.left;
+      if (left + popoverWidth > window.innerWidth - 16) {
+        left = Math.max(16, window.innerWidth - popoverWidth - 16);
+      }
+      setPopoverPos({
+        top: rect.bottom + 8,
+        left: Math.max(16, left)
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    setDraftStart(startDate);
+    setDraftEnd(endDate);
+  }, [startDate, endDate, isOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
+      updatePosition();
+      window.addEventListener('resize', updatePosition);
+      window.addEventListener('scroll', updatePosition, true);
+    }
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [isOpen, updatePosition]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        popoverRef.current && 
+        !popoverRef.current.contains(e.target as Node) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(e.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
+  const thaiMonths = [
+    'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+    'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+  ];
+
+  const formatShortThai = (dateStr: string) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    const day = d.getDate();
+    const month = THAI_MONTHS_SHORT[d.getMonth()];
+    const yearBE = d.getFullYear() + 543;
+    return `${day} ${month} ${yearBE}`;
+  };
+
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const firstDayOfWeek = new Date(viewYear, viewMonth, 1).getDay();
+
+  const handlePrevMonth = () => {
+    if (viewMonth === 0) {
+      setViewMonth(11);
+      setViewYear(prev => prev - 1);
+    } else {
+      setViewMonth(prev => prev - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (viewMonth === 11) {
+      setViewMonth(0);
+      setViewYear(prev => prev + 1);
+    } else {
+      setViewMonth(prev => prev + 1);
+    }
+  };
+
+  const handleDateClick = (dayNum: number) => {
+    const monthStr = String(viewMonth + 1).padStart(2, '0');
+    const dayStr = String(dayNum).padStart(2, '0');
+    const dateStr = `${viewYear}-${monthStr}-${dayStr}`;
+
+    if (pickingStep === 'start' || !draftStart || (draftStart && draftEnd)) {
+      setDraftStart(dateStr);
+      setDraftEnd('');
+      setPickingStep('end');
+    } else {
+      if (dateStr < draftStart) {
+        setDraftStart(dateStr);
+        setDraftEnd(draftStart);
+      } else {
+        setDraftEnd(dateStr);
+      }
+      setPickingStep('start');
+    }
+  };
+
+  const isSelectedStart = (dayNum: number) => {
+    if (!draftStart) return false;
+    const monthStr = String(viewMonth + 1).padStart(2, '0');
+    const dayStr = String(dayNum).padStart(2, '0');
+    return draftStart === `${viewYear}-${monthStr}-${dayStr}`;
+  };
+
+  const isSelectedEnd = (dayNum: number) => {
+    if (!draftEnd) return false;
+    const monthStr = String(viewMonth + 1).padStart(2, '0');
+    const dayStr = String(dayNum).padStart(2, '0');
+    return draftEnd === `${viewYear}-${monthStr}-${dayStr}`;
+  };
+
+  const isInRange = (dayNum: number) => {
+    if (!draftStart || !draftEnd) return false;
+    const monthStr = String(viewMonth + 1).padStart(2, '0');
+    const dayStr = String(dayNum).padStart(2, '0');
+    const dateStr = `${viewYear}-${monthStr}-${dayStr}`;
+    return dateStr >= draftStart && dateStr <= draftEnd;
+  };
+
+  const handlePresetSelect = (days: number) => {
+    const end = new Date().toISOString().split('T')[0];
+    const startObj = new Date();
+    startObj.setDate(startObj.getDate() - days);
+    const start = startObj.toISOString().split('T')[0];
+    setDraftStart(start);
+    setDraftEnd(end);
+  };
+
+  const handleApply = () => {
+    onChange(draftStart, draftEnd);
+    setIsOpen(false);
+  };
+
+  const isPresetActive = (days: number) => {
+    if (!draftStart || !draftEnd) return false;
+    const end = new Date().toISOString().split('T')[0];
+    const startObj = new Date();
+    startObj.setDate(startObj.getDate() - days);
+    const start = startObj.toISOString().split('T')[0];
+    return draftStart === start && draftEnd === end;
+  };
+
+  return (
+    <div className="relative inline-block text-left">
+      {/* Trigger Button */}
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={() => {
+          if (!isOpen) updatePosition();
+          setIsOpen(!isOpen);
+        }}
+        className="group relative flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-white/90 hover:bg-white border border-indigo-100/90 shadow-md hover:shadow-lg shadow-indigo-500/5 transition-all duration-200 cursor-pointer select-none"
+      >
+        <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+          <CalendarIcon className="w-4 h-4" />
+        </div>
+        <div className="flex flex-col text-left">
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-500">ช่วงวันที่แสดงผล</span>
+          <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+            {startDate ? formatShortThai(startDate) : 'ทั้งหมด'}
+            <span className="text-slate-400">→</span>
+            {endDate ? formatShortThai(endDate) : 'ปัจจุบัน'}
+          </span>
+        </div>
+        <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform duration-200 ml-1 ${isOpen ? 'rotate-90 text-indigo-600' : ''}`} />
+      </button>
+
+      {/* Thai Calendar Popover via Portal */}
+      {isOpen && typeof window !== 'undefined' && createPortal(
+        <div
+          ref={popoverRef}
+          style={{ top: `${popoverPos.top}px`, left: `${popoverPos.left}px` }}
+          className="fixed z-[9999] w-[320px] sm:w-[360px] bg-white/98 backdrop-blur-2xl p-4 sm:p-5 rounded-3xl border border-indigo-100 shadow-2xl shadow-indigo-500/20 animate-scale-up text-slate-800"
+        >
+          {/* Header Controls */}
+          <div className="flex items-center justify-between pb-3 border-b border-indigo-50 mb-3">
+            <button
+              type="button"
+              onClick={handlePrevMonth}
+              className="p-1.5 rounded-xl hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 transition-colors"
+              title="เดือนก่อนหน้า"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <div className="text-center">
+              <span className="font-extrabold text-slate-800 text-sm sm:text-base">
+                {thaiMonths[viewMonth]} {viewYear + 543}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleNextMonth}
+              className="p-1.5 rounded-xl hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 transition-colors"
+              title="เดือนถัดไป"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Quick Presets Pills */}
+          <div className="flex items-center gap-1.5 mb-3 overflow-x-auto pb-1">
+            {[7, 14, 30].map(days => (
+              <button
+                key={days}
+                type="button"
+                onClick={() => handlePresetSelect(days)}
+                className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all ${
+                  isPresetActive(days)
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'bg-indigo-50/70 text-indigo-700 hover:bg-indigo-100'
+                }`}
+              >
+                {days} วัน
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => {
+                const now = new Date();
+                const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+                setDraftStart(firstDay);
+                setDraftEnd(now.toISOString().split('T')[0]);
+              }}
+              className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-indigo-50/70 text-indigo-700 hover:bg-indigo-100 transition-all"
+            >
+              เดือนนี้
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setDraftStart('');
+                setDraftEnd('');
+              }}
+              className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all"
+            >
+              ทั้งหมด
+            </button>
+          </div>
+
+          {/* Weekday Labels */}
+          <div className="grid grid-cols-7 gap-1 text-center font-extrabold text-[11px] text-slate-500 mb-2">
+            <span className="text-rose-500">อา</span>
+            <span>จ</span>
+            <span>อ</span>
+            <span>พ</span>
+            <span>พฤ</span>
+            <span>ศ</span>
+            <span className="text-indigo-500">ส</span>
+          </div>
+
+          {/* Days Grid */}
+          <div className="grid grid-cols-7 gap-1 text-center">
+            {Array.from({ length: firstDayOfWeek }).map((_, i) => (
+              <div key={`blank-${i}`} className="h-8 sm:h-9" />
+            ))}
+
+            {Array.from({ length: daysInMonth }).map((_, i) => {
+              const dayNum = i + 1;
+              const isStart = isSelectedStart(dayNum);
+              const isEnd = isSelectedEnd(dayNum);
+              const inRange = isInRange(dayNum);
+
+              const monthStr = String(viewMonth + 1).padStart(2, '0');
+              const dayStr = String(dayNum).padStart(2, '0');
+              const dateStr = `${viewYear}-${monthStr}-${dayStr}`;
+              const dayHoliday = checkThaiHoliday(dateStr);
+
+              let bgClass = 'hover:bg-indigo-50 text-slate-700';
+              if (isStart || isEnd) {
+                bgClass = 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-black shadow-md shadow-indigo-500/30 rounded-xl';
+              } else if (inRange) {
+                bgClass = 'bg-indigo-100/80 text-indigo-800 font-bold rounded-lg';
+              } else if (dayHoliday?.type === 'government') {
+                bgClass = 'bg-amber-50 text-amber-900 font-bold hover:bg-amber-100 border border-amber-200/60';
+              }
+
+              return (
+                <button
+                  key={dayNum}
+                  type="button"
+                  onClick={() => handleDateClick(dayNum)}
+                  title={dayHoliday ? dayHoliday.name : undefined}
+                  className={`h-8 sm:h-9 text-xs font-semibold rounded-xl flex flex-col items-center justify-center transition-all duration-150 relative ${bgClass}`}
+                >
+                  <span>{dayNum}</span>
+                  {dayHoliday?.type === 'government' && !isStart && !isEnd && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 absolute bottom-1"></span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Popover Footer Actions */}
+          <div className="mt-4 pt-3 border-t border-indigo-50 flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-slate-500 truncate max-w-[170px]">
+              {draftStart ? formatShortThai(draftStart) : 'ทั้งหมด'} {draftEnd ? `→ ${formatShortThai(draftEnd)}` : ''}
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={handleApply}
+                className="px-4 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-bold shadow-md shadow-indigo-500/20 hover:bg-indigo-700"
+              >
+                ตกลง
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+});
+
+ThaiDateRangePicker.displayName = 'ThaiDateRangePicker';
 
 interface TimetableEntry {
   id: number;
@@ -104,6 +495,8 @@ interface Classroom {
   name: string;
   total_classes?: number;
   min_attendance_percent?: number;
+  late_to_absent_ratio?: number;
+  leave_to_absent_ratio?: number;
 }
 
 interface Student {
@@ -209,6 +602,7 @@ export default function Attendance() {
   
   // Export Modal state
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [exportStartDate, setExportStartDate] = useState('');
   const [exportEndDate, setExportEndDate] = useState('');
   const [exporting, setExporting] = useState(false);
@@ -224,17 +618,37 @@ export default function Attendance() {
     }
   });
 
-  // ─── Query: ดึงข้อมูลตารางเรียน (Timetable today entries) ───
-  const { data: todayEntries = [] } = useQuery<TimetableEntry[]>({
-    queryKey: ['timetable-today'],
+  // ─── Query: ดึงข้อมูลตารางเรียนทั้งหมด (All Timetable Entries) ───
+  const { data: allTimetableEntries = [] } = useQuery<TimetableEntry[]>({
+    queryKey: ['timetable-all'],
     queryFn: async () => {
       const res = await api.get('/timetable');
-      const allEntries: TimetableEntry[] = res.data.data?.entries || [];
-      const jsDay = new Date().getDay();
-      const schemaDayOfWeek = (jsDay + 6) % 7;
-      return allEntries.filter(e => e.day_of_week === schemaDayOfWeek);
+      return res.data.data?.entries || [];
     }
   });
+
+  const todayEntries = useMemo(() => {
+    const jsDay = new Date().getDay();
+    const schemaDayOfWeek = (jsDay + 6) % 7;
+    return allTimetableEntries.filter(e => e.day_of_week === schemaDayOfWeek);
+  }, [allTimetableEntries]);
+
+  // ─── State: วันที่มีการสอนของห้องเรียนนี้ (0=Mon .. 6=Sun) ───
+  const [teachingDays, setTeachingDays] = useState<number[]>([0, 1, 2, 3, 4]);
+
+  useEffect(() => {
+    if (!selectedClass) return;
+    const classEntries = allTimetableEntries.filter(
+      e => String(e.classroom_id) === String(selectedClass)
+    );
+    const timetableDays = Array.from(new Set(classEntries.map(e => e.day_of_week)));
+
+    if (timetableDays.length > 0) {
+      setTeachingDays(timetableDays.sort((a, b) => a - b));
+    } else {
+      setTeachingDays([0, 1, 2, 3, 4]);
+    }
+  }, [selectedClass, allTimetableEntries]);
 
   // ─── Query: ดึงข้อมูลการเช็คชื่อวันนี้ + นักเรียน + สถิติ ───
   const { data: attendanceData, isLoading: loadingAttendance } = useQuery({
@@ -281,6 +695,23 @@ export default function Attendance() {
       setStats([]);
     }
   }, [selectedClass]);
+
+  const isPresetActive = (days: number) => {
+    if (!matrixStartDate || !matrixEndDate) return false;
+    const end = new Date().toISOString().split('T')[0];
+    const startObj = new Date();
+    startObj.setDate(startObj.getDate() - days);
+    const start = startObj.toISOString().split('T')[0];
+    return matrixStartDate === start && matrixEndDate === end;
+  };
+
+  const isThisMonthActive = () => {
+    if (!matrixStartDate || !matrixEndDate) return false;
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const today = now.toISOString().split('T')[0];
+    return matrixStartDate === firstDay && matrixEndDate === today;
+  };
 
   // ─── Query: ดึงข้อมูล Matrix ย้อนหลัง ───
   const { data: matrixRecords = [], isLoading: loadingMatrix } = useQuery<AttendanceRecord[]>({
@@ -341,9 +772,23 @@ export default function Attendance() {
   });
 
   const handleStatusChange = (studentId: string, status: string) => {
-    setAttendance(prev => ({ ...prev, [studentId]: status }));
-    if (autoSave) {
-      singleStatusMutation.mutate({ studentId, status });
+    const current = attendance[studentId];
+    // Toggle off if clicking the active status
+    const newStatus = current === status ? '' : status;
+
+    setAttendance(prev => ({ ...prev, [studentId]: newStatus }));
+    
+    if (newStatus === '') {
+      api.delete(`/attendance?student_id=${studentId}&classroom_id=${selectedClass}&date=${date}`)
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ['attendance-data', selectedClass, date] });
+          toast.success('ลบข้อมูลการเช็คชื่อรายบุคคลเรียบร้อยแล้ว');
+        })
+        .catch(() => {
+          toast.error('ลบข้อมูลไม่สำเร็จ');
+        });
+    } else if (autoSave) {
+      singleStatusMutation.mutate({ studentId, status: newStatus });
     }
   };
 
@@ -426,7 +871,7 @@ export default function Attendance() {
     setMatrixEditingCell(null);
     const record = matrixRecords.find(r => 
       (String(r.student_id) === String(studentId)) && 
-      new Date(r.date).toISOString().split('T')[0] === dateStr
+      (r.date ? r.date.split('T')[0] === dateStr : false)
     );
     if (!record) return;
     matrixCellDeleteMutation.mutate(record.id);
@@ -482,11 +927,13 @@ export default function Attendance() {
       return api.delete(`/attendance?classroom_id=${selectedClass}&date=${date}`);
     },
     onSuccess: () => {
-      toast.success('ล้างข้อมูลการเช็คชื่อของวันนี้เรียบร้อยแล้ว');
+      toast.success('ลบข้อมูลการเช็คชื่อของวันที่เลือกเรียบร้อยแล้ว');
+      setAttendance({});
       queryClient.invalidateQueries({ queryKey: ['attendance-data', selectedClass, date] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-matrix', selectedClass] });
     },
     onError: () => {
-      toast.error('ล้างข้อมูลไม่สำเร็จ');
+      toast.error('ลบข้อมูลไม่สำเร็จ');
     }
   });
 
@@ -494,9 +941,9 @@ export default function Attendance() {
     if (!selectedClass || students.length === 0) return;
     
     const dateObj = new Date(date);
-    const formattedDateForConfirm = dateObj.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+    const formattedDateForConfirm = dateObj.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
     
-    if (!confirm(`ยืนยันการล้างข้อมูล?\n\nคุณต้องการลบข้อมูลการเช็คชื่อของทุกคนในห้องนี้\nสำหรับวันที่ "${formattedDateForConfirm}" ใช่หรือไม่?\n\n(การกระทำนี้ไม่สามารถย้อนกลับได้)`)) {
+    if (!confirm(`⚠️ ยืนยันการลบข้อมูลเช็คชื่อ?\n\nคุณต้องการลบข้อมูลการเช็คชื่อของทุกคนในห้องนี้\nสำหรับวันที่ "${formattedDateForConfirm}" ใช่หรือไม่?\n\n(เหมาะสำหรับกรณีลงชื่อผิดวัน หรือต้องการเริ่มลงใหม่ของวันนี้)`)) {
       return;
     }
     clearDataMutation.mutate();
@@ -641,16 +1088,48 @@ export default function Attendance() {
   });
 
   // Calculate unique dates in range for Matrix View
+  // ─── Holiday Calculation ───
+  const holidayMap = useMemo(() => {
+    if (!matrixStartDate || !matrixEndDate) return {};
+    const list = getThaiHolidays(matrixStartDate, matrixEndDate);
+    const map: Record<string, HolidayInfo> = {};
+    list.forEach(h => {
+      map[h.date] = h;
+    });
+    return map;
+  }, [matrixStartDate, matrixEndDate]);
+
+  const teachingDayGovHolidays = useMemo(() => {
+    return Object.values(holidayMap).filter(h => {
+      if (h.type !== 'government') return false;
+      const dayOfWeek = getSchemaDayOfWeek(h.date);
+      return teachingDays.includes(dayOfWeek);
+    });
+  }, [holidayMap, teachingDays]);
+
   const getUniqueDates = () => {
     const dates = new Set<string>();
     
     // Add dates that have records
     matrixRecords.forEach(r => {
       if (r.date) {
-        const dStr = new Date(r.date).toISOString().split('T')[0];
-        dates.add(dStr);
+        const dStr = r.date.split('T')[0];
+        if (dStr) dates.add(dStr);
       }
     });
+
+    // Include government holidays ONLY if they fall on teaching days of this classroom
+    if (matrixStartDate && matrixEndDate) {
+      const holidays = getThaiHolidays(matrixStartDate, matrixEndDate);
+      holidays.forEach(h => {
+        if (h.type === 'government') {
+          const dayOfWeek = getSchemaDayOfWeek(h.date);
+          if (teachingDays.includes(dayOfWeek)) {
+            dates.add(h.date);
+          }
+        }
+      });
+    }
 
     // Sort dates ascending
     return Array.from(dates).sort();
@@ -696,20 +1175,29 @@ export default function Attendance() {
             <button
               onClick={() => { setExportStartDate(''); setExportEndDate(''); setShowExportModal(true); }}
               className="flex-1 md:flex-none px-4 py-2.5 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700 border border-emerald-200/50 font-semibold transition-all duration-200 flex items-center justify-center gap-2"
-              title="ส่งออกข้อมูลการเช็คชื่อเป็น CSV"
+              title="พรีวิวและส่งออกข้อมูลการเช็คชื่อเป็น CSV / Excel"
             >
-              <Download className="w-4 h-4" />
-              <span>ส่งออก CSV</span>
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+              <span>พรีวิว & ส่งออก CSV</span>
+            </button>
+
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="flex-1 md:flex-none px-4 py-2.5 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200/60 font-bold transition-all duration-200 flex items-center justify-center gap-2 shadow-xs"
+              title="นำเข้าข้อมูลการเช็คชื่อจากไฟล์ Excel พร้อมดูตัวอย่างรูปแบบและดาวน์โหลดเทมเพลต"
+            >
+              <Upload className="w-4 h-4 text-indigo-600" />
+              <span>นำเข้าจาก Excel & ตัวอย่างไฟล์</span>
             </button>
             
             <button
               onClick={handleClearData}
               disabled={saving}
-              className="flex-1 md:flex-none px-4 py-2.5 rounded-xl bg-red-50 text-red-500 hover:bg-red-100 border border-red-200/50 font-semibold transition-all duration-200 flex items-center justify-center gap-2"
-              title="ล้างข้อมูลการเช็คชื่อของวันนี้ทั้งห้อง"
+              className="flex-1 md:flex-none px-4 py-2.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 border border-red-200/60 font-bold transition-all duration-200 flex items-center justify-center gap-2 shadow-sm"
+              title="ลบข้อมูลการเช็คชื่อทั้งห้องสำหรับวันที่เลือกอยู่"
             >
-              <Trash2 className="w-4 h-4" />
-              <span>ล้างวันปัจจุบัน</span>
+              <Trash2 className="w-4 h-4 text-red-500" />
+              <span>ลบข้อมูลวันที่เลือก ({new Date(date).getDate()} {THAI_MONTHS_SHORT[new Date(date).getMonth()]})</span>
             </button>
           </div>
         )}
@@ -1127,66 +1615,96 @@ export default function Attendance() {
             /* ================= ATTENDANCE HISTORY MATRIX GRID ================= */
             <div className="space-y-6">
               
-              {/* Date range filter card */}
-              <div className="glass p-5 rounded-2xl border border-white/50 shadow-md">
-                <div className="flex flex-col md:flex-row items-center justify-between gap-5">
-                  <div className="flex items-center gap-3 w-full md:w-auto">
-                    <div className="flex items-center gap-2">
-                      <CalendarIcon className="w-5 h-5 text-indigo-500" />
-                      <span className="font-semibold text-slate-700">ช่วงวันที่แสดงผล:</span>
+              {/* Modern Thai Date range filter card */}
+              <div className="bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-blue-500/10 p-4 sm:p-5 rounded-3xl border border-indigo-100/80 shadow-lg shadow-indigo-500/5 backdrop-blur-xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  {/* Left: Header Title */}
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 text-white flex items-center justify-center shadow-md shadow-indigo-500/20 shrink-0">
+                      <CalendarIcon className="w-5 h-5" />
                     </div>
-                    
-                    <div className="flex items-center gap-2 flex-1 md:flex-initial">
-                      <input
-                        type="date"
-                        value={matrixStartDate}
-                        onChange={e => setMatrixStartDate(e.target.value)}
-                        className="form-input py-1.5 px-3 text-sm bg-white/70 border-indigo-100/50 rounded-xl w-full md:w-36"
-                      />
-                      <span className="text-slate-600 font-bold text-sm">ถึง</span>
-                      <input
-                        type="date"
-                        value={matrixEndDate}
-                        onChange={e => setMatrixEndDate(e.target.value)}
-                        className="form-input py-1.5 px-3 text-sm bg-white/70 border-indigo-100/50 rounded-xl w-full md:w-36"
-                      />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-extrabold text-slate-800 text-base">ตัวเลือกช่วงวันที่แสดงผล</h3>
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-100/80 px-2.5 py-0.5 rounded-full border border-indigo-200/60">
+                          <Sparkles className="w-3 h-3 text-indigo-500 animate-pulse" /> ปฏิทินไทย
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">คลิกเพื่อเลือกวันเริ่มต้น-สิ้นสุดบนปฏิทินไทย หรือใช้ปุ่มลัดเลือกช่วงเวลา</p>
                     </div>
                   </div>
 
-                  <div className="flex gap-2 w-full md:w-auto justify-end">
-                    <button
-                      onClick={() => {
-                        const d = new Date();
-                        d.setDate(d.getDate() - 7);
-                        setMatrixStartDate(d.toISOString().split('T')[0]);
-                        setMatrixEndDate(new Date().toISOString().split('T')[0]);
+                  {/* Right: Thai Custom Date Range Picker Component & Counter */}
+                  <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap justify-between sm:justify-end">
+                    <ThaiDateRangePicker
+                      startDate={matrixStartDate}
+                      endDate={matrixEndDate}
+                      onChange={(start, end) => {
+                        setMatrixStartDate(start);
+                        setMatrixEndDate(end);
                       }}
-                      className="px-3.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors"
-                    >
-                      7 วันล่าสุด
-                    </button>
-                    <button
-                      onClick={() => {
-                        const d = new Date();
-                        d.setDate(d.getDate() - 14);
-                        setMatrixStartDate(d.toISOString().split('T')[0]);
-                        setMatrixEndDate(new Date().toISOString().split('T')[0]);
-                      }}
-                      className="px-3.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors"
-                    >
-                      14 วันล่าสุด
-                    </button>
-                    <button
-                      onClick={() => {
-                        const d = new Date();
-                        d.setDate(d.getDate() - 30);
-                        setMatrixStartDate(d.toISOString().split('T')[0]);
-                        setMatrixEndDate(new Date().toISOString().split('T')[0]);
-                      }}
-                      className="px-3.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors"
-                    >
-                      30 วันล่าสุด
-                    </button>
+                      matrixDatesCount={matrixDates.length}
+                    />
+
+                    {/* Range Summary Status */}
+                    <div className="flex items-center gap-2">
+                      <div className="text-xs text-slate-600 font-bold bg-white/80 px-3 py-2 rounded-2xl border border-indigo-100/80 shadow-sm flex items-center gap-2 shrink-0">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                        <span>{matrixDates.length > 0 ? `${matrixDates.length} คาบเรียน/วันในตาราง` : '0 คาบ'}</span>
+                      </div>
+                      {teachingDayGovHolidays.length > 0 && (
+                        <div 
+                          className="text-xs text-amber-900 font-bold bg-amber-50 px-3 py-2 rounded-2xl border border-amber-200/80 shadow-sm flex items-center gap-1.5 shrink-0" 
+                          title={`วันหยุดตรงกับวันที่มีสอน: ${teachingDayGovHolidays.map(h => `${h.date} (${h.name})`).join(', ')}`}
+                        >
+                          <span>🏖️</span>
+                          <span>ตรงวันสอน {teachingDayGovHolidays.length} วัน</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Teaching Days Filter Bar */}
+                <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-white/80 backdrop-blur-md rounded-2xl border border-indigo-100/90 shadow-sm mt-3">
+                  <div className="flex items-center gap-2">
+                    <CalendarIcon className="w-4 h-4 text-indigo-600" />
+                    <span className="text-xs font-bold text-slate-800">วันที่มีตารางสอนของห้องนี้:</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {[
+                      { id: 0, label: 'จันทร์' },
+                      { id: 1, label: 'อังคาร' },
+                      { id: 2, label: 'พุธ' },
+                      { id: 3, label: 'พฤหัสบดี' },
+                      { id: 4, label: 'ศุกร์' },
+                      { id: 5, label: 'เสาร์' },
+                      { id: 6, label: 'อาทิตย์' },
+                    ].map(day => {
+                      const isSelected = teachingDays.includes(day.id);
+                      return (
+                        <button
+                          key={day.id}
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              if (teachingDays.length > 1) {
+                                setTeachingDays(prev => prev.filter(d => d !== day.id));
+                              }
+                            } else {
+                              setTeachingDays(prev => [...prev, day.id].sort((a, b) => a - b));
+                            }
+                          }}
+                          className={`px-3 py-1 text-xs font-bold rounded-xl transition-all ${
+                            isSelected
+                              ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-500/20'
+                              : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                          }`}
+                        >
+                          {day.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -1196,7 +1714,7 @@ export default function Attendance() {
                 <div className="p-4 border-b border-indigo-50/50 bg-white/40 flex items-center justify-between gap-4">
                   <div className="flex items-center gap-2">
                     <Grid className="w-5 h-5 text-indigo-500" />
-                    <span className="font-bold text-slate-800">ตารางการเช็คชื่อสะสม ({matrixDates.length} คาบที่เช็คแล้ว)</span>
+                    <span className="font-bold text-slate-800">ตารางการเช็คชื่อสะสม ({matrixDates.length} คาบเรียน/วัน)</span>
                   </div>
                   
                   <div className="relative w-64">
@@ -1235,13 +1753,36 @@ export default function Attendance() {
                             const dateObj = new Date(dateStr);
                             const day = dateObj.getDate();
                             const month = dateObj.toLocaleDateString('th-TH', { month: 'short' });
+                            const holiday = holidayMap[dateStr] || checkThaiHoliday(dateStr);
+
+                            const isGovHoliday = holiday?.type === 'government';
+                            const isWeekend = holiday?.type === 'weekend';
+
                             return (
-                              <th key={dateStr} className="p-3 font-bold text-slate-700 text-center w-24 text-xs border-r border-indigo-100/50">
+                              <th 
+                                key={dateStr} 
+                                className={`p-3 font-bold text-center w-24 text-xs border-r transition-colors ${
+                                  isGovHoliday 
+                                    ? 'bg-amber-100/90 border-amber-200/90 text-amber-900' 
+                                    : isWeekend
+                                    ? 'bg-slate-150/80 bg-slate-200/60 border-slate-200/80 text-slate-600'
+                                    : 'bg-indigo-50/70 border-indigo-100/50 text-slate-700'
+                                }`}
+                                title={holiday ? holiday.name : undefined}
+                              >
                                 <div className="flex flex-col items-center">
-                                  <span className="text-[10px] text-slate-500 font-medium">
+                                  <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
                                     {dateObj.toLocaleDateString('th-TH', { weekday: 'short' })}
+                                    {isGovHoliday && <span>🏖️</span>}
                                   </span>
-                                  <span className="text-sm font-black text-indigo-800">{day} {month}</span>
+                                  <span className={`text-sm font-black ${isGovHoliday ? 'text-amber-950' : 'text-indigo-800'}`}>
+                                    {day} {month}
+                                  </span>
+                                  {isGovHoliday && (
+                                    <span className="text-[9px] font-bold text-amber-800 truncate max-w-[84px] leading-tight mt-0.5" title={holiday.name}>
+                                      {holiday.name}
+                                    </span>
+                                  )}
                                 </div>
                               </th>
                             );
@@ -1273,11 +1814,12 @@ export default function Attendance() {
                                 // Find matching record
                                 const record = matrixRecords.find(r => 
                                   (String(r.student_id) === String(student.id)) && 
-                                  new Date(r.date).toISOString().split('T')[0] === dateStr
+                                  (r.date ? r.date.split('T')[0] === dateStr : false)
                                 );
                                 
                                 const status = record ? record.status : null;
                                 const isEditing = matrixEditingCell?.studentId === student.id && matrixEditingCell?.date === dateStr;
+                                const holiday = holidayMap[dateStr] || checkThaiHoliday(dateStr);
 
                                 return (
                                   <MemoizedAttendanceCell
@@ -1286,7 +1828,9 @@ export default function Attendance() {
                                     isEditing={isEditing}
                                     onEditClick={() => setMatrixEditingCell({ studentId: student.id, date: dateStr })}
                                     onStatusSelect={statusVal => handleMatrixCellUpdate(student.id, dateStr, statusVal)}
+                                    onDeleteClick={status ? () => handleMatrixCellDelete(student.id, dateStr) : undefined}
                                     popoverRef={isEditing ? cellPopoverRef : undefined}
+                                    holiday={holiday}
                                   />
                                 );
                               })}
@@ -1380,82 +1924,36 @@ export default function Attendance() {
         document.body
       )}
 
-      {/* ================= EXPORT CSV MODAL ================= */}
-      {showExportModal && createPortal(
-        <div className="modal-overlay" onClick={() => setShowExportModal(false)}>
-          <div className="glass w-full max-w-md p-6 animate-scale-up" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
-                  <Download className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-slate-800 leading-tight">ส่งออกไฟล์ข้อมูล CSV</h2>
-                  <p className="text-sm text-slate-600">{selectedClassData?.name || 'ห้องเรียน'}</p>
-                </div>
-              </div>
-              <button onClick={() => setShowExportModal(false)} className="p-2 hover:bg-indigo-50 rounded-xl transition-colors">
-                <X className="w-5 h-5 text-slate-500" />
-              </button>
-            </div>
+      {/* ================= ATTENDANCE CSV PREVIEW & EXPORT MODAL ================= */}
+      <AttendanceCsvModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        classroom={selectedClassData ? {
+          id: selectedClassData.id,
+          name: selectedClassData.name,
+          min_attendance_percent: selectedClassData.min_attendance_percent,
+          total_classes: selectedClassData.total_classes,
+          late_to_absent_ratio: selectedClassData.late_to_absent_ratio,
+          leave_to_absent_ratio: selectedClassData.leave_to_absent_ratio,
+        } : null}
+        initialStartDate={exportStartDate}
+        initialEndDate={exportEndDate}
+      />
 
-            <div className="space-y-4">
-              <div className="bg-indigo-50/50 border border-indigo-100/50 rounded-2xl p-4 space-y-3">
-                <p className="text-sm font-bold text-indigo-900 flex items-center gap-2">
-                  <CalendarIcon className="w-4 h-4" /> กำหนดช่วงเวลาที่ต้องการ (ไม่บังคับ)
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-slate-600 mb-1 block font-semibold">เริ่มจาก</label>
-                    <input
-                      type="date"
-                      value={exportStartDate}
-                      onChange={e => setExportStartDate(e.target.value)}
-                      className="form-input text-sm rounded-xl"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-slate-600 mb-1 block font-semibold">สิ้นสุดที่</label>
-                    <input
-                      type="date"
-                      value={exportEndDate}
-                      onChange={e => setExportEndDate(e.target.value)}
-                      className="form-input text-sm rounded-xl"
-                    />
-                  </div>
-                </div>
-                <p className="text-[10px] text-slate-500 font-semibold leading-normal">
-                  * หากไม่เลือกช่วงเวลา ระบบจะส่งออกสถิติเช็คชื่อทั้งหมดตั้งแต่สร้างห้องเรียน
-                </p>
-              </div>
-
-              <div className="bg-amber-50/60 border border-amber-200 rounded-xl p-3">
-                <p className="text-[11px] text-amber-800 font-semibold leading-normal">
-                  💡 ข้อมูลไฟล์ CSV มีการเข้ารหัสภาษาไทย สามารถนำไปเปิดใช้งานต่อได้ทั้งบน Excel, Google Sheets, หรือโปรแกรมชีตทั่วไป
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-5 pt-4 border-t border-indigo-50/50 flex justify-end gap-3">
-              <button 
-                onClick={() => setShowExportModal(false)} 
-                className="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm transition-colors"
-              >
-                ยกเลิก
-              </button>
-              
-              <button
-                onClick={handleExportCSV}
-                disabled={exporting}
-                className="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition-all"
-              >
-                {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                <span>ดาวน์โหลด CSV</span>
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
+      {/* ================= ATTENDANCE EXCEL IMPORT & TEMPLATE MODAL ================= */}
+      {selectedClass && (
+        <AttendanceImportModal
+          isOpen={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          classroomId={selectedClass}
+          classroomName={classrooms.find(c => String(c.id) === selectedClass)?.name || 'ห้องเรียน'}
+          students={students}
+          currentDate={date}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['attendance'] });
+            toast.success('อัปเดตข้อมูลการเช็คชื่อในตารางเรียบร้อยแล้ว');
+          }}
+        />
       )}
 
     </div>

@@ -12,7 +12,6 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState('teacher');
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
   const router = useRouter();
@@ -29,7 +28,7 @@ export default function RegisterPage() {
     }
     setLoading(true);
     try {
-      await register(name, email, password, role);
+      await register(name, email, password);
       toast.success('สมัครสมาชิกสำเร็จ!');
       router.push('/');
     } catch (error: unknown) {
@@ -112,17 +111,6 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <div>
-            <label className="form-label">บทบาท</label>
-            <select
-              className="form-input"
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-            >
-              <option value="teacher">ครูผู้สอน</option>
-              <option value="admin">ผู้ดูแลระบบ</option>
-            </select>
-          </div>
 
           <button
             type="submit"

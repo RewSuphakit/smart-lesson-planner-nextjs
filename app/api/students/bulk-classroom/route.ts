@@ -15,6 +15,15 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ message: 'No students selected' }, { status: 400 });
     }
 
+    if (classroomId) {
+      const ownedClassroom = await prisma.classroom.findFirst({
+        where: { id: Number(classroomId), userId: user.id },
+      });
+      if (!ownedClassroom) {
+        return NextResponse.json({ message: 'Target classroom not found or unauthorized' }, { status: 403 });
+      }
+    }
+
     // Verify students belong to user before updating
     const updateResult = await prisma.student.updateMany({
       where: {

@@ -12,8 +12,8 @@ services:
       db-migrate:
         condition: service_completed_successfully
     environment:
-      - DATABASE_URL=${DATABASE_URL:-mysql://root:smartplanner2024@mysql:3306/smart_lesson_planner}
-      - JWT_SECRET=${JWT_SECRET:-smart-lesson-planner-secret-key-change-in-production}
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - NODE_ENV=production
@@ -32,7 +32,7 @@ services:
       mysql:
         condition: service_healthy
     environment:
-      - DATABASE_URL=${DATABASE_URL:-mysql://root:smartplanner2024@mysql:3306/smart_lesson_planner}
+      - DATABASE_URL=${DATABASE_URL}
     command: npx prisma db push
     networks:
       - coolify
@@ -43,14 +43,14 @@ services:
     ports:
       - "${MYSQL_PORT:-3306}:3306"
     environment:
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-smartplanner2024}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
       - MYSQL_DATABASE=${MYSQL_DATABASE:-smart_lesson_planner}
       - MYSQL_CHARACTER_SET_SERVER=utf8mb4
       - MYSQL_COLLATION_SERVER=utf8mb4_unicode_ci
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p$${MYSQL_ROOT_PASSWORD:-smartplanner2024}"]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p$${MYSQL_ROOT_PASSWORD}" ]
       interval: 10s
       timeout: 5s
       retries: 5

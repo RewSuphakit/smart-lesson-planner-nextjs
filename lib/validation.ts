@@ -11,7 +11,6 @@ export const RegisterSchema = z.object({
   email: z.string().trim().email('Invalid email address format'),
   password: z.string().min(6, 'Password must be at least 6 characters long'),
   name: z.string().trim().min(1, 'Name is required'),
-  role: z.enum(['teacher', 'admin']).optional().default('teacher'),
 });
 
 // ==================== Student Schemas ====================

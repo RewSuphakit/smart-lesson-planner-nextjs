@@ -174,7 +174,8 @@ async function parsePDF(buffer: Buffer, userId: number) {
     }
 
     const responseText = result.response.text();
-    const jsonStr = responseText.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+    const jsonStr = jsonMatch ? jsonMatch[0] : responseText.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
     const data = JSON.parse(jsonStr);
     
     if (!Array.isArray(data)) {
@@ -370,7 +371,8 @@ async function parseImageWithAI(buffer: Buffer, mimeType: string, userId: number
     }
 
     const responseText = result.response.text();
-    const jsonStr = responseText.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+    const jsonStr = jsonMatch ? jsonMatch[0] : responseText.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
     const data = JSON.parse(jsonStr);
     
     if (!Array.isArray(data)) {
@@ -428,6 +430,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'กรุณาเลือกไฟล์' }, { status: 400 });
     }
 
+    // Limit maximum upload file size to 5MB to avoid memory exhaustion (DoS)
+    const MAX_FILE_SIZE = 5 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json({ message: 'ขนาดไฟล์เกินกำหนด (สูงสุดไม่เกิน 5MB)' }, { status: 413 });
+    }
+
     const mime = file.type;
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
@@ -476,20 +484,27 @@ export async function POST(request: NextRequest) {
       semester,
     }));
 
+    let createdCount = 0;
     if (formData.get('replace') === 'true') {
-      await prisma.weeklySchedule.deleteMany({ where: { userId: user.id } });
+      const [_, created] = await prisma.$transaction([
+        prisma.weeklySchedule.deleteMany({ where: { userId: user.id } }),
+        prisma.weeklySchedule.createMany({ data: entries }),
+      ]);
+      createdCount = created.count;
+    } else {
+      const created = await prisma.weeklySchedule.createMany({ data: entries });
+      createdCount = created.count;
     }
 
-    const created = await prisma.weeklySchedule.createMany({ data: entries });
-
     return NextResponse.json({
-      message: `นำเข้าตารางสอนสำเร็จ ${created.count} รายการ`,
-      data: { count: created.count },
+      message: `นำเข้าตารางสอนสำเร็จ ${createdCount} รายการ`,
+      data: { count: createdCount },
     }, { status: 201 });
   } catch (error: unknown) {
     if (error instanceof AuthError) return handleAuthError();
     console.error('Timetable upload error:', error);
     const msg = error instanceof Error ? error.message : 'อัพโหลดไม่สำเร็จ';
-    return NextResponse.json({ message: msg }, { status: 500 });
+    const isUserError = msg.includes('CSV') || msg.includes('header') || msg.includes('คอลัมน์') || msg.includes('ไม่พบข้อมูล') || msg.includes('รูปแบบข้อมูล');
+    return NextResponse.json({ message: msg }, { status: isUserError ? 400 : 500 });
   }
 }

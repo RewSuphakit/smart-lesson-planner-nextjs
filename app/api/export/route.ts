@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
+import { calculateAffectiveScore } from '@/lib/affective';
 
 export async function GET(request: NextRequest) {
   try {
@@ -90,11 +91,12 @@ export async function GET(request: NextRequest) {
         }
         const classroom = classrooms.find(c => c.id === cId);
         const weightAffective = classroom?.affectiveWeight ? Number(classroom.affectiveWeight) : 20;
-        const attendancePenalty = (absentCount * 2) + (lateCount * 1);
-        const baseAffective = s.affectiveScore !== null && s.affectiveScore !== undefined
-          ? Number(s.affectiveScore)
-          : weightAffective;
-        const finalAffectiveScore = Math.min(weightAffective, Math.max(0, baseAffective - attendancePenalty));
+        const finalAffectiveScore = calculateAffectiveScore({
+          baseScore: s.affectiveScore ? Number(s.affectiveScore) : null,
+          maxWeight: weightAffective,
+          absentCount,
+          lateCount,
+        });
 
         return {
           id: s.id,

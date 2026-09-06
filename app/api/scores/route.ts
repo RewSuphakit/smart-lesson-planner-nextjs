@@ -163,6 +163,14 @@ export async function POST(request: NextRequest) {
     });
     if (!classroom) return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
 
+    // Helper to sanitize score values: converts empty/null to null, validates numbers, and clamps between 0 and 999.99
+    const sanitizeScore = (val: unknown): number | null => {
+      if (val === undefined || val === null || val === '') return null;
+      const num = Number(val);
+      if (isNaN(num)) return null;
+      return Math.min(999.99, Math.max(0, num));
+    };
+
     // Save score structure (Batch Transaction)
     if (body.type === 'structure' || searchParams.get('type') === 'structure' || body.structures) {
       const structures = body.structures || [];
@@ -170,45 +178,63 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ message: 'No structures provided' }, { status: 400 });
       }
 
-      const structOperations = structures.map((struct: {
-        lesson_number: number | string;
-        lesson_name?: string;
-        max_assignment_score?: number | string | null;
-        max_post_test_score?: number | string | null;
-        hours?: number | string;
-      }) => {
-        const lessonNum = Number(struct.lesson_number);
-        const maxAssign = struct.max_assignment_score === '' || struct.max_assignment_score === null || struct.max_assignment_score === undefined
-          ? 0 : Number(struct.max_assignment_score);
-        const maxPost = struct.max_post_test_score === '' || struct.max_post_test_score === null || struct.max_post_test_score === undefined
-          ? 0 : Number(struct.max_post_test_score);
-        const hrs = Number(struct.hours) || 0;
+      const structOperations = structures
+        .map((struct: {
+          lesson_number: number | string;
+          lesson_name?: string;
+          max_assignment_score?: number | string | null;
+          max_post_test_score?: number | string | null;
+          hours?: number | string;
+        }) => {
+          const lessonNum = Number(struct.lesson_number);
+          if (isNaN(lessonNum) || lessonNum < 1) return null;
 
-        return prisma.scoreStructure.upsert({
-          where: {
-            classroomId_lessonNumber: {
+          const maxAssign = sanitizeScore(struct.max_assignment_score) ?? 0;
+          const maxPost = sanitizeScore(struct.max_post_test_score) ?? 0;
+          const hrs = Math.max(0, Number(struct.hours) || 0);
+
+          return prisma.scoreStructure.upsert({
+            where: {
+              classroomId_lessonNumber: {
+                classroomId,
+                lessonNumber: lessonNum,
+              },
+            },
+            update: {
+              lessonName: struct.lesson_name || '',
+              maxAssignmentScore: maxAssign,
+              maxPostTestScore: maxPost,
+              hours: hrs,
+            },
+            create: {
               classroomId,
               lessonNumber: lessonNum,
+              lessonName: struct.lesson_name || '',
+              maxAssignmentScore: maxAssign,
+              maxPostTestScore: maxPost,
+              hours: hrs,
             },
-          },
-          update: {
-            lessonName: struct.lesson_name || '',
-            maxAssignmentScore: maxAssign,
-            maxPostTestScore: maxPost,
-            hours: hrs,
-          },
-          create: {
-            classroomId,
-            lessonNumber: lessonNum,
-            lessonName: struct.lesson_name || '',
-            maxAssignmentScore: maxAssign,
-            maxPostTestScore: maxPost,
-            hours: hrs,
-          },
-        });
-      });
+          });
+        })
+        .filter((op): op is NonNullable<typeof op> => op !== null);
 
-      await prisma.$transaction(structOperations);
+      if (structOperations.length > 0) {
+        await prisma.$transaction(structOperations);
+
+        // Delete any leftover structures beyond the highest submitted lesson number (e.g. switching from 18 to 15 weeks)
+        const validLessonNums = structures
+          .map((s: { lesson_number: number | string }) => Number(s.lesson_number))
+          .filter(n => !isNaN(n) && n > 0);
+        const maxLesson = Math.max(...validLessonNums);
+        if (maxLesson > 0) {
+          await prisma.scoreStructure.deleteMany({
+            where: {
+              classroomId,
+              lessonNumber: { gt: maxLesson }
+            }
+          });
+        }
+      }
       return NextResponse.json({ message: 'Structure saved successfully' });
     }
 
@@ -229,18 +255,18 @@ export async function POST(request: NextRequest) {
       const ownedStudentIds = new Set(ownedStudents.map(s => s.id));
 
       const lessonNum = Number(body.lesson_number);
+      if (isNaN(lessonNum) || lessonNum < 1) {
+        return NextResponse.json({ message: 'Invalid lesson number' }, { status: 400 });
+      }
+
       const scoreOperations = [];
 
       for (const score of scores) {
         const studentId = Number(score.student_id);
-        if (!ownedStudentIds.has(studentId)) continue; // Security isolation check
+        if (!ownedStudentIds.has(studentId) || isNaN(studentId)) continue; // Security isolation check
 
-        const assignVal = score.assignment_score !== undefined && score.assignment_score !== '' && score.assignment_score !== null
-          ? Math.max(0, Number(score.assignment_score))
-          : null;
-        const postVal = score.post_test_score !== undefined && score.post_test_score !== '' && score.post_test_score !== null
-          ? Math.max(0, Number(score.post_test_score))
-          : null;
+        const assignVal = sanitizeScore(score.assignment_score);
+        const postVal = sanitizeScore(score.post_test_score);
 
         scoreOperations.push(
           prisma.studentScore.upsert({
@@ -293,18 +319,14 @@ export async function POST(request: NextRequest) {
       for (const score of bulkScores) {
         const studentId = Number(score.student_id);
         const lessonNum = Number(score.lesson_number);
-        if (!ownedStudentIds.has(studentId) || isNaN(lessonNum)) continue;
+        if (!ownedStudentIds.has(studentId) || isNaN(lessonNum) || lessonNum < 1) continue;
 
         const data: { assignmentScore?: number | null; postTestScore?: number | null } = {};
         if (score.assignment_score !== undefined) {
-          data.assignmentScore = score.assignment_score !== '' && score.assignment_score !== null
-            ? Math.max(0, Number(score.assignment_score))
-            : null;
+          data.assignmentScore = sanitizeScore(score.assignment_score);
         }
         if (score.post_test_score !== undefined) {
-          data.postTestScore = score.post_test_score !== '' && score.post_test_score !== null
-            ? Math.max(0, Number(score.post_test_score))
-            : null;
+          data.postTestScore = sanitizeScore(score.post_test_score);
         }
 
         bulkOperations.push(

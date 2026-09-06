@@ -7,32 +7,34 @@ export async function PUT(request: NextRequest) {
     const user = requireAuth(request);
     const body = await request.json();
 
-    const { searchParams } = new URL(request.url);
-    const type = searchParams.get('type') || 'final';
-
-    if (!Array.isArray(body.scores)) {
+    if (!Array.isArray(body.scores) || body.scores.length === 0) {
       return NextResponse.json({ message: 'Invalid scores format' }, { status: 400 });
     }
 
-    for (const score of body.scores) {
-      const student = await prisma.student.findUnique({
-        where: { id: Number(score.student_id) },
-        include: {
-          classroom: true,
-          attendance: true,
-        },
-      });
+    const studentIds: number[] = Array.from(
+      new Set(body.scores.map((s: { student_id: string | number }) => Number(s.student_id)).filter((id: number) => !isNaN(id)))
+    );
 
-      if (!student || student.userId !== user.id) {
+    const ownedStudents = await prisma.student.findMany({
+      where: { id: { in: studentIds }, userId: user.id },
+      select: { id: true },
+    });
+    const ownedSet = new Set(ownedStudents.map(s => s.id));
+
+    const updateOperations = [];
+
+    for (const score of body.scores) {
+      const studentId = Number(score.student_id);
+      if (!ownedSet.has(studentId)) {
         continue;
       }
 
       const dataToUpdate: Record<string, unknown> = {};
       if (score.midterm_score !== undefined) {
-        dataToUpdate.midtermScore = score.midterm_score === '' ? null : Number(score.midterm_score);
+        dataToUpdate.midtermScore = score.midterm_score === '' || score.midterm_score === null ? null : Number(score.midterm_score);
       }
       if (score.final_score !== undefined) {
-        dataToUpdate.finalScore = score.final_score === '' ? null : Number(score.final_score);
+        dataToUpdate.finalScore = score.final_score === '' || score.final_score === null ? null : Number(score.final_score);
       }
       if (score.affective_score !== undefined) {
         if (score.affective_score === '' || score.affective_score === null) {
@@ -43,11 +45,17 @@ export async function PUT(request: NextRequest) {
       }
 
       if (Object.keys(dataToUpdate).length > 0) {
-        await prisma.student.update({
-          where: { id: student.id },
-          data: dataToUpdate,
-        });
+        updateOperations.push(
+          prisma.student.update({
+            where: { id: studentId },
+            data: dataToUpdate,
+          })
+        );
       }
+    }
+
+    if (updateOperations.length > 0) {
+      await prisma.$transaction(updateOperations);
     }
 
     return NextResponse.json({ message: 'Exams updated successfully' });

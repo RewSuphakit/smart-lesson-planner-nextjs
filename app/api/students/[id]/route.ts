@@ -6,11 +6,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const user = requireAuth(request);
     const { id } = await params;
+    const numericId = Number(id);
+    if (isNaN(numericId) || numericId <= 0) {
+      return NextResponse.json({ message: 'Invalid student ID' }, { status: 400 });
+    }
+
     const body = await request.json();
 
     // Check ownership
     const student = await prisma.student.findFirst({
-      where: { id: Number(id), userId: user.id },
+      where: { id: numericId, userId: user.id },
     });
     if (!student) return NextResponse.json({ message: 'Student not found' }, { status: 404 });
 
@@ -25,9 +30,24 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       if (body[key] !== undefined) {
         let val = body[key];
         if (prismaKey === 'classroomId') {
-          val = val ? Number(val) : null;
+          if (val) {
+            const ownedClassroom = await prisma.classroom.findFirst({
+              where: { id: Number(val), userId: user.id },
+            });
+            if (!ownedClassroom) {
+              return NextResponse.json({ message: 'Target classroom not found or unauthorized' }, { status: 403 });
+            }
+            val = Number(val);
+          } else {
+            val = null;
+          }
         } else if (prismaKey === 'midtermScore' || prismaKey === 'finalScore') {
-          val = val === '' || val === null || val === undefined ? null : Number(val);
+          if (val === '' || val === null || val === undefined) {
+            val = null;
+          } else {
+            const num = Number(val);
+            val = isNaN(num) ? null : Math.min(100, Math.max(0, num));
+          }
         } else if (['studentCode', 'gradeLevel', 'email'].includes(prismaKey)) {
           val = val || null;
         }
@@ -35,7 +55,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
-    await prisma.student.update({ where: { id: Number(id) }, data: updateData });
+    await prisma.student.update({ where: { id: numericId }, data: updateData });
     return NextResponse.json({ message: 'Student updated' });
   } catch (error) {
     if (error instanceof AuthError) return handleAuthError();
@@ -48,14 +68,18 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   try {
     const user = requireAuth(request);
     const { id } = await params;
+    const numericId = Number(id);
+    if (isNaN(numericId) || numericId <= 0) {
+      return NextResponse.json({ message: 'Invalid student ID' }, { status: 400 });
+    }
 
     // Check ownership
     const student = await prisma.student.findFirst({
-      where: { id: Number(id), userId: user.id },
+      where: { id: numericId, userId: user.id },
     });
     if (!student) return NextResponse.json({ message: 'Student not found' }, { status: 404 });
 
-    await prisma.student.delete({ where: { id: Number(id) } });
+    await prisma.student.delete({ where: { id: numericId } });
     return NextResponse.json({ message: 'Student deleted' });
   } catch (error) {
     if (error instanceof AuthError) return handleAuthError();

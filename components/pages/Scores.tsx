@@ -10,6 +10,9 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
+import { checkThaiHoliday } from '@/lib/thaiHolidays';
+import ScoreExcelModal from '@/components/ScoreExcelModal';
+import ScoreImportModal from '@/components/ScoreImportModal';
 
 interface MemoizedScoreInputProps {
   value: number | string;
@@ -53,6 +56,7 @@ MemoizedScoreInput.displayName = 'MemoizedScoreInput';
 interface Classroom {
   id: string | number;
   name: string;
+  description?: string;
   total_classes?: number;
   assignment_weight?: number;
   post_test_weight?: number;
@@ -131,13 +135,17 @@ export default function Scores() {
   // Bulk Import State
   const [importData, setImportData] = useState<StudentScoreEntry[]>([]);
   const [showImportPreview, setShowImportPreview] = useState(false);
+  const [showExcelImportModal, setShowExcelImportModal] = useState(false);
   const [importType, setImportType] = useState('assignment');
 
   // Test Blueprint Calculator State
   const [showCalculator, setShowCalculator] = useState(false);
-  const [totalAcademicScore, setTotalAcademicScore] = useState(70);
-  const [theoryHoursPerWeek, setTheoryHoursPerWeek] = useState(1);
+  const [totalAcademicScore, setTotalAcademicScore] = useState(40);
+  const [theoryHoursPerWeek, setTheoryHoursPerWeek] = useState(2);
   const [practiceHoursPerWeek, setPracticeHoursPerWeek] = useState(2);
+  const [curriculumWeeks, setCurriculumWeeks] = useState<number>(18);
+  const [scoreScaleMode, setScoreScaleMode] = useState<'standard_10' | 'direct_weight'>('standard_10');
+  const [standardWeeklyBaseScore, setStandardWeeklyBaseScore] = useState<number>(10);
 
   // Attendance Integration State
   const [showAttendance, setShowAttendance] = useState(true);
@@ -167,6 +175,103 @@ export default function Scores() {
     enabled: !!selectedClass && !!attendanceDate && showAttendance,
   });
 
+  // ─── Query: ดึงข้อมูลการเข้าเรียนทั้งหมดของห้องเรียน เพื่อแมปกับสัปดาห์ W1, W2... ───
+  const { data: allClassAttendance = [] } = useQuery<{ id: number; student_id: number; date: string; status: string }[]>({
+    queryKey: ['attendance-all-class-for-scores', selectedClass],
+    queryFn: async () => {
+      const res = await api.get(`/attendance?classroom_id=${selectedClass}`);
+      return res.data.data || [];
+    },
+    enabled: !!selectedClass,
+  });
+
+  const parseSafeDateStr = (rawDate: any): string => {
+    if (!rawDate) return '';
+    if (typeof rawDate === 'string') {
+      const clean = rawDate.split('T')[0];
+      if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
+    }
+    try {
+      const d = new Date(rawDate);
+      if (isNaN(d.getTime())) return '';
+      return d.toISOString().split('T')[0];
+    } catch {
+      return '';
+    }
+  };
+
+  const { weekDateMap, weekAttendanceMap } = useMemo(() => {
+    if (!allClassAttendance || allClassAttendance.length === 0) {
+      return { weekDateMap: {} as Record<number, string>, weekAttendanceMap: {} as Record<string, string> };
+    }
+
+    const validDates = allClassAttendance
+      .map(r => parseSafeDateStr(r.date))
+      .filter(d => d !== '');
+
+    const uniqueDates = Array.from(new Set(validDates)).sort();
+
+    const wDateMap: Record<number, string> = {};
+    uniqueDates.forEach((dateStr, idx) => {
+      wDateMap[idx + 1] = dateStr;
+    });
+
+    const wAttMap: Record<string, string> = {};
+    allClassAttendance.forEach(r => {
+      const dateStr = parseSafeDateStr(r.date);
+      if (dateStr) {
+        const weekIndex = uniqueDates.indexOf(dateStr) + 1;
+        if (weekIndex > 0) {
+          wAttMap[`${r.student_id}_${weekIndex}`] = r.status;
+        }
+      }
+    });
+
+    return { weekDateMap: wDateMap, weekAttendanceMap: wAttMap };
+  }, [allClassAttendance]);
+
+  // State for Semester Start Date (วันเริ่มเรียน/วันเริ่มต้นภาคเรียน)
+  const [semesterStartDate, setSemesterStartDate] = useState<string>('');
+
+  // ─── Query: ดึงข้อมูลตารางเรียนทั้งหมด (All Timetable Entries) ───
+  const { data: allTimetableEntries = [] } = useQuery<{ classroom_id: number | string; day_of_week: number }[]>({
+    queryKey: ['timetable-all'],
+    queryFn: async () => {
+      const res = await api.get('/timetable');
+      return res.data.data?.entries || [];
+    }
+  });
+
+  // Auto-set semesterStartDate per classroom
+  useEffect(() => {
+    if (!selectedClass) return;
+    const stored = localStorage.getItem(`scores_start_date_${selectedClass}`);
+    if (stored) {
+      setSemesterStartDate(stored);
+    } else if (allClassAttendance && allClassAttendance.length > 0) {
+      const validDates = allClassAttendance
+        .map(r => parseSafeDateStr(r.date))
+        .filter(d => d !== '')
+        .sort();
+      if (validDates.length > 0) {
+        setSemesterStartDate(validDates[0]);
+      } else {
+        const d = new Date();
+        setSemesterStartDate(`${d.getFullYear()}-05-18`);
+      }
+    } else {
+      const d = new Date();
+      setSemesterStartDate(`${d.getFullYear()}-05-18`);
+    }
+  }, [selectedClass, allClassAttendance]);
+
+  const handleStartDateChange = (newDate: string) => {
+    setSemesterStartDate(newDate);
+    if (selectedClass) {
+      localStorage.setItem(`scores_start_date_${selectedClass}`, newDate);
+    }
+  };
+
   // ─── Query: ดึงข้อมูลห้องเรียน (shared cache) ───
   const { data: classrooms = [], isLoading: loadingClassrooms } = useQuery<Classroom[]>({
     queryKey: ['classrooms'],
@@ -179,6 +284,73 @@ export default function Scores() {
   const classroomObj = useMemo(() => {
     return classrooms.find(c => String(c.id) === String(selectedClass));
   }, [classrooms, selectedClass]);
+
+  // Calculate Teaching Days of this Classroom (0=Mon .. 6=Sun)
+  const classTeachingDays = useMemo(() => {
+    if (!selectedClass) return [2]; // Default Wednesday (2)
+    const classEntries = allTimetableEntries.filter(
+      e => String(e.classroom_id) === String(selectedClass)
+    );
+    const days = Array.from(new Set(classEntries.map(e => Number(e.day_of_week))));
+    return days.length > 0 ? days.sort((a, b) => a - b) : [2];
+  }, [selectedClass, allTimetableEntries]);
+
+  // Generate Calculated Dates for All Weeks (W1 .. W18 or W15)
+  const calculatedWeekDates = useMemo(() => {
+    if (!semesterStartDate) return {};
+
+    const start = new Date(semesterStartDate);
+    if (isNaN(start.getTime())) return {};
+
+    let targetWeeks = 18;
+    if (classroomObj?.name?.includes('ปวส') || classroomObj?.name?.includes('ปวส.')) {
+      targetWeeks = 15;
+    }
+
+    const getSchemaDay = (d: Date) => (d.getDay() + 6) % 7;
+
+    let current = new Date(start);
+    while (!classTeachingDays.includes(getSchemaDay(current))) {
+      current.setDate(current.getDate() + 1);
+    }
+
+    const weekMap: Record<number, string> = {};
+    const firstTeachingDay = new Date(current);
+
+    const validActualDates = Array.from(
+      new Set(allClassAttendance.map(r => parseSafeDateStr(r.date)).filter(d => d !== ''))
+    ).sort();
+
+    for (let w = 1; w <= targetWeeks; w++) {
+      if (validActualDates[w - 1]) {
+        weekMap[w] = validActualDates[w - 1];
+      } else {
+        const wDate = new Date(firstTeachingDay);
+        wDate.setDate(firstTeachingDay.getDate() + (w - 1) * 7);
+        weekMap[w] = wDate.toISOString().split('T')[0];
+      }
+    }
+
+    return weekMap;
+  }, [semesterStartDate, classTeachingDays, classroomObj, allClassAttendance]);
+
+  const formatThaiFullDateHeader = (dateStr?: string) => {
+    if (!dateStr) return null;
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return null;
+    const THAI_DAYS = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
+    const THAI_SHORT_MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+    const dayName = THAI_DAYS[d.getDay()];
+    const dayNum = d.getDate();
+    const monthName = THAI_SHORT_MONTHS[d.getMonth()];
+    return {
+      dayName,
+      label: `${dayName} ${dayNum} ${monthName}`,
+      shortLabel: `${dayNum} ${monthName}`
+    };
+  };
+
+
 
   // ─── Composite Matrix Query: ดึงข้อมูลนักเรียน + โครงสร้างคะแนน + คะแนนทั้งหมด ───
   const { data: matrixData, isLoading: matrixLoading, refetch: refetchMatrix } = useQuery({
@@ -312,6 +484,17 @@ export default function Scores() {
     }
   }, [selectedLesson, matrixScores, students, selectedClass]);
 
+  // ─── Auto-sync attendanceDate with the currently selected weekly lesson ───
+  useEffect(() => {
+    const weekNum = parseInt(selectedLesson);
+    if (!isNaN(weekNum) && weekNum > 0) {
+      const targetDate = calculatedWeekDates[weekNum] || weekDateMap[weekNum];
+      if (targetDate && targetDate !== attendanceDate) {
+        setAttendanceDate(targetDate);
+      }
+    }
+  }, [selectedLesson, calculatedWeekDates, weekDateMap]);
+
   // ─── Analytics Summary Computations ───
   const analyticsSummary = useMemo(() => {
     if (!students.length || !structures.length) {
@@ -406,6 +589,67 @@ export default function Scores() {
       default:
         return <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-400 text-[10px] font-bold border border-slate-200">ไม่มีข้อมูล</span>;
     }
+  };
+
+  // ─── Quick Fill 0 for Absent Students ───
+  const handleFillZeroForAbsentees = (targetWeekNum?: number) => {
+    const targetWeek = targetWeekNum || (Number(selectedLesson) ? Number(selectedLesson) : null);
+    let fillCount = 0;
+
+    if (viewMode === 'matrix') {
+      setMatrixScores(prev => {
+        const next = { ...prev };
+        students.forEach(student => {
+          const weekNums = targetWeek ? [targetWeek] : structures.map(s => s.lesson_number);
+          weekNums.forEach(wNum => {
+            const attStatus = weekAttendanceMap[`${student.id}_${wNum}`];
+            if (attStatus === 'absent' || attStatus === 'leave') {
+              const key = `${student.id}_${wNum}`;
+              const current = next[key] || { assignment_score: '', post_test_score: '' };
+              next[key] = {
+                assignment_score: current.assignment_score === '' ? 0 : current.assignment_score,
+                post_test_score: current.post_test_score === '' ? 0 : current.post_test_score
+              };
+              fillCount++;
+            }
+          });
+        });
+        return next;
+      });
+    } else {
+      setScores(prev => {
+        const next = { ...prev };
+        students.forEach(student => {
+          const attStatus = attendanceRecords[String(student.id)] || (targetWeek ? weekAttendanceMap[`${student.id}_${targetWeek}`] : '');
+          if (attStatus === 'absent' || attStatus === 'leave') {
+            const current = next[String(student.id)] || { assignment_score: '', post_test_score: '' };
+            next[String(student.id)] = {
+              assignment_score: current.assignment_score === '' ? 0 : current.assignment_score,
+              post_test_score: current.post_test_score === '' ? 0 : current.post_test_score
+            };
+            fillCount++;
+          }
+        });
+        return next;
+      });
+    }
+
+    toast.success(`เติมคะแนน 0 สำหรับนักเรียนที่ขาด/ลา เรียบร้อยแล้ว`);
+  };
+
+  const handleFillSingleStudentZero = (studentId: string | number, lessonNum?: number) => {
+    if (viewMode === 'matrix' && lessonNum) {
+      setMatrixScores(prev => ({
+        ...prev,
+        [`${studentId}_${lessonNum}`]: { assignment_score: 0, post_test_score: 0 }
+      }));
+    } else {
+      setScores(prev => ({
+        ...prev,
+        [String(studentId)]: { assignment_score: 0, post_test_score: 0 }
+      }));
+    }
+    toast.success('กำหนดคะแนน 0 สำหรับนักเรียนที่ขาดเรียนแล้ว');
   };
 
   const handleStructureChange = (index: number, field: keyof ScoreStructure, value: any) => {
@@ -572,53 +816,159 @@ export default function Scores() {
     }
   };
 
-  // --- Test Blueprint Calculator ---
+  // --- Open Test Blueprint Calculator with Smart Auto-Prefill ---
+  const handleOpenCalculator = () => {
+    // 1. Auto-detect curriculum (ปวช. 18 สัปดาห์ vs ปวส. 15 สัปดาห์)
+    const nameOrDesc = `${classroomObj?.name || ''} ${classroomObj?.description || ''}`;
+    const isPws = Boolean(nameOrDesc.includes('ปวส') || nameOrDesc.includes('ปวส.'));
+    const detectedWeeks = isPws ? 15 : (structures.length === 15 ? 15 : 18);
+    setCurriculumWeeks(detectedWeeks);
+
+    // 2. Auto-prefill total academic score from classroom settings
+    const assignWeight = Number(classroomObj?.assignment_weight) || 0;
+    const postTestWeight = Number(classroomObj?.post_test_weight) || 0;
+    const academicSum = assignWeight + postTestWeight;
+    if (academicSum > 0) {
+      setTotalAcademicScore(academicSum);
+    } else {
+      setTotalAcademicScore(40);
+    }
+
+    // 3. Auto-detect Theory and Practice hours from Subject name/description e.g. (1-2-2) or timetable
+    const match = nameOrDesc.match(/\(?\b(\d+)\s*[-–/]\s*(\d+)\s*[-–/]\s*(\d+)\b\)?/);
+    if (match) {
+      const t = parseInt(match[1]);
+      const p = parseInt(match[2]);
+      if (!isNaN(t) && !isNaN(p) && (t > 0 || p > 0)) {
+        setTheoryHoursPerWeek(t);
+        setPracticeHoursPerWeek(p);
+      }
+    } else {
+      const classEntries = allTimetableEntries.filter(
+        e => String(e.classroom_id) === String(selectedClass)
+      );
+      if (classEntries.length > 0) {
+        let tHours = 0;
+        let pHours = 0;
+        classEntries.forEach((entry: any) => {
+          const h = Number(entry.hours) || 1;
+          if (entry.entry_type === 'lab' || entry.entryType === 'lab') {
+            pHours += h;
+          } else {
+            tHours += h;
+          }
+        });
+        if (tHours > 0 || pHours > 0) {
+          setTheoryHoursPerWeek(tHours || 2);
+          setPracticeHoursPerWeek(pHours || 2);
+        }
+      }
+    }
+
+    setShowCalculator(true);
+  };
+
+  // --- Test Blueprint Calculator with Smart Fallback & Curriculum (ปวช./ปวส.) ---
   const calculateBlueprint = () => {
-    let totalHours = 0;
-    structures.forEach(s => { totalHours += parseFloat(String(s.hours)) || 0; });
-    if (totalHours === 0) {
-      toast.error('กรุณาระบุชั่วโมงเรียนให้ครบถ้วนก่อนคำนวณ');
+    const totalContactHours = (Number(theoryHoursPerWeek) || 0) + (Number(practiceHoursPerWeek) || 0);
+    if (totalContactHours === 0) {
+      toast.error('กรุณาระบุชั่วโมงทฤษฎีและปฏิบัติ (ต้องรวมกันมากกว่า 0)');
       return;
     }
-    const totalContactHours = theoryHoursPerWeek + practiceHoursPerWeek;
-    if (totalContactHours === 0) {
-      toast.error('กรุณาระบุชั่วโมงทฤษฎีและปฏิบัติ');
-      return;
+
+    // 1. Adjust structures length to match curriculumWeeks (15 for ปวส., 18 for ปวช.)
+    let effectiveStructures = structures;
+    if (effectiveStructures.length !== curriculumWeeks) {
+      if (effectiveStructures.length > curriculumWeeks) {
+        effectiveStructures = effectiveStructures.slice(0, curriculumWeeks);
+      } else {
+        const diff = curriculumWeeks - effectiveStructures.length;
+        const startNum = effectiveStructures.length + 1;
+        const padding = Array.from({ length: diff }, (_, i) => ({
+          lesson_number: startNum + i,
+          lesson_name: `บทที่/สัปดาห์ที่ ${startNum + i}`,
+          max_assignment_score: 10,
+          max_post_test_score: 10,
+          hours: totalContactHours
+        }));
+        effectiveStructures = [...effectiveStructures, ...padding];
+      }
+    }
+
+    let totalHours = 0;
+    effectiveStructures.forEach(s => { totalHours += parseFloat(String(s.hours)) || 0; });
+
+    // Zero-friction fallback: If no hours are defined yet in the structure, auto-assign weekly contact hours
+    if (totalHours === 0) {
+      effectiveStructures = effectiveStructures.map(s => ({
+        ...s,
+        hours: totalContactHours
+      }));
+      totalHours = effectiveStructures.reduce((sum, s) => sum + (Number(s.hours) || 0), 0);
     }
 
     const practiceRatio = practiceHoursPerWeek / totalContactHours;
     const theoryRatio = theoryHoursPerWeek / totalContactHours;
 
-    let runningSkillTotal = 0;
-    let runningTestTotal = 0;
-    const targetSkillTotal = Math.round(totalAcademicScore * practiceRatio);
-    const targetTestTotal = totalAcademicScore - targetSkillTotal;
+    let newStructs: ScoreStructure[] = [];
 
-    const newStructs = structures.map((s, index) => {
-      const h = parseFloat(String(s.hours)) || 0;
-      const baseScore = (h / totalHours) * totalAcademicScore;
-      let finalSkill, finalPostTest;
+    if (scoreScaleMode === 'standard_10') {
+      // โหมดคะแนนเต็มมาตรฐาน (เช่น เต็ม 10/ช่อง หรือตามสัดส่วน 5 กับ 10) ตรวจง่าย ไม่เป็น 1 คะแนน
+      let assignPerWeek = standardWeeklyBaseScore;
+      let postTestPerWeek = standardWeeklyBaseScore;
 
-      if (index === structures.length - 1) {
-        finalSkill = targetSkillTotal - runningSkillTotal;
-        finalPostTest = targetTestTotal - runningTestTotal;
-      } else {
-        finalSkill = Math.round(baseScore * practiceRatio);
-        finalPostTest = Math.round(baseScore * theoryRatio);
-        runningSkillTotal += finalSkill;
-        runningTestTotal += finalPostTest;
+      if (practiceRatio > theoryRatio) {
+        assignPerWeek = standardWeeklyBaseScore;
+        postTestPerWeek = Math.max(1, Math.round(standardWeeklyBaseScore * (theoryRatio / practiceRatio)));
+      } else if (theoryRatio > practiceRatio) {
+        postTestPerWeek = standardWeeklyBaseScore;
+        assignPerWeek = Math.max(1, Math.round(standardWeeklyBaseScore * (practiceRatio / theoryRatio)));
       }
 
-      return {
+      newStructs = effectiveStructures.map(s => ({
         ...s,
-        max_assignment_score: Math.max(0, finalSkill),
-        max_post_test_score: Math.max(0, finalPostTest)
-      };
-    });
+        hours: s.hours || totalContactHours,
+        max_assignment_score: assignPerWeek,
+        max_post_test_score: postTestPerWeek
+      }));
+
+      const totalRaw = newStructs.reduce((sum, s) => sum + Number(s.max_assignment_score || 0) + Number(s.max_post_test_score || 0), 0);
+      toast.success(`ตั้งค่าสัดส่วนสำเร็จ (${curriculumWeeks === 15 ? 'ปวส. 15 สัปดาห์' : 'ปวช. 18 สัปดาห์'})! สอบย่อยเต็ม ${postTestPerWeek} | งานเก็บเต็ม ${assignPerWeek} (รวมดิบ ${totalRaw} คะแนน — ทอนน้ำหนัก ${totalAcademicScore} ในหน้าตัดเกรดอัตโนมัติ)`);
+    } else {
+      // โหมดเกลี่ยตรงตามค่าน้ำหนักวิชา (Direct weight distribution)
+      let runningSkillTotal = 0;
+      let runningTestTotal = 0;
+      const targetSkillTotal = Math.round(totalAcademicScore * practiceRatio);
+      const targetTestTotal = totalAcademicScore - targetSkillTotal;
+
+      newStructs = effectiveStructures.map((s, index) => {
+        const h = parseFloat(String(s.hours)) || 0;
+        const baseScore = totalHours > 0 ? (h / totalHours) * totalAcademicScore : (totalAcademicScore / effectiveStructures.length);
+        let finalSkill, finalPostTest;
+
+        if (index === effectiveStructures.length - 1) {
+          finalSkill = targetSkillTotal - runningSkillTotal;
+          finalPostTest = targetTestTotal - runningTestTotal;
+        } else {
+          finalSkill = Math.round(baseScore * practiceRatio);
+          finalPostTest = Math.round(baseScore * theoryRatio);
+          runningSkillTotal += finalSkill;
+          runningTestTotal += finalPostTest;
+        }
+
+        return {
+          ...s,
+          hours: s.hours || totalContactHours,
+          max_assignment_score: Math.max(0, finalSkill),
+          max_post_test_score: Math.max(0, finalPostTest)
+        };
+      });
+
+      toast.success(`คำนวณสัดส่วนสำเร็จ (${curriculumWeeks === 15 ? 'ปวส. 15 สัปดาห์' : 'ปวช. 18 สัปดาห์'})! สอบย่อย = ${targetTestTotal} | งานเก็บ = ${targetSkillTotal} | รวม = ${totalAcademicScore}`);
+    }
 
     setStructures(newStructs);
     setShowCalculator(false);
-    toast.success(`คำนวณสัดส่วนสำเร็จ! งานเก็บ = ${targetSkillTotal} | สอบ = ${targetTestTotal} | รวม = ${totalAcademicScore}`);
   };
 
   const handleBlueprintImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -974,18 +1324,66 @@ export default function Scores() {
               <div className="p-5 border-b border-indigo-100 flex flex-col lg:flex-row items-center justify-between gap-4 bg-indigo-50/60">
                 <div>
                   <h2 className="text-lg font-bold text-slate-800">ตารางน้ำหนักคะแนนเต็ม (Test Blueprint)</h2>
-                  <p className="text-sm text-slate-600">กำหนดคะแนนเต็มของงานเก็บและสอบย่อยในแต่ละบทเรียน (18 สัปดาห์)</p>
+                  <p className="text-sm text-slate-600">
+                    กำหนดคะแนนเต็มของงานเก็บและสอบย่อยในแต่ละบทเรียน ({structures.length} สัปดาห์ — {structures.length === 15 ? 'หลักสูตร ปวส.' : 'หลักสูตร ปวช.'})
+                  </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <button onClick={() => setShowCalculator(true)} className="btn bg-indigo-500/10 text-indigo-600 hover:bg-indigo-500/20 border border-indigo-200 flex items-center gap-2 text-xs">
+                  <div className="flex items-center bg-white border border-indigo-200 rounded-lg p-0.5 text-xs shadow-sm">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (structures.length !== 18) {
+                          const diff = 18 - structures.length;
+                          if (diff > 0) {
+                            const padding = Array.from({ length: diff }, (_, i) => ({
+                              lesson_number: structures.length + 1 + i,
+                              lesson_name: `บทที่/สัปดาห์ที่ ${structures.length + 1 + i}`,
+                              max_assignment_score: 10,
+                              max_post_test_score: 10,
+                              hours: 4
+                            }));
+                            setStructures([...structures, ...padding]);
+                          } else {
+                            setStructures(structures.slice(0, 18));
+                          }
+                          setCurriculumWeeks(18);
+                        }
+                      }}
+                      className={`px-2.5 py-1 rounded-md font-medium transition-all ${
+                        structures.length >= 18 ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-indigo-600'
+                      }`}
+                    >
+                      ปวช. (18 สัปดาห์)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (structures.length !== 15) {
+                          setStructures(structures.slice(0, 15));
+                          setCurriculumWeeks(15);
+                        }
+                      }}
+                      className={`px-2.5 py-1 rounded-md font-medium transition-all ${
+                        structures.length === 15 ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-indigo-600'
+                      }`}
+                    >
+                      ปวส. (15 สัปดาห์)
+                    </button>
+                  </div>
+                  <button onClick={handleOpenCalculator} className="btn bg-indigo-500/10 text-indigo-600 hover:bg-indigo-500/20 border border-indigo-200 flex items-center gap-2 text-xs">
                     <Calculator className="w-4 h-4" />
                     คำนวณสัดส่วนอัตโนมัติ
                   </button>
-                  <label className="btn bg-indigo-100 hover:bg-indigo-200 text-indigo-700 cursor-pointer flex items-center gap-2 text-xs">
-                    <FileSpreadsheet className="w-4 h-4" />
-                    นำเข้า Blueprint
-                    <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleBlueprintImport} />
-                  </label>
+                  <button 
+                    type="button"
+                    onClick={() => setShowExcelImportModal(true)} 
+                    className="btn bg-indigo-100 hover:bg-indigo-200 text-indigo-700 cursor-pointer flex items-center gap-2 text-xs font-semibold shadow-xs"
+                    title="เปิดหน้าต่างนำเข้า Blueprint พร้อมดูตัวอย่างรูปแบบและดาวน์โหลดเทมเพลต"
+                  >
+                    <Upload className="w-4 h-4 text-indigo-600" />
+                    <span>นำเข้า Blueprint & ตัวอย่างไฟล์</span>
+                  </button>
                   <button onClick={saveStructure} disabled={saving} className="btn btn-primary flex items-center gap-2 text-xs">
                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     บันทึกโครงสร้าง
@@ -1077,16 +1475,34 @@ export default function Scores() {
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
-                  <label className="btn bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200 text-xs cursor-pointer flex items-center gap-1.5">
-                    <Upload className="w-3.5 h-3.5" /> นำเข้าคะแนนงานเก็บ (Excel)
-                    <input type="file" accept=".xlsx,.xls" className="hidden" onChange={e => handleScoreImport(e, 'assignment')} />
-                  </label>
-                  <label className="btn bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200 text-xs cursor-pointer flex items-center gap-1.5">
-                    <Upload className="w-3.5 h-3.5" /> นำเข้าคะแนนสอบ (Excel)
-                    <input type="file" accept=".xlsx,.xls" className="hidden" onChange={e => handleScoreImport(e, 'post_test')} />
-                  </label>
-                  <button onClick={() => setShowExportModal(true)} className="btn bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 text-xs flex items-center gap-1.5">
-                    <FileSpreadsheet className="w-3.5 h-3.5" /> ส่งออก Excel
+                  <div className="flex items-center gap-1.5 bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-200 text-xs font-bold text-indigo-900 shadow-2xs">
+                    <span>📅 วันเริ่มสอน:</span>
+                    <input
+                      type="date"
+                      value={semesterStartDate}
+                      onChange={e => handleStartDateChange(e.target.value)}
+                      className="form-input py-0.5 px-2 bg-white border-indigo-300 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500 shadow-2xs cursor-pointer"
+                      title="เลือกวันเริ่มต้นสอนของภาคเรียน เพื่อให้ระบบคำนวณวันที่ของทั้ง 18 สัปดาห์อัตโนมัติ"
+                    />
+                  </div>
+                  <button
+                    onClick={() => handleFillZeroForAbsentees()}
+                    className="btn bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
+                    title="กรอกคะแนน 0 ให้อัตโนมัติสำหรับนักเรียนที่มีประวัติขาดเรียนหรือลา"
+                  >
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-500" /> ⚡ กรอก 0 คนขาดเรียน
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowExcelImportModal(true)}
+                    className="btn bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 text-xs flex items-center gap-1.5 font-bold shadow-xs cursor-pointer"
+                    title="เปิดหน้าต่างนำเข้าคะแนนจาก Excel พร้อมดูตัวอย่างรูปแบบและดาวน์โหลดเทมเพลต"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>นำเข้าคะแนน (Excel) & ตัวอย่างไฟล์</span>
+                  </button>
+                  <button onClick={() => setShowExportModal(true)} className="btn bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 text-xs flex items-center gap-1.5 font-semibold shadow-2xs">
+                    <FileSpreadsheet className="w-3.5 h-3.5" /> พรีวิว & ส่งออก Excel
                   </button>
                   <button onClick={saveScores} disabled={saving} className="btn btn-primary text-xs flex items-center gap-1.5 shadow-md shadow-indigo-500/20">
                     {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
@@ -1119,13 +1535,26 @@ export default function Scores() {
                         <thead className="sticky top-0 z-20 bg-indigo-100/90 backdrop-blur-md text-slate-700">
                           <tr>
                             <th className="p-3 sticky left-0 z-30 bg-indigo-100 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)] w-16 text-center font-bold border-r border-indigo-200">รหัส</th>
-                            <th className="p-3 sticky left-16 z-30 bg-indigo-100 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)] min-w-[160px] font-bold border-r border-indigo-200">ชื่อ-นามสกุล</th>
-                            {structures.map(struct => (
-                              <th key={struct.lesson_number} colSpan={2} className="p-2 text-center border-l border-indigo-200 font-bold min-w-[110px]">
-                                W{struct.lesson_number}
-                                <div className="text-[10px] font-normal text-slate-500">({struct.max_assignment_score}/{struct.max_post_test_score})</div>
-                              </th>
-                            ))}
+                            <th className="p-3 sticky left-16 z-30 bg-indigo-100 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)] min-w-[220px] font-bold border-r border-indigo-200">ชื่อ-นามสกุล</th>
+                            {structures.map(struct => {
+                              const dateStr = calculatedWeekDates[struct.lesson_number] || weekDateMap[struct.lesson_number];
+                              const dateInfo = formatThaiFullDateHeader(dateStr);
+                              const holiday = dateStr ? checkThaiHoliday(dateStr) : null;
+                              return (
+                                <th key={struct.lesson_number} colSpan={2} className="p-2 text-center border-l border-indigo-200 font-bold min-w-[115px]">
+                                  <div className="flex flex-col items-center gap-0.5">
+                                    <span className="text-xs font-black text-slate-800">W{struct.lesson_number}</span>
+                                    {dateInfo ? (
+                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border inline-flex items-center gap-1 shadow-2xs ${holiday ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-indigo-100/90 text-indigo-800 border-indigo-200/60'}`} title={holiday ? `วันหยุด: ${holiday.name}` : `วันที่สอน: ${dateStr}`}>
+                                        {holiday ? '🏖️' : ''} {dateInfo.label}
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] font-normal text-slate-400">({struct.max_assignment_score}/{struct.max_post_test_score})</span>
+                                    )}
+                                  </div>
+                                </th>
+                              );
+                            })}
                             <th className="p-3 text-center border-l border-indigo-200 bg-cyan-100/80 min-w-[70px] font-bold">กลางภาค</th>
                             <th className="p-3 text-center bg-blue-100/80 min-w-[70px] font-bold">ปลายภาค</th>
                             <th className="p-3 text-center bg-pink-100/80 min-w-[70px] font-bold">จิตพิสัย</th>
@@ -1213,13 +1642,32 @@ export default function Scores() {
                   <div className="p-4 border-b border-indigo-100 flex flex-col md:flex-row gap-4 items-end justify-between bg-indigo-50/60">
                     <div className="w-full md:w-1/3">
                       <label className="form-label text-indigo-800 font-bold">เลือกบทเรียน/สัปดาห์ หรือการสอบ</label>
-                      <select value={selectedLesson} onChange={e => setSelectedLesson(e.target.value)} className="form-input bg-white border-indigo-200">
+                      <select 
+                        value={selectedLesson} 
+                        onChange={e => {
+                          const newLesson = e.target.value;
+                          setSelectedLesson(newLesson);
+                          const weekNum = parseInt(newLesson);
+                          if (!isNaN(weekNum) && weekNum > 0) {
+                            const targetDate = calculatedWeekDates[weekNum] || weekDateMap[weekNum];
+                            if (targetDate) {
+                              setAttendanceDate(targetDate);
+                            }
+                          }
+                        }} 
+                        className="form-input bg-white border-indigo-200"
+                      >
                         <optgroup label="คะแนนภาคผลงาน (รายสัปดาห์)">
-                          {structures.map(s => (
-                            <option key={s.lesson_number} value={s.lesson_number}>
-                              สัปดาห์ที่ {s.lesson_number}: {s.lesson_name || 'ไม่มีชื่อ'}
-                            </option>
-                          ))}
+                          {structures.map(s => {
+                            const dateStr = calculatedWeekDates[s.lesson_number] || weekDateMap[s.lesson_number];
+                            const dateInfo = formatThaiFullDateHeader(dateStr);
+                            const dateText = dateInfo ? ` (${dateInfo.label})` : '';
+                            return (
+                              <option key={s.lesson_number} value={s.lesson_number}>
+                                สัปดาห์ที่ {s.lesson_number}{dateText}: {s.lesson_name || 'ไม่มีชื่อ'}
+                              </option>
+                            );
+                          })}
                         </optgroup>
                         <optgroup label="คะแนนภาควิชา / จิตพิสัย">
                           <option value="midterm">สอบกลางภาค (คะแนนภาควิชา)</option>
@@ -1260,14 +1708,45 @@ export default function Scores() {
                       </div>
 
                       {showAttendance && (
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs text-slate-500">ระบุวันที่เช็คชื่อ:</span>
-                          <input
-                            type="date"
-                            value={attendanceDate}
-                            onChange={e => setAttendanceDate(e.target.value)}
-                            className="form-input py-1 px-3 text-xs bg-white border-indigo-200 rounded-xl w-36"
-                          />
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <span className="text-xs font-semibold text-slate-600 flex items-center gap-1">
+                            <span>📅 วันที่เช็คชื่อ:</span>
+                          </span>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <input
+                              type="date"
+                              value={attendanceDate}
+                              onChange={e => setAttendanceDate(e.target.value)}
+                              className="form-input py-1 px-2.5 text-xs bg-white border-indigo-300 rounded-xl font-medium text-slate-800 focus:border-indigo-500 shadow-2xs cursor-pointer"
+                              title="เลือกวันที่เช็คชื่อที่ต้องการดึงข้อมูลมาแสดง"
+                            />
+                            {(() => {
+                              const weekNum = parseInt(selectedLesson);
+                              const targetWeekDate = !isNaN(weekNum) ? (calculatedWeekDates[weekNum] || weekDateMap[weekNum]) : null;
+                              const isSynced = targetWeekDate ? targetWeekDate === attendanceDate : true;
+                              const dateInfo = formatThaiFullDateHeader(attendanceDate);
+
+                              return (
+                                <div className="flex items-center gap-2">
+                                  {dateInfo && (
+                                    <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-200">
+                                      {dateInfo.label}
+                                    </span>
+                                  )}
+                                  {!isSynced && targetWeekDate && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setAttendanceDate(targetWeekDate)}
+                                      className="btn bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-[11px] py-0.5 px-2 rounded-lg flex items-center gap-1 transition-all shadow-2xs font-semibold"
+                                      title={`คลิกเพื่อรีเซ็ตวันที่ให้ตรงกับสัปดาห์ที่ ${weekNum} (${targetWeekDate})`}
+                                    >
+                                      🔄 ซิงค์ตามสัปดาห์ที่ {weekNum}
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1290,14 +1769,32 @@ export default function Scores() {
                       <tbody>
                         {displayedStudents.map(student => {
                           const scoreData = scores[student.id] || { assignment_score: '', post_test_score: '' };
-                          const attStatus = attendanceRecords[String(student.id)] || '';
+                          const directRecord = allClassAttendance.find(
+                            r => String(r.student_id) === String(student.id) && parseSafeDateStr(r.date) === attendanceDate
+                          );
+                          const attStatus = attendanceRecords[String(student.id)] 
+                            || directRecord?.status 
+                            || weekAttendanceMap[`${student.id}_${selectedLesson}`] 
+                            || '';
                           return (
                             <tr key={student.id} className="border-b border-indigo-100 hover:bg-indigo-50/50">
                               <td className="p-3 text-slate-500 font-medium">{student.student_code || '-'}</td>
                               <td className="p-3 font-semibold text-slate-800">
-                                <div className="flex items-center gap-2">
-                                  <span>{student.name}</span>
-                                  {showAttendance && getAttendanceBadge(attStatus)}
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <span>{student.name}</span>
+                                    {getAttendanceBadge(attStatus)}
+                                  </div>
+                                  {!['midterm', 'final', 'affective'].includes(selectedLesson) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleFillSingleStudentZero(student.id)}
+                                      className="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-[10px] font-bold rounded-lg transition-colors shadow-2xs"
+                                      title="กำหนดคะแนนเป็น 0 สำหรับนักเรียนที่ขาดเรียน"
+                                    >
+                                      ขาด = 0
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                               {!['midterm', 'final', 'affective'].includes(selectedLesson) && (
@@ -1334,81 +1831,327 @@ export default function Scores() {
           )}
 
       {/* Calculator Modal */}
-      {showCalculator && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white border border-indigo-200 rounded-2xl p-6 max-w-lg w-full">
-            <h3 className="text-xl font-bold text-slate-800 mb-2 flex items-center gap-2">
-              <Calculator className="w-5 h-5 text-indigo-600" />
-              คำนวณสัดส่วนคะแนนอัตโนมัติ
-            </h3>
-            <p className="text-slate-600 mb-5 text-sm">
-              ระบบจะนำชั่วโมงเรียนในตารางมาเทียบบัญญัติไตรยางศ์ แล้วแบ่งคะแนนตามสัดส่วนทฤษฎี:ปฏิบัติ
-            </p>
-            <div className="space-y-4 mb-6">
-              <div>
-                <label className="form-label text-slate-800">คะแนนวิชาการรวม (งานเก็บ + สอบย่อย)</label>
-                <input
-                  type="number"
-                  value={totalAcademicScore}
-                  onChange={e => setTotalAcademicScore(parseFloat(e.target.value) || 0)}
-                  className="form-input text-lg"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="form-label text-amber-600">ทฤษฎี ชม./สัปดาห์</label>
-                  <input
-                    type="number" min="0" step="1"
-                    value={theoryHoursPerWeek}
-                    onChange={e => setTheoryHoursPerWeek(parseFloat(e.target.value) || 0)}
-                    className="form-input text-lg text-center"
-                  />
-                </div>
-                <div>
-                  <label className="form-label text-emerald-600">ปฏิบัติ ชม./สัปดาห์</label>
-                  <input
-                    type="number" min="0" step="1"
-                    value={practiceHoursPerWeek}
-                    onChange={e => setPracticeHoursPerWeek(parseFloat(e.target.value) || 0)}
-                    className="form-input text-lg text-center"
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-3 justify-end">
-              <button onClick={() => setShowCalculator(false)} className="btn bg-slate-100 text-slate-700">ยกเลิก</button>
-              <button onClick={calculateBlueprint} className="btn btn-primary">เริ่มคำนวณ</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {showCalculator && (() => {
+        const contactHours = (Number(theoryHoursPerWeek) || 0) + (Number(practiceHoursPerWeek) || 0);
+        const tRatio = contactHours > 0 ? (Number(theoryHoursPerWeek) || 0) / contactHours : 0;
+        const pRatio = contactHours > 0 ? (Number(practiceHoursPerWeek) || 0) / contactHours : 0;
+        const tPct = Math.round(tRatio * 1000) / 10;
+        const pPct = Math.round(pRatio * 1000) / 10;
 
-      {/* Export Modal */}
-      {showExportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white border border-indigo-200 rounded-2xl p-6 max-w-lg w-full">
-            <h3 className="text-xl font-bold text-slate-800 mb-2 flex items-center gap-2">
-              <FileSpreadsheet className="w-5 h-5 text-indigo-600" />
-              ส่งออก Excel / Google Sheets
-            </h3>
-            <div className="space-y-3 mb-6">
-              <label className="flex items-center gap-3 p-3 border border-indigo-100 rounded-xl cursor-pointer hover:bg-indigo-50">
-                <input type="radio" name="exportType" value="full_matrix" checked={exportType === 'full_matrix'} onChange={() => setExportType('full_matrix')} />
-                <div>
-                  <div className="text-sm font-semibold text-slate-800">ตารางคะแนนรวมทั้งหมด (ทุกสัปดาห์)</div>
-                  <div className="text-xs text-slate-500">ส่งออกคะแนนดิบทั้งหมดในรูปแบบตาราง Excel</div>
+        // Preview values based on scoreScaleMode
+        let previewAssign = 10;
+        let previewPostTest = 10;
+        if (pRatio > tRatio) {
+          previewAssign = standardWeeklyBaseScore;
+          previewPostTest = Math.max(1, Math.round(standardWeeklyBaseScore * (tRatio / pRatio)));
+        } else if (tRatio > pRatio) {
+          previewPostTest = standardWeeklyBaseScore;
+          previewAssign = Math.max(1, Math.round(standardWeeklyBaseScore * (pRatio / tRatio)));
+        }
+        const totalWeeklyStandard = previewAssign + previewPostTest;
+        const totalTermRawStandard = totalWeeklyStandard * curriculumWeeks;
+
+        const directSkillTotal = Math.round((Number(totalAcademicScore) || 0) * pRatio);
+        const directTestTotal = (Number(totalAcademicScore) || 0) - directSkillTotal;
+        const directAvgAssign = Math.round((directSkillTotal / curriculumWeeks) * 10) / 10;
+        const directAvgTest = Math.round((directTestTotal / curriculumWeeks) * 10) / 10;
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="bg-white border border-indigo-200 rounded-2xl p-6 max-w-lg w-full shadow-2xl">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                  <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                    <Calculator className="w-5 h-5" />
+                  </div>
+                  คำนวณสัดส่วนคะแนนอัตโนมัติ
+                </h3>
+              </div>
+              <p className="text-slate-600 mb-4 text-xs">
+                กำหนดสัดส่วนชั่วโมงและคำนวณคะแนนเต็มของงานเก็บและสอบย่อยให้เหมาะสมกับหลักสูตร ปวช. และ ปวส.
+              </p>
+
+              <div className="space-y-4 mb-5">
+                {/* 1. เลือกระดับหลักสูตร (ปวช. 18 สัปดาห์ vs ปวส. 15 สัปดาห์) */}
+                <div className="p-3 bg-indigo-50/80 border border-indigo-100 rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800">เลือกระดับหลักสูตร:</span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setCurriculumWeeks(18)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                          curriculumWeeks === 18
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        ปวช. (18 สัปดาห์)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCurriculumWeeks(15)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                          curriculumWeeks === 15
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        ปวส. (15 สัปดาห์)
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </label>
-            </div>
-            <div className="flex gap-3 justify-end">
-              <button onClick={() => setShowExportModal(false)} className="btn bg-slate-100 text-slate-700">ยกเลิก</button>
-              <button onClick={handleExportScores} disabled={exporting} className="btn btn-primary flex items-center gap-2">
-                {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileSpreadsheet className="w-4 h-4" />}
-                {exporting ? 'กำลังส่งออก...' : 'ส่งออกไฟล์'}
-              </button>
+
+                {/* 2. เลือกรูปแบบคะแนนเต็ม (แก้ปัญหาได้ 1 คะแนน) */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">รูปแบบคะแนนเต็มรายสัปดาห์</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setScoreScaleMode('standard_10')}
+                      className={`p-2.5 rounded-xl border text-left transition-all ${
+                        scoreScaleMode === 'standard_10'
+                          ? 'bg-indigo-50/90 border-indigo-500 ring-2 ring-indigo-500/20'
+                          : 'bg-white border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="text-xs font-bold text-slate-800 flex items-center justify-between">
+                        <span>คะแนนเต็มมาตรฐาน</span>
+                        <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">แนะนำ</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        เต็ม 5-10 ตรวจง่าย ระบบจะทอนคะแนนตามน้ำหนัก {totalAcademicScore} คะแนนในหน้าตัดเกรดอัตโนมัติ
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setScoreScaleMode('direct_weight')}
+                      className={`p-2.5 rounded-xl border text-left transition-all ${
+                        scoreScaleMode === 'direct_weight'
+                          ? 'bg-indigo-50/90 border-indigo-500 ring-2 ring-indigo-500/20'
+                          : 'bg-white border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="text-xs font-bold text-slate-800">เกลี่ยตามค่าน้ำหนักรวม</div>
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        หารคะแนนรวม {totalAcademicScore} เฉลี่ย {curriculumWeeks} สัปดาห์ (คะแนนต่อช่องจะเฉลี่ย ~1-2 คะแนน)
+                      </p>
+                    </button>
+                  </div>
+                </div>
+
+                {/* ถ้าเลือกโหมดมาตรฐาน สามารถเลือกฐานคะแนนเต็มได้ (เช่น เต็ม 10 หรือ 5) */}
+                {scoreScaleMode === 'standard_10' ? (
+                  <div className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+                    <span className="text-xs font-semibold text-slate-700">ฐานคะแนนเต็มต่อช่องงานเก็บ:</span>
+                    <div className="flex gap-1.5">
+                      {[5, 10, 20].map(pts => (
+                        <button
+                          key={pts}
+                          type="button"
+                          onClick={() => setStandardWeeklyBaseScore(pts)}
+                          className={`px-2.5 py-1 text-xs rounded-lg font-bold border transition-all ${
+                            standardWeeklyBaseScore === pts
+                              ? 'bg-indigo-600 text-white border-indigo-600'
+                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          เต็ม {pts}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="form-label text-slate-800 text-xs font-semibold mb-0">คะแนนวิชาการรวม (งานเก็บ + สอบย่อย)</label>
+                      <span className="text-[11px] text-indigo-600 font-medium bg-indigo-50 px-2 py-0.5 rounded-md">
+                        ค่าน้ำหนักวิชา: {totalAcademicScore} คะแนน
+                      </span>
+                    </div>
+                    <input
+                      type="number"
+                      value={totalAcademicScore}
+                      onChange={e => setTotalAcademicScore(parseFloat(e.target.value) || 0)}
+                      className="form-input text-lg font-bold text-slate-800"
+                    />
+                  </div>
+                )}
+
+                {/* 3. สัดส่วนชั่วโมงเรียน (ท-ป-น) */}
+                <div>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <span className="text-xs font-semibold text-slate-700">สัดส่วนชั่วโมงเรียนตามหลักสูตร (ท-ป-น)</span>
+                    <span className="text-[11px] text-slate-500">พรีเซ็ตด่วน:</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 mb-2.5">
+                    {[
+                      { label: '1-2-2 (3 ชม.)', t: 1, p: 2 },
+                      { label: '2-2-3 (4 ชม.)', t: 2, p: 2 },
+                      { label: '2-0-2 (2 ชม.)', t: 2, p: 0 },
+                      { label: '1-4-3 (5 ชม.)', t: 1, p: 4 },
+                      { label: '3-0-3 (3 ชม.)', t: 3, p: 0 },
+                    ].map(preset => (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => {
+                          setTheoryHoursPerWeek(preset.t);
+                          setPracticeHoursPerWeek(preset.p);
+                        }}
+                        className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
+                          theoryHoursPerWeek === preset.t && practiceHoursPerWeek === preset.p
+                            ? 'bg-indigo-600 text-white border-indigo-600 font-semibold shadow-sm'
+                            : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 rounded-xl border border-amber-200 bg-amber-50/50">
+                      <label className="block text-xs font-semibold text-amber-800 mb-1">ทฤษฎี ชม./สัปดาห์</label>
+                      <input
+                        type="number" min="0" step="1"
+                        value={theoryHoursPerWeek}
+                        onChange={e => setTheoryHoursPerWeek(parseFloat(e.target.value) || 0)}
+                        className="form-input text-lg text-center font-bold text-amber-700 bg-white border-amber-300"
+                      />
+                    </div>
+                    <div className="p-3 rounded-xl border border-emerald-200 bg-emerald-50/50">
+                      <label className="block text-xs font-semibold text-emerald-800 mb-1">ปฏิบัติ ชม./สัปดาห์</label>
+                      <input
+                        type="number" min="0" step="1"
+                        value={practiceHoursPerWeek}
+                        onChange={e => setPracticeHoursPerWeek(parseFloat(e.target.value) || 0)}
+                        className="form-input text-lg text-center font-bold text-emerald-700 bg-white border-emerald-300"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Real-time Preview Card */}
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+                  <div className="flex justify-between items-center text-xs font-semibold text-slate-700 mb-2">
+                    <span>ผลลัพธ์ที่จะบันทึกลงตาราง ({curriculumWeeks === 15 ? 'ปวส. 15 สัปดาห์' : 'ปวช. 18 สัปดาห์'})</span>
+                    <span className="text-slate-500 font-normal">รวม {contactHours} ชม./สัปดาห์</span>
+                  </div>
+
+                  {/* Dual color progress bar */}
+                  <div className="h-2.5 w-full bg-slate-200 rounded-full overflow-hidden flex mb-2.5 shadow-inner">
+                    <div
+                      style={{ width: `${tPct}%` }}
+                      className="bg-amber-500 h-full transition-all duration-300"
+                      title={`ทฤษฎี ${tPct}%`}
+                    />
+                    <div
+                      style={{ width: `${pPct}%` }}
+                      className="bg-emerald-500 h-full transition-all duration-300"
+                      title={`ปฏิบัติ ${pPct}%`}
+                    />
+                  </div>
+
+                  {scoreScaleMode === 'standard_10' ? (
+                    <div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="p-2 rounded-lg bg-amber-100/70 border border-amber-200">
+                          <div className="text-amber-800 font-medium">สอบย่อย (ทฤษฎี)</div>
+                          <div className="text-sm font-bold text-amber-900 mt-0.5">เต็ม {previewPostTest} คะแนน/สัปดาห์</div>
+                        </div>
+                        <div className="p-2 rounded-lg bg-emerald-100/70 border border-emerald-200">
+                          <div className="text-emerald-800 font-medium">งานเก็บ (ปฏิบัติ)</div>
+                          <div className="text-sm font-bold text-emerald-900 mt-0.5">เต็ม {previewAssign} คะแนน/สัปดาห์</div>
+                        </div>
+                      </div>
+                      <p className="mt-2 text-[11px] text-indigo-700 bg-indigo-50 p-2 rounded-lg border border-indigo-100 flex items-center gap-1.5">
+                        <span>✨</span>
+                        <span>คะแนนดิบรวมทั้งเทอม {totalTermRawStandard} คะแนน — ในหน้าตัดเกรด ระบบจะทอนสัดส่วนให้ตรงกับค่าน้ำหนัก {totalAcademicScore} คะแนนให้อัตโนมัติ</span>
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="p-2 rounded-lg bg-amber-100/70 border border-amber-200">
+                          <div className="text-amber-800 font-medium">สอบย่อย (ทฤษฎี)</div>
+                          <div className="text-sm font-bold text-amber-900 mt-0.5">รวม {directTestTotal} คะแนน (~{directAvgTest}/สัปดาห์)</div>
+                        </div>
+                        <div className="p-2 rounded-lg bg-emerald-100/70 border border-emerald-200">
+                          <div className="text-emerald-800 font-medium">งานเก็บ (ปฏิบัติ)</div>
+                          <div className="text-sm font-bold text-emerald-900 mt-0.5">รวม {directSkillTotal} คะแนน (~{directAvgAssign}/สัปดาห์)</div>
+                        </div>
+                      </div>
+                      <p className="mt-2 text-[11px] text-slate-500">
+                        * คะแนนเฉลี่ยต่อสัปดาห์จะได้ประมาณ 1-2 คะแนน เพื่อให้ยอดรวมทั้ง {curriculumWeeks} สัปดาห์เท่ากับ {totalAcademicScore} คะแนนพอดี
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-2.5 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowCalculator(false)}
+                  className="btn bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-4"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  onClick={calculateBlueprint}
+                  className="btn btn-primary text-xs px-5 flex items-center gap-1.5 shadow-md shadow-indigo-500/20"
+                >
+                  <Calculator className="w-4 h-4" />
+                  คำนวณและนำลงตาราง ({curriculumWeeks} สัปดาห์)
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        );
+      })()}
+
+      {/* Excel Live Preview & Export Modal */}
+      <ScoreExcelModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        classroom={classroomObj || null}
+        students={students}
+        structures={structures}
+        matrixScores={matrixScores}
+        calculatedWeekDates={calculatedWeekDates}
+        weekAttendanceMap={weekAttendanceMap}
+        analyticsSummary={analyticsSummary}
+      />
+
+      {/* Excel Import & Template Modal */}
+      {selectedClass && (
+        <ScoreImportModal
+          isOpen={showExcelImportModal}
+          onClose={() => setShowExcelImportModal(false)}
+          classroomName={classroomObj?.name || 'ห้องเรียน'}
+          students={students}
+          structures={structures}
+          onImportScores={async (scores, type) => {
+            await api.post(`/scores?classroom_id=${selectedClass}`, {
+              classroom_id: selectedClass,
+              scores: scores.map(d => ({
+                student_id: d.student_id,
+                lesson_number: d.lesson_number,
+                ...(type === 'assignment' ? { assignment_score: d.assignment_score } : { post_test_score: d.post_test_score })
+              }))
+            });
+            toast.success(`นำเข้าคะแนนสำเร็จ ${scores.length} รายการ`);
+            refetchMatrix();
+          }}
+          onImportBlueprint={(newStructs) => {
+            setStructures(newStructs);
+            saveStructureMutation.mutate();
+          }}
+        />
       )}
         </>
       )}

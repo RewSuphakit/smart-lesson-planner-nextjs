@@ -4,10 +4,11 @@ import { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
-import { Plus, Edit, Trash2, X, Users as UsersIcon, Loader2, Search, GraduationCap, Upload, CheckCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Users as UsersIcon, Loader2, Search, GraduationCap, Upload, CheckCircle, FileSpreadsheet, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import Pagination from '@/components/Pagination';
+import StudentExcelModal from '@/components/StudentExcelModal';
 
 const animalAvatars = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐧', '🐥', '🦉', '🦄', '🐙', '🐢', '🦖', '🦕', '🦦', '🦥'];
 
@@ -37,6 +38,7 @@ export default function Students() {
 
   const [showForm, setShowForm] = useState(false);
   const [showImportForm, setShowImportForm] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
   
   const [editing, setEditing] = useState<string | number | null>(null);
   const [search, setSearch] = useState('');
@@ -357,8 +359,12 @@ export default function Students() {
               <span>ลบทั้งหมด</span>
             </button>
           )}
-          <button onClick={handleExport} className="btn bg-emerald-600 hover:bg-emerald-500 text-slate-800 flex-1 sm:flex-none">
-            ส่งออก (Excel)
+          <button 
+            onClick={() => setShowExportModal(true)} 
+            className="btn bg-emerald-600 hover:bg-emerald-700 text-white flex-1 sm:flex-none flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 font-bold text-xs"
+            title="พรีวิวตัวอย่างตาราง Excel ก่อนส่งออก"
+          >
+            <FileSpreadsheet className="w-4 h-4" /> พรีวิว & ส่งออก Excel
           </button>
           <button onClick={() => { setShowImportForm(true); setImportData([]); setImportClassroomId(''); }} className="btn bg-white hover:bg-indigo-100 text-slate-800 flex-1 sm:flex-none">
             <Upload className="w-4 h-4" /> นำเข้าจาก Excel
@@ -696,6 +702,16 @@ export default function Students() {
         </div>,
         document.body
       )}
+
+      {/* Student Excel Preview & Export Modal */}
+      <StudentExcelModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        students={filtered}
+        classrooms={classrooms}
+        filterClassroomId={filterClassroomId}
+        selectedStudentIds={selectedStudents}
+      />
 
     </div>
   );

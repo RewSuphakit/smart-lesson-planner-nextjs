@@ -278,6 +278,86 @@ export async function GET(request: NextRequest) {
           'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
         },
       });
+    } else if (fileFormat === 'json') {
+      const summaryList = students.map((s, idx) => {
+        const studentRangeRecords = records.filter(r => r.studentId === s.id);
+        const rPresent = rangeMap.get(s.id)?.present || 0;
+        const rLate = rangeMap.get(s.id)?.late || 0;
+        const rAbsent = rangeMap.get(s.id)?.absent || 0;
+        const rLeave = rangeMap.get(s.id)?.leave || 0;
+        const rangeConvertedAbsent = rAbsent + Math.floor(rLate / ratioLate) + Math.floor(rLeave / ratioLeave);
+        const rangeTotalChecked = studentRangeRecords.length;
+        const rangePercent = rangeTotalChecked > 0 
+          ? Math.max(0, Math.min(100, Math.round(((rangeTotalChecked - rangeConvertedAbsent) / rangeTotalChecked) * 10000) / 100)) 
+          : 100;
+        const oLate = overallMap.get(s.id)?.late || 0;
+        const oAbsent = overallMap.get(s.id)?.absent || 0;
+        const oLeave = overallMap.get(s.id)?.leave || 0;
+        const overallConvertedAbsent = oAbsent + Math.floor(oLate / ratioLate) + Math.floor(oLeave / ratioLeave);
+        const isF = overallConvertedAbsent > maxAllowedAbsences;
+
+        const dateStatusMap: Record<string, string> = {};
+        uniqueDates.forEach(d => {
+          const rec = studentRangeRecords.find(r => r.date.toISOString().split('T')[0] === d);
+          dateStatusMap[d] = rec ? (rec.status === 'present' ? 'มา' : rec.status === 'late' ? 'สาย' : rec.status === 'absent' ? 'ขาด' : rec.status === 'leave' ? 'ลา' : '-') : '-';
+        });
+
+        return {
+          no: idx + 1,
+          id: s.id,
+          student_code: s.studentCode || '',
+          name: s.name,
+          present: rPresent,
+          late: rLate,
+          absent: rAbsent,
+          leave: rLeave,
+          converted_absent: rangeConvertedAbsent,
+          attendance_percent: rangePercent,
+          overall_converted_absent: overallConvertedAbsent,
+          status: isF ? 'หมดสิทธิ์สอบ (ข.ร.)' : rangePercent < minAttPercent ? 'เฝ้าระวัง' : 'ปกติ',
+          is_f: isF,
+          date_records: dateStatusMap,
+        };
+      });
+
+      const detailedList = records.map((r, idx) => {
+        const student = students.find(s => s.id === r.studentId);
+        const thaiStatus = r.status === 'present' ? 'มาเรียน' :
+                           r.status === 'late' ? 'สาย' :
+                           r.status === 'absent' ? 'ขาด' :
+                           r.status === 'leave' ? 'ลา' : r.status;
+        return {
+          no: idx + 1,
+          student_code: student?.studentCode || '',
+          name: student?.name || '',
+          date: r.date.toISOString().split('T')[0],
+          status: thaiStatus,
+        };
+      });
+
+      return NextResponse.json({
+        data: {
+          classroom: {
+            id: classroom.id,
+            name: classroom.name,
+            totalClasses,
+            maxAllowedAbsences,
+            minAttPercent,
+            ratioLate,
+            ratioLeave,
+          },
+          uniqueDates,
+          summaryStats: {
+            totalStudents: students.length,
+            recordsCount: records.length,
+            datesCount: uniqueDates.length,
+            fCount,
+            avgPercent: (totalPercentsSum / (students.length || 1)).toFixed(1),
+          },
+          summaryList,
+          detailedList,
+        }
+      });
     } else {
       // Fallback: CSV
       const filename = `${filenameBase}.csv`;

@@ -54,6 +54,21 @@ export async function POST(request: NextRequest) {
 
     // Bulk create
     if (Array.isArray(body.entries)) {
+      const classroomIds: number[] = Array.from(
+        new Set(body.entries.map((e: Record<string, unknown>) => Number(e.classroom_id)).filter((id: number) => !isNaN(id) && id > 0))
+      );
+      if (classroomIds.length > 0) {
+        const ownedClassrooms = await prisma.classroom.findMany({
+          where: { id: { in: classroomIds }, userId: user.id },
+          select: { id: true },
+        });
+        const ownedSet = new Set(ownedClassrooms.map(c => c.id));
+        const hasUnauthorized = classroomIds.some(id => !ownedSet.has(id));
+        if (hasUnauthorized) {
+          return NextResponse.json({ message: 'One or more classrooms not found or unauthorized' }, { status: 403 });
+        }
+      }
+
       const data = body.entries.map((e: Record<string, unknown>) => {
         const startPeriod = Number(e.start_period);
         const endPeriod = Number(e.end_period);
@@ -87,6 +102,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Single create
+    if (body.classroom_id) {
+      const ownedClassroom = await prisma.classroom.findFirst({
+        where: { id: Number(body.classroom_id), userId: user.id },
+      });
+      if (!ownedClassroom) {
+        return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 403 });
+      }
+    }
+
     const startPeriod = Number(body.start_period);
     const endPeriod = Number(body.end_period);
     const hours = startPeriod === 0 ? 0 : (endPeriod - startPeriod + 1);

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { OAuth2Client } from 'google-auth-library';
 import prisma from '@/lib/prisma';
-import { generateToken } from '@/lib/auth';
+import { generateToken, setAuthCookie } from '@/lib/auth';
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -42,11 +42,14 @@ export async function POST(request: NextRequest) {
 
     const token = generateToken(user);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       message: 'Google login successful',
       token,
       user: { id: user.id, email: user.email, name: user.name, role: user.role, avatar: user.avatar },
     });
+
+    setAuthCookie(response, token);
+    return response;
   } catch (error) {
     console.error('Google login error:', error);
     return NextResponse.json({ message: 'Google authentication failed' }, { status: 500 });

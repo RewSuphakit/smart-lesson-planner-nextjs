@@ -50,8 +50,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
     };
 
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'token') {
+        if (!e.newValue) {
+          // Token was removed in another tab (logout)
+          setUser(null);
+          localStorage.removeItem('user');
+        } else if (e.newValue !== e.oldValue) {
+          // Token was updated / switched user in another tab
+          initAuth();
+        }
+      }
+    };
+
     window.addEventListener('auth:unauthorized', handleUnauthorized);
-    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener('auth:unauthorized', handleUnauthorized);
+      window.removeEventListener('storage', handleStorage);
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -78,10 +95,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return data;
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setUser(null);
+  const logout = async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      // Ignore network errors during logout
+    } finally {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      setUser(null);
+    }
   };
 
   return (

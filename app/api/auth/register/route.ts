@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
       return validation.response;
     }
 
-    const { email, password, name, role } = validation.data;
+    const { email, password, name } = validation.data;
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
         email,
         password: hashedPassword,
         name,
-        role: role || 'teacher',
+        role: 'teacher',
       },
       select: { id: true, email: true, name: true, role: true, avatar: true },
     });

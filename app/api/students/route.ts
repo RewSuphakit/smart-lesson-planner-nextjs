@@ -89,6 +89,22 @@ export async function POST(request: NextRequest) {
         return validation.response;
       }
 
+      // IDOR check for any specified classroom_ids
+      const classroomIds = Array.from(
+        new Set(validation.data.students.map(s => s.classroom_id).filter((id): id is number => typeof id === 'number' && id > 0))
+      );
+      if (classroomIds.length > 0) {
+        const ownedClassrooms = await prisma.classroom.findMany({
+          where: { id: { in: classroomIds }, userId: user.id },
+          select: { id: true },
+        });
+        const ownedSet = new Set(ownedClassrooms.map(c => c.id));
+        const hasUnauthorized = classroomIds.some(id => !ownedSet.has(id));
+        if (hasUnauthorized) {
+          return NextResponse.json({ message: 'One or more classrooms not found or unauthorized' }, { status: 403 });
+        }
+      }
+
       const data = validation.data.students.map(s => ({
         userId: user.id,
         name: s.name,
@@ -106,6 +122,16 @@ export async function POST(request: NextRequest) {
     const validation = await validateRequestBody(request, CreateStudentSchema);
     if (!validation.success) {
       return validation.response;
+    }
+
+    // IDOR check for single student classroom
+    if (validation.data.classroom_id) {
+      const ownedClassroom = await prisma.classroom.findFirst({
+        where: { id: Number(validation.data.classroom_id), userId: user.id },
+      });
+      if (!ownedClassroom) {
+        return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 403 });
+      }
     }
 
     const student = await prisma.student.create({
@@ -134,9 +160,18 @@ export async function PATCH(request: NextRequest) {
 
     // Bulk update classroom
     if (body.student_ids && body.classroom_id !== undefined) {
+      if (body.classroom_id) {
+        const ownedClassroom = await prisma.classroom.findFirst({
+          where: { id: Number(body.classroom_id), userId: user.id },
+        });
+        if (!ownedClassroom) {
+          return NextResponse.json({ message: 'Target classroom not found or unauthorized' }, { status: 403 });
+        }
+      }
+
       await prisma.student.updateMany({
         where: { id: { in: body.student_ids }, userId: user.id },
-        data: { classroomId: body.classroom_id || null },
+        data: { classroomId: body.classroom_id ? Number(body.classroom_id) : null },
       });
       return NextResponse.json({ message: 'Students updated' });
     }
@@ -175,6 +210,14 @@ export async function DELETE(request: NextRequest) {
     const classroomId = searchParams.get('classroom_id');
     const idsParam = searchParams.get('ids');
 
+    // Prevent accidental full database wipe
+    if (!idsParam && !classroomId) {
+      return NextResponse.json(
+        { message: 'Must specify classroom_id or ids parameter to delete students' },
+        { status: 400 }
+      );
+    }
+
     // Case 1: Delete specific students by IDs list
     if (idsParam) {
       const ids = idsParam.split(',').map(Number).filter(id => !isNaN(id));
@@ -187,13 +230,21 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ message: `Deleted ${result.count} students`, count: result.count });
     }
 
-    // Case 2: Delete all students (optionally in a specific classroom)
-    const where: Record<string, unknown> = { userId: user.id };
-    if (classroomId) {
-      where.classroomId = Number(classroomId);
+    // Case 2: Delete students in a specific classroom
+    const cid = Number(classroomId);
+    const ownedClassroom = await prisma.classroom.findFirst({
+      where: { id: cid, userId: user.id },
+    });
+    if (!ownedClassroom) {
+      return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
     }
 
-    const result = await prisma.student.deleteMany({ where });
+    const result = await prisma.student.deleteMany({
+      where: {
+        userId: user.id,
+        classroomId: cid,
+      },
+    });
     return NextResponse.json({ message: `Deleted ${result.count} students`, count: result.count });
   } catch (error) {
     if (error instanceof AuthError) return handleAuthError();

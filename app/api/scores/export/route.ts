@@ -24,14 +24,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
     }
 
-    // Determine target weeks based on total_classes of the classroom
-    const totalClasses = classroom.totalClasses || 40;
+    // Determine target weeks based on classroom level (ปวส = 15 weeks, ปวช = 18 weeks) or total_classes
     let targetWeeks = 18;
-    if (totalClasses % 18 !== 0) {
-      for (let w = 15; w <= 20; w++) {
-        if (totalClasses % w === 0) {
-          targetWeeks = w;
-          break;
+    if (classroom.name?.includes('ปวส') || classroom.name?.includes('ปวส.')) {
+      targetWeeks = 15;
+    } else if (classroom.name?.includes('ปวช') || classroom.name?.includes('ปวช.')) {
+      targetWeeks = 18;
+    } else {
+      const totalClasses = classroom.totalClasses || 40;
+      if (totalClasses % 18 !== 0) {
+        for (let w = 15; w <= 20; w++) {
+          if (totalClasses % w === 0) {
+            targetWeeks = w;
+            break;
+          }
         }
       }
     }
@@ -50,6 +56,11 @@ export async function GET(request: NextRequest) {
       where: { classroomId: Number(classroomId) },
       orderBy: { lessonNumber: 'asc' }
     });
+
+    // If teacher already defined custom structures (e.g. 15 weeks for ปวส. or 18 for ปวช.), use that exact count
+    if (structures.length > 0) {
+      targetWeeks = structures.length;
+    }
 
     // Map structures by lessonNumber for quick lookup
     const structureMap = new Map();
@@ -139,15 +150,16 @@ export async function GET(request: NextRequest) {
         return studentRow;
       });
 
-    } else if (exportType === 'full_matrix') {
-      filenameBase += '_full_scores_matrix';
+    } else if (exportType === 'full_matrix' || exportType === 'multi_sheet') {
+      filenameBase += exportType === 'multi_sheet' ? '_scores_workbook' : '_full_scores_matrix';
       sheetName = 'ตารางคะแนนรวม';
 
       headers = ['รหัสประจำตัว', 'ชื่อ-นามสกุล'];
       for (let w = 1; w <= targetWeeks; w++) {
-        headers.push(`สัปดาห์ที่ ${w} - งานเก็บ`);
-        headers.push(`สัปดาห์ที่ ${w} - สอบย่อย`);
+        headers.push(`W${w} - งานเก็บ`);
+        headers.push(`W${w} - สอบย่อย`);
       }
+      headers.push('กลางภาค', 'ปลายภาค', 'จิตพิสัย', 'รวมคะแนนสุทธิ');
 
       rows = students.map(student => {
         const studentRow: (string | number)[] = [
@@ -155,14 +167,31 @@ export async function GET(request: NextRequest) {
           student.name
         ];
 
+        let totalScore = 0;
         for (let w = 1; w <= targetWeeks; w++) {
           const score = scoreMap.get(`${student.id}_${w}`);
           const assignVal = score && score.assignmentScore !== null ? Number(score.assignmentScore) : '';
           const postVal = score && score.postTestScore !== null ? Number(score.postTestScore) : '';
           
+          if (typeof assignVal === 'number') totalScore += assignVal;
+          if (typeof postVal === 'number') totalScore += postVal;
+
           studentRow.push(assignVal);
           studentRow.push(postVal);
         }
+
+        const midVal = student.midtermScore !== null ? Number(student.midtermScore) : '';
+        const finVal = student.finalScore !== null ? Number(student.finalScore) : '';
+        const affVal = student.affectiveScore !== null ? Number(student.affectiveScore) : '';
+
+        if (typeof midVal === 'number') totalScore += midVal;
+        if (typeof finVal === 'number') totalScore += finVal;
+        if (typeof affVal === 'number') totalScore += affVal;
+
+        studentRow.push(midVal);
+        studentRow.push(finVal);
+        studentRow.push(affVal);
+        studentRow.push(Math.round(totalScore * 100) / 100);
 
         return studentRow;
       });
@@ -170,14 +199,85 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'Invalid export_type' }, { status: 400 });
     }
 
+    if (fileFormat === 'json') {
+      return NextResponse.json({
+        data: {
+          classroom,
+          targetWeeks,
+          structures,
+          headers,
+          rows
+        }
+      });
+    }
+
     if (fileFormat === 'xlsx') {
       const filename = `${filenameBase}.xlsx`;
-      
-      // Build SheetJS Workbook
-      const data = [headers, ...rows];
-      const ws = XLSX.utils.aoa_to_sheet(data);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+      if (exportType === 'multi_sheet') {
+        // Sheet 1: ตารางคะแนนรวม
+        const wsMatrix = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+        XLSX.utils.book_append_sheet(wb, wsMatrix, 'ตารางคะแนนรวม');
+
+        // Sheet 2: คะแนนงานเก็บ
+        const assignHeaders = ['รหัสประจำตัว', 'ชื่อ-นามสกุล', ...Array.from({ length: targetWeeks }, (_, i) => `W${i + 1} งานเก็บ`), 'รวมงานเก็บ'];
+        const assignRows = students.map(student => {
+          const r: (string | number)[] = [student.studentCode || '', student.name];
+          let sumAssign = 0;
+          for (let w = 1; w <= targetWeeks; w++) {
+            const score = scoreMap.get(`${student.id}_${w}`);
+            const val = score && score.assignmentScore !== null ? Number(score.assignmentScore) : '';
+            if (typeof val === 'number') sumAssign += val;
+            r.push(val);
+          }
+          r.push(Math.round(sumAssign * 100) / 100);
+          return r;
+        });
+        const wsAssign = XLSX.utils.aoa_to_sheet([assignHeaders, ...assignRows]);
+        XLSX.utils.book_append_sheet(wb, wsAssign, 'คะแนนงานเก็บ');
+
+        // Sheet 3: คะแนนสอบย่อย
+        const testHeaders = ['รหัสประจำตัว', 'ชื่อ-นามสกุล', ...Array.from({ length: targetWeeks }, (_, i) => `W${i + 1} สอบย่อย`), 'รวมสอบย่อย'];
+        const testRows = students.map(student => {
+          const r: (string | number)[] = [student.studentCode || '', student.name];
+          let sumTest = 0;
+          for (let w = 1; w <= targetWeeks; w++) {
+            const score = scoreMap.get(`${student.id}_${w}`);
+            const val = score && score.postTestScore !== null ? Number(score.postTestScore) : '';
+            if (typeof val === 'number') sumTest += val;
+            r.push(val);
+          }
+          r.push(Math.round(sumTest * 100) / 100);
+          return r;
+        });
+        const wsTests = XLSX.utils.aoa_to_sheet([testHeaders, ...testRows]);
+        XLSX.utils.book_append_sheet(wb, wsTests, 'คะแนนสอบย่อย');
+
+        // Sheet 4: สรุปและคะแนนสอบ
+        const summaryHeaders = ['รหัสประจำตัว', 'ชื่อ-นามสกุล', 'กลางภาค', 'ปลายภาค', 'จิตพิสัย', 'คะแนนรวมสุทธิ'];
+        const summaryRows = students.map(student => {
+          let total = 0;
+          for (let w = 1; w <= targetWeeks; w++) {
+            const score = scoreMap.get(`${student.id}_${w}`);
+            if (score && score.assignmentScore !== null) total += Number(score.assignmentScore);
+            if (score && score.postTestScore !== null) total += Number(score.postTestScore);
+          }
+          const mid = student.midtermScore !== null ? Number(student.midtermScore) : '';
+          const fin = student.finalScore !== null ? Number(student.finalScore) : '';
+          const aff = student.affectiveScore !== null ? Number(student.affectiveScore) : '';
+          if (typeof mid === 'number') total += mid;
+          if (typeof fin === 'number') total += fin;
+          if (typeof aff === 'number') total += aff;
+          return [student.studentCode || '', student.name, mid, fin, aff, Math.round(total * 100) / 100];
+        });
+        const wsSummary = XLSX.utils.aoa_to_sheet([summaryHeaders, ...summaryRows]);
+        XLSX.utils.book_append_sheet(wb, wsSummary, 'สรุปและคะแนนสอบ');
+      } else {
+        const data = [headers, ...rows];
+        const ws = XLSX.utils.aoa_to_sheet(data);
+        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+      }
       
       // Write workbook to buffer
       const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });

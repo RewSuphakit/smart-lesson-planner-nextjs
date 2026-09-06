@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
+import { calculateAffectiveScore } from '@/lib/affective';
 
 export async function GET(request: NextRequest) {
   try {
@@ -46,12 +47,32 @@ export async function GET(request: NextRequest) {
     const maxMidtermScore = Number(classroom.midtermMaxScore ?? 100);
     const maxFinalScore = Number(classroom.finalMaxScore ?? 100);
 
-    // Get actual max lesson number from score structures
+    // Determine target weeks based on classroom level (ปวส = 15 weeks, ปวช = 18 weeks) or structures
+    const isPws = classroom.name?.includes('ปวส') || 
+                  classroom.name?.includes('ปวส.') || 
+                  classroom.description?.includes('ปวส') || 
+                  classroom.description?.includes('ปวส.');
+
     const maxLessonAgg = await prisma.scoreStructure.aggregate({
       where: { classroomId: numericClassroomId },
       _max: { lessonNumber: true },
     });
-    const targetWeeks = maxLessonAgg._max.lessonNumber || 18;
+
+    const weeksParam = searchParams.get('weeks');
+    let targetWeeks = 18;
+
+    if (weeksParam && !isNaN(Number(weeksParam))) {
+      targetWeeks = Number(weeksParam);
+    } else if (isPws) {
+      // For ปวส curriculum, cap standard weeks at 15
+      targetWeeks = maxLessonAgg._max.lessonNumber && maxLessonAgg._max.lessonNumber <= 15
+        ? maxLessonAgg._max.lessonNumber
+        : 15;
+    } else if (classroom.name?.includes('ปวช') || classroom.name?.includes('ปวช.')) {
+      targetWeeks = maxLessonAgg._max.lessonNumber || 18;
+    } else {
+      targetWeeks = maxLessonAgg._max.lessonNumber || 18;
+    }
 
     // Get max possible scores from score_structures up to targetWeeks
     const structureAgg = await prisma.scoreStructure.aggregate({
@@ -61,8 +82,16 @@ export async function GET(request: NextRequest) {
       },
       _sum: { maxAssignmentScore: true, maxPostTestScore: true },
     });
-    const maxAssignRaw = Number(structureAgg._sum.maxAssignmentScore ?? 0);
-    const maxPostTestRaw = Number(structureAgg._sum.maxPostTestScore ?? 0);
+    let maxAssignRaw = Number(structureAgg._sum.maxAssignmentScore ?? 0);
+    let maxPostTestRaw = Number(structureAgg._sum.maxPostTestScore ?? 0);
+
+    // Fallback if no structures exist in DB yet: standard 10 points per week
+    if (maxAssignRaw === 0) {
+      maxAssignRaw = targetWeeks * 10;
+    }
+    if (maxPostTestRaw === 0) {
+      maxPostTestRaw = targetWeeks * 10;
+    }
 
     // Get students with scores and attendance
     const students = await prisma.student.findMany({
@@ -74,11 +103,21 @@ export async function GET(request: NextRequest) {
       orderBy: [{ studentCode: 'asc' }, { name: 'asc' }],
     });
 
-    // Get criteria
-    const criteria = await prisma.gradeCriteria.findMany({
+    // Get criteria (with official vocational 8-level fallback if not yet set)
+    const dbCriteria = await prisma.gradeCriteria.findMany({
       where: { classroomId: numericClassroomId },
       orderBy: { minScore: 'desc' },
     });
+    const criteria = dbCriteria.length > 0 ? dbCriteria.map(c => ({ grade: c.grade, minScore: Number(c.minScore) })) : [
+      { grade: '4', minScore: 80 },
+      { grade: '3.5', minScore: 75 },
+      { grade: '3', minScore: 70 },
+      { grade: '2.5', minScore: 65 },
+      { grade: '2', minScore: 60 },
+      { grade: '1.5', minScore: 55 },
+      { grade: '1', minScore: 50 },
+      { grade: '0', minScore: 0 },
+    ];
 
     // Get attendance config
     const ratioLate = classroom.lateToAbsentRatio || 3;
@@ -101,6 +140,9 @@ export async function GET(request: NextRequest) {
       const convertedFromLeave = Math.floor(leaveCount / ratioLeave);
       const totalConverted = absentCount + convertedFromLate + convertedFromLeave;
       const isF = totalConverted > maxAllowedAbsences;
+      const attendancePercent = totalClasses > 0
+        ? Math.max(0, Math.min(100, Math.round(((totalClasses - totalConverted) / totalClasses) * 100)))
+        : 100;
 
       // Score calculation up to targetWeeks
       const sumAssignRaw = s.studentScores
@@ -110,30 +152,36 @@ export async function GET(request: NextRequest) {
         .filter(sc => sc.lessonNumber <= targetWeeks)
         .reduce((acc, sc) => acc + Number(sc.postTestScore ?? 0), 0);
       const midtermScore = Number(s.midtermScore ?? 0);
-      const finalScore = Number(s.finalScore ?? 0);
+      
+      const rawFinalScore = s.finalScore !== null ? Number(s.finalScore) : null;
+      const isAbsentFinal = rawFinalScore === -1;
+      const isIncomplete = rawFinalScore === -2;
+      const finalScore = (rawFinalScore === null || rawFinalScore < 0) ? 0 : rawFinalScore;
 
       const preciseScaledAssign = maxAssignRaw > 0 ? (sumAssignRaw / maxAssignRaw) * weightAssign : 0;
       const preciseScaledPostTest = maxPostTestRaw > 0 ? (sumPostTestRaw / maxPostTestRaw) * weightPostTest : 0;
       const preciseScaledMidterm = maxMidtermScore > 0 ? (midtermScore / maxMidtermScore) * weightMidterm : 0;
       const preciseScaledFinal = maxFinalScore > 0 ? (finalScore / maxFinalScore) * weightFinal : 0;
 
-      // Affective score calculation:
-      // If s.affectiveScore is explicitly set by teacher in database, use it directly (clamped to weightAffective).
-      // Otherwise, calculate dynamically from attendance penalty (2 pts per absence, 1 pt per late).
-      let affectiveScore: number;
-      if (s.affectiveScore !== null && s.affectiveScore !== undefined) {
-        affectiveScore = Math.min(weightAffective, Math.max(0, Number(s.affectiveScore)));
-      } else {
-        const attendancePenalty = (absentCount * 2) + (lateCount * 1);
-        affectiveScore = Math.max(0, weightAffective - attendancePenalty);
-      }
+      // Affective score calculation via shared helper
+      const affectiveScore = calculateAffectiveScore({
+        baseScore: s.affectiveScore ? Number(s.affectiveScore) : null,
+        maxWeight: weightAffective,
+        absentCount,
+        lateCount,
+      });
 
       const totalScorePrecise = preciseScaledAssign + preciseScaledPostTest + affectiveScore + preciseScaledMidterm + preciseScaledFinal;
       const percentage = totalWeightSum > 0 ? (totalScorePrecise / totalWeightSum) * 100 : 0;
 
+      // Determine final grade according to official vocational education (สอศ.) rules
       let finalGrade: string | null = null;
       if (isF) {
-        finalGrade = 'มส';
+        finalGrade = 'ข.ร.';
+      } else if (isAbsentFinal) {
+        finalGrade = 'ข.ส.';
+      } else if (isIncomplete) {
+        finalGrade = 'ม.ส.';
       } else {
         for (const c of criteria) {
           if (percentage >= Number(c.minScore)) {
@@ -148,7 +196,9 @@ export async function GET(request: NextRequest) {
         name: s.name,
         student_code: s.studentCode,
         midterm_score: midtermScore,
-        final_score: finalScore,
+        final_score: rawFinalScore,
+        is_absent_final: isAbsentFinal,
+        is_incomplete: isIncomplete,
         raw_assign: sumAssignRaw,
         max_assign: maxAssignRaw,
         precise_scaled_assign: preciseScaledAssign,
@@ -165,6 +215,7 @@ export async function GET(request: NextRequest) {
         total_score: Math.round(totalScorePrecise),
         affective_score: affectiveScore,
         percentage: percentage.toFixed(2),
+        attendance_percent: attendancePercent,
         grade: finalGrade || 'ไม่มีเกรด',
         is_f: isF,
         absent_count: absentCount,
@@ -185,6 +236,10 @@ export async function GET(request: NextRequest) {
         midterm_max_score: maxMidtermScore,
         final_max_score: maxFinalScore,
         total_weight_sum: totalWeightSum,
+        target_weeks: targetWeeks,
+        is_pws: isPws,
+        max_assign_raw: maxAssignRaw,
+        max_post_test_raw: maxPostTestRaw,
       }
     });
   } catch (error) {
@@ -211,18 +266,24 @@ export async function POST(request: NextRequest) {
     });
     if (!classroom) return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
 
-    // Save criteria
-    await prisma.gradeCriteria.deleteMany({ where: { classroomId: Number(classroomId) } });
+    // Save criteria atomically via transaction
+    const operations = [
+      prisma.gradeCriteria.deleteMany({ where: { classroomId: Number(classroomId) } }),
+    ];
 
     if (body.criteria && body.criteria.length > 0) {
-      await prisma.gradeCriteria.createMany({
-        data: body.criteria.map((c: { grade: string; min_score: string | number }) => ({
-          classroomId: Number(classroomId),
-          grade: c.grade,
-          minScore: isNaN(Number(c.min_score)) ? 0 : Number(c.min_score),
-        })),
-      });
+      operations.push(
+        prisma.gradeCriteria.createMany({
+          data: body.criteria.map((c: { grade: string; min_score: string | number }) => ({
+            classroomId: Number(classroomId),
+            grade: c.grade,
+            minScore: isNaN(Number(c.min_score)) ? 0 : Number(c.min_score),
+          })),
+        })
+      );
     }
+
+    await prisma.$transaction(operations);
 
     return NextResponse.json({ message: 'Criteria saved' });
   } catch (error) {

@@ -3,9 +3,10 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
+import { createPortal } from 'react-dom';
 import { 
   Loader2, Search, RotateCcw, Zap, Plus, Minus,
-  ThumbsUp, ThumbsDown, AlertCircle, HeartHandshake, CheckCircle2, AlertTriangle, Users, Award
+  ThumbsUp, ThumbsDown, AlertCircle, HeartHandshake, CheckCircle2, AlertTriangle, Users, Award, X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -46,6 +47,10 @@ export default function Affective() {
   
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'score-desc' | 'score-asc'>('name');
+
+  // Modal for calculating from attendance stats
+  const [showCalcModal, setShowCalcModal] = useState(false);
+  const [calcMode, setCalcMode] = useState<'deductFromCurrent' | 'resetFromMax'>('deductFromCurrent');
 
   // ─── Query: ดึงข้อมูลห้องเรียน ───
   const { data: classrooms = [], isLoading: loadingClassrooms } = useQuery<Classroom[]>({
@@ -215,13 +220,24 @@ export default function Affective() {
   // Global Action: Calculate from attendance statistics & persist to DB
   const handleAutoCalculateFromAttendance = () => {
     if (students.length === 0) return;
-    if (!window.confirm(`ยืนยันการคำนวณหักคะแนนจิตพิสัยตามสถิติ ขาด (หัก 2) / สาย (หัก 1) ของนักเรียนทุกคนและบันทึกลงฐานข้อมูลหรือไม่?`)) return;
+    setShowCalcModal(true);
+  };
+
+  const executeAutoCalculate = () => {
+    if (students.length === 0) return;
 
     const batchScores = students.map(s => {
       const absent = s.absent_count || 0;
       const late = s.late_count || 0;
       const penalty = (absent * 2) + (late * 1);
-      const autoScore = Math.max(0, maxAffectiveWeight - penalty);
+      
+      let autoScore: number;
+      if (calcMode === 'deductFromCurrent') {
+        autoScore = Math.max(0, s.affective_score - penalty);
+      } else {
+        autoScore = Math.max(0, maxAffectiveWeight - penalty);
+      }
+
       return {
         student_id: s.id,
         affective_score: autoScore
@@ -230,7 +246,13 @@ export default function Affective() {
 
     updateBatchScoresMutation.mutate(batchScores, {
       onSuccess: () => {
-        toast.success('คำนวณหักคะแนนตามสถิติ ขาด/สาย และบันทึกลงฐานข้อมูลเรียบร้อยแล้ว!', { icon: '⚡' });
+        setShowCalcModal(false);
+        toast.success(
+          calcMode === 'deductFromCurrent'
+            ? 'คำนวณหักคะแนนตามสถิติ ขาด/สาย เพิ่มเติมจากคะแนนปัจจุบันเรียบร้อยแล้ว!'
+            : 'คำนวณหักคะแนนตามสถิติ ขาด/สาย จากคะแนนเต็มเรียบร้อยแล้ว!',
+          { icon: '⚡' }
+        );
       }
     });
   };
@@ -587,6 +609,105 @@ export default function Affective() {
             })}
           </div>
         </div>
+      )}
+
+      {/* ================= CALCULATION MODAL ================= */}
+      {showCalcModal && createPortal(
+        <div className="modal-overlay" onClick={() => setShowCalcModal(false)}>
+          <div className="glass w-full max-w-lg p-6 animate-scale-up" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-indigo-50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold shrink-0">
+                  <Zap className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-800 text-base">คำนวณคะแนนจิตพิสัยตามประวัติเข้าเรียน</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">หักคะแนนตามสถิติ ขาด (หัก 2 คะแนน) / สาย (หัก 1 คะแนน)</p>
+                </div>
+              </div>
+              <button onClick={() => setShowCalcModal(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+
+            {/* Mode Options */}
+            <div className="space-y-3 mb-6">
+              {/* Option 1: Deduct from current (Default) */}
+              <label
+                onClick={() => setCalcMode('deductFromCurrent')}
+                className={`flex items-start gap-3.5 p-4 rounded-2xl border-2 transition-all cursor-pointer select-none ${
+                  calcMode === 'deductFromCurrent'
+                    ? 'bg-amber-50/80 border-amber-500/80 shadow-md shadow-amber-500/10'
+                    : 'bg-white border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="calcMode"
+                  checked={calcMode === 'deductFromCurrent'}
+                  onChange={() => setCalcMode('deductFromCurrent')}
+                  className="mt-1 text-amber-600 focus:ring-amber-500"
+                />
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-extrabold text-sm text-slate-800">หักลบเพิ่มจากคะแนนปัจจุบัน</span>
+                    <span className="text-[10px] font-bold bg-amber-200/80 text-amber-800 px-2 py-0.5 rounded-full">แนะนำ (ไม่ลบคะแนนที่หักเอง)</span>
+                  </div>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    นำโทษขาด/สาย หักลบเพิ่มเติมจากคะแนนจิตพิสัยเดิมที่ครูเคยบวกหรือหักไว้ (คะแนนพฤติกรรมที่ครูหักไว้แล้วจะไม่หายไป)
+                  </p>
+                  <div className="text-[11px] text-amber-800 font-semibold bg-amber-100/50 p-2.5 rounded-xl border border-amber-200/60 mt-2">
+                    💡 ตัวอย่าง: คะแนนพฤติกรรมเดิม 17 + ขาด 1 ครั้ง (หัก 2) ➔ คะแนนใหม่จะเท่ากับ <span className="font-bold text-amber-900">15 คะแนน</span>
+                  </div>
+                </div>
+              </label>
+
+              {/* Option 2: Reset from max */}
+              <label
+                onClick={() => setCalcMode('resetFromMax')}
+                className={`flex items-start gap-3.5 p-4 rounded-2xl border-2 transition-all cursor-pointer select-none ${
+                  calcMode === 'resetFromMax'
+                    ? 'bg-indigo-50/80 border-indigo-500/80 shadow-md shadow-indigo-500/10'
+                    : 'bg-white border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="calcMode"
+                  checked={calcMode === 'resetFromMax'}
+                  onChange={() => setCalcMode('resetFromMax')}
+                  className="mt-1 text-indigo-600 focus:ring-indigo-500"
+                />
+                <div className="space-y-1">
+                  <span className="font-extrabold text-sm text-slate-800">คำนวณใหม่จากคะแนนเต็ม ({maxAffectiveWeight})</span>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    คำนวณคะแนนใหม่จากคะแนนเต็มโดยตรง (`{maxAffectiveWeight} - โทษขาดสาย`) โดยล้างการหักคะแนนพฤติกรรมเดิมทั้งหมด
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+              <button
+                onClick={() => setShowCalcModal(false)}
+                className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-xs hover:bg-slate-50 transition-colors"
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={executeAutoCalculate}
+                disabled={updateBatchScoresMutation.isPending}
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold text-xs shadow-lg shadow-amber-500/25 flex items-center gap-2 transition-all"
+              >
+                {updateBatchScoresMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                <span>ยืนยันการคำนวณ</span>
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

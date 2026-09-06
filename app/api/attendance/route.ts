@@ -186,8 +186,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ message: 'Some students not found or unauthorized' }, { status: 403 });
       }
 
-      for (const record of records) {
-        await prisma.attendance.upsert({
+      const attendanceOperations = records.map(record =>
+        prisma.attendance.upsert({
           where: {
             studentId_classroomId_date: {
               studentId: record.student_id,
@@ -202,17 +202,27 @@ export async function POST(request: NextRequest) {
             date: new Date(record.date),
             status: record.status,
           },
-        });
+        })
+      );
+
+      if (attendanceOperations.length > 0) {
+        await prisma.$transaction(attendanceOperations);
       }
       return NextResponse.json({ message: 'Attendance marked' });
     }
 
     // Single mark
-    // Verify classroom ownership
-    const classroom = await prisma.classroom.findFirst({
-      where: { id: Number(body.classroom_id), userId: user.id }
-    });
+    // Verify classroom and student ownership
+    const [classroom, student] = await Promise.all([
+      prisma.classroom.findFirst({
+        where: { id: Number(body.classroom_id), userId: user.id }
+      }),
+      prisma.student.findFirst({
+        where: { id: Number(body.student_id), userId: user.id }
+      }),
+    ]);
     if (!classroom) return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
+    if (!student) return NextResponse.json({ message: 'Student not found or unauthorized' }, { status: 404 });
 
     await prisma.attendance.upsert({
       where: {
@@ -245,25 +255,65 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const classroomId = searchParams.get('classroom_id');
     const date = searchParams.get('date');
+    const studentId = searchParams.get('student_id');
     const id = searchParams.get('id');
 
+    if (!id && !classroomId) {
+      return NextResponse.json({ message: 'Missing required parameters (id or classroom_id required)' }, { status: 400 });
+    }
+
     if (id) {
+      const numericId = Number(id);
+      if (isNaN(numericId) || numericId <= 0) {
+        return NextResponse.json({ message: 'Invalid attendance ID' }, { status: 400 });
+      }
+
       // Verify ownership of the attendance record
       const attendance = await prisma.attendance.findFirst({
-        where: { id: Number(id), classroom: { userId: user.id } }
+        where: { id: numericId, classroom: { userId: user.id } }
       });
       if (!attendance) return NextResponse.json({ message: 'Attendance record not found' }, { status: 404 });
 
-      await prisma.attendance.delete({ where: { id: Number(id) } });
-    } else if (classroomId && date) {
-      // Verify classroom ownership
-      const classroom = await prisma.classroom.findFirst({
-        where: { id: Number(classroomId), userId: user.id }
-      });
-      if (!classroom) return NextResponse.json({ message: 'Classroom not found' }, { status: 404 });
+      await prisma.attendance.delete({ where: { id: numericId } });
+      return NextResponse.json({ message: 'Attendance deleted' });
+    }
+
+    const numericClassroomId = Number(classroomId);
+    if (isNaN(numericClassroomId) || numericClassroomId <= 0) {
+      return NextResponse.json({ message: 'Invalid classroom ID' }, { status: 400 });
+    }
+
+    if (!date) {
+      return NextResponse.json({ message: 'Date is required when deleting by classroom' }, { status: 400 });
+    }
+
+    const parsedDate = new Date(date);
+    if (isNaN(parsedDate.getTime())) {
+      return NextResponse.json({ message: 'Invalid date format' }, { status: 400 });
+    }
+
+    // Verify classroom ownership
+    const classroom = await prisma.classroom.findFirst({
+      where: { id: numericClassroomId, userId: user.id }
+    });
+    if (!classroom) return NextResponse.json({ message: 'Classroom not found' }, { status: 404 });
+
+    if (studentId) {
+      const numericStudentId = Number(studentId);
+      if (isNaN(numericStudentId) || numericStudentId <= 0) {
+        return NextResponse.json({ message: 'Invalid student ID' }, { status: 400 });
+      }
 
       await prisma.attendance.deleteMany({
-        where: { classroomId: Number(classroomId), date: new Date(date) },
+        where: {
+          studentId: numericStudentId,
+          classroomId: numericClassroomId,
+          date: parsedDate,
+        },
+      });
+    } else {
+      await prisma.attendance.deleteMany({
+        where: { classroomId: numericClassroomId, date: parsedDate },
       });
     }
 

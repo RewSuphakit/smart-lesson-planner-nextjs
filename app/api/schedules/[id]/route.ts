@@ -15,11 +15,18 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (!schedule) return NextResponse.json({ message: 'Schedule not found' }, { status: 404 });
 
     const updateData: Record<string, unknown> = {};
+    const toUtcTime = (timeStr: string) => {
+      const clean = timeStr.trim();
+      const parts = clean.split(':');
+      const formatted = parts.length === 2 ? `${clean}:00` : clean;
+      return new Date(`1970-01-01T${formatted}.000Z`);
+    };
+
     if (body.title !== undefined) updateData.title = body.title;
     if (body.subject !== undefined) updateData.subject = body.subject;
     if (body.scheduled_date !== undefined) updateData.scheduledDate = new Date(body.scheduled_date);
-    if (body.start_time !== undefined) updateData.startTime = new Date(`1970-01-01T${body.start_time}`);
-    if (body.end_time !== undefined) updateData.endTime = new Date(`1970-01-01T${body.end_time}`);
+    if (body.start_time !== undefined) updateData.startTime = toUtcTime(body.start_time);
+    if (body.end_time !== undefined) updateData.endTime = toUtcTime(body.end_time);
     if (body.notes !== undefined) updateData.notes = body.notes;
     if (body.status !== undefined) updateData.status = body.status;
 

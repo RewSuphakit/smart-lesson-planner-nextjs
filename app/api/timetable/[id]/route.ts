@@ -26,7 +26,23 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     };
 
     for (const [key, prismaKey] of Object.entries(fieldMap)) {
-      if (body[key] !== undefined) updateData[prismaKey] = body[key];
+      if (body[key] !== undefined) {
+        if (prismaKey === 'classroomId') {
+          if (body[key]) {
+            const ownedClassroom = await prisma.classroom.findFirst({
+              where: { id: Number(body[key]), userId: user.id },
+            });
+            if (!ownedClassroom) {
+              return NextResponse.json({ message: 'Target classroom not found or unauthorized' }, { status: 403 });
+            }
+            updateData[prismaKey] = Number(body[key]);
+          } else {
+            updateData[prismaKey] = null;
+          }
+        } else {
+          updateData[prismaKey] = body[key];
+        }
+      }
     }
 
     const finalStartPeriod = body.start_period !== undefined ? Number(body.start_period) : entry.startPeriod;
