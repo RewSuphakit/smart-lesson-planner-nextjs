@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { 
-  Printer, X, Settings2, FileText, CheckSquare, Square, 
-  ZoomIn, ZoomOut, RotateCcw, Award, CheckCircle2, UserCheck, 
+import {
+  Printer, X, Settings2, FileText, CheckSquare, Square,
+  ZoomIn, ZoomOut, RotateCcw, Award, CheckCircle2, UserCheck,
   Building2, Calendar, BookOpen, Layers
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -349,7 +349,7 @@ export default function GradePdfModal({
 <body>
   <div class="header-block">
     <div class="emblem-title">${institutionName}</div>
-    <div class="emblem-sub">แบบรายงานและบันทึกผลการเรียนรายวิชา (เทียบเคียง ศธ.02 ออนไลน์)</div>
+    <div class="emblem-sub">แบบรายงานและบันทึกผลการเรียนรายวิชา</div>
     <div class="emblem-dept">สังกัดสำนักงานคณะกรรมการการอาชีวศึกษา (สอศ.) กระทรวงศึกษาธิการ</div>
   </div>
 
@@ -386,19 +386,19 @@ export default function GradePdfModal({
     </thead>
     <tbody>
       ${report.map((s, idx) => {
-        const isKr = s.grade === 'ข.ร.' || s.grade === 'ขร' || s.is_f;
-        const isKs = s.grade === 'ข.ส.' || s.is_absent_final;
-        const isMs = s.grade === 'ม.ส.' || s.is_incomplete;
-        const isFail = s.grade === '0' || s.grade === 'F';
-        const rowClass = isKr ? 'kr' : isKs ? 'ks' : isMs ? 'ms' : isFail ? 'fail' : '';
+      const isKr = s.grade === 'ข.ร.' || s.grade === 'ขร' || s.is_f;
+      const isKs = s.grade === 'ข.ส.' || s.is_absent_final;
+      const isMs = s.grade === 'ม.ส.' || s.is_incomplete;
+      const isFail = s.grade === '0' || s.grade === 'F';
+      const rowClass = isKr ? 'kr' : isKs ? 'ks' : isMs ? 'ms' : isFail ? 'fail' : '';
 
-        const finalVal = isKs ? 'ข.ส.' : isMs ? 'ม.ส.' : Number(s.precise_scaled_final || s.scaled_final || 0).toFixed(1);
-        const totalVal = (isKs || isMs) ? '-' : Number(s.total_score_precise ?? s.total_score ?? 0).toFixed(1);
+      const finalVal = isKs ? 'ข.ส.' : isMs ? 'ม.ส.' : Number(s.precise_scaled_final || s.scaled_final || 0).toFixed(1);
+      const totalVal = (isKs || isMs) ? '-' : Number(s.total_score_precise ?? s.total_score ?? 0).toFixed(1);
 
-        const rawAssignHint = showRawScore ? `<span class="raw-hint">(${Number(s.raw_assign || 0).toFixed(0)}/${s.max_assign || (isPws ? 150 : 180)})</span>` : '';
-        const rawPostHint = showRawScore ? `<span class="raw-hint">(${Number(s.raw_post_test || 0).toFixed(0)}/${s.max_post_test || (isPws ? 150 : 180)})</span>` : '';
+      const rawAssignHint = showRawScore ? `<span class="raw-hint">(${Number(s.raw_assign || 0).toFixed(0)}/${s.max_assign || (isPws ? 150 : 180)})</span>` : '';
+      const rawPostHint = showRawScore ? `<span class="raw-hint">(${Number(s.raw_post_test || 0).toFixed(0)}/${s.max_post_test || (isPws ? 150 : 180)})</span>` : '';
 
-        return `<tr class="${rowClass}">
+      return `<tr class="${rowClass}">
           <td>${idx + 1}</td>
           <td>${s.student_code || '-'}</td>
           <td class="name">${s.name}</td>
@@ -411,7 +411,7 @@ export default function GradePdfModal({
           <td>${s.attendance_percent ?? 100}%</td>
           <td><strong>${s.grade || '-'}</strong></td>
         </tr>`;
-      }).join('')}
+    }).join('')}
     </tbody>
   </table>
 
@@ -502,17 +502,17 @@ export default function GradePdfModal({
   if (!isOpen || !mounted) return null;
 
   return createPortal(
-    <div 
+    <div
       className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-5 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200"
       onClick={e => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div 
+      <div
         className="bg-slate-50 rounded-2xl shadow-2xl border border-indigo-200 w-full max-w-7xl max-h-[95vh] flex flex-col overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
-        
+
         {/* Modal Header */}
         <div className="px-6 py-4 bg-white border-b border-slate-200 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
@@ -548,33 +548,30 @@ export default function GradePdfModal({
 
         {/* Modal Body: Two Columns */}
         <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-12 gap-0">
-          
+
           {/* Left Column: Controls & Settings (4 cols on lg) */}
           <div className="lg:col-span-4 bg-white border-r border-slate-200 flex flex-col h-full overflow-y-auto p-5 space-y-4">
-            
+
             {/* Setting Tabs */}
             <div className="flex rounded-xl bg-slate-100 p-1 text-xs font-semibold">
               <button
                 onClick={() => setActiveTab('info')}
-                className={`flex-1 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                  activeTab === 'info' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                }`}
+                className={`flex-1 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${activeTab === 'info' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                  }`}
               >
                 <Building2 className="w-3.5 h-3.5" /> ข้อมูลหัวรายงาน
               </button>
               <button
                 onClick={() => setActiveTab('display')}
-                className={`flex-1 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                  activeTab === 'display' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                }`}
+                className={`flex-1 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${activeTab === 'display' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                  }`}
               >
                 <Layers className="w-3.5 h-3.5" /> ตัวเลือกตาราง
               </button>
               <button
                 onClick={() => setActiveTab('signatures')}
-                className={`flex-1 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                  activeTab === 'signatures' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                }`}
+                className={`flex-1 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${activeTab === 'signatures' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                  }`}
               >
                 <UserCheck className="w-3.5 h-3.5" /> ช่องลงนาม
               </button>
@@ -655,11 +652,10 @@ export default function GradePdfModal({
                     <button
                       type="button"
                       onClick={() => setReportType('official_vocational')}
-                      className={`p-2.5 rounded-xl border text-left transition-all ${
-                        reportType === 'official_vocational'
+                      className={`p-2.5 rounded-xl border text-left transition-all ${reportType === 'official_vocational'
                           ? 'border-indigo-500 bg-indigo-50/70 text-indigo-900 font-bold'
                           : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                      }`}
+                        }`}
                     >
                       <div className="font-bold">ศธ.02 ทางการ</div>
                       <div className="text-[10px] text-slate-500 font-normal">มีหัวหนังสือราชการและช่องลงนาม</div>
@@ -667,11 +663,10 @@ export default function GradePdfModal({
                     <button
                       type="button"
                       onClick={() => setReportType('compact_announcement')}
-                      className={`p-2.5 rounded-xl border text-left transition-all ${
-                        reportType === 'compact_announcement'
+                      className={`p-2.5 rounded-xl border text-left transition-all ${reportType === 'compact_announcement'
                           ? 'border-indigo-500 bg-indigo-50/70 text-indigo-900 font-bold'
                           : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                      }`}
+                        }`}
                     >
                       <div className="font-bold">แบบติดบอร์ด</div>
                       <div className="text-[10px] text-slate-500 font-normal">กระชับ แจ้งคะแนนนักเรียน</div>
@@ -734,18 +729,16 @@ export default function GradePdfModal({
                     <button
                       type="button"
                       onClick={() => setPaperOrientation('portrait')}
-                      className={`p-2 rounded-lg border text-center font-bold text-xs ${
-                        paperOrientation === 'portrait' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-700 border-slate-200'
-                      }`}
+                      className={`p-2 rounded-lg border text-center font-bold text-xs ${paperOrientation === 'portrait' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-700 border-slate-200'
+                        }`}
                     >
                       แนวตั้ง (Portrait)
                     </button>
                     <button
                       type="button"
                       onClick={() => setPaperOrientation('landscape')}
-                      className={`p-2 rounded-lg border text-center font-bold text-xs ${
-                        paperOrientation === 'landscape' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-700 border-slate-200'
-                      }`}
+                      className={`p-2 rounded-lg border text-center font-bold text-xs ${paperOrientation === 'landscape' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-700 border-slate-200'
+                        }`}
                     >
                       แนวนอน (Landscape)
                     </button>
@@ -826,7 +819,7 @@ export default function GradePdfModal({
 
           {/* Right Column: Live A4 Sheet Preview (8 cols on lg) */}
           <div className="lg:col-span-8 bg-slate-200/80 flex flex-col h-full overflow-hidden">
-            
+
             {/* Preview Toolbar */}
             <div className="px-4 py-2 bg-slate-100 border-b border-slate-300 flex items-center justify-between text-xs text-slate-600 shrink-0">
               <div className="flex items-center gap-2">
@@ -878,7 +871,7 @@ export default function GradePdfModal({
                 <div className="text-center border-b-2 border-slate-800 pb-2 mb-3">
                   <div className="text-xl font-bold text-slate-900">{institutionName}</div>
                   <div className="text-sm font-bold text-slate-800">
-                    แบบรายงานและบันทึกผลการเรียนรายวิชา (เทียบเคียง ศธ.02 ออนไลน์)
+                    แบบรายงานและบันทึกผลการเรียนรายวิชา
                   </div>
                   <div className="text-xs text-slate-600">
                     สังกัดสำนักงานคณะกรรมการการอาชีวศึกษา (สอศ.) กระทรวงศึกษาธิการ
@@ -938,8 +931,8 @@ export default function GradePdfModal({
                       const isFail = s.grade === '0' || s.grade === 'F';
                       const bgClass = isKr ? 'bg-rose-100/70 text-rose-900 font-bold'
                         : isKs ? 'bg-amber-100/70 text-amber-900 font-bold'
-                        : isMs ? 'bg-purple-100/70 text-purple-900 font-bold'
-                        : isFail ? 'bg-rose-50 text-rose-800' : '';
+                          : isMs ? 'bg-purple-100/70 text-purple-900 font-bold'
+                            : isFail ? 'bg-rose-50 text-rose-800' : '';
 
                       const finalVal = isKs ? 'ข.ส.' : isMs ? 'ม.ส.' : Number(s.precise_scaled_final || s.scaled_final || 0).toFixed(1);
                       const totalVal = (isKs || isMs) ? '-' : Number(s.total_score_precise ?? s.total_score ?? 0).toFixed(1);
