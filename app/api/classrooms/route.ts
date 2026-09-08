@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { CurriculumType } from '@prisma/client';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { ClassroomSchema, validateRequestBody } from '@/lib/validation';
-import { resolveTargetWeeks, getCurrentWeek, getSemesterEndDate, getDefaultWeeks, type CurriculumType } from '@/lib/semester';
+import { resolveTargetWeeks, getCurrentWeek, getSemesterEndDate, getDefaultWeeks } from '@/lib/semester';
 
 export async function GET(request: NextRequest) {
   try {
@@ -105,7 +106,7 @@ export async function POST(request: NextRequest) {
         finalWeight: final_weight,
         midtermMaxScore: midterm_max_score,
         finalMaxScore: final_max_score,
-        curriculumType: curriculum_type || 'pvch',
+        curriculumType: (curriculum_type as CurriculumType) || CurriculumType.pvch,
         totalWeeks: resolvedWeeks,
         semesterStartDate: semester_start_date ? new Date(semester_start_date) : null,
       },
