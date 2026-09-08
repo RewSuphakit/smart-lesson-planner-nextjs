@@ -17,28 +17,34 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     });
     if (!classroom) return NextResponse.json({ message: 'Not found' }, { status: 404 });
 
-    const semesterStart = classroom.semesterStartDate;
-    const totalWeeks = resolveTargetWeeks(classroom);
+    const c = classroom as typeof classroom & {
+      curriculumType?: string;
+      totalWeeks?: number;
+      semesterStartDate?: Date | null;
+    };
+
+    const semesterStart = c.semesterStartDate ?? null;
+    const totalWeeks = resolveTargetWeeks(c);
     const currentWeek = semesterStart ? getCurrentWeek(semesterStart, totalWeeks) : null;
     const semesterEnd = semesterStart ? getSemesterEndDate(semesterStart, totalWeeks) : null;
 
     const formatted = {
-      id: classroom.id,
-      name: classroom.name,
-      description: classroom.description,
-      late_to_absent_ratio: classroom.lateToAbsentRatio,
-      leave_to_absent_ratio: classroom.leaveToAbsentRatio,
-      absent_to_f_ratio: classroom.absentToFRatio,
-      total_classes: classroom.totalClasses,
-      min_attendance_percent: classroom.minAttendancePercent,
-      assignment_weight: classroom.assignmentWeight ? Number(classroom.assignmentWeight) : 10,
-      post_test_weight: classroom.postTestWeight ? Number(classroom.postTestWeight) : 70,
-      affective_weight: classroom.affectiveWeight ? Number(classroom.affectiveWeight) : 20,
-      midterm_weight: classroom.midtermWeight ? Number(classroom.midtermWeight) : 0,
-      final_weight: classroom.finalWeight ? Number(classroom.finalWeight) : 0,
-      midterm_max_score: classroom.midtermMaxScore ? Number(classroom.midtermMaxScore) : 100,
-      final_max_score: classroom.finalMaxScore ? Number(classroom.finalMaxScore) : 100,
-      curriculum_type: classroom.curriculumType,
+      id: c.id,
+      name: c.name,
+      description: c.description,
+      late_to_absent_ratio: c.lateToAbsentRatio,
+      leave_to_absent_ratio: c.leaveToAbsentRatio,
+      absent_to_f_ratio: c.absentToFRatio,
+      total_classes: c.totalClasses,
+      min_attendance_percent: c.minAttendancePercent,
+      assignment_weight: c.assignmentWeight ? Number(c.assignmentWeight) : 10,
+      post_test_weight: c.postTestWeight ? Number(c.postTestWeight) : 70,
+      affective_weight: c.affectiveWeight ? Number(c.affectiveWeight) : 20,
+      midterm_weight: c.midtermWeight ? Number(c.midtermWeight) : 0,
+      final_weight: c.finalWeight ? Number(c.finalWeight) : 0,
+      midterm_max_score: c.midtermMaxScore ? Number(c.midtermMaxScore) : 100,
+      final_max_score: c.finalMaxScore ? Number(c.finalMaxScore) : 100,
+      curriculum_type: c.curriculumType ?? 'pvch',
       total_weeks: totalWeeks,
       semester_start_date: semesterStart ? semesterStart.toISOString().split('T')[0] : null,
       semester_end_date: semesterEnd ? semesterEnd.toISOString().split('T')[0] : null,

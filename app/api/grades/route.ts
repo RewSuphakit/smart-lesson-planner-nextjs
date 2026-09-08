@@ -48,6 +48,12 @@ export async function GET(request: NextRequest) {
     const maxMidtermScore = Number(classroom.midtermMaxScore ?? 100);
     const maxFinalScore = Number(classroom.finalMaxScore ?? 100);
 
+    const c = classroom as typeof classroom & {
+      curriculumType?: string;
+      totalWeeks?: number;
+      semesterStartDate?: Date | null;
+    };
+
     // Resolve target weeks from classroom settings (replaces old name-guessing logic)
     const weeksParam = searchParams.get('weeks');
     let targetWeeks: number;
@@ -55,7 +61,7 @@ export async function GET(request: NextRequest) {
     if (weeksParam && !isNaN(Number(weeksParam))) {
       targetWeeks = Number(weeksParam);
     } else {
-      targetWeeks = resolveTargetWeeks(classroom);
+      targetWeeks = resolveTargetWeeks(c);
     }
 
     // Get max possible scores from score_structures up to targetWeeks
@@ -221,7 +227,7 @@ export async function GET(request: NextRequest) {
         final_max_score: maxFinalScore,
         total_weight_sum: totalWeightSum,
         target_weeks: targetWeeks,
-        is_pws: classroom.curriculumType === 'pvs',
+        is_pws: (c.curriculumType ?? 'pvch') === 'pvs',
         max_assign_raw: maxAssignRaw,
         max_post_test_raw: maxPostTestRaw,
       }

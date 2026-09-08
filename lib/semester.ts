@@ -27,9 +27,9 @@ export interface SemesterInfo {
 }
 
 export interface ClassroomSemesterFields {
-  curriculumType: string;
-  totalWeeks: number;
-  semesterStartDate: Date | null;
+  curriculumType?: string | null;
+  totalWeeks?: number | null;
+  semesterStartDate?: Date | null;
 }
 
 /**
@@ -116,14 +116,14 @@ export function getWeekDateRanges(startDate: Date, totalWeeks: number): WeekRang
  */
 export function resolveTargetWeeks(classroom: ClassroomSemesterFields): number {
   // totalWeeks is explicitly set by the user (or defaulted during creation)
-  return classroom.totalWeeks || getDefaultWeeks(classroom.curriculumType as CurriculumType);
+  return classroom.totalWeeks || getDefaultWeeks(((classroom.curriculumType || 'pvch') as CurriculumType));
 }
 
 /**
  * Builds the full semester info object for API responses.
  */
 export function buildSemesterInfo(classroomId: number, classroom: ClassroomSemesterFields): SemesterInfo {
-  const curriculumType = classroom.curriculumType as CurriculumType;
+  const curriculumType = ((classroom.curriculumType || 'pvch') as CurriculumType);
   const totalWeeks = resolveTargetWeeks(classroom);
 
   if (!classroom.semesterStartDate) {

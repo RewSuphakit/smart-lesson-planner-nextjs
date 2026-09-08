@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Resolve target weeks from classroom settings (replaces old name-guessing logic)
-    let targetWeeks = resolveTargetWeeks(classroom);
+    let targetWeeks = resolveTargetWeeks(classroom as Parameters<typeof resolveTargetWeeks>[0]);
 
     // Fetch students
     const students = await prisma.student.findMany({

@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
     }
 
-    const semesterInfo = buildSemesterInfo(numericClassroomId, classroom);
+    const semesterInfo = buildSemesterInfo(numericClassroomId, classroom as Parameters<typeof buildSemesterInfo>[1]);
 
     return NextResponse.json({ data: semesterInfo });
   } catch (error) {

@@ -14,8 +14,13 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     });
 
-    const result = classrooms.map((c) => {
-      const semesterStart = c.semesterStartDate;
+    const result = classrooms.map((classroom) => {
+      const c = classroom as typeof classroom & {
+        curriculumType?: string;
+        totalWeeks?: number;
+        semesterStartDate?: Date | null;
+      };
+      const semesterStart = c.semesterStartDate ?? null;
       const totalWeeks = resolveTargetWeeks(c);
       const currentWeek = semesterStart ? getCurrentWeek(semesterStart, totalWeeks) : null;
       const semesterEnd = semesterStart ? getSemesterEndDate(semesterStart, totalWeeks) : null;
@@ -37,7 +42,7 @@ export async function GET(request: NextRequest) {
         final_weight: c.finalWeight ? Number(c.finalWeight) : 0,
         midterm_max_score: c.midtermMaxScore ? Number(c.midtermMaxScore) : 100,
         final_max_score: c.finalMaxScore ? Number(c.finalMaxScore) : 100,
-        curriculum_type: c.curriculumType,
+        curriculum_type: c.curriculumType ?? 'pvch',
         total_weeks: totalWeeks,
         semester_start_date: semesterStart ? semesterStart.toISOString().split('T')[0] : null,
         semester_end_date: semesterEnd ? semesterEnd.toISOString().split('T')[0] : null,
