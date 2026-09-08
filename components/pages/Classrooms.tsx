@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
-import { Plus, Edit, Trash2, X, Loader2, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Loader2, Search, Calendar, GraduationCap } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const animalAvatars = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐧', '🐥', '🦉', '🦄', '🐙', '🐢', '🦖', '🦕', '🦦', '🦥'];
@@ -18,6 +18,11 @@ interface Classroom {
   leave_to_absent_ratio?: number;
   total_classes?: number;
   min_attendance_percent?: number;
+  curriculum_type?: 'pvch' | 'pvs' | 'custom';
+  total_weeks?: number;
+  semester_start_date?: string | null;
+  semester_end_date?: string | null;
+  current_week?: number | null;
 }
 
 interface ClassroomCardProps {
@@ -28,11 +33,15 @@ interface ClassroomCardProps {
   onDelete: (id: string) => void;
 }
 
-function ClassroomCard({ c, i, colors, onEdit, onDelete }: ClassroomCardProps) {
+function ClassroomCard({ c, onEdit, onDelete }: ClassroomCardProps) {
+  const isPvs = c.curriculum_type === 'pvs';
+  const isCustom = c.curriculum_type === 'custom';
+  const weeks = c.total_weeks || (isPvs ? 15 : 18);
+
   return (
-    <div className="glass p-5 rounded-2xl flex flex-col h-full">
-      <div className="flex items-start justify-between mb-4">
-        <div className={'w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-2xl shadow-sm shrink-0'}>
+    <div className="glass p-5 rounded-2xl flex flex-col h-full hover:shadow-md transition-shadow">
+      <div className="flex items-start justify-between mb-3">
+        <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-2xl shadow-sm shrink-0">
           {animalAvatars[Number(c.id || 0) % animalAvatars.length]}
         </div>
         <div className="flex gap-1">
@@ -54,10 +63,46 @@ function ClassroomCard({ c, i, colors, onEdit, onDelete }: ClassroomCardProps) {
           </button>
         </div>
       </div>
+
       <div className="flex-1">
-        <h3 className="text-lg font-bold text-slate-800 mb-1">{c.name}</h3>
+        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+          <h3 className="text-lg font-bold text-slate-800">{c.name}</h3>
+          <span className={`inline-flex items-center gap-1 text-[0.7rem] px-2.5 py-0.5 rounded-full font-semibold ${
+            isPvs 
+              ? 'bg-purple-50 text-purple-700 border border-purple-200' 
+              : isCustom
+              ? 'bg-amber-50 text-amber-700 border border-amber-200'
+              : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+          }`}>
+            <GraduationCap className="w-3 h-3" />
+            {isPvs ? 'ปวส. 15 สัปดาห์' : isCustom ? `กำหนดเอง ${weeks} สัปดาห์` : 'ปวช. 18 สัปดาห์'}
+          </span>
+        </div>
         {c.description && <p className="text-sm text-slate-600 line-clamp-2">{c.description}</p>}
+
+        {/* ข้อมูลวันเปิดภาคเรียน & สัปดาห์ปัจจุบัน */}
+        {c.semester_start_date ? (
+          <div className="mt-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-1.5 text-slate-600">
+              <Calendar className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+              <span>เปิดเทอม: {c.semester_start_date}</span>
+            </div>
+            {c.current_week ? (
+              <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100 shrink-0">
+                สัปดาห์ที่ {c.current_week}/{weeks}
+              </span>
+            ) : (
+              <span className="text-slate-400 text-[0.7rem]">ยังไม่ถึงกำหนด</span>
+            )}
+          </div>
+        ) : (
+          <div className="mt-3 p-2 rounded-xl bg-slate-50/60 border border-dashed border-slate-200 text-slate-400 text-[0.7rem] flex items-center gap-1.5">
+            <Calendar className="w-3 h-3 shrink-0" />
+            <span>ยังไม่ได้กำหนดวันเปิดเทอม (กดแก้ไขเพื่อตั้งค่า)</span>
+          </div>
+        )}
       </div>
+
       <div className="mt-4 pt-4 border-t border-indigo-100 flex flex-col gap-1 text-[0.65rem] text-slate-500">
         <div className="flex items-center justify-between">
           <span>นักเรียน: {c.student_count || 0} คน</span>
@@ -87,7 +132,10 @@ export default function Classrooms() {
     late_to_absent_ratio: 3, 
     leave_to_absent_ratio: 2, 
     total_classes: 36, 
-    min_attendance_percent: 80 
+    min_attendance_percent: 80,
+    curriculum_type: 'pvch' as 'pvch' | 'pvs' | 'custom',
+    total_weeks: 18,
+    semester_start_date: ''
   };
   const [form, setForm] = useState(emptyForm);
 
@@ -107,10 +155,16 @@ export default function Classrooms() {
   // ─── Mutation: สร้าง/แก้ไขห้องเรียน ───
   const saveMutation = useMutation({
     mutationFn: async (payload: typeof form) => {
+      const formattedPayload = {
+        ...payload,
+        total_weeks: totalWeeks,
+        semester_start_date: payload.semester_start_date ? payload.semester_start_date : null,
+      };
+
       if (editing) {
-        return api.put('/classrooms/' + editing, payload);
+        return api.put('/classrooms/' + editing, formattedPayload);
       } else {
-        return api.post('/classrooms', payload);
+        return api.post('/classrooms', formattedPayload);
       }
     },
     onSuccess: () => {
@@ -142,21 +196,36 @@ export default function Classrooms() {
     saveMutation.mutate(form);
   };
 
+  const handleCurriculumChange = (type: 'pvch' | 'pvs' | 'custom') => {
+    let weeks = totalWeeks;
+    if (type === 'pvch') weeks = 18;
+    else if (type === 'pvs') weeks = 15;
+
+    setTotalWeeks(weeks);
+    setForm(prev => ({
+      ...prev,
+      curriculum_type: type,
+      total_weeks: weeks,
+      total_classes: periodsPerWeek * weeks
+    }));
+  };
+
+  const handlePeriodsChange = (val: number) => {
+    setPeriodsPerWeek(val);
+    setForm(prev => ({ ...prev, total_classes: val * totalWeeks }));
+  };
+
+  const handleWeeksChange = (val: number) => {
+    setTotalWeeks(val);
+    setForm(prev => ({ ...prev, total_weeks: val, total_classes: periodsPerWeek * val }));
+  };
+
   const handleEdit = (c: Classroom) => {
-    const total = c.total_classes || 40;
-    let weeks = 18;
-    let periods = Math.round(total / 18) || 1;
-    if (total % 18 === 0) {
-      periods = total / 18;
-    } else {
-      for (let w = 15; w <= 20; w++) {
-        if (total % w === 0) {
-          weeks = w;
-          periods = total / w;
-          break;
-        }
-      }
-    }
+    const curType = c.curriculum_type || (c.name?.includes('ปวส') ? 'pvs' : 'pvch');
+    const weeks = c.total_weeks || (curType === 'pvs' ? 15 : 18);
+    const total = c.total_classes || (weeks * 2);
+    const periods = Math.round(total / weeks) || 2;
+
     setPeriodsPerWeek(periods);
     setTotalWeeks(weeks);
 
@@ -166,7 +235,10 @@ export default function Classrooms() {
       late_to_absent_ratio: c.late_to_absent_ratio || 3,
       leave_to_absent_ratio: c.leave_to_absent_ratio || 2,
       total_classes: total,
-      min_attendance_percent: c.min_attendance_percent || 80
+      min_attendance_percent: c.min_attendance_percent || 80,
+      curriculum_type: curType,
+      total_weeks: weeks,
+      semester_start_date: c.semester_start_date || ''
     });
     setEditing(c.id);
     setShowForm(true);
@@ -250,111 +322,183 @@ export default function Classrooms() {
 
       {showForm && createPortal(
         <div className="modal-overlay" onClick={() => setShowForm(false)}>
-          <div className="glass w-full max-w-md p-7 animate-fade-in-up" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-5">
+          <div className="glass w-full max-w-md p-6 max-h-[90vh] overflow-y-auto animate-fade-in-up" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
-                  <span className="text-slate-800 text-lg">🏫</span>
+                  <span className="text-white text-lg">🏫</span>
                 </div>
                 <h2 className="text-lg font-bold text-slate-800">{editing ? 'แก้ไขห้องเรียน' : 'สร้างห้องเรียนใหม่'}</h2>
               </div>
-              <button onClick={() => setShowForm(false)} className="p-2 hover:bg-indigo-50 rounded-xl">
+              <button onClick={() => setShowForm(false)} className="p-2 hover:bg-indigo-50 rounded-xl" aria-label="ปิดหน้าต่าง">
                 <X className="w-5 h-5 text-slate-500" />
               </button>
             </div>
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="form-label" htmlFor="classroom-name">ชื่อห้องเรียน/วิชา</label>
+                <label className="form-label text-xs" htmlFor="classroom-name">ชื่อห้องเรียน/วิชา</label>
                 <input
                   id="classroom-name"
                   value={form.name}
                   onChange={e => setForm({ ...form, name: e.target.value })}
-                  className="form-input"
+                  className="form-input text-sm"
                   required
-                  placeholder="เช่น ม.3/1 หรือ วิทยาศาสตร์ ม.3"
+                  placeholder="เช่น ม.3/1 หรือ การเขียนโปรแกรม ปวช.2"
                 />
               </div>
+
               <div>
-                <label className="form-label" htmlFor="classroom-desc">รายละเอียด (ไม่บังคับ)</label>
+                <label className="form-label text-xs" htmlFor="classroom-desc">รายละเอียด (ไม่บังคับ)</label>
                 <textarea
                   id="classroom-desc"
                   value={form.description}
                   onChange={e => setForm({ ...form, description: e.target.value })}
-                  className="form-input"
-                  placeholder="คำอธิบายเพิ่มเติม"
+                  className="form-input text-sm"
+                  placeholder="คำอธิบายเพิ่มเติมหรือห้องเรียน"
                   rows={2}
                 />
               </div>
-              <div>
-                <label className="form-label" htmlFor="classroom-late-ratio">กฎ: สายกี่ครั้งนับเป็นขาด 1 ครั้ง</label>
-                <input
-                  id="classroom-late-ratio"
-                  type="number"
-                  min="1"
-                  max="10"
-                  value={form.late_to_absent_ratio}
-                  onChange={e => setForm({ ...form, late_to_absent_ratio: parseInt(e.target.value) || 1 })}
-                  className="form-input"
-                  required
-                />
-                <p className="text-xs text-slate-500 mt-1">ค่าเริ่มต้น: 3 (สาย 3 ครั้ง = ขาด 1 ครั้ง)</p>
-              </div>
-              <div>
-                <label className="form-label" htmlFor="classroom-leave-ratio">กฎ: ลากี่ครั้งนับเป็นขาด 1 ครั้ง</label>
-                <input
-                  id="classroom-leave-ratio"
-                  type="number"
-                  min="1"
-                  max="10"
-                  value={form.leave_to_absent_ratio}
-                  onChange={e => setForm({ ...form, leave_to_absent_ratio: parseInt(e.target.value) || 1 })}
-                  className="form-input"
-                  required
-                />
-                <p className="text-xs text-slate-500 mt-1">ค่าเริ่มต้น: 2 (ลา 2 ครั้ง = ขาด 1 ครั้ง)</p>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+
+              {/* ─── ส่วนหลักสูตรและวันเปิดภาคเรียน ─── */}
+              <div className="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-100 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <GraduationCap className="w-4 h-4 text-indigo-600" />
+                    ระดับหลักสูตร
+                  </label>
+                  <span className="text-[0.7rem] text-indigo-600 font-medium">
+                    กำหนดจำนวนสัปดาห์
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleCurriculumChange('pvch')}
+                    className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all flex flex-col items-center gap-0.5 ${
+                      form.curriculum_type === 'pvch'
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>ปวช.</span>
+                    <span className={`text-[0.65rem] ${form.curriculum_type === 'pvch' ? 'text-indigo-100' : 'text-slate-400'}`}>18 สัปดาห์</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleCurriculumChange('pvs')}
+                    className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all flex flex-col items-center gap-0.5 ${
+                      form.curriculum_type === 'pvs'
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>ปวส.</span>
+                    <span className={`text-[0.65rem] ${form.curriculum_type === 'pvs' ? 'text-indigo-100' : 'text-slate-400'}`}>15 สัปดาห์</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleCurriculumChange('custom')}
+                    className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all flex flex-col items-center gap-0.5 ${
+                      form.curriculum_type === 'custom'
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>กำหนดเอง</span>
+                    <span className={`text-[0.65rem] ${form.curriculum_type === 'custom' ? 'text-indigo-100' : 'text-slate-400'}`}>{totalWeeks} สัปดาห์</span>
+                  </button>
+                </div>
+
+                {/* วันเปิดภาคเรียน */}
                 <div>
-                  <label className="form-label" htmlFor="classroom-periods">คาบเรียน/สัปดาห์</label>
+                  <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5 mb-1" htmlFor="classroom-start-date">
+                    <Calendar className="w-3.5 h-3.5 text-indigo-500" />
+                    วันเปิดภาคเรียน (สัปดาห์ที่ 1)
+                  </label>
+                  <input
+                    id="classroom-start-date"
+                    type="date"
+                    value={form.semester_start_date}
+                    onChange={e => setForm({ ...form, semester_start_date: e.target.value })}
+                    className="form-input text-xs"
+                  />
+                  <p className="text-[0.65rem] text-slate-500 mt-1">
+                    ระบบจะคำนวณสัปดาห์ปัจจุบัน (1-{totalWeeks}) และวันสิ้นสุดเทอมให้อัตโนมัติ
+                  </p>
+                </div>
+              </div>
+
+              {/* ─── คาบเรียนและจำนวนสัปดาห์ ─── */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="form-label text-xs" htmlFor="classroom-periods">คาบเรียน/สัปดาห์</label>
                   <input
                     id="classroom-periods"
                     type="number"
                     min="1"
                     max="10"
                     value={periodsPerWeek}
-                    onChange={e => {
-                      const val = parseInt(e.target.value) || 1;
-                      setPeriodsPerWeek(val);
-                      setForm({ ...form, total_classes: val * totalWeeks });
-                    }}
-                    className="form-input"
+                    onChange={e => handlePeriodsChange(parseInt(e.target.value) || 1)}
+                    className="form-input text-sm"
                     required
                   />
                 </div>
                 <div>
-                  <label className="form-label" htmlFor="classroom-weeks">จำนวนสัปดาห์/เทอม</label>
+                  <label className="form-label text-xs" htmlFor="classroom-weeks">จำนวนสัปดาห์/เทอม</label>
                   <input
                     id="classroom-weeks"
                     type="number"
                     min="1"
                     max="40"
                     value={totalWeeks}
-                    onChange={e => {
-                      const val = parseInt(e.target.value) || 1;
-                      setTotalWeeks(val);
-                      setForm({ ...form, total_classes: periodsPerWeek * val });
-                    }}
-                    className="form-input"
+                    disabled={form.curriculum_type !== 'custom'}
+                    onChange={e => handleWeeksChange(parseInt(e.target.value) || 1)}
+                    className={`form-input text-sm ${form.curriculum_type !== 'custom' ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''}`}
                     required
                   />
                 </div>
               </div>
-              <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-100 text-sm text-center font-medium text-indigo-600">
-                รวมคาบเรียนทั้งหมด: {form.total_classes} คาบ
+
+              <div className="bg-indigo-50/80 p-2.5 rounded-xl border border-indigo-100 text-xs text-center font-medium text-indigo-700">
+                รวมคาบเรียนทั้งหมด: <span className="font-bold">{form.total_classes}</span> คาบ ({periodsPerWeek} คาบ × {totalWeeks} สัปดาห์)
               </div>
-              
+
+              {/* ─── กฎสาย / ลา ─── */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="form-label text-xs" htmlFor="classroom-late-ratio">สายกี่ครั้ง = ขาด 1</label>
+                  <input
+                    id="classroom-late-ratio"
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={form.late_to_absent_ratio}
+                    onChange={e => setForm({ ...form, late_to_absent_ratio: parseInt(e.target.value) || 1 })}
+                    className="form-input text-sm"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="form-label text-xs" htmlFor="classroom-leave-ratio">ลากี่ครั้ง = ขาด 1</label>
+                  <input
+                    id="classroom-leave-ratio"
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={form.leave_to_absent_ratio}
+                    onChange={e => setForm({ ...form, leave_to_absent_ratio: parseInt(e.target.value) || 1 })}
+                    className="form-input text-sm"
+                    required
+                  />
+                </div>
+              </div>
+
               <div>
-                <label className="form-label" htmlFor="classroom-min-attendance">เวลาเรียนขั้นต่ำที่มีสิทธิ์สอบ (%)</label>
+                <label className="form-label text-xs" htmlFor="classroom-min-attendance">เวลาเรียนขั้นต่ำมีสิทธิ์สอบ (%)</label>
                 <input
                   id="classroom-min-attendance"
                   type="number"
@@ -362,15 +506,16 @@ export default function Classrooms() {
                   max="100"
                   value={form.min_attendance_percent}
                   onChange={e => setForm({ ...form, min_attendance_percent: parseInt(e.target.value) || 80 })}
-                  className="form-input"
+                  className="form-input text-sm"
                   required
                 />
-                <p className="text-xs text-slate-500 mt-1">
-                  ค่าเริ่มต้น: 80% (ขาดได้ไม่เกิน {Math.floor(form.total_classes * ((100 - form.min_attendance_percent) / 100))} คาบ)
+                <p className="text-[0.65rem] text-slate-500 mt-1">
+                  ขาดได้ไม่เกิน {Math.floor(form.total_classes * ((100 - form.min_attendance_percent) / 100))} คาบ
                 </p>
               </div>
+
               <button type="submit" disabled={saveMutation.isPending} className="btn btn-primary w-full py-3">
-                {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : editing ? 'อัปเดต' : 'สร้างห้องเรียน'}
+                {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : editing ? 'อัปเดตห้องเรียน' : 'สร้างห้องเรียน'}
               </button>
             </form>
           </div>
