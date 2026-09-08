@@ -38,6 +38,12 @@ enum EntryType {
   homeroom
 }
 
+enum CurriculumType {
+  pvch    // ปวช — 18 สัปดาห์
+  pvs     // ปวส — 15 สัปดาห์
+  custom  // กำหนดเอง
+}
+
 // ==================== Users ====================
 model User {
   id        Int      @id @default(autoincrement())
@@ -97,6 +103,9 @@ model Classroom {
   finalWeight          Decimal? @default(0) @map("final_weight") @db.Decimal(5, 2)
   midtermMaxScore      Decimal? @default(100) @map("midterm_max_score") @db.Decimal(5, 2)
   finalMaxScore        Decimal? @default(100) @map("final_max_score") @db.Decimal(5, 2)
+  curriculumType       CurriculumType @default(pvch) @map("curriculum_type")
+  totalWeeks           Int            @default(18) @map("total_weeks")
+  semesterStartDate    DateTime?      @map("semester_start_date") @db.Date
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
 

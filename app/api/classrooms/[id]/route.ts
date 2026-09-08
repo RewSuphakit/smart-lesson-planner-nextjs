@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
+import { resolveTargetWeeks, getCurrentWeek, getSemesterEndDate } from '@/lib/semester';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -15,6 +16,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       where: { id: numericId, userId: user.id },
     });
     if (!classroom) return NextResponse.json({ message: 'Not found' }, { status: 404 });
+
+    const semesterStart = classroom.semesterStartDate;
+    const totalWeeks = resolveTargetWeeks(classroom);
+    const currentWeek = semesterStart ? getCurrentWeek(semesterStart, totalWeeks) : null;
+    const semesterEnd = semesterStart ? getSemesterEndDate(semesterStart, totalWeeks) : null;
+
     const formatted = {
       id: classroom.id,
       name: classroom.name,
@@ -31,6 +38,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       final_weight: classroom.finalWeight ? Number(classroom.finalWeight) : 0,
       midterm_max_score: classroom.midtermMaxScore ? Number(classroom.midtermMaxScore) : 100,
       final_max_score: classroom.finalMaxScore ? Number(classroom.finalMaxScore) : 100,
+      curriculum_type: classroom.curriculumType,
+      total_weeks: totalWeeks,
+      semester_start_date: semesterStart ? semesterStart.toISOString().split('T')[0] : null,
+      semester_end_date: semesterEnd ? semesterEnd.toISOString().split('T')[0] : null,
+      current_week: currentWeek,
     };
     return NextResponse.json({ data: formatted });
   } catch (error) {
@@ -66,10 +78,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       affective_weight: 'affectiveWeight', midterm_weight: 'midtermWeight',
       final_weight: 'finalWeight', midterm_max_score: 'midtermMaxScore',
       final_max_score: 'finalMaxScore',
+      curriculum_type: 'curriculumType', total_weeks: 'totalWeeks',
     };
 
     for (const [key, prismaKey] of Object.entries(fieldMap)) {
       if (body[key] !== undefined) updateData[prismaKey] = body[key];
+    }
+
+    // Handle semester_start_date separately (needs Date conversion)
+    if (body.semester_start_date !== undefined) {
+      updateData.semesterStartDate = body.semester_start_date ? new Date(body.semester_start_date) : null;
     }
 
     await prisma.classroom.update({ where: { id: numericId }, data: updateData });

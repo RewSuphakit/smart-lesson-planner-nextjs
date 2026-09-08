@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { calculateAffectiveScore } from '@/lib/affective';
+import { resolveTargetWeeks } from '@/lib/semester';
 
 export async function GET(request: NextRequest) {
   try {
@@ -47,31 +48,14 @@ export async function GET(request: NextRequest) {
     const maxMidtermScore = Number(classroom.midtermMaxScore ?? 100);
     const maxFinalScore = Number(classroom.finalMaxScore ?? 100);
 
-    // Determine target weeks based on classroom level (ปวส = 15 weeks, ปวช = 18 weeks) or structures
-    const isPws = classroom.name?.includes('ปวส') || 
-                  classroom.name?.includes('ปวส.') || 
-                  classroom.description?.includes('ปวส') || 
-                  classroom.description?.includes('ปวส.');
-
-    const maxLessonAgg = await prisma.scoreStructure.aggregate({
-      where: { classroomId: numericClassroomId },
-      _max: { lessonNumber: true },
-    });
-
+    // Resolve target weeks from classroom settings (replaces old name-guessing logic)
     const weeksParam = searchParams.get('weeks');
-    let targetWeeks = 18;
+    let targetWeeks: number;
 
     if (weeksParam && !isNaN(Number(weeksParam))) {
       targetWeeks = Number(weeksParam);
-    } else if (isPws) {
-      // For ปวส curriculum, cap standard weeks at 15
-      targetWeeks = maxLessonAgg._max.lessonNumber && maxLessonAgg._max.lessonNumber <= 15
-        ? maxLessonAgg._max.lessonNumber
-        : 15;
-    } else if (classroom.name?.includes('ปวช') || classroom.name?.includes('ปวช.')) {
-      targetWeeks = maxLessonAgg._max.lessonNumber || 18;
     } else {
-      targetWeeks = maxLessonAgg._max.lessonNumber || 18;
+      targetWeeks = resolveTargetWeeks(classroom);
     }
 
     // Get max possible scores from score_structures up to targetWeeks
@@ -237,7 +221,7 @@ export async function GET(request: NextRequest) {
         final_max_score: maxFinalScore,
         total_weight_sum: totalWeightSum,
         target_weeks: targetWeeks,
-        is_pws: isPws,
+        is_pws: classroom.curriculumType === 'pvs',
         max_assign_raw: maxAssignRaw,
         max_post_test_raw: maxPostTestRaw,
       }

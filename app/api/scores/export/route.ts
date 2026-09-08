@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { resolveTargetWeeks } from '@/lib/semester';
 import * as XLSX from 'xlsx';
 
 export async function GET(request: NextRequest) {
@@ -24,23 +25,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
     }
 
-    // Determine target weeks based on classroom level (ปวส = 15 weeks, ปวช = 18 weeks) or total_classes
-    let targetWeeks = 18;
-    if (classroom.name?.includes('ปวส') || classroom.name?.includes('ปวส.')) {
-      targetWeeks = 15;
-    } else if (classroom.name?.includes('ปวช') || classroom.name?.includes('ปวช.')) {
-      targetWeeks = 18;
-    } else {
-      const totalClasses = classroom.totalClasses || 40;
-      if (totalClasses % 18 !== 0) {
-        for (let w = 15; w <= 20; w++) {
-          if (totalClasses % w === 0) {
-            targetWeeks = w;
-            break;
-          }
-        }
-      }
-    }
+    // Resolve target weeks from classroom settings (replaces old name-guessing logic)
+    let targetWeeks = resolveTargetWeeks(classroom);
 
     // Fetch students
     const students = await prisma.student.findMany({

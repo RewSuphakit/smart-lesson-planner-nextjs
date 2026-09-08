@@ -52,7 +52,11 @@ export const ClassroomSchema = z.object({
   final_weight: z.number().min(0).max(100).optional().default(0),
   midterm_max_score: z.number().min(0).optional().default(100),
   final_max_score: z.number().min(0).optional().default(100),
+  curriculum_type: z.enum(['pvch', 'pvs', 'custom']).optional().default('pvch'),
+  total_weeks: z.number().int().min(1).max(52).optional().default(18),
+  semester_start_date: z.string().nullable().optional(),
 });
+
 
 // ==================== Validation Helper ====================
 export function formatZodError(error: z.ZodError): NextResponse {
