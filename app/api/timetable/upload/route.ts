@@ -7,6 +7,9 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import pdfParse from 'pdf-parse';
 import { PERIOD_TIMES } from '@/lib/constants';
 
+export const maxDuration = 60; // Allow up to 60 seconds on Vercel Serverless Function
+export const dynamic = 'force-dynamic';
+
 const DAY_MAP: Record<string, number> = {
   'จันทร์': 0, 'วันจันทร์': 0, 'mon': 0, 'monday': 0,
   'อังคาร': 1, 'วันอังคาร': 1, 'tue': 1, 'tuesday': 1,
@@ -23,6 +26,18 @@ const TYPE_MAP: Record<string, string> = {
   'activity': 'activity', 'กิจกรรม': 'activity',
   'homeroom': 'homeroom', 'โฮมรูม': 'homeroom', 'เข้าแถว': 'homeroom',
 };
+
+interface RawAIEntry {
+  day_of_week?: number | string;
+  start_period?: number | string;
+  end_period?: number | string;
+  subject_code?: string | null;
+  subject_name?: string | null;
+  room?: string | null;
+  instructor?: string | null;
+  group_name?: string | null;
+  entry_type?: string | null;
+}
 
 function parseCSV(content: string, userId: number) {
   const cleanContent = content.startsWith('\uFEFF') ? content.slice(1) : content;
@@ -93,6 +108,32 @@ function parseCSV(content: string, userId: number) {
   return entries;
 }
 
+async function callGeminiWithFallback(
+  genAI: GoogleGenerativeAI,
+  parts: (string | { inlineData: { data: string; mimeType: string } })[]
+) {
+  const models = ['gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-3.5-flash-lite'];
+  let lastError: Error | null = null;
+
+  for (const modelName of models) {
+    try {
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        generationConfig: {
+          responseMimeType: 'application/json',
+        },
+      });
+      const result = await model.generateContent(parts);
+      return result;
+    } catch (err: unknown) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      console.warn(`Gemini model ${modelName} attempt failed: ${lastError.message}`);
+    }
+  }
+
+  throw new Error(`Google Gemini API ไม่สามารถประมวลผลได้ในขณะนี้: ${lastError?.message || 'Unknown'}`);
+}
+
 async function parsePDF(buffer: Buffer, userId: number) {
   const data = await pdfParse(buffer);
   const text = data.text;
@@ -105,7 +146,6 @@ async function parsePDF(buffer: Buffer, userId: number) {
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const prompt = `
       คุณเป็นผู้เชี่ยวชาญการอ่านตารางสอนของสถาบันอาชีวศึกษาไทย
@@ -150,40 +190,25 @@ async function parsePDF(buffer: Buffer, userId: number) {
       ห้ามมีคำอธิบายประกอบ ให้ตอบกลับมาเป็น JSON array ล้วนๆ ที่สามารถใช้อ้างอิงและ JSON.parse() ได้ทันที
     `;
 
-    let result = null;
-    const retries = 3;
-    let delayMs = 1500;
-    let lastError: Error | null = null;
+    const result = await callGeminiWithFallback(genAI, [prompt]);
 
-    for (let attempt = 1; attempt <= retries; attempt++) {
-      try {
-        result = await model.generateContent([prompt]);
-        break; // Success!
-      } catch (error: unknown) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        console.warn(`Gemini API PDF parsing failed (Attempt ${attempt}/${retries}). Error: ${lastError.message}`);
-        if (attempt < retries) {
-          await new Promise(resolve => setTimeout(resolve, delayMs));
-          delayMs *= 2;
-        }
-      }
+    const responseText = result.response.text().trim();
+    let parsedData: RawAIEntry[];
+    try {
+      parsedData = JSON.parse(responseText);
+    } catch {
+      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+      const jsonStr = jsonMatch ? jsonMatch[0] : responseText.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+      parsedData = JSON.parse(jsonStr);
     }
-
-    if (!result) {
-      throw new Error(`Gemini API ไม่ตอบสนอง: ${lastError?.message}`);
-    }
-
-    const responseText = result.response.text();
-    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-    const jsonStr = jsonMatch ? jsonMatch[0] : responseText.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
-    const data = JSON.parse(jsonStr);
     
-    if (!Array.isArray(data)) {
+    if (!Array.isArray(parsedData)) {
       throw new Error("รูปแบบข้อมูลที่ AI ส่งกลับมาไม่ใช่ Array");
     }
 
+    const aiData = parsedData;
     const entries = [];
-    for (const item of data) {
+    for (const item of aiData) {
       const startP = item.start_period !== undefined && item.start_period !== null ? parseInt(item.start_period) : 1;
       const endP = item.end_period !== undefined && item.end_period !== null ? parseInt(item.end_period) : startP;
       
@@ -265,11 +290,15 @@ function parsePDFRegexFallback(text: string, userId: number) {
 async function parseImageWithAI(buffer: Buffer, mimeType: string, userId: number) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error('ไม่พบ API Key สำหรับ Gemini AI กรุณาตรวจสอบการตั้งค่า');
+    throw new Error('ไม่พบ API Key สำหรับ Gemini AI กรุณาตรวจสอบการตั้งค่า GEMINI_API_KEY ใน Vercel หรือไฟล์ .env');
+  }
+
+  let normalizedMime = mimeType;
+  if (normalizedMime === 'image/jpg' || normalizedMime === 'image/pjpeg') {
+    normalizedMime = 'image/jpeg';
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
   const prompt = `
     คุณเป็นผู้เชี่ยวชาญการอ่านตารางสอนของสถาบันอาชีวศึกษาไทย
@@ -341,39 +370,23 @@ async function parseImageWithAI(buffer: Buffer, mimeType: string, userId: number
     {
       inlineData: {
         data: buffer.toString("base64"),
-        mimeType: mimeType
+        mimeType: normalizedMime
       }
     }
   ];
 
   try {
-    let result = null;
-    const retries = 3;
-    let delayMs = 1500;
-    let lastError: Error | null = null;
+    const result = await callGeminiWithFallback(genAI, [prompt, ...imageParts]);
 
-    for (let attempt = 1; attempt <= retries; attempt++) {
-      try {
-        result = await model.generateContent([prompt, ...imageParts]);
-        break; // Success!
-      } catch (error: unknown) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        console.warn(`Gemini API call failed (Attempt ${attempt}/${retries}). Error: ${lastError.message}`);
-        if (attempt < retries) {
-          await new Promise(resolve => setTimeout(resolve, delayMs));
-          delayMs *= 2; // Exponential backoff
-        }
-      }
+    const responseText = result.response.text().trim();
+    let data: RawAIEntry[];
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+      const jsonStr = jsonMatch ? jsonMatch[0] : responseText.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+      data = JSON.parse(jsonStr);
     }
-
-    if (!result) {
-      throw new Error(`Google Gemini API ไม่ตอบสนอง (เนื่องจากมีผู้ใช้งานหนาแน่น 503) รายละเอียด: ${lastError?.message || lastError}`);
-    }
-
-    const responseText = result.response.text();
-    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-    const jsonStr = jsonMatch ? jsonMatch[0] : responseText.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
-    const data = JSON.parse(jsonStr);
     
     if (!Array.isArray(data)) {
       throw new Error("รูปแบบข้อมูลที่ AI ส่งกลับมาไม่ใช่ Array");
@@ -486,7 +499,7 @@ export async function POST(request: NextRequest) {
 
     let createdCount = 0;
     if (formData.get('replace') === 'true') {
-      const [_, created] = await prisma.$transaction([
+      const [, created] = await prisma.$transaction([
         prisma.weeklySchedule.deleteMany({ where: { userId: user.id } }),
         prisma.weeklySchedule.createMany({ data: entries }),
       ]);
@@ -504,7 +517,16 @@ export async function POST(request: NextRequest) {
     if (error instanceof AuthError) return handleAuthError();
     console.error('Timetable upload error:', error);
     const msg = error instanceof Error ? error.message : 'อัพโหลดไม่สำเร็จ';
-    const isUserError = msg.includes('CSV') || msg.includes('header') || msg.includes('คอลัมน์') || msg.includes('ไม่พบข้อมูล') || msg.includes('รูปแบบข้อมูล');
+    const isUserError =
+      msg.includes('CSV') ||
+      msg.includes('header') ||
+      msg.includes('คอลัมน์') ||
+      msg.includes('ไม่พบข้อมูล') ||
+      msg.includes('รูปแบบข้อมูล') ||
+      msg.includes('GEMINI_API_KEY') ||
+      msg.includes('API Key') ||
+      msg.includes('AI ไม่สามารถวิเคราะห์') ||
+      msg.includes('Google Gemini API');
     return NextResponse.json({ message: msg }, { status: isUserError ? 400 : 500 });
   }
 }
