@@ -6,8 +6,8 @@ import api from '@/services/api';
 import { createPortal } from 'react-dom';
 import { 
   Loader2, Users, Save, Calendar as CalendarIcon, CheckCircle, Clock, XCircle, 
-  FileText, AlertCircle, X, History, Trash2, Download, ChevronLeft, ChevronRight, 
-  Search, Check, Grid, List, RefreshCw, Sparkles, Filter, ArrowRight, RotateCcw,
+  FileText, AlertCircle, X, History, Trash2, ChevronLeft, ChevronRight, 
+  Search, Check, Grid, List, RefreshCw, Sparkles, RotateCcw,
   FileSpreadsheet, Upload
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -126,10 +126,9 @@ interface ThaiDateRangePickerProps {
   startDate: string;
   endDate: string;
   onChange: (start: string, end: string) => void;
-  matrixDatesCount: number;
 }
 
-const ThaiDateRangePicker = memo(({ startDate, endDate, onChange, matrixDatesCount }: ThaiDateRangePickerProps) => {
+const ThaiDateRangePicker = memo(({ startDate, endDate, onChange }: ThaiDateRangePickerProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -628,7 +627,6 @@ export default function Attendance() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [exportStartDate, setExportStartDate] = useState('');
   const [exportEndDate, setExportEndDate] = useState('');
-  const [exporting, setExporting] = useState(false);
 
   // ─── Retroactive Attendance Modal State ───
   const [showRetroactiveModal, setShowRetroactiveModal] = useState(false);
@@ -738,22 +736,7 @@ export default function Attendance() {
     }
   }, [selectedClass]);
 
-  const isPresetActive = (days: number) => {
-    if (!matrixStartDate || !matrixEndDate) return false;
-    const end = new Date().toISOString().split('T')[0];
-    const startObj = new Date();
-    startObj.setDate(startObj.getDate() - days);
-    const start = startObj.toISOString().split('T')[0];
-    return matrixStartDate === start && matrixEndDate === end;
-  };
 
-  const isThisMonthActive = () => {
-    if (!matrixStartDate || !matrixEndDate) return false;
-    const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    const today = now.toISOString().split('T')[0];
-    return matrixStartDate === firstDay && matrixEndDate === today;
-  };
 
   // ─── Query: ดึงข้อมูล Matrix ย้อนหลัง ───
   const { data: matrixRecords = [], isLoading: loadingMatrix } = useQuery<AttendanceRecord[]>({
@@ -836,7 +819,7 @@ export default function Attendance() {
 
   // ─── Mutation: บันทึกข้อมูลการเข้าเรียนด้วยตนเอง (Manual Save) ───
   const saveMutation = useMutation({
-    mutationFn: async (records: any[]) => {
+    mutationFn: async (records: Array<{ student_id: number; classroom_id: number; date: string; status: string }>) => {
       return api.post('/attendance', { records });
     },
     onSuccess: () => {
@@ -879,7 +862,7 @@ export default function Attendance() {
         }]
       });
     },
-    onSuccess: (_, variables) => {
+    onSuccess: () => {
       toast.success('อัปเดตข้อมูลการเข้าเรียนเรียบร้อย');
       queryClient.invalidateQueries({ queryKey: ['attendance-matrix', selectedClass, matrixStartDate, matrixEndDate] });
       queryClient.invalidateQueries({ queryKey: ['attendance-data', selectedClass] });
@@ -991,48 +974,7 @@ export default function Attendance() {
     clearDataMutation.mutate();
   };
 
-  const handleExportCSV = async () => {
-    if (!selectedClass) return;
-    setExporting(true);
-    try {
-      const params = new URLSearchParams();
-      params.append('classroom_id', selectedClass);
-      if (exportStartDate) params.append('start_date', exportStartDate);
-      if (exportEndDate) params.append('end_date', exportEndDate);
-      
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/attendance/export?${params.toString()}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
-      if (!response.ok) throw new Error('Export failed');
-      
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      
-      const disposition = response.headers.get('Content-Disposition');
-      let filename = 'attendance_export.csv';
-      if (disposition) {
-        const match = disposition.match(/filename="?(.+?)"?$/i);
-        if (match) filename = decodeURIComponent(match[1]);
-      }
-      
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-      
-      toast.success('ส่งออก CSV เรียบร้อยแล้ว');
-      setShowExportModal(false);
-    } catch {
-      toast.error('ส่งออก CSV ไม่สำเร็จ');
-    } finally {
-      setExporting(false);
-    }
-  };
+
 
   const getStatusDisplay = (status: string) => {
     switch (status) {
@@ -1046,7 +988,7 @@ export default function Attendance() {
 
   // ─── Mutation: เลือกสถานะทั้งหมด ───
   const markAllMutation = useMutation({
-    mutationFn: async ({ status, records }: { status: string; records: any[] }) => {
+    mutationFn: async ({ records }: { status?: string; records: Array<{ student_id: number; classroom_id: number; date: string; status: string }> }) => {
       return api.post('/attendance', { records });
     },
     onMutate: () => {
@@ -1762,7 +1704,6 @@ export default function Attendance() {
                         setMatrixStartDate(start);
                         setMatrixEndDate(end);
                       }}
-                      matrixDatesCount={matrixDates.length}
                     />
 
                     {/* Range Summary Status */}

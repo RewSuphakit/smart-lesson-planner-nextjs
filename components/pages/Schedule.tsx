@@ -11,14 +11,21 @@ import {
 import { th } from 'date-fns/locale';
 import {
   ChevronLeft, ChevronRight, Plus, X, Loader2,
-  Clock, Trash2, Calendar, BookOpen, Edit2, AlertCircle,
-  UploadCloud, FileText, Table, Link2
+  Trash2, Calendar, Edit2, AlertCircle,
+  UploadCloud, FileText, Table
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const DAY_NAMES = ['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา'];
 const TIMETABLE_DAYS = ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์', 'อาทิตย์'];
-const PERIODS = Array.from({ length: 13 }, (_, i) => i + 1);
+
+interface ApiError {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+}
 
 interface ScheduleItem {
   id: string | number;
@@ -256,7 +263,7 @@ export default function Schedule() {
 
   // ─── Mutation: จัดการคาบเรียนตารางเรียนรายสัปดาห์ (Timetable Entry) ───
   const timetableMutation = useMutation({
-    mutationFn: async (payload: any) => {
+    mutationFn: async (payload: Record<string, unknown>) => {
       if (editTimetableTarget) {
         return api.put(`/timetable/${editTimetableTarget.id}`, payload);
       } else {
@@ -270,7 +277,7 @@ export default function Schedule() {
       queryClient.invalidateQueries({ queryKey: ['timetable'] });
       queryClient.invalidateQueries({ queryKey: ['schedules'] });
     },
-    onError: (err: any) => {
+    onError: (err: ApiError) => {
       toast.error(err.response?.data?.message || 'บันทึกคาบเรียนไม่สำเร็จ');
     }
   });
@@ -363,7 +370,7 @@ export default function Schedule() {
       closeForm();
       queryClient.invalidateQueries({ queryKey: ['schedules'] });
     },
-    onError: (err: any) => {
+    onError: (err: ApiError) => {
       toast.error(err.response?.data?.message || 'บันทึกไม่สำเร็จ');
     }
   });
@@ -399,7 +406,7 @@ export default function Schedule() {
       toast.success(variables.isVirtual ? 'ยกเลิกคาบสอนแล้ว' : 'ลบตารางสอนแล้ว');
       queryClient.invalidateQueries({ queryKey: ['schedules'] });
     },
-    onError: (err: any) => {
+    onError: (err: ApiError) => {
       toast.error(err.response?.data?.message || 'ทำรายการไม่สำเร็จ');
     }
   });
@@ -429,7 +436,7 @@ export default function Schedule() {
       setShowAutoGenerate(false);
       queryClient.invalidateQueries({ queryKey: ['schedules'] });
     },
-    onError: (err: any) => {
+    onError: (err: ApiError) => {
       toast.error(err.response?.data?.message || 'สร้างตารางสอนล่วงหน้าไม่สำเร็จ');
     }
   });
@@ -459,7 +466,7 @@ export default function Schedule() {
       queryClient.invalidateQueries({ queryKey: ['timetable'] });
       queryClient.invalidateQueries({ queryKey: ['schedules'] });
     },
-    onError: (err: any) => {
+    onError: (err: ApiError) => {
       toast.error(err.response?.data?.message || 'อัพโหลดไม่สำเร็จ กรุณาตรวจสอบรูปแบบไฟล์');
     }
   });
@@ -533,7 +540,7 @@ export default function Schedule() {
       queryClient.invalidateQueries({ queryKey: ['timetable'] });
       queryClient.invalidateQueries({ queryKey: ['schedules'] });
     },
-    onError: (err: any) => {
+    onError: (err: ApiError) => {
       toast.error(err.response?.data?.message || 'ทำรายการไม่สำเร็จ');
     }
   });
@@ -547,7 +554,7 @@ export default function Schedule() {
       queryClient.invalidateQueries({ queryKey: ['timetable'] });
       queryClient.invalidateQueries({ queryKey: ['schedules'] });
     },
-    onError: (err: any) => {
+    onError: (err: ApiError) => {
       toast.error(err.response?.data?.message || 'ทำรายการไม่สำเร็จ');
     }
   });
