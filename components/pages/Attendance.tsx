@@ -497,6 +497,29 @@ interface Classroom {
   min_attendance_percent?: number;
   late_to_absent_ratio?: number;
   leave_to_absent_ratio?: number;
+  curriculum_type?: 'pvch' | 'pvs' | 'custom';
+  total_weeks?: number;
+  semester_start_date?: string | null;
+  semester_end_date?: string | null;
+  current_week?: number | null;
+}
+
+interface SemesterWeek {
+  week: number;
+  start: string;
+  end: string;
+  isCurrent: boolean;
+}
+
+interface SemesterInfo {
+  classroomId: number;
+  curriculumType: 'pvch' | 'pvs' | 'custom';
+  totalWeeks: number;
+  semesterStartDate: string | null;
+  semesterEndDate: string | null;
+  currentWeek: number | null;
+  isSemesterActive: boolean;
+  weeks: SemesterWeek[];
 }
 
 interface Student {
@@ -607,6 +630,15 @@ export default function Attendance() {
   const [exportEndDate, setExportEndDate] = useState('');
   const [exporting, setExporting] = useState(false);
 
+  // ─── Retroactive Attendance Modal State ───
+  const [showRetroactiveModal, setShowRetroactiveModal] = useState(false);
+  const [retroactiveTab, setRetroactiveTab] = useState<'weeks' | 'calendar'>('weeks');
+  const [customRetroDate, setCustomRetroDate] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().split('T')[0];
+  });
+
   const cellPopoverRef = useRef<HTMLDivElement>(null);
 
   // ─── Query: ดึงข้อมูลห้องเรียน (shared cache) ───
@@ -616,6 +648,16 @@ export default function Attendance() {
       const res = await api.get('/classrooms');
       return res.data.data || [];
     }
+  });
+
+  // ─── Query: ข้อมูลภาคเรียนและสัปดาห์ (Semester Info) ───
+  const { data: semesterInfo } = useQuery<SemesterInfo>({
+    queryKey: ['semester-info', selectedClass],
+    queryFn: async () => {
+      const res = await api.get(`/semester?classroom_id=${selectedClass}`);
+      return res.data.data;
+    },
+    enabled: !!selectedClass
   });
 
   // ─── Query: ดึงข้อมูลตารางเรียนทั้งหมด (All Timetable Entries) ───
@@ -1139,6 +1181,21 @@ export default function Attendance() {
   const selectedClassData = classrooms.find(c => String(c.id) === String(selectedClass));
   const maxAllowedAbsences = selectedClassData ? Math.floor((Number(selectedClassData.total_classes) || 40) * (100 - (Number(selectedClassData.min_attendance_percent) || 80)) / 100) : 0;
 
+  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const isPastDate = date < todayStr;
+  const isToday = date === todayStr;
+
+  const selectedDateWeekNumber = useMemo(() => {
+    if (!semesterInfo?.semesterStartDate) return null;
+    const start = new Date(semesterInfo.semesterStartDate);
+    const current = new Date(date);
+    const diffTime = current.getTime() - start.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    if (diffDays < 0) return null;
+    const weekNum = Math.floor(diffDays / 7) + 1;
+    return (weekNum >= 1 && weekNum <= (semesterInfo.totalWeeks || 18)) ? weekNum : null;
+  }, [semesterInfo, date]);
+
   const formattedSelectedDate = new Date(date).toLocaleDateString('th-TH', {
     weekday: 'long',
     year: 'numeric',
@@ -1361,12 +1418,12 @@ export default function Attendance() {
                     </button>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-end">
                     <button 
                       onClick={setToday} 
-                      className={`px-4 py-2 text-sm font-semibold rounded-xl border transition-all ${
-                        date === new Date().toISOString().split('T')[0]
-                          ? 'bg-indigo-500 text-white border-indigo-500 shadow-md'
+                      className={`px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-xl border transition-all ${
+                        isToday
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
                           : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                       }`}
                     >
@@ -1374,13 +1431,75 @@ export default function Attendance() {
                     </button>
                     <button 
                       onClick={setYesterday} 
-                      className="px-4 py-2 text-sm font-semibold rounded-xl bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition-all"
+                      className="px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-xl bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition-all"
                     >
                       เมื่อวาน
+                    </button>
+
+                    {/* ปุ่มเช็คชื่อย้อนหลัง */}
+                    <button 
+                      type="button"
+                      onClick={() => setShowRetroactiveModal(true)} 
+                      className="px-4 py-2 text-xs sm:text-sm font-bold rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/30 transition-all flex items-center gap-1.5 hover:scale-[1.02] active:scale-[0.98]"
+                      title="เปิดหน้าต่างเลือกสัปดาห์หรือวันย้อนหลังเพื่อเช็คชื่อ"
+                    >
+                      <History className="w-4 h-4" />
+                      <span>เช็คชื่อย้อนหลัง</span>
                     </button>
                   </div>
                 </div>
               </div>
+
+              {/* Retroactive Alert Banner (เมื่อเลือกวันในอดีต) */}
+              {isPastDate && (
+                <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-amber-100/70 p-4 rounded-2xl border border-amber-200/90 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fade-in-up">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-500/20 shrink-0">
+                      <History className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-extrabold text-amber-950 text-sm">
+                          🕒 กำลังเช็คชื่อย้อนหลัง:
+                        </span>
+                        <span className="text-xs bg-white text-amber-900 font-bold px-2.5 py-0.5 rounded-full border border-amber-300 shadow-xs">
+                          {formattedSelectedDate}
+                        </span>
+                        {selectedDateWeekNumber && (
+                          <span className="text-xs bg-indigo-100 text-indigo-800 font-bold px-2.5 py-0.5 rounded-full border border-indigo-200">
+                            สัปดาห์ที่ {selectedDateWeekNumber}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-amber-800 mt-0.5">
+                        {dailyStats.marked === dailyStats.total && dailyStats.total > 0
+                          ? `บันทึกครบแล้ว (${dailyStats.marked}/${dailyStats.total} คน)`
+                          : dailyStats.marked > 0
+                          ? `เช็คแล้ว ${dailyStats.marked} คน (ยังค้างอีก ${dailyStats.total - dailyStats.marked} คน)`
+                          : 'ยังไม่มีประวัติการเช็คชื่อของวันนี้ — สามารถเช็คสถานะและบันทึกได้ทันที'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setShowRetroactiveModal(true)}
+                      className="px-3 py-1.5 rounded-xl bg-white hover:bg-amber-50 text-amber-900 border border-amber-300 text-xs font-bold transition-all shadow-xs flex items-center gap-1"
+                    >
+                      <Clock className="w-3.5 h-3.5 text-amber-600" />
+                      <span>เปลี่ยนวันย้อนหลัง</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={setToday}
+                      className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs font-bold transition-all shadow-md shadow-indigo-500/20 hover:scale-105 flex items-center gap-1.5"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>กลับไปวันนี้</span>
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Dynamic Counters Card */}
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
@@ -1771,13 +1890,27 @@ export default function Attendance() {
                                 title={holiday ? holiday.name : undefined}
                               >
                                 <div className="flex flex-col items-center">
-                                  <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
-                                    {dateObj.toLocaleDateString('th-TH', { weekday: 'short' })}
-                                    {isGovHoliday && <span>🏖️</span>}
-                                  </span>
-                                  <span className={`text-sm font-black ${isGovHoliday ? 'text-amber-950' : 'text-indigo-800'}`}>
-                                    {day} {month}
-                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setDate(dateStr);
+                                      setActiveTab('daily');
+                                      toast.success(`เปิดหน้าเช็คชื่อวันที่ ${day} ${month}`);
+                                    }}
+                                    className="group/btn flex flex-col items-center hover:opacity-85 transition-all cursor-pointer"
+                                    title={`คลิกเพื่อเปิดหน้าเช็คชื่อทั้งห้องของวันที่ ${day} ${month}`}
+                                  >
+                                    <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
+                                      {dateObj.toLocaleDateString('th-TH', { weekday: 'short' })}
+                                      {isGovHoliday && <span>🏖️</span>}
+                                    </span>
+                                    <span className={`text-sm font-black ${isGovHoliday ? 'text-amber-950' : 'text-indigo-800'} group-hover/btn:underline`}>
+                                      {day} {month}
+                                    </span>
+                                    <span className="text-[9px] text-indigo-600 font-bold bg-white/90 hover:bg-white px-1.5 py-0.5 rounded-md border border-indigo-200/80 mt-0.5 opacity-80 group-hover/btn:opacity-100 shadow-xs">
+                                      เช็คทั้งห้อง
+                                    </span>
+                                  </button>
                                   {isGovHoliday && (
                                     <span className="text-[9px] font-bold text-amber-800 truncate max-w-[84px] leading-tight mt-0.5" title={holiday.name}>
                                       {holiday.name}
@@ -1954,6 +2087,258 @@ export default function Attendance() {
             toast.success('อัปเดตข้อมูลการเช็คชื่อในตารางเรียบร้อยแล้ว');
           }}
         />
+      )}
+
+      {/* ================= RETROACTIVE ATTENDANCE MODAL ================= */}
+      {showRetroactiveModal && createPortal(
+        <div className="modal-overlay" onClick={() => setShowRetroactiveModal(false)}>
+          <div 
+            className="glass w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto animate-scale-up" 
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                  <History className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-800 leading-tight">เลือกวัน/สัปดาห์ที่ต้องการเช็คชื่อย้อนหลัง</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    ห้องเรียน: <span className="font-semibold text-indigo-700">{selectedClassData?.name || 'ห้องเรียน'}</span>
+                    {selectedClassData?.curriculum_type && (
+                      <span className="ml-1.5 px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-bold text-[10px] border border-indigo-200">
+                        {selectedClassData.curriculum_type === 'pvs' ? 'ปวส. 15 สัปดาห์' : selectedClassData.curriculum_type === 'custom' ? `กำหนดเอง ${selectedClassData.total_weeks || 18} สัปดาห์` : 'ปวช. 18 สัปดาห์'}
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowRetroactiveModal(false)} 
+                className="p-2 hover:bg-indigo-50 rounded-xl transition-colors" 
+                aria-label="ปิดหน้าต่าง"
+              >
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+
+            {/* Modal Tabs */}
+            <div className="flex bg-slate-100/80 p-1.5 rounded-2xl mb-5 border border-slate-200/60">
+              <button
+                type="button"
+                onClick={() => setRetroactiveTab('weeks')}
+                className={`flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                  retroactiveTab === 'weeks'
+                    ? 'bg-white text-indigo-700 shadow-sm'
+                    : 'text-slate-600 hover:text-indigo-600'
+                }`}
+              >
+                <CalendarIcon className="w-4 h-4 text-indigo-600" />
+                <span>เลือกตามสัปดาห์ภาคเรียน ({semesterInfo?.totalWeeks || selectedClassData?.total_weeks || 18} สัปดาห์)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setRetroactiveTab('calendar')}
+                className={`flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                  retroactiveTab === 'calendar'
+                    ? 'bg-white text-indigo-700 shadow-sm'
+                    : 'text-slate-600 hover:text-indigo-600'
+                }`}
+              >
+                <Clock className="w-4 h-4 text-violet-600" />
+                <span>ปฏิทินเลือกวันที่ด่วน</span>
+              </button>
+            </div>
+
+            {/* Tab 1: Week Navigator */}
+            {retroactiveTab === 'weeks' && (
+              <div className="space-y-4">
+                {semesterInfo?.weeks && semesterInfo.weeks.length > 0 ? (
+                  <div className="space-y-3">
+                    <p className="text-xs text-slate-500">
+                      คลิกเลือกวันที่มีการสอนในสัปดาห์ที่ต้องการ เพื่อเปิดหน้าเช็คชื่อย้อนหลังของวันนั้น:
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto pr-1">
+                      {semesterInfo.weeks.map(w => {
+                        const weekStart = new Date(w.start);
+                        const daysInThisWeek = [];
+                        for (let i = 0; i < 7; i++) {
+                          const curD = new Date(weekStart);
+                          curD.setDate(weekStart.getDate() + i);
+                          const curDateStr = curD.toISOString().split('T')[0];
+                          const dayOfWeek = (curD.getDay() + 6) % 7; // 0=Mon..6=Sun
+                          daysInThisWeek.push({
+                            dateStr: curDateStr,
+                            dateObj: curD,
+                            dayOfWeek,
+                            isTeachingDay: teachingDays.includes(dayOfWeek),
+                            isFuture: curDateStr > todayStr,
+                            isSelected: curDateStr === date
+                          });
+                        }
+
+                        const thaiDayNames = ['จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.', 'อา.'];
+
+                        return (
+                          <div 
+                            key={w.week} 
+                            className={`p-3.5 rounded-2xl border transition-all ${
+                              w.isCurrent
+                                ? 'bg-indigo-50/90 border-indigo-300 ring-2 ring-indigo-200 shadow-sm'
+                                : 'bg-white border-slate-200/80 hover:border-indigo-200 shadow-xs'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-extrabold text-sm text-slate-800 flex items-center gap-1.5">
+                                <span>สัปดาห์ที่ {w.week}</span>
+                                {w.isCurrent && (
+                                  <span className="text-[10px] bg-indigo-600 text-white font-bold px-2 py-0.5 rounded-full">
+                                    สัปดาห์ปัจจุบัน
+                                  </span>
+                                )}
+                              </span>
+                              <span className="text-[11px] text-slate-500 font-medium">
+                                {new Date(w.start).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} - {new Date(w.end).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
+                              </span>
+                            </div>
+
+                            {/* Days buttons in this week */}
+                            <div className="flex flex-wrap gap-1.5">
+                              {daysInThisWeek.map(d => {
+                                if (!d.isTeachingDay && d.dayOfWeek >= 5) return null;
+
+                                return (
+                                  <button
+                                    key={d.dateStr}
+                                    type="button"
+                                    disabled={d.isFuture}
+                                    onClick={() => {
+                                      setDate(d.dateStr);
+                                      setShowRetroactiveModal(false);
+                                      setActiveTab('daily');
+                                      toast.success(`เลือกเช็คชื่อวันที่ ${d.dateObj.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })} (สัปดาห์ที่ ${w.week})`);
+                                    }}
+                                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex flex-col items-center min-w-[50px] ${
+                                      d.isSelected
+                                        ? 'bg-indigo-600 text-white shadow-sm'
+                                        : d.isFuture
+                                        ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
+                                        : d.isTeachingDay
+                                        ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200/70 hover:scale-105'
+                                        : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200'
+                                    }`}
+                                    title={d.isFuture ? 'ยังไม่ถึงวันที่นี้' : `เช็คชื่อวันที่ ${d.dateStr}`}
+                                  >
+                                    <span className="text-[10px] opacity-75">{thaiDayNames[d.dayOfWeek]}</span>
+                                    <span>{d.dateObj.getDate()}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-8 text-center bg-indigo-50/50 rounded-2xl border border-indigo-100">
+                    <CalendarIcon className="w-10 h-10 text-indigo-400 mx-auto mb-2" />
+                    <p className="font-bold text-slate-700 text-sm">ยังไม่ได้กำหนดวันเปิดภาคเรียนของห้องนี้</p>
+                    <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                      สามารถไปตั้งค่า &quot;วันเปิดภาคเรียน&quot; ได้ที่เมนู <strong>ห้องเรียน</strong> หรือใช้แท็บ <strong>&quot;ปฏิทินเลือกวันที่ด่วน&quot;</strong> เพื่อเลือกวันที่ย้อนหลังได้ทันทีครับ
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setRetroactiveTab('calendar')}
+                      className="btn btn-primary text-xs px-4 py-2 mt-4"
+                    >
+                      ใช้ปฏิทินเลือกวันที่ด่วน
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tab 2: Quick Presets & Calendar */}
+            {retroactiveTab === 'calendar' && (
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 mb-2 block">
+                    ปุ่มลัดเลือกวันย้อนหลัง:
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      { label: 'เมื่อวาน', days: 1 },
+                      { label: '2 วันก่อน', days: 2 },
+                      { label: '3 วันก่อน', days: 3 },
+                      { label: '1 สัปดาห์ก่อน', days: 7 },
+                    ].map(p => {
+                      const d = new Date();
+                      d.setDate(d.getDate() - p.days);
+                      const dStr = d.toISOString().split('T')[0];
+                      const isSel = date === dStr;
+
+                      return (
+                        <button
+                          key={p.days}
+                          type="button"
+                          onClick={() => {
+                            setDate(dStr);
+                            setShowRetroactiveModal(false);
+                            setActiveTab('daily');
+                            toast.success(`เลือกเช็คชื่อวันที่ ${d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}`);
+                          }}
+                          className={`p-3 rounded-2xl border text-center transition-all ${
+                            isSel
+                              ? 'bg-indigo-600 text-white font-bold border-indigo-600 shadow-sm'
+                              : 'bg-white hover:bg-indigo-50 border-slate-200 text-slate-700 font-semibold'
+                          }`}
+                        >
+                          <div className="text-xs">{p.label}</div>
+                          <div className={`text-[10px] mt-0.5 ${isSel ? 'text-indigo-100' : 'text-slate-400'}`}>
+                            {d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-slate-100">
+                  <label className="text-xs font-bold text-slate-700 mb-1.5 block" htmlFor="retro-custom-date">
+                    หรือระบุวันที่ในอดีตที่ต้องการ:
+                  </label>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <input
+                      id="retro-custom-date"
+                      type="date"
+                      max={todayStr}
+                      value={customRetroDate}
+                      onChange={e => setCustomRetroDate(e.target.value)}
+                      className="form-input text-sm flex-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!customRetroDate) return;
+                        setDate(customRetroDate);
+                        setShowRetroactiveModal(false);
+                        setActiveTab('daily');
+                        const parsed = new Date(customRetroDate);
+                        toast.success(`เลือกเช็คชื่อวันที่ ${parsed.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}`);
+                      }}
+                      className="btn btn-primary px-6 py-2.5 text-sm"
+                    >
+                      ยืนยันเลือกวันนี้
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>,
+        document.body
       )}
 
     </div>
