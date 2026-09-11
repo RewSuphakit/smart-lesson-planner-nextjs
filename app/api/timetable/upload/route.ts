@@ -3,8 +3,6 @@ import prisma from '@/lib/prisma';
 import { EntryType } from '@prisma/client';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-// @ts-expect-error - pdf-parse lacks official type declarations
-import pdfParse from 'pdf-parse';
 import { PERIOD_TIMES } from '@/lib/constants';
 
 export const maxDuration = 60; // Allow up to 60 seconds on Vercel Serverless Function
@@ -135,8 +133,14 @@ async function callGeminiWithFallback(
 }
 
 async function parsePDF(buffer: Buffer, userId: number) {
-  const data = await pdfParse(buffer);
-  const text = data.text;
+  let text = '';
+  try {
+    const { pdf } = await import('pdf-parse');
+    const data = await pdf(buffer);
+    text = data.text;
+  } catch (pdfErr) {
+    console.warn('pdf-parse extraction failed:', pdfErr);
+  }
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
