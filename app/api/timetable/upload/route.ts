@@ -209,8 +209,8 @@ async function parsePDF(buffer: Buffer, userId: number) {
     const aiData = parsedData;
     const entries = [];
     for (const item of aiData) {
-      const startP = item.start_period !== undefined && item.start_period !== null ? parseInt(item.start_period) : 1;
-      const endP = item.end_period !== undefined && item.end_period !== null ? parseInt(item.end_period) : startP;
+      const startP = item.start_period !== undefined && item.start_period !== null ? parseInt(String(item.start_period), 10) || 1 : 1;
+      const endP = item.end_period !== undefined && item.end_period !== null ? parseInt(String(item.end_period), 10) || startP : startP;
       
       const rawType = (item.entry_type || 'lecture').toLowerCase().trim();
       let normalizedType = 'lecture';
@@ -394,8 +394,8 @@ async function parseImageWithAI(buffer: Buffer, mimeType: string, userId: number
 
     const entries = [];
     for (const item of data) {
-      const startP = item.start_period !== undefined && item.start_period !== null ? parseInt(item.start_period) : 1;
-      const endP = item.end_period !== undefined && item.end_period !== null ? parseInt(item.end_period) : startP;
+      const startP = item.start_period !== undefined && item.start_period !== null ? parseInt(String(item.start_period), 10) || 1 : 1;
+      const endP = item.end_period !== undefined && item.end_period !== null ? parseInt(String(item.end_period), 10) || startP : startP;
       
       // Normalize entry type to match MySQL enum constraints: 'lecture' | 'lab' | 'activity' | 'homeroom'
       const rawType = (item.entry_type || 'lecture').toLowerCase().trim();
@@ -410,7 +410,7 @@ async function parseImageWithAI(buffer: Buffer, mimeType: string, userId: number
 
       entries.push({
         userId,
-        dayOfWeek: item.day_of_week,
+        dayOfWeek: Number(item.day_of_week) || 0,
         startPeriod: startP,
         endPeriod: endP,
         startTime: PERIOD_TIMES[startP]?.start ? new Date(`1970-01-01T${PERIOD_TIMES[startP].start}`) : null,
