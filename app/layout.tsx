@@ -38,6 +38,7 @@ export default function RootLayout({
             <Analytics />
           </AuthProvider>
         </QueryProvider>
+        <Analytics />
       </body>
     </html>
   );
