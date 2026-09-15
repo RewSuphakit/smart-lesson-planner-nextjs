@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
-import { PERIOD_TIMES } from '@/lib/constants';
+import { PERIOD_TIMES, parseTimeToUtc } from '@/lib/constants';
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -39,6 +39,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           } else {
             updateData[prismaKey] = null;
           }
+        } else if (prismaKey === 'entryType') {
+          const lower = String(body[key] || '').toLowerCase().trim();
+          if (lower === 'lab' || lower === 'ปฏิบัติ') updateData[prismaKey] = 'lab';
+          else if (lower === 'activity' || lower === 'กิจกรรม') updateData[prismaKey] = 'activity';
+          else if (lower === 'homeroom' || lower === 'โฮมรูม' || lower === 'เข้าแถว') updateData[prismaKey] = 'homeroom';
+          else updateData[prismaKey] = 'lecture';
         } else {
           updateData[prismaKey] = body[key];
         }
@@ -51,17 +57,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     updateData.hours = finalStartPeriod === 0 ? 0 : (finalEndPeriod - finalStartPeriod + 1);
 
     if (body.start_time !== undefined) {
-      updateData.startTime = body.start_time ? new Date(`1970-01-01T${body.start_time}`) : null;
+      updateData.startTime = parseTimeToUtc(body.start_time);
     } else if (body.start_period !== undefined) {
       const startTimeStr = PERIOD_TIMES[finalStartPeriod]?.start;
-      updateData.startTime = startTimeStr ? new Date(`1970-01-01T${startTimeStr}`) : null;
+      updateData.startTime = parseTimeToUtc(startTimeStr);
     }
 
     if (body.end_time !== undefined) {
-      updateData.endTime = body.end_time ? new Date(`1970-01-01T${body.end_time}`) : null;
+      updateData.endTime = parseTimeToUtc(body.end_time);
     } else if (body.end_period !== undefined) {
       const endTimeStr = PERIOD_TIMES[finalEndPeriod]?.end;
-      updateData.endTime = endTimeStr ? new Date(`1970-01-01T${endTimeStr}`) : null;
+      updateData.endTime = parseTimeToUtc(endTimeStr);
     }
 
     await prisma.weeklySchedule.update({ where: { id: Number(id) }, data: updateData });

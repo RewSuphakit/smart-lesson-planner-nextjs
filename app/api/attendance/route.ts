@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAuth, AuthError } from '@/lib/auth';
+import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
+import { formatAttendanceRecord, calculateAttendanceStats } from '@/lib/formatters';
 
 export async function GET(request: NextRequest) {
   try {
@@ -24,16 +25,7 @@ export async function GET(request: NextRequest) {
         where: { studentId: Number(studentId), classroomId: Number(classroomId) },
         orderBy: { date: 'desc' },
       });
-      const mapped = records.map(r => ({
-        id: r.id,
-        student_id: r.studentId,
-        classroom_id: r.classroomId,
-        date: r.date,
-        status: r.status,
-        created_at: r.createdAt,
-        updated_at: r.updatedAt
-      }));
-      return NextResponse.json({ data: mapped });
+      return NextResponse.json({ data: records.map(formatAttendanceRecord) });
     }
 
     // Get all records in a date range for a classroom (Matrix view)
@@ -54,16 +46,7 @@ export async function GET(request: NextRequest) {
         },
         orderBy: { date: 'asc' },
       });
-      const mapped = records.map(r => ({
-        id: r.id,
-        student_id: r.studentId,
-        classroom_id: r.classroomId,
-        date: r.date,
-        status: r.status,
-        created_at: r.createdAt,
-        updated_at: r.updatedAt
-      }));
-      return NextResponse.json({ data: mapped });
+      return NextResponse.json({ data: records.map(formatAttendanceRecord) });
     }
 
     // Get by date
@@ -77,16 +60,7 @@ export async function GET(request: NextRequest) {
       const records = await prisma.attendance.findMany({
         where: { classroomId: Number(classroomId), date: new Date(date) },
       });
-      const mapped = records.map(r => ({
-        id: r.id,
-        student_id: r.studentId,
-        classroom_id: r.classroomId,
-        date: r.date,
-        status: r.status,
-        created_at: r.createdAt,
-        updated_at: r.updatedAt
-      }));
-      return NextResponse.json({ data: mapped });
+      return NextResponse.json({ data: records.map(formatAttendanceRecord) });
     }
 
     // Get stats
@@ -97,56 +71,17 @@ export async function GET(request: NextRequest) {
       });
       if (!classroom) return NextResponse.json([], { status: 200 });
 
-      const ratioLate = classroom.lateToAbsentRatio || 3;
-      const ratioLeave = classroom.leaveToAbsentRatio || 2;
-      const totalClasses = classroom.totalClasses || 40;
-      const minAttPercent = classroom.minAttendancePercent || 80;
-      const maxAllowedAbsences = Math.floor(totalClasses * ((100 - minAttPercent) / 100));
-
       const records = await prisma.attendance.findMany({
         where: { classroomId: Number(classroomId) },
       });
 
-      // Group by student
-      const studentMap = new Map<number, { present: number; late: number; absent: number; leave: number }>();
-      for (const r of records) {
-        if (!studentMap.has(r.studentId)) {
-          studentMap.set(r.studentId, { present: 0, late: 0, absent: 0, leave: 0 });
-        }
-        const s = studentMap.get(r.studentId)!;
-        if (r.status === 'present') s.present++;
-        else if (r.status === 'late') s.late++;
-        else if (r.status === 'absent') s.absent++;
-        else if (r.status === 'leave') s.leave++;
-      }
-
-      const stats = Array.from(studentMap.entries()).map(([studentId, s]) => {
-        const convertedFromLate = Math.floor(s.late / ratioLate);
-        const convertedFromLeave = Math.floor(s.leave / ratioLeave);
-        const totalConverted = s.absent + convertedFromLate + convertedFromLeave;
-        return {
-          student_id: studentId,
-          present_count: s.present,
-          late_count: s.late,
-          absent_count: s.absent,
-          leave_count: s.leave,
-          converted_absent_count: totalConverted,
-          remaining_late_count: s.late % ratioLate,
-          remaining_leave_count: s.leave % ratioLeave,
-          is_f: totalConverted > maxAllowedAbsences,
-          max_allowed_absences: maxAllowedAbsences,
-          total_classes: totalClasses,
-          converted_from_late: convertedFromLate,
-          converted_from_leave: convertedFromLeave,
-        };
-      });
-
+      const stats = calculateAttendanceStats(records, classroom);
       return NextResponse.json({ data: stats });
     }
 
     return NextResponse.json({ data: [] });
   } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+    if (error instanceof AuthError) return handleAuthError();
     return NextResponse.json({ message: 'Failed to get attendance' }, { status: 500 });
   }
 }
@@ -212,13 +147,33 @@ export async function POST(request: NextRequest) {
     }
 
     // Single mark
+    if (!body.student_id || !body.classroom_id || !body.date || !body.status) {
+      return NextResponse.json(
+        { message: 'Missing required fields (student_id, classroom_id, date, status)' },
+        { status: 400 }
+      );
+    }
+
+    const validStatuses = ['present', 'late', 'absent', 'leave'];
+    if (!validStatuses.includes(body.status)) {
+      return NextResponse.json(
+        { message: 'Invalid attendance status. Must be present, late, absent, or leave' },
+        { status: 400 }
+      );
+    }
+
+    const parsedDate = new Date(body.date);
+    if (isNaN(parsedDate.getTime())) {
+      return NextResponse.json({ message: 'Invalid date format' }, { status: 400 });
+    }
+
     // Verify classroom and student ownership
     const [classroom, student] = await Promise.all([
       prisma.classroom.findFirst({
-        where: { id: Number(body.classroom_id), userId: user.id }
+        where: { id: Number(body.classroom_id), userId: user.id },
       }),
       prisma.student.findFirst({
-        where: { id: Number(body.student_id), userId: user.id }
+        where: { id: Number(body.student_id), userId: user.id },
       }),
     ]);
     if (!classroom) return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
@@ -227,23 +182,23 @@ export async function POST(request: NextRequest) {
     await prisma.attendance.upsert({
       where: {
         studentId_classroomId_date: {
-          studentId: body.student_id,
-          classroomId: body.classroom_id,
-          date: new Date(body.date),
+          studentId: Number(body.student_id),
+          classroomId: Number(body.classroom_id),
+          date: parsedDate,
         },
       },
       update: { status: body.status },
       create: {
-        studentId: body.student_id,
-        classroomId: body.classroom_id,
-        date: new Date(body.date),
+        studentId: Number(body.student_id),
+        classroomId: Number(body.classroom_id),
+        date: parsedDate,
         status: body.status,
       },
     });
 
     return NextResponse.json({ message: 'Attendance marked' });
   } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+    if (error instanceof AuthError) return handleAuthError();
     console.error('Mark attendance error:', error);
     return NextResponse.json({ message: 'Failed to mark attendance' }, { status: 500 });
   }
@@ -270,7 +225,7 @@ export async function DELETE(request: NextRequest) {
 
       // Verify ownership of the attendance record
       const attendance = await prisma.attendance.findFirst({
-        where: { id: numericId, classroom: { userId: user.id } }
+        where: { id: numericId, classroom: { userId: user.id } },
       });
       if (!attendance) return NextResponse.json({ message: 'Attendance record not found' }, { status: 404 });
 
@@ -294,7 +249,7 @@ export async function DELETE(request: NextRequest) {
 
     // Verify classroom ownership
     const classroom = await prisma.classroom.findFirst({
-      where: { id: numericClassroomId, userId: user.id }
+      where: { id: numericClassroomId, userId: user.id },
     });
     if (!classroom) return NextResponse.json({ message: 'Classroom not found' }, { status: 404 });
 
@@ -303,6 +258,12 @@ export async function DELETE(request: NextRequest) {
       if (isNaN(numericStudentId) || numericStudentId <= 0) {
         return NextResponse.json({ message: 'Invalid student ID' }, { status: 400 });
       }
+
+      // Verify student ownership
+      const student = await prisma.student.findFirst({
+        where: { id: numericStudentId, userId: user.id },
+      });
+      if (!student) return NextResponse.json({ message: 'Student not found or unauthorized' }, { status: 404 });
 
       await prisma.attendance.deleteMany({
         where: {
@@ -319,7 +280,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ message: 'Attendance deleted' });
   } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ message: error.message }, { status: 401 });
+    if (error instanceof AuthError) return handleAuthError();
     return NextResponse.json({ message: 'Failed to delete attendance' }, { status: 500 });
   }
 }

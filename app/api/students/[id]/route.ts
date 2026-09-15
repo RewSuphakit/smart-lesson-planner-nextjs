@@ -26,6 +26,29 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       midterm_score: 'midtermScore', final_score: 'finalScore',
     };
 
+    // Lookup classroom max scores if updating exam scores
+    let classroomMaxScores: { midterm: number; final: number } = { midterm: 100, final: 100 };
+    if (body.midterm_score !== undefined || body.final_score !== undefined) {
+      const targetClassroomId =
+        body.classroom_id !== undefined
+          ? body.classroom_id
+            ? Number(body.classroom_id)
+            : null
+          : student.classroomId;
+      if (targetClassroomId) {
+        const cls = await prisma.classroom.findUnique({
+          where: { id: targetClassroomId },
+          select: { midtermMaxScore: true, finalMaxScore: true },
+        });
+        if (cls) {
+          classroomMaxScores = {
+            midterm: cls.midtermMaxScore ? Number(cls.midtermMaxScore) : 100,
+            final: cls.finalMaxScore ? Number(cls.finalMaxScore) : 100,
+          };
+        }
+      }
+    }
+
     for (const [key, prismaKey] of Object.entries(fieldMap)) {
       if (body[key] !== undefined) {
         let val = body[key];
@@ -46,7 +69,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             val = null;
           } else {
             const num = Number(val);
-            val = isNaN(num) ? null : Math.min(100, Math.max(0, num));
+            if (isNaN(num)) {
+              val = null;
+            } else if (num === -1 || num === -2) {
+              // Special scores: -1 = ขาดสอบ (absent), -2 = หมดสิทธิ์สอบ (no rights)
+              val = num;
+            } else {
+              const maxScore = prismaKey === 'midtermScore' ? classroomMaxScores.midterm : classroomMaxScores.final;
+              val = Math.min(maxScore, Math.max(0, num));
+            }
           }
         } else if (['studentCode', 'gradeLevel', 'email'].includes(prismaKey)) {
           val = val || null;

@@ -57,6 +57,26 @@ export const ClassroomSchema = z.object({
   semester_start_date: z.string().nullable().optional(),
 });
 
+export const UpdateClassroomSchema = z.object({
+  name: z.string().trim().min(1, 'Classroom name cannot be empty').optional(),
+  description: z.string().trim().nullable().optional(),
+  late_to_absent_ratio: z.number().int().min(1).optional(),
+  leave_to_absent_ratio: z.number().int().min(1).optional(),
+  absent_to_f_ratio: z.number().int().min(1).optional(),
+  total_classes: z.number().int().min(1).optional(),
+  min_attendance_percent: z.number().min(0).max(100).optional(),
+  assignment_weight: z.number().min(0).max(100).optional(),
+  post_test_weight: z.number().min(0).max(100).optional(),
+  affective_weight: z.number().min(0).max(100).optional(),
+  midterm_weight: z.number().min(0).max(100).optional(),
+  final_weight: z.number().min(0).max(100).optional(),
+  midterm_max_score: z.number().min(0).optional(),
+  final_max_score: z.number().min(0).optional(),
+  curriculum_type: z.enum(['pvch', 'pvs', 'custom']).optional(),
+  total_weeks: z.number().int().min(1).max(52).optional(),
+  semester_start_date: z.string().nullable().optional(),
+});
+
 
 // ==================== Validation Helper ====================
 export function formatZodError(error: z.ZodError): NextResponse {

@@ -20,18 +20,21 @@ export async function POST(request: NextRequest) {
     }
 
     const { sub: googleId, email, name, picture } = payload;
+    if (!email) {
+      return NextResponse.json({ message: 'Email not provided by Google account' }, { status: 400 });
+    }
 
     let user = await prisma.user.findUnique({ where: { googleId } });
 
     if (!user) {
-      const existingByEmail = await prisma.user.findUnique({ where: { email: email! } });
+      const existingByEmail = await prisma.user.findUnique({ where: { email } });
       if (existingByEmail) {
         return NextResponse.json({ message: 'Email already registered. Please use email/password login.' }, { status: 400 });
       }
 
       user = await prisma.user.create({
         data: {
-          email: email!,
+          email,
           name: name || 'User',
           googleId,
           avatar: picture,

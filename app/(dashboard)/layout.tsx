@@ -7,7 +7,7 @@ import {
   LayoutDashboard, BookOpen, Calendar, Users,
   FileText, LogOut, Menu, GraduationCap,
   Presentation, CheckCircle, Award, CheckSquare,
-  Smile
+  Smile, UserCog
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
@@ -24,6 +24,7 @@ const navItems = [
   { path: '/affective', icon: Smile, label: 'คะแนนจิตพิสัย' },
   { path: '/scores', icon: CheckSquare, label: 'คะแนนรายสัปดาห์' },
   { path: '/grades', icon: Award, label: 'ตัดเกรด' },
+  { path: '/profile', icon: UserCog, label: 'โปรไฟล์' },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -120,17 +121,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* User Profile */}
         <div className="p-4 pt-2">
-          <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-200/30 p-3.5 rounded-2xl">
+          <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-200/30 p-3.5 rounded-2xl transition-all duration-300 hover:shadow-md hover:border-indigo-300/60">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-100 border border-indigo-200 flex items-center justify-center text-xl shadow-sm">
-                {animalAvatars[(user?.id || 1) % animalAvatars.length]}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-slate-700 truncate">{user?.name}</p>
-                <p className="text-[0.62rem] text-indigo-400 font-medium">
-                  {user?.role === 'admin' ? 'ผู้ดูแลระบบ' : 'ครูผู้สอน'}
-                </p>
-              </div>
+              <Link
+                href="/profile"
+                className="flex items-center gap-3 flex-1 min-w-0 group"
+                title="แก้ไขข้อมูลส่วนตัว"
+              >
+                <div className="w-10 h-10 rounded-xl bg-indigo-100 border border-indigo-200 flex items-center justify-center text-xl shadow-sm transition-transform duration-300 group-hover:scale-110">
+                  {user?.avatar || animalAvatars[(user?.id || 1) % animalAvatars.length]}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-slate-700 truncate group-hover:text-indigo-600 transition-colors">
+                    {user?.name}
+                  </p>
+                  <p className="text-[0.62rem] text-indigo-400 font-medium">
+                    {user?.role === 'admin' ? 'ผู้ดูแลระบบ' : 'ครูผู้สอน'}
+                  </p>
+                </div>
+              </Link>
               <button
                 onClick={handleLogout}
                 className="p-2 rounded-xl hover:bg-rose-100 text-slate-600 hover:text-rose-500 transition-all duration-300"

@@ -47,7 +47,7 @@ interface TimetableEntry {
   subject_name?: string;
   room?: string;
   group_name?: string;
-  entry_type: 'lab' | 'activity' | 'homeroom' | 'theory' | string;
+  entry_type: 'lecture' | 'lab' | 'activity' | 'homeroom' | 'theory' | string;
   hours?: number;
   classroom_id?: number | null;
   instructor?: string;
@@ -121,7 +121,7 @@ export default function Schedule() {
     room: '',
     group_name: '',
     instructor: '',
-    entry_type: 'theory',
+    entry_type: 'lecture',
     color: '#3b82f6',
     classroom_id: '' as string | number
   });
@@ -212,7 +212,7 @@ export default function Schedule() {
       room: '',
       group_name: '',
       instructor: '',
-      entry_type: 'theory',
+      entry_type: 'lecture',
       color: '#3b82f6',
       classroom_id: ''
     });
@@ -232,7 +232,7 @@ export default function Schedule() {
       room: entry.room || '',
       group_name: entry.group_name || '',
       instructor: entry.instructor || '',
-      entry_type: entry.entry_type || 'theory',
+      entry_type: (entry.entry_type === 'theory' ? 'lecture' : entry.entry_type) || 'lecture',
       color: entry.color || '#3b82f6',
       classroom_id: entry.classroom_id !== null && entry.classroom_id !== undefined ? entry.classroom_id : ''
     });
@@ -288,6 +288,13 @@ export default function Schedule() {
     if (Number(timetableForm.start_period) > Number(timetableForm.end_period)) return toast.error('คาบเรียนสิ้นสุดต้องไม่น้อยกว่าคาบเรียนเริ่มต้น');
     if (timetableForm.start_time >= timetableForm.end_time) return toast.error('เวลาสิ้นสุดต้องมากกว่าเวลาเริ่มต้น');
 
+    const isHomeroomOrFlagpole = 
+      timetableForm.entry_type === 'homeroom' || 
+      Number(timetableForm.start_period) === 0 || 
+      timetableForm.subject_name?.includes('เสาธง') || 
+      timetableForm.subject_name?.includes('โฮมรูม') || 
+      timetableForm.subject_name?.includes('เข้าแถว');
+
     const payload = {
       day_of_week: Number(timetableForm.day_of_week),
       start_period: Number(timetableForm.start_period),
@@ -301,7 +308,7 @@ export default function Schedule() {
       instructor: timetableForm.instructor.trim() || null,
       entry_type: timetableForm.entry_type,
       color: timetableForm.color || null,
-      classroom_id: timetableForm.classroom_id ? Number(timetableForm.classroom_id) : null
+      classroom_id: isHomeroomOrFlagpole ? null : (timetableForm.classroom_id ? Number(timetableForm.classroom_id) : null)
     };
 
     timetableMutation.mutate(payload);
@@ -659,11 +666,14 @@ export default function Schedule() {
                   </span>
                   {daySchs.length > 0 && (
                     <div className="mt-1 space-y-0.5">
-                      {daySchs.slice(0, 2).map((s, j) => (
-                        <div key={j} className={"text-[0.55rem] font-medium leading-tight rounded-[4px] px-1.5 py-0.5 truncate border backdrop-blur-md " + (STATUS_STYLE[s.status] || STATUS_STYLE.scheduled)}>
-                          {s.start_time?.slice(0, 5)} {s.lesson_title} ({s.subject})
-                        </div>
-                      ))}
+                      {daySchs.slice(0, 2).map((s, j) => {
+                        const isAct = s.lesson_title?.includes('เสาธง') || s.lesson_title?.includes('โฮมรูม') || s.subject?.includes('เสาธง') || s.lesson_title?.includes('เข้าแถว');
+                        return (
+                          <div key={j} className={"text-[0.55rem] font-medium leading-tight rounded-[4px] px-1.5 py-0.5 truncate border backdrop-blur-md " + (isAct ? "bg-rose-50 text-rose-600 border-rose-200" : (STATUS_STYLE[s.status] || STATUS_STYLE.scheduled))}>
+                            {s.start_time?.slice(0, 5)} {s.lesson_title} {isAct ? '' : `(${s.subject})`}
+                          </div>
+                        );
+                      })}
                       {daySchs.length > 2 && <div className="text-[0.55rem] text-slate-500 pl-1">+{daySchs.length - 2}</div>}
                     </div>
                   )}
@@ -700,7 +710,11 @@ export default function Schedule() {
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <span className="text-xs font-bold bg-indigo-50 px-2 py-1 rounded-md">{sch.start_time?.slice(0, 5)} - {sch.end_time?.slice(0, 5)}</span>
-                      <span className={"text-[0.65rem] font-bold px-2 py-1 rounded-md " + STATUS_STYLE[sch.status]}>{STATUS_LABEL[sch.status]}</span>
+                      {sch.lesson_title?.includes('เสาธง') || sch.lesson_title?.includes('โฮมรูม') || sch.subject?.includes('เสาธง') || sch.lesson_title?.includes('เข้าแถว') ? (
+                        <span className="text-[0.65rem] font-bold px-2 py-1 rounded-md bg-rose-50 text-rose-600 border border-rose-200">กิจกรรม/เข้าแถว</span>
+                      ) : (
+                        <span className={"text-[0.65rem] font-bold px-2 py-1 rounded-md " + STATUS_STYLE[sch.status]}>{STATUS_LABEL[sch.status]}</span>
+                      )}
                     </div>
                     <p className="text-sm font-bold text-slate-800">{sch.lesson_title}</p>
                     <p className="text-xs text-slate-500 mt-1">วิชา: {sch.subject}</p>
@@ -1135,7 +1149,8 @@ export default function Schedule() {
                   💡 ระบบจะสร้างแผนการสอนลงปฏิทินตลอดภาคเรียนอัตโนมัติ:
                 </p>
                 <ul className="list-disc list-inside text-[0.7rem] text-slate-600 space-y-1">
-                  <li>ใช้คาบเรียนที่ <strong>เชื่อมกับห้องเรียน</strong> แล้วเท่านั้น</li>
+                  <li>ใช้คาบเรียนวิชาการที่ <strong>เชื่อมกับห้องเรียน</strong> แล้วเท่านั้น</li>
+                  <li>ไม่รวมคาบกิจกรรมหน้าเสาธงหรือโฮมรูม (ไม่นับเป็นคาบสอน)</li>
                   <li>คำนวณวันและเวลาสอนแต่ละสัปดาห์ตามตารางเรียน</li>
                   <li>จำนวนคาบตาม <strong>จำนวนคาบทั้งหมด</strong> ที่ตั้งค่าไว้ในห้องเรียน</li>
                 </ul>
@@ -1265,7 +1280,7 @@ export default function Schedule() {
                     className="form-input"
                     required
                   >
-                    <option value="theory">ทฤษฎี (Theory)</option>
+                    <option value="lecture">ทฤษฎี (Theory / Lecture)</option>
                     <option value="lab">ปฏิบัติ (Lab)</option>
                     <option value="activity">กิจกรรม (Activity)</option>
                     <option value="homeroom">โฮมรูม (Homeroom)</option>
@@ -1363,16 +1378,23 @@ export default function Schedule() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="form-label text-slate-700 font-bold mb-1.5 block">เชื่อมห้องเรียนในระบบ</label>
-                  <select
-                    value={timetableForm.classroom_id}
-                    onChange={e => setTimetableForm(f => ({ ...f, classroom_id: e.target.value }))}
-                    className="form-input"
-                  >
-                    <option value="">-- ไม่เชื่อม --</option>
-                    {classroomsList.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
+                  {(timetableForm.entry_type === 'homeroom' || Number(timetableForm.start_period) === 0 || timetableForm.subject_name?.includes('เสาธง') || timetableForm.subject_name?.includes('โฮมรูม') || timetableForm.subject_name?.includes('เข้าแถว')) ? (
+                    <div className="text-xs text-amber-700 bg-amber-50 p-2.5 rounded-xl border border-amber-200/80 flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
+                      <span>กิจกรรมหน้าเสาธง/โฮมรูม ไม่ต้องเชื่อมห้องเรียน (ไม่นับเป็นคาบสอน)</span>
+                    </div>
+                  ) : (
+                    <select
+                      value={timetableForm.classroom_id}
+                      onChange={e => setTimetableForm(f => ({ ...f, classroom_id: e.target.value }))}
+                      className="form-input"
+                    >
+                      <option value="">-- ไม่เชื่อม --</option>
+                      {classroomsList.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
                 <div>
                   <label className="form-label text-slate-700 font-bold mb-1.5 block">สีประจำวิชา</label>

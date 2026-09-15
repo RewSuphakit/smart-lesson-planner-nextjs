@@ -58,14 +58,15 @@ export async function GET(request: NextRequest) {
     });
 
     // Map scores by studentId_lessonNumber for quick lookup
-    const scoreMap = new Map();
+    const scoreMap = new Map<string, (typeof allScores)[number]>();
     allScores.forEach(s => {
       scoreMap.set(`${s.studentId}_${s.lessonNumber}`, s);
     });
 
     let filenameBase = `scores_${classroom.name.replace(/[^a-zA-Z0-9ก-๙_-]/g, '_')}`;
     let headers: string[] = [];
-    let rows: any[][] = [];
+    type ExportCell = string | number | { t: string; f?: string; v: unknown };
+    let rows: ExportCell[][] = [];
     let sheetName = 'Scores';
 
     if (exportType === 'current_week') {

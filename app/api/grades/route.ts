@@ -48,12 +48,6 @@ export async function GET(request: NextRequest) {
     const maxMidtermScore = Number(classroom.midtermMaxScore ?? 100);
     const maxFinalScore = Number(classroom.finalMaxScore ?? 100);
 
-    const c = classroom as typeof classroom & {
-      curriculumType?: string;
-      totalWeeks?: number;
-      semesterStartDate?: Date | null;
-    };
-
     // Resolve target weeks from classroom settings (replaces old name-guessing logic)
     const weeksParam = searchParams.get('weeks');
     let targetWeeks: number;
@@ -61,7 +55,7 @@ export async function GET(request: NextRequest) {
     if (weeksParam && !isNaN(Number(weeksParam))) {
       targetWeeks = Number(weeksParam);
     } else {
-      targetWeeks = resolveTargetWeeks(c);
+      targetWeeks = resolveTargetWeeks(classroom);
     }
 
     // Get max possible scores from score_structures up to targetWeeks
@@ -227,7 +221,7 @@ export async function GET(request: NextRequest) {
         final_max_score: maxFinalScore,
         total_weight_sum: totalWeightSum,
         target_weeks: targetWeeks,
-        is_pws: (c.curriculumType ?? 'pvch') === 'pvs',
+        is_pws: (classroom.curriculumType ?? 'pvch') === 'pvs',
         max_assign_raw: maxAssignRaw,
         max_post_test_raw: maxPostTestRaw,
       }
@@ -256,24 +250,20 @@ export async function POST(request: NextRequest) {
     });
     if (!classroom) return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
 
-    // Save criteria atomically via transaction
-    const operations = [
-      prisma.gradeCriteria.deleteMany({ where: { classroomId: Number(classroomId) } }),
-    ];
+    // Save criteria atomically via interactive transaction
+    await prisma.$transaction(async (tx) => {
+      await tx.gradeCriteria.deleteMany({ where: { classroomId: Number(classroomId) } });
 
-    if (body.criteria && body.criteria.length > 0) {
-      operations.push(
-        prisma.gradeCriteria.createMany({
+      if (body.criteria && body.criteria.length > 0) {
+        await tx.gradeCriteria.createMany({
           data: body.criteria.map((c: { grade: string; min_score: string | number }) => ({
             classroomId: Number(classroomId),
             grade: c.grade,
             minScore: isNaN(Number(c.min_score)) ? 0 : Number(c.min_score),
           })),
-        })
-      );
-    }
-
-    await prisma.$transaction(operations);
+        });
+      }
+    });
 
     return NextResponse.json({ message: 'Criteria saved' });
   } catch (error) {

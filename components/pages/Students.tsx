@@ -93,6 +93,9 @@ export default function Students() {
       setForm(emptyForm);
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['classrooms'] });
+      queryClient.invalidateQueries({ queryKey: ['grades'] });
+      queryClient.invalidateQueries({ queryKey: ['scores-matrix'] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-data'] });
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
       toast.error(err.response?.data?.message || 'บันทึกไม่สำเร็จ');
@@ -106,6 +109,9 @@ export default function Students() {
       toast.success('ลบนักเรียนแล้ว');
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['classrooms'] });
+      queryClient.invalidateQueries({ queryKey: ['grades'] });
+      queryClient.invalidateQueries({ queryKey: ['scores-matrix'] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-data'] });
     },
     onError: () => {
       toast.error('ลบไม่สำเร็จ');
@@ -123,6 +129,9 @@ export default function Students() {
       setSelectedStudents([]);
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['classrooms'] });
+      queryClient.invalidateQueries({ queryKey: ['grades'] });
+      queryClient.invalidateQueries({ queryKey: ['scores-matrix'] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-data'] });
     },
     onError: () => {
       toast.error('ย้ายห้องเรียนไม่สำเร็จ');
@@ -137,6 +146,9 @@ export default function Students() {
       setSelectedStudents([]);
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['classrooms'] });
+      queryClient.invalidateQueries({ queryKey: ['grades'] });
+      queryClient.invalidateQueries({ queryKey: ['scores-matrix'] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-data'] });
     },
     onError: () => {
       toast.error('ลบไม่สำเร็จ');
@@ -154,6 +166,9 @@ export default function Students() {
       setSelectedStudents([]);
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['classrooms'] });
+      queryClient.invalidateQueries({ queryKey: ['grades'] });
+      queryClient.invalidateQueries({ queryKey: ['scores-matrix'] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-data'] });
     },
     onError: () => {
       toast.error('ลบไม่สำเร็จ');
@@ -172,6 +187,9 @@ export default function Students() {
       setImportClassroomId('');
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['classrooms'] });
+      queryClient.invalidateQueries({ queryKey: ['grades'] });
+      queryClient.invalidateQueries({ queryKey: ['scores-matrix'] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-data'] });
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
       toast.error(err.response?.data?.message || 'นำเข้าไม่สำเร็จ');

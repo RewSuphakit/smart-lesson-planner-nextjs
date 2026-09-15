@@ -670,7 +670,15 @@ export default function Attendance() {
   const todayEntries = useMemo(() => {
     const jsDay = new Date().getDay();
     const schemaDayOfWeek = (jsDay + 6) % 7;
-    return allTimetableEntries.filter(e => e.day_of_week === schemaDayOfWeek);
+    return allTimetableEntries.filter(e => {
+      if (e.day_of_week !== schemaDayOfWeek) return false;
+      // กรองคาบหน้าเสาธง/โฮมรูม/เข้าแถว ออก ไม่นำมาแสดงเป็นคาบเรียนวันนี้
+      if (e.start_period === 0) return false;
+      if (e.entry_type === 'homeroom') return false;
+      const name = `${e.subject_name || ''} ${e.subject_code || ''}`.toLowerCase();
+      if (name.includes('เสาธง') || name.includes('โฮมรูม') || name.includes('เข้าแถว')) return false;
+      return true;
+    });
   }, [allTimetableEntries]);
 
   // ─── State: วันที่มีการสอนของห้องเรียนนี้ (0=Mon .. 6=Sun) ───
@@ -679,7 +687,11 @@ export default function Attendance() {
   useEffect(() => {
     if (!selectedClass) return;
     const classEntries = allTimetableEntries.filter(
-      e => String(e.classroom_id) === String(selectedClass)
+      e => String(e.classroom_id) === String(selectedClass) &&
+           e.start_period !== 0 &&
+           e.entry_type !== 'homeroom' &&
+           !e.subject_name?.includes('เสาธง') &&
+           !e.subject_name?.includes('เข้าแถว')
     );
     const timetableDays = Array.from(new Set(classEntries.map(e => e.day_of_week)));
 
@@ -825,6 +837,7 @@ export default function Attendance() {
     onSuccess: () => {
       toast.success('บันทึกการเช็คชื่อเรียบร้อยแล้ว');
       queryClient.invalidateQueries({ queryKey: ['attendance-data', selectedClass, date] });
+      queryClient.invalidateQueries({ queryKey: ['grades'] });
     },
     onError: () => {
       toast.error('บันทึกไม่สำเร็จ');
@@ -866,6 +879,7 @@ export default function Attendance() {
       toast.success('อัปเดตข้อมูลการเข้าเรียนเรียบร้อย');
       queryClient.invalidateQueries({ queryKey: ['attendance-matrix', selectedClass, matrixStartDate, matrixEndDate] });
       queryClient.invalidateQueries({ queryKey: ['attendance-data', selectedClass] });
+      queryClient.invalidateQueries({ queryKey: ['grades'] });
     },
     onError: () => {
       toast.error('อัปเดตไม่สำเร็จ');
@@ -997,6 +1011,7 @@ export default function Attendance() {
     onSuccess: () => {
       setAutoSaveStatus('saved');
       queryClient.invalidateQueries({ queryKey: ['attendance-data', selectedClass, date] });
+      queryClient.invalidateQueries({ queryKey: ['grades'] });
     },
     onError: () => {
       setAutoSaveStatus('error');

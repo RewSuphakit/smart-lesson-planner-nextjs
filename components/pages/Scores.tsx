@@ -755,6 +755,7 @@ export default function Scores() {
       const now = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       setLastAutoSavedTime(now);
       toast.success('บันทึกคะแนนรวมเรียบร้อยแล้ว');
+      queryClient.invalidateQueries({ queryKey: ['grades'] });
       refetchMatrix();
     },
     onError: () => {
@@ -801,6 +802,7 @@ export default function Scores() {
     },
     onSuccess: () => {
       toast.success('บันทึกคะแนนเรียบร้อย');
+      queryClient.invalidateQueries({ queryKey: ['grades'] });
       refetchMatrix();
     },
     onError: () => {
@@ -1133,6 +1135,7 @@ export default function Scores() {
       toast.success('นำเข้าคะแนนสำเร็จ');
       setShowImportPreview(false);
       setImportData([]);
+      queryClient.invalidateQueries({ queryKey: ['grades'] });
       refetchMatrix();
     },
     onError: () => { toast.error('นำเข้าไม่สำเร็จ'); },

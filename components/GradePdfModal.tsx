@@ -374,11 +374,11 @@ export default function GradePdfModal({
         <th style="width: 32px;">ลำดับ</th>
         <th style="width: 90px;">รหัสนักศึกษา</th>
         <th>ชื่อ - สกุล</th>
-        <th style="width: 65px;">งานเก็บ<br>(${weights.assignment_weight}%)</th>
+        <th style="width: 55px;">จิตพิสัย<br>(${weights.affective_weight}%)</th>
         <th style="width: 65px;">สอบย่อย<br>(${weights.post_test_weight}%)</th>
+        <th style="width: 65px;">งานเก็บ<br>(${weights.assignment_weight}%)</th>
         <th style="width: 55px;">กลางภาค<br>(${weights.midterm_weight}%)</th>
         <th style="width: 55px;">ปลายภาค<br>(${weights.final_weight}%)</th>
-        <th style="width: 55px;">จิตพิสัย<br>(${weights.affective_weight}%)</th>
         <th style="width: 65px;">รวม<br>(100)</th>
         <th style="width: 55px;">เวลาเรียน<br>(%)</th>
         <th style="width: 55px;">ผลการเรียน</th>
@@ -402,11 +402,11 @@ export default function GradePdfModal({
           <td>${idx + 1}</td>
           <td>${s.student_code || '-'}</td>
           <td class="name">${s.name}</td>
-          <td>${Number(s.precise_scaled_assign || s.scaled_assign || 0).toFixed(1)}${rawAssignHint}</td>
+          <td>${Number(s.affective_score || 0).toFixed(1)}</td>
           <td>${Number(s.precise_scaled_post_test || s.scaled_post_test || 0).toFixed(1)}${rawPostHint}</td>
+          <td>${Number(s.precise_scaled_assign || s.scaled_assign || 0).toFixed(1)}${rawAssignHint}</td>
           <td>${Number(s.precise_scaled_midterm || s.scaled_midterm || 0).toFixed(1)}</td>
           <td>${finalVal}</td>
-          <td>${Number(s.affective_score || 0).toFixed(1)}</td>
           <td><strong>${totalVal}</strong></td>
           <td>${s.attendance_percent ?? 100}%</td>
           <td><strong>${s.grade || '-'}</strong></td>
@@ -899,20 +899,20 @@ export default function GradePdfModal({
                       <th className="border border-slate-600 p-1 w-8 text-center">ลำดับ</th>
                       <th className="border border-slate-600 p-1 w-24 text-center">รหัสนักศึกษา</th>
                       <th className="border border-slate-600 p-1 text-left pl-2">ชื่อ - สกุล</th>
-                      <th className="border border-slate-600 p-1 text-center w-16">
-                        งานเก็บ<br /><span className="text-[10px] font-normal">({weights.assignment_weight}%)</span>
+                      <th className="border border-slate-600 p-1 text-center w-14">
+                        จิตพิสัย<br /><span className="text-[10px] font-normal">({weights.affective_weight}%)</span>
                       </th>
                       <th className="border border-slate-600 p-1 text-center w-16">
                         สอบย่อย<br /><span className="text-[10px] font-normal">({weights.post_test_weight}%)</span>
+                      </th>
+                      <th className="border border-slate-600 p-1 text-center w-16">
+                        งานเก็บ<br /><span className="text-[10px] font-normal">({weights.assignment_weight}%)</span>
                       </th>
                       <th className="border border-slate-600 p-1 text-center w-14">
                         กลางภาค<br /><span className="text-[10px] font-normal">({weights.midterm_weight}%)</span>
                       </th>
                       <th className="border border-slate-600 p-1 text-center w-14">
                         ปลายภาค<br /><span className="text-[10px] font-normal">({weights.final_weight}%)</span>
-                      </th>
-                      <th className="border border-slate-600 p-1 text-center w-14">
-                        จิตพิสัย<br /><span className="text-[10px] font-normal">({weights.affective_weight}%)</span>
                       </th>
                       <th className="border border-slate-600 p-1 text-center w-16 font-extrabold bg-slate-200/70">
                         รวม<br /><span className="text-[10px] font-normal">(100)</span>
@@ -943,12 +943,7 @@ export default function GradePdfModal({
                           <td className="border border-slate-400 p-1 text-center font-mono">{s.student_code || '-'}</td>
                           <td className="border border-slate-400 p-1 pl-2 text-left">{s.name}</td>
                           <td className="border border-slate-400 p-1 text-center">
-                            {Number(s.precise_scaled_assign || s.scaled_assign || 0).toFixed(1)}
-                            {showRawScore && (
-                              <span className="block text-[9px] text-slate-500">
-                                ({Number(s.raw_assign || 0).toFixed(0)}/{s.max_assign || (isPws ? 150 : 180)})
-                              </span>
-                            )}
+                            {Number(s.affective_score || 0).toFixed(1)}
                           </td>
                           <td className="border border-slate-400 p-1 text-center">
                             {Number(s.precise_scaled_post_test || s.scaled_post_test || 0).toFixed(1)}
@@ -959,12 +954,17 @@ export default function GradePdfModal({
                             )}
                           </td>
                           <td className="border border-slate-400 p-1 text-center">
+                            {Number(s.precise_scaled_assign || s.scaled_assign || 0).toFixed(1)}
+                            {showRawScore && (
+                              <span className="block text-[9px] text-slate-500">
+                                ({Number(s.raw_assign || 0).toFixed(0)}/{s.max_assign || (isPws ? 150 : 180)})
+                              </span>
+                            )}
+                          </td>
+                          <td className="border border-slate-400 p-1 text-center">
                             {Number(s.precise_scaled_midterm || s.scaled_midterm || 0).toFixed(1)}
                           </td>
                           <td className="border border-slate-400 p-1 text-center">{finalVal}</td>
-                          <td className="border border-slate-400 p-1 text-center">
-                            {Number(s.affective_score || 0).toFixed(1)}
-                          </td>
                           <td className="border border-slate-400 p-1 text-center font-bold bg-slate-50">
                             {totalVal}
                           </td>

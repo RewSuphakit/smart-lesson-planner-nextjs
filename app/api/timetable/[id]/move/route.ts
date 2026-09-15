@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
-import { PERIOD_TIMES } from '@/lib/constants';
+import { PERIOD_TIMES, parseTimeToUtc } from '@/lib/constants';
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -34,8 +34,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     
     const startTimeStr = PERIOD_TIMES[startPeriod]?.start;
     const endTimeStr = PERIOD_TIMES[endPeriod]?.end;
-    const startTime = startTimeStr ? new Date(`1970-01-01T${startTimeStr}.000Z`) : null;
-    const endTime = endTimeStr ? new Date(`1970-01-01T${endTimeStr}.000Z`) : null;
+    const startTime = parseTimeToUtc(startTimeStr);
+    const endTime = parseTimeToUtc(endTimeStr);
 
     await prisma.weeklySchedule.update({
       where: { id: numericId },

@@ -22,7 +22,11 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Uncaught error:', error, errorInfo);
+    console.error('=== UNCAUGHT FRONTEND ERROR ===');
+    console.error('Message:', error?.message);
+    console.error('Stack:', error?.stack);
+    console.error('Component Stack:', errorInfo?.componentStack);
+    console.error('===============================');
   }
 
   public render() {
@@ -34,9 +38,14 @@ export default class ErrorBoundary extends Component<Props, State> {
               <AlertTriangle className="w-8 h-8 text-red-500" />
             </div>
             <h2 className="text-xl font-bold text-slate-800 mb-2">เกิดข้อผิดพลาดบางอย่าง</h2>
-            <p className="text-slate-600 mb-6 text-sm">
+            <p className="text-slate-600 mb-4 text-sm">
               ขออภัย ระบบพบข้อผิดพลาดที่ไม่คาดคิด กรุณาลองใหม่อีกครั้ง
             </p>
+            {this.state.error?.message && (
+              <div className="bg-red-50 text-red-700 text-xs p-3 rounded-xl mb-4 font-mono text-left break-all border border-red-200">
+                {this.state.error.message}
+              </div>
+            )}
             <button
               onClick={() => {
                 this.setState({ hasError: false });

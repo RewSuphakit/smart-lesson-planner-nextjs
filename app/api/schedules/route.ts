@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ScheduleStatus } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
+import { parseTimeToUtc } from '@/lib/constants';
+
+function isFlagpoleOrHomeroom(ws: { startPeriod?: number; entryType?: string; subjectName?: string | null; subjectCode?: string | null }) {
+  if (ws.startPeriod === 0) return true;
+  if (ws.entryType === 'homeroom') return true;
+  const name = `${ws.subjectName || ''} ${ws.subjectCode || ''}`.toLowerCase();
+  if (name.includes('เสาธง') || name.includes('โฮมรูม') || name.includes('เข้าแถว')) return true;
+  return false;
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -83,6 +92,7 @@ export async function GET(request: NextRequest) {
       const dayConcrete = mappedConcrete.filter(c => c.scheduled_date.startsWith(dateStr));
 
       for (const slot of dayWeeklySlots) {
+        if (isFlagpoleOrHomeroom(slot)) continue;
         const slotStartStr = slot.startTime ? slot.startTime.toISOString().split('T')[1] : '08:30:00.000Z';
         const slotEndStr = slot.endTime ? slot.endTime.toISOString().split('T')[1] : '10:30:00.000Z';
 
@@ -139,15 +149,16 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ message: 'รูปแบบวันเริ่มต้นภาคเรียนไม่ถูกต้อง' }, { status: 400 });
       }
 
-      // Fetch classrooms, weekly schedules (with classroomId)
+      // Fetch classrooms, weekly schedules (with classroomId, excluding homeroom/flagpole)
       const classrooms = await prisma.classroom.findMany({ where: { userId: user.id } });
-      const weeklySchedules = await prisma.weeklySchedule.findMany({
+      const rawWeeklySchedules = await prisma.weeklySchedule.findMany({
         where: { userId: user.id, classroomId: { not: null } },
       });
+      const weeklySchedules = rawWeeklySchedules.filter(ws => !isFlagpoleOrHomeroom(ws));
 
       if (weeklySchedules.length === 0) {
         return NextResponse.json({
-          message: 'ไม่พบคาบเรียนที่เชื่อมกับห้องเรียน กรุณาไปตั้งค่าที่เมนู "ตารางเรียน" → คลิกที่คาบ → เลือกห้องเรียน',
+          message: 'ไม่พบคาบเรียนวิชาการที่เชื่อมกับห้องเรียน กรุณาไปตั้งค่าที่เมนู "ตารางเรียน" → คลิกที่คาบวิชา → เลือกห้องเรียน (คาบกิจกรรมหน้าเสาธง/โฮมรูมไม่นับเป็นคาบสอน)',
         }, { status: 400 });
       }
 
@@ -217,9 +228,13 @@ export async function POST(request: NextRequest) {
         prisma.schedule.deleteMany({
           where: {
             userId: user.id,
-            notes: {
-              startsWith: 'สร้างอัตโนมัติ:',
-            },
+            OR: [
+              { notes: { startsWith: 'สร้างอัตโนมัติ:' } },
+              { title: { contains: 'เสาธง' } },
+              { subject: { contains: 'เสาธง' } },
+              { title: { contains: 'เข้าแถว' } },
+              { subject: { contains: 'เข้าแถว' } },
+            ],
           },
         }),
         ...(schedulesToCreate.length > 0
@@ -239,23 +254,37 @@ export async function POST(request: NextRequest) {
       }, { status: 201 });
     }
 
-    const toUtcTime = (timeStr: string) => {
-      const clean = timeStr.trim();
-      const parts = clean.split(':');
-      const formatted = parts.length === 2 ? `${clean}:00` : clean;
-      return new Date(`1970-01-01T${formatted}.000Z`);
-    };
+    if (!body.title || !body.subject || !body.scheduled_date || !body.start_time || !body.end_time) {
+      return NextResponse.json(
+        { message: 'Missing required fields (title, subject, scheduled_date, start_time, end_time)' },
+        { status: 400 }
+      );
+    }
+
+    const scheduledDate = new Date(body.scheduled_date);
+    if (isNaN(scheduledDate.getTime())) {
+      return NextResponse.json({ message: 'Invalid scheduled_date format' }, { status: 400 });
+    }
+
+    const startTime = parseTimeToUtc(body.start_time);
+    const endTime = parseTimeToUtc(body.end_time);
+    if (!startTime || !endTime) {
+      return NextResponse.json({ message: 'Invalid start_time or end_time format (expected HH:mm)' }, { status: 400 });
+    }
+
+    const validStatuses = ['scheduled', 'completed', 'cancelled'];
+    const status = body.status && validStatuses.includes(body.status) ? (body.status as ScheduleStatus) : ScheduleStatus.scheduled;
 
     const schedule = await prisma.schedule.create({
       data: {
         userId: user.id,
-        title: body.title,
-        subject: body.subject,
-        scheduledDate: new Date(body.scheduled_date),
-        startTime: toUtcTime(body.start_time),
-        endTime: toUtcTime(body.end_time),
-        notes: body.notes || null,
-        status: body.status || 'scheduled',
+        title: String(body.title).trim(),
+        subject: String(body.subject).trim(),
+        scheduledDate,
+        startTime,
+        endTime,
+        notes: body.notes ? String(body.notes).trim() : null,
+        status,
       },
     });
 

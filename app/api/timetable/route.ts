@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
-import { PERIOD_TIMES } from '@/lib/constants';
+import { PERIOD_TIMES, parseTimeToUtc } from '@/lib/constants';
+
+function normalizeEntryType(type?: string | null): 'lecture' | 'lab' | 'activity' | 'homeroom' {
+  const lower = String(type || '').toLowerCase().trim();
+  if (lower === 'lab' || lower === 'ปฏิบัติ') return 'lab';
+  if (lower === 'activity' || lower === 'กิจกรรม') return 'activity';
+  if (lower === 'homeroom' || lower === 'โฮมรูม' || lower === 'เข้าแถว') return 'homeroom';
+  return 'lecture';
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -83,15 +91,15 @@ export async function POST(request: NextRequest) {
           dayOfWeek: e.day_of_week as number,
           startPeriod,
           endPeriod,
-          startTime: startTimeStr ? new Date(`1970-01-01T${startTimeStr}`) : null,
-          endTime: endTimeStr ? new Date(`1970-01-01T${endTimeStr}`) : null,
+          startTime: parseTimeToUtc(startTimeStr),
+          endTime: parseTimeToUtc(endTimeStr),
           subjectCode: (e.subject_code as string) || null,
           subjectName: (e.subject_name as string) || null,
           room: (e.room as string) || null,
           instructor: (e.instructor as string) || null,
           groupName: (e.group_name as string) || null,
           hours,
-          entryType: (e.entry_type as string) || 'lecture',
+          entryType: normalizeEntryType(e.entry_type as string),
           color: (e.color as string) || null,
           classroomId: e.classroom_id ? Number(e.classroom_id) : null,
         };
@@ -125,15 +133,15 @@ export async function POST(request: NextRequest) {
         dayOfWeek: Number(body.day_of_week),
         startPeriod,
         endPeriod,
-        startTime: startTimeStr ? new Date(`1970-01-01T${startTimeStr}`) : null,
-        endTime: endTimeStr ? new Date(`1970-01-01T${endTimeStr}`) : null,
+        startTime: parseTimeToUtc(startTimeStr),
+        endTime: parseTimeToUtc(endTimeStr),
         subjectCode: body.subject_code || null,
         subjectName: body.subject_name || null,
         room: body.room || null,
         instructor: body.instructor || null,
         groupName: body.group_name || null,
         hours,
-        entryType: body.entry_type || 'lecture',
+        entryType: normalizeEntryType(body.entry_type),
         color: body.color || null,
         classroomId: body.classroom_id ? Number(body.classroom_id) : null,
       },

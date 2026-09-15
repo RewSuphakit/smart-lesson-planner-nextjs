@@ -78,7 +78,7 @@ export function getThaiHolidays(startDateStr: string, endDateStr: string): Holid
     const dayOfWeek = curr.getDay(); // 0 = Sunday, 6 = Saturday
 
     // Check fixed or variable government holidays
-    let govHolidayName = VARIABLE_THAI_HOLIDAYS[dateStr] || FIXED_THAI_HOLIDAYS[mmdd];
+    const govHolidayName = VARIABLE_THAI_HOLIDAYS[dateStr] || FIXED_THAI_HOLIDAYS[mmdd];
 
     if (govHolidayName) {
       result.push({

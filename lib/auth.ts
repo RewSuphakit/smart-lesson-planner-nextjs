@@ -48,6 +48,21 @@ export function getAuthUser(request: NextRequest): JwtPayload | null {
   }
 }
 
+function getCookieMaxAge(): number {
+  const expires = process.env.JWT_EXPIRES_IN || '7d';
+  const match = expires.match(/^(\d+)([smhd])$/i);
+  if (!match) return 7 * 24 * 60 * 60;
+  const num = parseInt(match[1], 10);
+  const unit = match[2].toLowerCase();
+  switch (unit) {
+    case 's': return num;
+    case 'm': return num * 60;
+    case 'h': return num * 3600;
+    case 'd': return num * 86400;
+    default: return 7 * 86400;
+  }
+}
+
 export function setAuthCookie(response: NextResponse, token: string): void {
   response.cookies.set({
     name: 'token',
@@ -56,7 +71,7 @@ export function setAuthCookie(response: NextResponse, token: string): void {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge: 7 * 24 * 60 * 60,
+    maxAge: getCookieMaxAge(),
   });
 }
 

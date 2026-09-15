@@ -19,3 +19,30 @@ export const PERIOD_TIMES: Record<number, { start: string; end: string }> = {
   11: { start: '19:00', end: '20:00' },
   12: { start: '20:00', end: '21:00' },
 };
+
+/**
+ * Safely parse a time string (e.g. '08:00', '08:00:00', '1970-01-01T08:00:00.000Z')
+ * into a valid Date object in UTC representation for MySQL TIME(0) fields.
+ */
+export function parseTimeToUtc(timeStr?: string | null): Date | null {
+  if (!timeStr) return null;
+  const clean = String(timeStr).trim();
+  if (!clean) return null;
+
+  if (clean.includes('T')) {
+    const d = new Date(clean);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  // Strip trailing Z if present
+  const withoutZ = clean.replace(/Z$/i, '');
+  const parts = withoutZ.split(':');
+  const hh = parts[0].padStart(2, '0');
+  const mm = (parts[1] || '00').padStart(2, '0');
+  const ss = (parts[2] || '00').padStart(2, '0');
+  const [sec, ms = '000'] = ss.split('.');
+
+  const dateStr = `1970-01-01T${hh}:${mm}:${sec.padStart(2, '0')}.${ms.padEnd(3, '0').slice(0, 3)}Z`;
+  const d = new Date(dateStr);
+  return isNaN(d.getTime()) ? null : d;
+}

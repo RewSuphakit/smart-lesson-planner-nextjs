@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import { EntryType } from '@prisma/client';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { PERIOD_TIMES } from '@/lib/constants';
+import { PERIOD_TIMES, parseTimeToUtc } from '@/lib/constants';
 
 export const maxDuration = 60; // Allow up to 60 seconds on Vercel Serverless Function
 export const dynamic = 'force-dynamic';
@@ -92,8 +92,8 @@ function parseCSV(content: string, userId: number) {
       dayOfWeek: dayNum,
       startPeriod,
       endPeriod,
-      startTime: PERIOD_TIMES[startPeriod]?.start ? new Date(`1970-01-01T${PERIOD_TIMES[startPeriod].start}`) : null,
-      endTime: PERIOD_TIMES[endPeriod]?.end ? new Date(`1970-01-01T${PERIOD_TIMES[endPeriod].end}`) : null,
+      startTime: parseTimeToUtc(PERIOD_TIMES[startPeriod]?.start),
+      endTime: parseTimeToUtc(PERIOD_TIMES[endPeriod]?.end),
       subjectCode: headerMap.subject_code !== undefined ? cols[headerMap.subject_code] || null : null,
       subjectName: headerMap.subject_name !== undefined ? cols[headerMap.subject_name] || null : null,
       room: headerMap.room !== undefined ? cols[headerMap.room] || null : null,
@@ -231,8 +231,8 @@ async function parsePDF(buffer: Buffer, userId: number) {
         dayOfWeek: Number(item.day_of_week),
         startPeriod: startP,
         endPeriod: endP,
-        startTime: PERIOD_TIMES[startP]?.start ? new Date(`1970-01-01T${PERIOD_TIMES[startP].start}`) : null,
-        endTime: PERIOD_TIMES[endP]?.end ? new Date(`1970-01-01T${PERIOD_TIMES[endP].end}`) : null,
+        startTime: parseTimeToUtc(PERIOD_TIMES[startP]?.start),
+        endTime: parseTimeToUtc(PERIOD_TIMES[endP]?.end),
         subjectCode: item.subject_code || null,
         subjectName: item.subject_name || null,
         room: item.room || null,
@@ -275,8 +275,8 @@ function parsePDFRegexFallback(text: string, userId: number) {
         dayOfWeek: currentDay,
         startPeriod: 1,
         endPeriod: 1,
-        startTime: new Date(`1970-01-01T${PERIOD_TIMES[1].start}`),
-        endTime: new Date(`1970-01-01T${PERIOD_TIMES[1].end}`),
+        startTime: parseTimeToUtc(PERIOD_TIMES[1].start),
+        endTime: parseTimeToUtc(PERIOD_TIMES[1].end),
         subjectCode: code,
         subjectName: parts[0]?.trim() || null,
         room: parts[1]?.trim() || null,
@@ -417,8 +417,8 @@ async function parseImageWithAI(buffer: Buffer, mimeType: string, userId: number
         dayOfWeek: Number(item.day_of_week) || 0,
         startPeriod: startP,
         endPeriod: endP,
-        startTime: PERIOD_TIMES[startP]?.start ? new Date(`1970-01-01T${PERIOD_TIMES[startP].start}`) : null,
-        endTime: PERIOD_TIMES[endP]?.end ? new Date(`1970-01-01T${PERIOD_TIMES[endP].end}`) : null,
+        startTime: parseTimeToUtc(PERIOD_TIMES[startP]?.start),
+        endTime: parseTimeToUtc(PERIOD_TIMES[endP]?.end),
         subjectCode: item.subject_code || null,
         subjectName: item.subject_name || null,
         room: item.room || null,

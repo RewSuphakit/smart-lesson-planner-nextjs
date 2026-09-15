@@ -81,16 +81,10 @@ export default function GradeCsvModal({
       getValue: s => s.name
     },
     {
-      id: 'assign_scaled',
-      label: `งานเก็บ (${weights.assignment_weight}%)`,
+      id: 'affective',
+      label: `จิตพิสัย (${weights.affective_weight}%)`,
       defaultChecked: true,
-      getValue: s => Number(s.precise_scaled_assign || s.scaled_assign || 0).toFixed(1)
-    },
-    {
-      id: 'assign_raw',
-      label: `งานเก็บดิบ (เต็ม ${weights.max_assign_raw || (isPws ? 150 : 180)})`,
-      defaultChecked: true,
-      getValue: s => Number(s.raw_assign || 0).toFixed(1)
+      getValue: s => Number(s.affective_score || 0).toFixed(1)
     },
     {
       id: 'post_scaled',
@@ -105,6 +99,18 @@ export default function GradeCsvModal({
       getValue: s => Number(s.raw_post_test || 0).toFixed(1)
     },
     {
+      id: 'assign_scaled',
+      label: `งานเก็บ (${weights.assignment_weight}%)`,
+      defaultChecked: true,
+      getValue: s => Number(s.precise_scaled_assign || s.scaled_assign || 0).toFixed(1)
+    },
+    {
+      id: 'assign_raw',
+      label: `งานเก็บดิบ (เต็ม ${weights.max_assign_raw || (isPws ? 150 : 180)})`,
+      defaultChecked: true,
+      getValue: s => Number(s.raw_assign || 0).toFixed(1)
+    },
+    {
       id: 'midterm',
       label: `กลางภาค (${weights.midterm_weight}%)`,
       defaultChecked: weights.midterm_weight > 0,
@@ -115,12 +121,6 @@ export default function GradeCsvModal({
       label: `ปลายภาค (${weights.final_weight}%)`,
       defaultChecked: true,
       getValue: s => s.is_absent_final ? 'ข.ส.' : s.is_incomplete ? 'ม.ส.' : Number(s.precise_scaled_final || s.scaled_final || 0).toFixed(1)
-    },
-    {
-      id: 'affective',
-      label: `จิตพิสัย (${weights.affective_weight}%)`,
-      defaultChecked: true,
-      getValue: s => Number(s.affective_score || 0).toFixed(1)
     },
     {
       id: 'total_score',

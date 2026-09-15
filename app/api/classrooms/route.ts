@@ -3,7 +3,8 @@ import prisma from '@/lib/prisma';
 import { CurriculumType } from '@prisma/client';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { ClassroomSchema, validateRequestBody } from '@/lib/validation';
-import { resolveTargetWeeks, getCurrentWeek, getSemesterEndDate, getDefaultWeeks } from '@/lib/semester';
+import { getDefaultWeeks } from '@/lib/semester';
+import { formatClassroomResponse } from '@/lib/formatters';
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,41 +16,7 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     });
 
-    const result = classrooms.map((classroom) => {
-      const c = classroom as typeof classroom & {
-        curriculumType?: string;
-        totalWeeks?: number;
-        semesterStartDate?: Date | null;
-      };
-      const semesterStart = c.semesterStartDate ?? null;
-      const totalWeeks = resolveTargetWeeks(c);
-      const currentWeek = semesterStart ? getCurrentWeek(semesterStart, totalWeeks) : null;
-      const semesterEnd = semesterStart ? getSemesterEndDate(semesterStart, totalWeeks) : null;
-
-      return {
-        id: c.id,
-        name: c.name,
-        description: c.description,
-        late_to_absent_ratio: c.lateToAbsentRatio,
-        leave_to_absent_ratio: c.leaveToAbsentRatio,
-        absent_to_f_ratio: c.absentToFRatio,
-        total_classes: c.totalClasses,
-        min_attendance_percent: c.minAttendancePercent,
-        student_count: c._count.students,
-        assignment_weight: c.assignmentWeight ? Number(c.assignmentWeight) : 10,
-        post_test_weight: c.postTestWeight ? Number(c.postTestWeight) : 70,
-        affective_weight: c.affectiveWeight ? Number(c.affectiveWeight) : 20,
-        midterm_weight: c.midtermWeight ? Number(c.midtermWeight) : 0,
-        final_weight: c.finalWeight ? Number(c.finalWeight) : 0,
-        midterm_max_score: c.midtermMaxScore ? Number(c.midtermMaxScore) : 100,
-        final_max_score: c.finalMaxScore ? Number(c.finalMaxScore) : 100,
-        curriculum_type: c.curriculumType ?? 'pvch',
-        total_weeks: totalWeeks,
-        semester_start_date: semesterStart ? semesterStart.toISOString().split('T')[0] : null,
-        semester_end_date: semesterEnd ? semesterEnd.toISOString().split('T')[0] : null,
-        current_week: currentWeek,
-      };
-    });
+    const result = classrooms.map((classroom) => formatClassroomResponse(classroom));
 
     return NextResponse.json({ data: result });
   } catch (error) {

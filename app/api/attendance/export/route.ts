@@ -183,7 +183,8 @@ export async function GET(request: NextRequest) {
         const isF = overallConvertedAbsent > maxAllowedAbsences;
         const statusLabel = isF ? 'หมดสิทธิ์สอบ (มส.)' : 'ปกติ';
 
-        const studentRow: any[] = [
+        type ExcelCell = string | number | { t: string; f?: string; v: unknown };
+        const studentRow: ExcelCell[] = [
           student.studentCode || '',
           student.name
         ];

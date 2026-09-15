@@ -200,8 +200,16 @@ body::before {
   padding-left: 2.25rem !important;
 }
 
+.form-input.pl-10 {
+  padding-left: 2.5rem !important;
+}
+
 .form-input.pl-11 {
   padding-left: 2.75rem !important;
+}
+
+.form-input.pr-11 {
+  padding-right: 2.75rem !important;
 }
 
 .form-input:focus {

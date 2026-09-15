@@ -475,11 +475,11 @@ export default function Grades() {
       'ลำดับ',
       'รหัสประจำตัว',
       'ชื่อ-นามสกุล',
-      `งานเก็บ (${weights.assignment_weight}%)`,
+      `จิตพิสัย (${weights.affective_weight}%)`,
       `สอบย่อย (${weights.post_test_weight}%)`,
+      `งานเก็บ (${weights.assignment_weight}%)`,
       `กลางภาค (${weights.midterm_weight}%)`,
       `ปลายภาค (${weights.final_weight}%)`,
-      `จิตพิสัย (${weights.affective_weight}%)`,
       'รวมคะแนน (100)',
       'ระดับผลการเรียน',
       'เวลาเรียน (%)',
@@ -503,11 +503,11 @@ export default function Grades() {
         idx + 1,
         student.student_code || '-',
         student.name,
-        Number(student.precise_scaled_assign || student.scaled_assign || 0).toFixed(1),
+        Number(student.affective_score || 0).toFixed(1),
         Number(student.precise_scaled_post_test || student.scaled_post_test || 0).toFixed(1),
+        Number(student.precise_scaled_assign || student.scaled_assign || 0).toFixed(1),
         Number(student.precise_scaled_midterm || student.scaled_midterm || 0).toFixed(1),
         finalDisplay,
-        Number(student.affective_score || 0).toFixed(1),
         totalDisplay,
         student.grade || '0',
         `${student.attendance_percent ?? 100}%`,
@@ -739,23 +739,23 @@ export default function Grades() {
 
             {/* Visual Weight Distribution Progress Bar */}
             <div className="w-full h-3.5 bg-slate-200 rounded-full overflow-hidden flex shadow-inner">
-              <div style={{ width: `${Math.min(100, (weights.assignment_weight / 100) * 100)}%` }} className="bg-emerald-500 transition-all" title={`งานเก็บ ${weights.assignment_weight}%`} />
+              <div style={{ width: `${Math.min(100, (weights.affective_weight / 100) * 100)}%` }} className="bg-pink-500 transition-all" title={`จิตพิสัย ${weights.affective_weight}%`} />
               <div style={{ width: `${Math.min(100, (weights.post_test_weight / 100) * 100)}%` }} className="bg-amber-500 transition-all" title={`สอบย่อย ${weights.post_test_weight}%`} />
+              <div style={{ width: `${Math.min(100, (weights.assignment_weight / 100) * 100)}%` }} className="bg-emerald-500 transition-all" title={`งานเก็บ ${weights.assignment_weight}%`} />
               <div style={{ width: `${Math.min(100, (weights.midterm_weight / 100) * 100)}%` }} className="bg-cyan-500 transition-all" title={`กลางภาค ${weights.midterm_weight}%`} />
               <div style={{ width: `${Math.min(100, (weights.final_weight / 100) * 100)}%` }} className="bg-blue-500 transition-all" title={`ปลายภาค ${weights.final_weight}%`} />
-              <div style={{ width: `${Math.min(100, (weights.affective_weight / 100) * 100)}%` }} className="bg-pink-500 transition-all" title={`จิตพิสัย ${weights.affective_weight}%`} />
             </div>
 
             {/* Weight inputs */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2">
-              <div className="bg-white p-3 rounded-2xl border border-emerald-100 shadow-xs">
-                <label className="block text-[11px] font-bold text-emerald-700 uppercase mb-1">งานเก็บ (%)</label>
+              <div className="bg-white p-3 rounded-2xl border border-pink-100 shadow-xs">
+                <label className="block text-[11px] font-bold text-pink-700 uppercase mb-1">จิตพิสัย (%)</label>
                 <input 
                   type="number" min="0" max="100"
-                  value={weights.assignment_weight} 
-                  onChange={e => setWeights({...weights, assignment_weight: parseFloat(e.target.value) || 0})}
-                  className="form-input text-center font-bold text-emerald-800 text-sm py-1.5" 
-                  placeholder="20" 
+                  value={weights.affective_weight} 
+                  onChange={e => setWeights({...weights, affective_weight: parseFloat(e.target.value) || 0})}
+                  className="form-input text-center font-bold text-pink-800 text-sm py-1.5" 
+                  placeholder="10" 
                 />
               </div>
               <div className="bg-white p-3 rounded-2xl border border-amber-100 shadow-xs">
@@ -766,6 +766,16 @@ export default function Grades() {
                   onChange={e => setWeights({...weights, post_test_weight: parseFloat(e.target.value) || 0})}
                   className="form-input text-center font-bold text-amber-800 text-sm py-1.5" 
                   placeholder="30" 
+                />
+              </div>
+              <div className="bg-white p-3 rounded-2xl border border-emerald-100 shadow-xs">
+                <label className="block text-[11px] font-bold text-emerald-700 uppercase mb-1">งานเก็บ (%)</label>
+                <input 
+                  type="number" min="0" max="100"
+                  value={weights.assignment_weight} 
+                  onChange={e => setWeights({...weights, assignment_weight: parseFloat(e.target.value) || 0})}
+                  className="form-input text-center font-bold text-emerald-800 text-sm py-1.5" 
+                  placeholder="20" 
                 />
               </div>
               <div className="bg-white p-3 rounded-2xl border border-cyan-100 shadow-xs">
@@ -786,16 +796,6 @@ export default function Grades() {
                   onChange={e => setWeights({...weights, final_weight: parseFloat(e.target.value) || 0})}
                   className="form-input text-center font-bold text-blue-800 text-sm py-1.5" 
                   placeholder="20" 
-                />
-              </div>
-              <div className="bg-white p-3 rounded-2xl border border-pink-100 shadow-xs">
-                <label className="block text-[11px] font-bold text-pink-700 uppercase mb-1">จิตพิสัย (%)</label>
-                <input 
-                  type="number" min="0" max="100"
-                  value={weights.affective_weight} 
-                  onChange={e => setWeights({...weights, affective_weight: parseFloat(e.target.value) || 0})}
-                  className="form-input text-center font-bold text-pink-800 text-sm py-1.5" 
-                  placeholder="10" 
                 />
               </div>
             </div>
@@ -1171,13 +1171,17 @@ export default function Grades() {
                       >
                         ชื่อ-นามสกุล
                       </th>
-                      <th className="p-2.5 text-center text-emerald-800 min-w-[95px] bg-emerald-50/40 border-r border-emerald-100/50">
-                        งานเก็บ
-                        <div className="text-[10px] font-normal text-emerald-600 font-mono">({weights.assignment_weight}%)</div>
+                      <th className="p-2.5 text-center text-pink-800 min-w-[85px] bg-pink-50/40 border-r border-pink-100/50">
+                        จิตพิสัย
+                        <div className="text-[10px] font-normal text-pink-600 font-mono">({weights.affective_weight}%)</div>
                       </th>
                       <th className="p-2.5 text-center text-amber-800 min-w-[95px] bg-amber-50/40 border-r border-amber-100/50">
                         สอบย่อย
                         <div className="text-[10px] font-normal text-amber-600 font-mono">({weights.post_test_weight}%)</div>
+                      </th>
+                      <th className="p-2.5 text-center text-emerald-800 min-w-[95px] bg-emerald-50/40 border-r border-emerald-100/50">
+                        งานเก็บ
+                        <div className="text-[10px] font-normal text-emerald-600 font-mono">({weights.assignment_weight}%)</div>
                       </th>
                       <th className="p-2.5 text-center text-cyan-800 min-w-[100px] bg-cyan-50/40 border-r border-cyan-100/50">
                         กลางภาค
@@ -1186,10 +1190,6 @@ export default function Grades() {
                       <th className="p-2.5 text-center text-blue-800 min-w-[110px] bg-blue-50/40 border-r border-blue-100/50">
                         ปลายภาค
                         <div className="text-[10px] font-normal text-blue-600 font-mono">({weights.final_weight}%)</div>
-                      </th>
-                      <th className="p-2.5 text-center text-pink-800 min-w-[85px] bg-pink-50/40 border-r border-pink-100/50">
-                        จิตพิสัย
-                        <div className="text-[10px] font-normal text-pink-600 font-mono">({weights.affective_weight}%)</div>
                       </th>
                       <th className="p-2.5 text-center bg-indigo-100/70 text-indigo-900 font-black min-w-[85px] border-r border-indigo-200/50">
                         รวม
@@ -1245,15 +1245,27 @@ export default function Grades() {
                             </div>
                           </td>
 
-                          {/* Raw & Scaled Scores Breakdown */}
-                          <td className="p-2 text-center bg-emerald-50/20 border-r border-emerald-100/40">
-                            <div className="font-extrabold text-emerald-700 text-sm font-mono">{Number(student.precise_scaled_assign || student.scaled_assign || 0).toFixed(1)}</div>
-                            <div className="text-[10px] text-slate-400">ดิบ: {Number(student.raw_assign || 0).toFixed(1)}/{student.max_assign || 0}</div>
+                          {/* Affective Editable Score */}
+                          <td className="p-2 text-center bg-pink-50/20 border-r border-pink-100/40">
+                            <input 
+                              type="number" step="0.5" min="0" max={weights.affective_weight}
+                              value={student.affective_score ?? ''}
+                              onChange={e => handleExamScoreChange(student.student_id, 'affective_score', e.target.value)}
+                              className="form-input text-center py-1 px-1.5 w-16 mx-auto text-pink-800 font-bold border-pink-200 focus:border-pink-500 text-xs rounded-xl bg-white shadow-2xs" 
+                              placeholder="0"
+                            />
                           </td>
 
+                          {/* Raw & Scaled Post-test Breakdown */}
                           <td className="p-2 text-center bg-amber-50/20 border-r border-amber-100/40">
                             <div className="font-extrabold text-amber-700 text-sm font-mono">{Number(student.precise_scaled_post_test || student.scaled_post_test || 0).toFixed(1)}</div>
                             <div className="text-[10px] text-slate-400">ดิบ: {Number(student.raw_post_test || 0).toFixed(1)}/{student.max_post_test || 0}</div>
+                          </td>
+
+                          {/* Raw & Scaled Assignment Breakdown */}
+                          <td className="p-2 text-center bg-emerald-50/20 border-r border-emerald-100/40">
+                            <div className="font-extrabold text-emerald-700 text-sm font-mono">{Number(student.precise_scaled_assign || student.scaled_assign || 0).toFixed(1)}</div>
+                            <div className="text-[10px] text-slate-400">ดิบ: {Number(student.raw_assign || 0).toFixed(1)}/{student.max_assign || 0}</div>
                           </td>
 
                           {/* Midterm Editable Score */}
@@ -1326,17 +1338,6 @@ export default function Grades() {
                                 </div>
                               </>
                             )}
-                          </td>
-
-                          {/* Affective Editable Score */}
-                          <td className="p-2 text-center bg-pink-50/20 border-r border-pink-100/40">
-                            <input 
-                              type="number" step="0.5" min="0" max={weights.affective_weight}
-                              value={student.affective_score ?? ''}
-                              onChange={e => handleExamScoreChange(student.student_id, 'affective_score', e.target.value)}
-                              className="form-input text-center py-1 px-1.5 w-16 mx-auto text-pink-800 font-bold border-pink-200 focus:border-pink-500 text-xs rounded-xl bg-white shadow-2xs" 
-                              placeholder="0"
-                            />
                           </td>
 
                           {/* Precise Total Score */}
@@ -1417,12 +1418,15 @@ export default function Grades() {
 
                       {/* Scores Grid */}
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1 text-xs">
-                        <div className="p-2.5 rounded-2xl bg-emerald-50/50 border border-emerald-100">
-                          <span className="text-[10px] font-bold text-emerald-700 uppercase">งานเก็บ ({weights.assignment_weight}%)</span>
-                          <div className="font-extrabold text-emerald-800 text-base font-mono">
-                            {Number(student.precise_scaled_assign || student.scaled_assign || 0).toFixed(1)}
-                          </div>
-                          <span className="text-[9px] text-slate-400">ดิบ {Number(student.raw_assign || 0).toFixed(0)}/{student.max_assign || 0}</span>
+                        <div className="p-2.5 rounded-2xl bg-pink-50/50 border border-pink-100">
+                          <span className="text-[10px] font-bold text-pink-700 uppercase">จิตพิสัย ({weights.affective_weight}%)</span>
+                          <input 
+                            type="number" step="0.5" min="0" max={weights.affective_weight}
+                            value={student.affective_score ?? ''}
+                            onChange={e => handleExamScoreChange(student.student_id, 'affective_score', e.target.value)}
+                            className="form-input text-center py-1 px-1 w-full text-pink-900 font-bold border-pink-200 focus:border-pink-500 text-xs rounded-xl bg-white mt-1" 
+                            placeholder="0"
+                          />
                         </div>
 
                         <div className="p-2.5 rounded-2xl bg-amber-50/50 border border-amber-100">
@@ -1431,6 +1435,14 @@ export default function Grades() {
                             {Number(student.precise_scaled_post_test || student.scaled_post_test || 0).toFixed(1)}
                           </div>
                           <span className="text-[9px] text-slate-400">ดิบ {Number(student.raw_post_test || 0).toFixed(0)}/{student.max_post_test || 0}</span>
+                        </div>
+
+                        <div className="p-2.5 rounded-2xl bg-emerald-50/50 border border-emerald-100">
+                          <span className="text-[10px] font-bold text-emerald-700 uppercase">งานเก็บ ({weights.assignment_weight}%)</span>
+                          <div className="font-extrabold text-emerald-800 text-base font-mono">
+                            {Number(student.precise_scaled_assign || student.scaled_assign || 0).toFixed(1)}
+                          </div>
+                          <span className="text-[9px] text-slate-400">ดิบ {Number(student.raw_assign || 0).toFixed(0)}/{student.max_assign || 0}</span>
                         </div>
 
                         <div className="p-2.5 rounded-2xl bg-cyan-50/50 border border-cyan-100">
@@ -1460,17 +1472,6 @@ export default function Grades() {
                               placeholder="0"
                             />
                           )}
-                        </div>
-
-                        <div className="p-2.5 rounded-2xl bg-pink-50/50 border border-pink-100">
-                          <span className="text-[10px] font-bold text-pink-700 uppercase">จิตพิสัย ({weights.affective_weight}%)</span>
-                          <input 
-                            type="number" step="0.5" min="0" max={weights.affective_weight}
-                            value={student.affective_score ?? ''}
-                            onChange={e => handleExamScoreChange(student.student_id, 'affective_score', e.target.value)}
-                            className="form-input text-center py-1 px-1 w-full text-pink-900 font-bold border-pink-200 focus:border-pink-500 text-xs rounded-xl bg-white mt-1" 
-                            placeholder="0"
-                          />
                         </div>
 
                         <div className="p-2.5 rounded-2xl bg-indigo-50 border border-indigo-200 flex flex-col justify-center text-center">
