@@ -5,12 +5,23 @@ import { NextResponse } from 'next/server';
 export const LoginSchema = z.object({
   email: z.string().trim().email('Invalid email address format'),
   password: z.string().min(1, 'Password is required'),
+  rememberMe: z.boolean().optional(),
 });
 
 export const RegisterSchema = z.object({
   email: z.string().trim().email('Invalid email address format'),
   password: z.string().min(6, 'Password must be at least 6 characters long'),
   name: z.string().trim().min(1, 'Name is required'),
+});
+
+export const ForgotPasswordSchema = z.object({
+  email: z.string().trim().email('กรุณาระบุรูปแบบอีเมลให้ถูกต้อง'),
+});
+
+export const ResetPasswordSchema = z.object({
+  email: z.string().trim().email('กรุณาระบุรูปแบบอีเมลให้ถูกต้อง'),
+  code: z.string().trim().length(6, 'รหัส OTP ต้องมีความยาว 6 หลัก'),
+  newPassword: z.string().min(6, 'รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 6 ตัวอักษร'),
 });
 
 // ==================== Student Schemas ====================

@@ -77,12 +77,28 @@ export async function GET(request: NextRequest) {
       maxPostTestRaw = targetWeeks * 10;
     }
 
-    // Get students with scores and attendance
+    // Get students with scores and attendance (lean projection to minimize memory & transfer)
     const students = await prisma.student.findMany({
       where: { classroomId: numericClassroomId },
-      include: {
-        studentScores: true,
-        attendance: { where: { classroomId: numericClassroomId } },
+      select: {
+        id: true,
+        name: true,
+        studentCode: true,
+        midtermScore: true,
+        finalScore: true,
+        affectiveScore: true,
+        attendance: {
+          where: { classroomId: numericClassroomId },
+          select: { status: true },
+        },
+        studentScores: {
+          where: { classroomId: numericClassroomId },
+          select: {
+            lessonNumber: true,
+            assignmentScore: true,
+            postTestScore: true,
+          },
+        },
       },
       orderBy: [{ studentCode: 'asc' }, { name: 'asc' }],
     });

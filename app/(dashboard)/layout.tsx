@@ -4,10 +4,10 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import {
-  LayoutDashboard, BookOpen, Calendar, Users,
-  FileText, LogOut, Menu, GraduationCap,
+  LayoutDashboard, Calendar, Users,
+  LogOut, Menu, GraduationCap,
   Presentation, CheckCircle, Award, CheckSquare,
-  Smile, UserCog
+  Smile, UserCog, Mail, ArrowRight
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
@@ -35,20 +35,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     if (!loading && !user) {
-      router.push('/login');
+      document.cookie = 'token=; Max-Age=0; path=/;';
+      window.location.href = '/login';
+      return;
+    }
+    if (!loading && user && user.emailVerified === false) {
+      router.replace(`/verify-email?email=${encodeURIComponent(user.email)}`);
     }
   }, [user, loading, router]);
 
-  if (loading) {
+  if (loading || !user) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-400" />
-        <p className="text-slate-500 text-sm">กำลังโหลด...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-slate-50">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        <p className="text-slate-600 text-sm font-medium">กำลังโหลด...</p>
       </div>
     );
   }
-
-  if (!user) return null;
 
   const handleLogout = () => {
     logout();
@@ -169,6 +172,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <h1 className="text-base font-bold gradient-text">Smart Planner</h1>
           </div>
         </header>
+
+        {/* Unverified Email Warning Banner */}
+        {user && user.emailVerified === false && (
+          <div className="mt-4 mx-4 lg:mx-8 p-3 bg-amber-50 border border-amber-200/80 rounded-2xl flex items-center justify-between gap-3 animate-fade-in text-xs">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <Mail className="w-4 h-4 text-amber-600 shrink-0" />
+              <span className="text-amber-900 font-medium truncate">
+                กรุณายืนยันอีเมล ({user.email})
+              </span>
+            </div>
+            <Link
+              href={`/verify-email?email=${encodeURIComponent(user.email)}`}
+              className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-medium text-xs transition-all shrink-0"
+            >
+              ยืนยันอีเมล
+            </Link>
+          </div>
+        )}
 
         <div className="flex-1 p-4 lg:p-8 overflow-y-auto overflow-x-hidden">
           <ErrorBoundary>

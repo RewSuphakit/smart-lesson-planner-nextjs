@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
-import { formatAttendanceRecord, calculateAttendanceStats } from '@/lib/formatters';
+import { formatAttendanceRecord, calculateAttendanceStatsFromGrouped } from '@/lib/formatters';
 
 export async function GET(request: NextRequest) {
   try {
@@ -71,11 +71,13 @@ export async function GET(request: NextRequest) {
       });
       if (!classroom) return NextResponse.json([], { status: 200 });
 
-      const records = await prisma.attendance.findMany({
+      const groupedCounts = await prisma.attendance.groupBy({
+        by: ['studentId', 'status'],
         where: { classroomId: Number(classroomId) },
+        _count: true,
       });
 
-      const stats = calculateAttendanceStats(records, classroom);
+      const stats = calculateAttendanceStatsFromGrouped(groupedCounts, classroom);
       return NextResponse.json({ data: stats });
     }
 
@@ -100,13 +102,18 @@ export async function POST(request: NextRequest) {
         status: 'present' | 'late' | 'absent' | 'leave';
       }
       const records = body.records as RecordInput[];
-      // Find unique classroom IDs and verify ownership
+      // Find unique classroom IDs and verify ownership in a single query
       const classroomIds = Array.from(new Set(records.map(r => Number(r.classroom_id)))) as number[];
-      for (const cid of classroomIds) {
-        const classroom = await prisma.classroom.findFirst({
-          where: { id: cid, userId: user.id }
+      if (classroomIds.length > 0) {
+        const ownedClassrooms = await prisma.classroom.findMany({
+          where: { id: { in: classroomIds }, userId: user.id },
+          select: { id: true },
         });
-        if (!classroom) return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
+        const ownedClassroomIds = new Set(ownedClassrooms.map(c => c.id));
+        const hasUnauthorizedClassroom = classroomIds.some(cid => !ownedClassroomIds.has(cid));
+        if (hasUnauthorizedClassroom) {
+          return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
+        }
       }
 
       // Verify student ownership for all students in the request

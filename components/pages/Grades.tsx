@@ -82,21 +82,36 @@ export interface Weights {
 
 const animalAvatars = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐧', '🐥', '🦉', '🦄', '🐙', '🐢', '🦖', '🦕', '🦦', '🦥'];
 
+const EMPTY_CLASSROOMS: Classroom[] = [];
+
+const DEFAULT_CRITERIA: Criterion[] = [
+  { grade: '4', min_score: 80 },
+  { grade: '3.5', min_score: 75 },
+  { grade: '3', min_score: 70 },
+  { grade: '2.5', min_score: 65 },
+  { grade: '2', min_score: 60 },
+  { grade: '1.5', min_score: 55 },
+  { grade: '1', min_score: 50 },
+  { grade: '0', min_score: 0 },
+];
+
+const DEFAULT_WEIGHTS: Weights = {
+  assignment_weight: 10,
+  post_test_weight: 70,
+  affective_weight: 20,
+  midterm_weight: 0,
+  final_weight: 0,
+  midterm_max_score: 100,
+  final_max_score: 100
+};
+
 export default function Grades() {
   const queryClient = useQueryClient();
 
   const [selectedClass, setSelectedClass] = useState<string>('');
   const [report, setReport] = useState<ReportStudent[]>([]);
   const [criteria, setCriteria] = useState<Criterion[]>([]);
-  const [weights, setWeights] = useState<Weights>({
-    assignment_weight: 10,
-    post_test_weight: 70,
-    affective_weight: 20,
-    midterm_weight: 0,
-    final_weight: 0,
-    midterm_max_score: 100,
-    final_max_score: 100
-  });
+  const [weights, setWeights] = useState<Weights>(DEFAULT_WEIGHTS);
   const [showSettings, setShowSettings] = useState(false);
   const { user } = useAuth();
   const [showPdfPreviewModal, setShowPdfPreviewModal] = useState(false);
@@ -148,19 +163,8 @@ export default function Grades() {
     return Math.max(160, Math.min(550, w + customWidthOffset));
   }, [nameColMode, calculatedAutoWidth, customWidthOffset]);
 
-  const defaultCriteria: Criterion[] = [
-    { grade: '4', min_score: 80 },
-    { grade: '3.5', min_score: 75 },
-    { grade: '3', min_score: 70 },
-    { grade: '2.5', min_score: 65 },
-    { grade: '2', min_score: 60 },
-    { grade: '1.5', min_score: 55 },
-    { grade: '1', min_score: 50 },
-    { grade: '0', min_score: 0 },
-  ];
-
   // ─── Query: ดึงข้อมูลห้องเรียน ───
-  const { data: classrooms = [], isLoading: loadingClassrooms } = useQuery<Classroom[]>({
+  const { data: classrooms = EMPTY_CLASSROOMS, isLoading: loadingClassrooms } = useQuery<Classroom[]>({
     queryKey: ['classrooms'],
     queryFn: async () => {
       const res = await api.get('/classrooms');
@@ -184,7 +188,7 @@ export default function Grades() {
       const loadedCriteria = critRes.data.data;
       const finalCriteria = (loadedCriteria && loadedCriteria.length > 0)
         ? loadedCriteria
-        : defaultCriteria.map(c => ({ ...c }));
+        : DEFAULT_CRITERIA.map(c => ({ ...c }));
 
       return {
         criteria: finalCriteria,
@@ -198,8 +202,8 @@ export default function Grades() {
   // Sync query data into local state
   useEffect(() => {
     if (gradesData) {
-      setCriteria(gradesData.criteria);
-      setReport(gradesData.report);
+      setCriteria(gradesData.criteria || []);
+      setReport(gradesData.report || []);
       if (gradesData.weights) {
         setWeights(gradesData.weights);
       }
@@ -208,12 +212,22 @@ export default function Grades() {
     }
   }, [gradesData]);
 
+  // Reset local state when no class is selected
+  useEffect(() => {
+    if (!selectedClass) {
+      setReport(prev => (prev.length === 0 ? prev : []));
+      setCriteria(prev => (prev.length === 0 ? prev : []));
+      setHasUnsavedChanges(prev => (prev ? false : prev));
+    }
+  }, [selectedClass]);
+
   // Update weights when classroom changes
   useEffect(() => {
-    if (selectedClass) {
-      const c = classrooms.find(cl => String(cl.id) === String(selectedClass));
-      if (c) {
-        setWeights({
+    if (!selectedClass || classrooms.length === 0) return;
+    const c = classrooms.find(cl => String(cl.id) === String(selectedClass));
+    if (c) {
+      setWeights(prev => {
+        const nextWeights = {
           assignment_weight: c.assignment_weight ?? 10,
           post_test_weight: c.post_test_weight ?? 70,
           affective_weight: c.affective_weight ?? 20,
@@ -221,12 +235,20 @@ export default function Grades() {
           final_weight: c.final_weight ?? 0,
           midterm_max_score: c.midterm_max_score ?? 100,
           final_max_score: c.final_max_score ?? 100
-        });
-      }
-    } else {
-      setReport([]);
-      setCriteria([]);
-      setHasUnsavedChanges(false);
+        };
+        if (
+          prev.assignment_weight === nextWeights.assignment_weight &&
+          prev.post_test_weight === nextWeights.post_test_weight &&
+          prev.affective_weight === nextWeights.affective_weight &&
+          prev.midterm_weight === nextWeights.midterm_weight &&
+          prev.final_weight === nextWeights.final_weight &&
+          prev.midterm_max_score === nextWeights.midterm_max_score &&
+          prev.final_max_score === nextWeights.final_max_score
+        ) {
+          return prev;
+        }
+        return { ...prev, ...nextWeights };
+      });
     }
   }, [selectedClass, classrooms]);
 
@@ -852,7 +874,7 @@ export default function Grades() {
                   ใช้เกรดอักษร (A-F)
                 </button>
                 <button 
-                  onClick={() => setCriteria([...defaultCriteria])}
+                  onClick={() => setCriteria([...DEFAULT_CRITERIA])}
                   className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors border border-emerald-200"
                 >
                   ใช้เกรดตัวเลข (4-0)

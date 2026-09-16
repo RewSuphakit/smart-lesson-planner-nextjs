@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import { Toaster } from 'react-hot-toast';
+import { Toaster as HotToaster } from 'react-hot-toast';
+import { Toaster as SonnerToaster } from 'sonner';
 import { AuthProvider } from '@/context/AuthContext';
 import QueryProvider from '@/components/QueryProvider';
 import { Analytics } from '@vercel/analytics/next';
@@ -21,7 +22,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <QueryProvider>
           <AuthProvider>
-            <Toaster
+            <HotToaster
               position="top-right"
               toastOptions={{
                 style: {
@@ -35,6 +36,7 @@ export default function RootLayout({
                 error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
               }}
             />
+            <SonnerToaster richColors position="top-right" closeButton />
             {children}
             <Analytics />
             <SpeedInsights />

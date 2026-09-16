@@ -7,7 +7,8 @@ import toast from 'react-hot-toast';
 import {
   User, Mail, Lock, Shield, Sparkles, Check,
   Eye, EyeOff, Save, KeyRound, Calendar,
-  Loader2, BadgeCheck
+  Loader2, BadgeCheck, Edit2, ArrowRight, X,
+  RotateCw, AlertCircle, CheckCircle2, Info
 } from 'lucide-react';
 
 const ANIMAL_AVATARS = [
@@ -49,6 +50,92 @@ export default function ProfilePage() {
   // Account metadata
   const [createdAt, setCreatedAt] = useState<string | null>(null);
   const [loadingInitial, setLoadingInitial] = useState(true);
+
+  // Email change state & modal
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [emailStep, setEmailStep] = useState<'request' | 'verify'>('request');
+  const [newEmail, setNewEmail] = useState('');
+  const [emailOtp, setEmailOtp] = useState('');
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [devOtpNotice, setDevOtpNotice] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState(0);
+
+  // Countdown timer for resend OTP
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const timer = setInterval(() => {
+      setCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [countdown]);
+
+  const openEmailModal = () => {
+    setNewEmail('');
+    setEmailOtp('');
+    setEmailStep('request');
+    setDevOtpNotice(null);
+    setCountdown(0);
+    setIsEmailModalOpen(true);
+  };
+
+  const handleRequestEmailOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cleanEmail = newEmail.trim().toLowerCase();
+    if (!cleanEmail) {
+      toast.error('กรุณาระบุที่อยู่อีเมลใหม่');
+      return;
+    }
+    if (cleanEmail === user?.email?.toLowerCase()) {
+      toast.error('อีเมลนี้ตรงกับอีเมลปัจจุบันของคุณแล้ว');
+      return;
+    }
+
+    setEmailLoading(true);
+    try {
+      const res = await api.post('/auth/profile/email/request', { newEmail: cleanEmail });
+      toast.success(res.data.message || 'ส่งรหัส OTP เรียบร้อยแล้ว');
+      if (res.data.isDevMode && res.data.devCode) {
+        setDevOtpNotice(res.data.devCode);
+      } else {
+        setDevOtpNotice(null);
+      }
+      setEmailStep('verify');
+      setCountdown(60);
+    } catch (err: unknown) {
+      const apiErr = err as ApiError;
+      toast.error(apiErr.response?.data?.message || 'ไม่สามารถส่งรหัส OTP ได้');
+    } finally {
+      setEmailLoading(false);
+    }
+  };
+
+  const handleVerifyEmailOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanCode = emailOtp.trim();
+    if (!cleanCode || cleanCode.length !== 6) {
+      toast.error('กรุณากรอกรหัส OTP 6 หลัก');
+      return;
+    }
+
+    setEmailLoading(true);
+    try {
+      const res = await api.post('/auth/profile/email/verify', { code: cleanCode });
+      if (res.data.user) {
+        updateUser(res.data.user);
+      }
+      if (res.data.token) {
+        localStorage.setItem('token', res.data.token);
+        document.cookie = `token=${res.data.token}; path=/; max-age=604800; SameSite=Lax`;
+      }
+      toast.success(res.data.message || 'เปลี่ยนที่อยู่อีเมลสำเร็จเรียบร้อย 🎉');
+      setIsEmailModalOpen(false);
+    } catch (err: unknown) {
+      const apiErr = err as ApiError;
+      toast.error(apiErr.response?.data?.message || 'การยืนยันรหัส OTP ล้มเหลว');
+    } finally {
+      setEmailLoading(false);
+    }
+  };
 
   // Initialize from user or fetch profile
   useEffect(() => {
@@ -315,28 +402,45 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                {/* Email (Read-only) */}
+                {/* Email (with Change Email option) */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <label htmlFor="email-display" className="block text-xs font-semibold text-slate-700">
-                      ที่อยู่อีเมล
+                      ที่อยู่อีเมลเข้าสู่ระบบ
                     </label>
-                    <span className="text-[0.68rem] text-slate-400 font-medium">
-                      เชื่อมต่อกับบัญชีเข้าสู่ระบบ (ไม่สามารถแก้ไขได้)
-                    </span>
+                    <button
+                      type="button"
+                      onClick={openEmailModal}
+                      className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 inline-flex items-center gap-1 hover:underline transition-colors"
+                    >
+                      <Edit2 className="w-3 h-3" /> เปลี่ยนอีเมล
+                    </button>
                   </div>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                      <Mail className="w-4 h-4" />
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                        <Mail className="w-4 h-4" />
+                      </div>
+                      <input
+                        id="email-display"
+                        type="email"
+                        value={user?.email || ''}
+                        disabled
+                        className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-100/80 border border-slate-200 text-sm text-slate-700 font-medium cursor-not-allowed select-none"
+                      />
                     </div>
-                    <input
-                      id="email-display"
-                      type="email"
-                      value={user?.email || ''}
-                      disabled
-                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-100/80 border border-slate-200 text-sm text-slate-500 font-medium cursor-not-allowed select-none"
-                    />
+                    <button
+                      type="button"
+                      onClick={openEmailModal}
+                      className="px-4 py-2.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium text-xs border border-indigo-200 shadow-sm transition-all flex items-center gap-1.5 shrink-0"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                      เปลี่ยนอีเมล
+                    </button>
                   </div>
+                  <p className="text-[0.72rem] text-slate-500">
+                    อีเมลใช้สำหรับการเข้าสู่ระบบและกู้คืนรหัสผ่าน สามารถเปลี่ยนเป็นอีเมลจริงได้โดยข้อมูลเดิมยังคงอยู่ครบถ้วน
+                  </p>
                 </div>
 
                 {/* Avatar Selection */}
@@ -567,6 +671,222 @@ export default function ProfilePage() {
           )}
         </div>
       </div>
+
+      {/* ================= Email Change Modal ================= */}
+      {isEmailModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
+          <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 p-6 sm:p-8 overflow-hidden animate-scale-up">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+                  <Mail className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold text-slate-800">
+                    เปลี่ยนที่อยู่อีเมลประจำบัญชี
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {emailStep === 'request'
+                      ? 'ขั้นตอนที่ 1/2: ระบุอีเมลใหม่เพื่อรับรหัสยืนยัน'
+                      : 'ขั้นตอนที่ 2/2: ยืนยันรหัส OTP 6 หลัก'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => !emailLoading && setIsEmailModalOpen(false)}
+                disabled={emailLoading}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            {emailStep === 'request' ? (
+              /* Step 1: Request Email */
+              <form onSubmit={handleRequestEmailOtp} className="mt-5 space-y-4">
+                {/* Current Email Card */}
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 flex items-center justify-between text-xs">
+                  <span className="text-slate-500 font-medium">อีเมลปัจจุบัน:</span>
+                  <span className="font-bold text-slate-700">{user?.email}</span>
+                </div>
+
+                {/* Assurance Alert */}
+                <div className="p-3.5 bg-indigo-50/70 rounded-2xl border border-indigo-100 text-xs text-indigo-900 flex items-start gap-2.5">
+                  <Info className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="font-semibold text-indigo-950">ข้อมูลทั้งหมดจะคงอยู่ครบถ้วน</p>
+                    <p className="text-indigo-700 text-[0.72rem] leading-relaxed">
+                      ตารางสอน รายชื่อนักเรียน และผลคะแนนจะไม่หาย ระบบจะส่งรหัส OTP ไปยังอีเมลใหม่เพื่อยืนยันความเป็นเจ้าของ
+                    </p>
+                  </div>
+                </div>
+
+                {/* New Email Input */}
+                <div className="space-y-1.5">
+                  <label htmlFor="modal-new-email" className="block text-xs font-semibold text-slate-700">
+                    ที่อยู่อีเมลใหม่ <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <Mail className="w-4 h-4" />
+                    </div>
+                    <input
+                      id="modal-new-email"
+                      type="email"
+                      value={newEmail}
+                      onChange={(e) => setNewEmail(e.target.value)}
+                      placeholder="เช่น yourname@gmail.com หรืออีเมลวิทยาลัย"
+                      required
+                      autoFocus
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50/60 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm text-slate-800 font-medium shadow-sm transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* Modal Footer Buttons */}
+                <div className="pt-3 flex items-center justify-end gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsEmailModalOpen(false)}
+                    disabled={emailLoading}
+                    className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={emailLoading || !newEmail.trim()}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold text-xs shadow-md shadow-indigo-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {emailLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" /> กำลังส่งรหัส...
+                      </>
+                    ) : (
+                      <>
+                        ส่งรหัส OTP ยืนยัน <ArrowRight className="w-3.5 h-3.5" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              /* Step 2: Verify OTP */
+              <form onSubmit={handleVerifyEmailOtp} className="mt-5 space-y-4">
+                {/* Target email badge with change button */}
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-1.5 overflow-hidden">
+                    <span className="text-slate-500">ส่งรหัสไปที่:</span>
+                    <span className="font-bold text-slate-800 truncate">{newEmail}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmailStep('request');
+                      setEmailOtp('');
+                    }}
+                    className="text-xs text-indigo-600 hover:text-indigo-700 font-semibold underline shrink-0 ml-2"
+                  >
+                    แก้ไขอีเมล
+                  </button>
+                </div>
+
+                {/* Dev mode OTP fallback helper if active */}
+                {devOtpNotice && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-800 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5 text-amber-600" /> [โหมดทดสอบ] รหัส OTP:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setEmailOtp(devOtpNotice)}
+                        className="px-2 py-0.5 bg-amber-200/60 hover:bg-amber-200 rounded-lg font-mono font-bold text-amber-900 text-xs transition-colors"
+                      >
+                        กดเพื่อกรอกอัตโนมัติ
+                      </button>
+                    </div>
+                    <p className="font-mono text-base font-extrabold text-amber-900 tracking-widest text-center">
+                      {devOtpNotice}
+                    </p>
+                  </div>
+                )}
+
+                {/* OTP Input */}
+                <div className="space-y-1.5">
+                  <label htmlFor="modal-otp-input" className="block text-xs font-semibold text-slate-700 text-center">
+                    กรอกรหัสยืนยัน OTP (6 หลัก) <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    id="modal-otp-input"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={emailOtp}
+                    onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, ''))}
+                    placeholder="000000"
+                    required
+                    autoFocus
+                    className="w-full py-3 text-center text-3xl font-mono tracking-[0.5em] rounded-2xl bg-slate-50 border-2 border-indigo-200 focus:outline-none focus:border-indigo-600 text-slate-900 font-bold shadow-inner"
+                  />
+                  <p className="text-[0.72rem] text-slate-400 text-center">
+                    รหัสยืนยันมีอายุ 15 นาที หากไม่พบในกล่องจดหมาย กรุณาตรวจสอบในโฟลเดอร์ Junk/Spam
+                  </p>
+                </div>
+
+                {/* Resend OTP */}
+                <div className="text-center text-xs">
+                  {countdown > 0 ? (
+                    <span className="text-slate-400">
+                      ขอรหัสใหม่ได้ในอีก <strong className="text-indigo-600">{countdown}</strong> วินาที
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleRequestEmailOtp()}
+                      disabled={emailLoading}
+                      className="text-indigo-600 hover:text-indigo-700 font-semibold inline-flex items-center gap-1 hover:underline"
+                    >
+                      <RotateCw className={`w-3.5 h-3.5 ${emailLoading ? 'animate-spin' : ''}`} />
+                      ส่งรหัส OTP ใหม่อีกครั้ง
+                    </button>
+                  )}
+                </div>
+
+                {/* Modal Footer Buttons */}
+                <div className="pt-3 flex items-center justify-end gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsEmailModalOpen(false)}
+                    disabled={emailLoading}
+                    className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={emailLoading || emailOtp.length !== 6}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold text-xs shadow-md shadow-indigo-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {emailLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" /> กำลังตรวจสอบ...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5" /> ยืนยันและเปลี่ยนอีเมล
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

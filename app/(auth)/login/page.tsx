@@ -1,14 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { 
-  GraduationCap, Loader2, Mail, Lock, LogIn, Eye, EyeOff, 
-  Sparkles, ArrowRight, ShieldCheck 
+import {
+  GraduationCap, Loader2, Mail, Lock, Eye, EyeOff,
+  Sparkles, ArrowRight, ShieldCheck
 } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import GoogleSignInButton from '@/components/GoogleSignInButton';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -19,16 +20,49 @@ export default function LoginPage() {
   const { login } = useAuth();
   const router = useRouter();
 
+  // Load remembered email on mount if user previously checked rememberMe
+  useEffect(() => {
+    try {
+      const savedEmail = localStorage.getItem('remembered_email');
+      if (savedEmail) {
+        setEmail(savedEmail);
+        setRememberMe(true);
+      }
+    } catch {
+      // Ignore localStorage read errors
+    }
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await login(email, password);
+      // Store or clear remembered email based on rememberMe checkbox
+      try {
+        if (rememberMe) {
+          localStorage.setItem('remembered_email', email);
+        } else {
+          localStorage.removeItem('remembered_email');
+        }
+      } catch {
+        // Ignore localStorage write errors
+      }
+
+      await login(email, password, rememberMe);
       toast.success('เข้าสู่ระบบสำเร็จ!');
       router.push('/');
     } catch (error: unknown) {
-      const err = error as { response?: { data?: { message?: string } } };
-      toast.error(err.response?.data?.message || 'เข้าสู่ระบบไม่สำเร็จ');
+      const err = error as { response?: { data?: { message?: string; requireVerification?: boolean; email?: string } } };
+      if (err.response?.data?.requireVerification) {
+        toast('กรุณายืนยันอีเมลก่อนเข้าใช้งาน', {
+          icon: '📧',
+          duration: 3000,
+        });
+        const targetEmail = err.response.data.email || email;
+        router.push(`/verify-email?email=${encodeURIComponent(targetEmail)}`);
+      } else {
+        toast.error(err.response?.data?.message || 'เข้าสู่ระบบไม่สำเร็จ');
+      }
     } finally {
       setLoading(false);
     }
@@ -42,8 +76,8 @@ export default function LoginPage() {
         <div className="absolute top-1/4 -right-40 w-96 h-96 bg-purple-200/40 rounded-full blur-3xl animate-pulse delay-700" />
         <div className="absolute -bottom-40 left-1/3 w-96 h-96 bg-emerald-100/50 rounded-full blur-3xl animate-pulse delay-1000" />
         {/* Subtle grid pattern */}
-        <div 
-          className="absolute inset-0 opacity-[0.03]" 
+        <div
+          className="absolute inset-0 opacity-[0.03]"
           style={{
             backgroundImage: `radial-gradient(#4f46e5 1px, transparent 1px)`,
             backgroundSize: '24px 24px'
@@ -86,7 +120,7 @@ export default function LoginPage() {
                 <input
                   type="email"
                   className="form-input pl-11 py-2.5 text-sm rounded-xl bg-slate-50/60 focus:bg-white border-slate-200 focus:border-indigo-500 transition-all font-normal"
-                  placeholder="name@school.ac.th"
+                  placeholder="กรุณากรอกอีเมล"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -100,6 +134,12 @@ export default function LoginPage() {
                 <label className="form-label text-xs font-semibold text-slate-700 block mb-0">
                   รหัสผ่าน
                 </label>
+                <Link
+                  href="/forgot-password"
+                  className="text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline transition-colors"
+                >
+                  ลืมรหัสผ่าน?
+                </Link>
               </div>
               <div className="relative group">
                 <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 group-focus-within:text-indigo-600 transition-colors flex items-center justify-center">
@@ -158,14 +198,26 @@ export default function LoginPage() {
                 )}
               </button>
             </div>
+
+            {/* Divider */}
+            <div className="relative flex items-center justify-center my-4">
+              <div className="border-t border-slate-200 w-full" />
+              <span className="bg-white/95 px-3 text-[11px] text-slate-400 font-normal shrink-0">
+                หรือ
+              </span>
+              <div className="border-t border-slate-200 w-full" />
+            </div>
+
+            {/* Google Sign-in */}
+            <GoogleSignInButton text="continue_with" />
           </form>
 
           {/* Switch to Register */}
           <div className="mt-6 pt-5 border-t border-slate-100 text-center">
             <p className="text-xs text-slate-500">
               ยังไม่มีบัญชีผู้ใช้งาน?{' '}
-              <Link 
-                href="/register" 
+              <Link
+                href="/register"
                 className="text-indigo-600 hover:text-indigo-700 font-semibold transition-colors hover:underline"
               >
                 สมัครสมาชิกใหม่

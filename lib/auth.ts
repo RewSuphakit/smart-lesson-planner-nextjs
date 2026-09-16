@@ -15,11 +15,23 @@ interface JwtPayload {
   role: string;
 }
 
-export function generateToken(user: { id: number; email: string; role: string }): string {
+export function generateToken(
+  user: { id: number; email: string; role: string },
+  rememberMe?: boolean
+): string {
+  let expiresIn: string;
+  if (rememberMe === true) {
+    expiresIn = '30d';
+  } else if (rememberMe === false) {
+    expiresIn = '1d';
+  } else {
+    expiresIn = process.env.JWT_EXPIRES_IN || '7d';
+  }
+
   return jwt.sign(
     { id: user.id, email: user.email, role: user.role },
     getJwtSecret(),
-    { expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as jwt.SignOptions['expiresIn'] }
+    { expiresIn: expiresIn as jwt.SignOptions['expiresIn'] }
   );
 }
 
@@ -63,7 +75,20 @@ function getCookieMaxAge(): number {
   }
 }
 
-export function setAuthCookie(response: NextResponse, token: string): void {
+export function setAuthCookie(
+  response: NextResponse,
+  token: string,
+  rememberMe?: boolean
+): void {
+  let maxAge: number;
+  if (rememberMe === true) {
+    maxAge = 30 * 24 * 60 * 60; // 30 days
+  } else if (rememberMe === false) {
+    maxAge = 24 * 60 * 60; // 1 day
+  } else {
+    maxAge = getCookieMaxAge();
+  }
+
   response.cookies.set({
     name: 'token',
     value: token,
@@ -71,7 +96,7 @@ export function setAuthCookie(response: NextResponse, token: string): void {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge: getCookieMaxAge(),
+    maxAge,
   });
 }
 

@@ -4,6 +4,7 @@ import { EntryType } from '@prisma/client';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { PERIOD_TIMES, parseTimeToUtc } from '@/lib/constants';
+import { protectRequest, aiLimiter } from '@/lib/arcjet';
 
 export const maxDuration = 60; // Allow up to 60 seconds on Vercel Serverless Function
 export const dynamic = 'force-dynamic';
@@ -440,6 +441,13 @@ async function parseImageWithAI(buffer: Buffer, mimeType: string, userId: number
 export async function POST(request: NextRequest) {
   try {
     const user = requireAuth(request);
+
+    // Arcjet Rate Limiting & Bot/Abuse Protection for AI Quota (15 uploads / hour)
+    const arcjetCheck = await protectRequest(request, aiLimiter, { userId: String(user.id) });
+    if (!arcjetCheck.allowed) {
+      return arcjetCheck.response!;
+    }
+
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
     

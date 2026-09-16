@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { id: authUser.id },
-      select: { id: true, email: true, name: true, role: true, avatar: true, createdAt: true },
+      select: { id: true, email: true, name: true, role: true, avatar: true, emailVerified: true, createdAt: true },
     });
 
     if (!user) {
@@ -42,7 +42,7 @@ export async function PUT(request: NextRequest) {
     const updatedUser = await prisma.user.update({
       where: { id: authUser.id },
       data: updateData,
-      select: { id: true, email: true, name: true, role: true, avatar: true, createdAt: true },
+      select: { id: true, email: true, name: true, role: true, avatar: true, emailVerified: true, createdAt: true },
     });
 
     return NextResponse.json({ message: 'Profile updated', user: updatedUser });

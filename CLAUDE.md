@@ -84,7 +84,7 @@ docker-compose.yml                 # Container orchestration
 next.config.ts                     # Server config (rewrites, external packages)
 prisma.config.ts                   # Prisma engine config
 eslint.config.mjs                  # ESLint config
-.env                               # Environment variables
+.env                               # Environment variables (ห้ามเปิดดูหรืออ่านไฟล์เด็ดขาด หากต้องการค่าใดให้บอกผู้ใช้ใส่เอง)
 ```
 
 ### 🤝 Shared Files (Coordinate with Gemini)

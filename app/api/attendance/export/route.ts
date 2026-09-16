@@ -38,27 +38,28 @@ export async function GET(request: NextRequest) {
     const minAttPercent = classroom.minAttendancePercent || 80;
     const maxAllowedAbsences = Math.floor(totalClasses * ((100 - minAttPercent) / 100));
 
-    // Fetch all students in the classroom
-    const students = await prisma.student.findMany({
-      where: { classroomId: Number(classroomId), userId: user.id },
-      orderBy: [{ studentCode: 'asc' }, { name: 'asc' }]
-    });
-
     // Build the query filter for records within range
     const where: Record<string, unknown> = { classroomId: Number(classroomId) };
     if (startDate) where.date = { ...(where.date as Record<string, unknown> || {}), gte: new Date(startDate) };
     if (endDate) where.date = { ...(where.date as Record<string, unknown> || {}), lte: new Date(endDate) };
 
-    // Fetch attendance records in the target range
-    const records = await prisma.attendance.findMany({
-      where,
-      orderBy: { date: 'asc' }
-    });
-
-    // Fetch all attendance records for overall classroom statistics (used for overall term F-grade status)
-    const allRecordsForClass = await prisma.attendance.findMany({
-      where: { classroomId: Number(classroomId) }
-    });
+    // Fetch students, range records, and overall grouped counts in parallel
+    const [students, records, overallCountsGrouped] = await Promise.all([
+      prisma.student.findMany({
+        where: { classroomId: Number(classroomId), userId: user.id },
+        select: { id: true, name: true, studentCode: true },
+        orderBy: [{ studentCode: 'asc' }, { name: 'asc' }]
+      }),
+      prisma.attendance.findMany({
+        where,
+        orderBy: { date: 'asc' }
+      }),
+      prisma.attendance.groupBy({
+        by: ['studentId', 'status'],
+        where: { classroomId: Number(classroomId) },
+        _count: true,
+      })
+    ]);
 
     // Find unique dates in sorted order
     const uniqueDates = Array.from(
@@ -78,17 +79,17 @@ export async function GET(request: NextRequest) {
       else if (r.status === 'leave') s.leave++;
     });
 
-    // Map overall records by student_id
+    // Map overall records from DB groupBy by student_id
     const overallMap = new Map<number, { present: number; late: number; absent: number; leave: number }>();
-    allRecordsForClass.forEach(r => {
+    overallCountsGrouped.forEach(r => {
       if (!overallMap.has(r.studentId)) {
         overallMap.set(r.studentId, { present: 0, late: 0, absent: 0, leave: 0 });
       }
       const s = overallMap.get(r.studentId)!;
-      if (r.status === 'present') s.present++;
-      else if (r.status === 'late') s.late++;
-      else if (r.status === 'absent') s.absent++;
-      else if (r.status === 'leave') s.leave++;
+      if (r.status === 'present') s.present += r._count;
+      else if (r.status === 'late') s.late += r._count;
+      else if (r.status === 'absent') s.absent += r._count;
+      else if (r.status === 'leave') s.leave += r._count;
     });
 
     // Calculate initial dashboard stats

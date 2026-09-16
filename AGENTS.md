@@ -191,6 +191,8 @@ API routes ใช้ rewrites เพื่อ clean URLs:
 5. JWT secret ต้องมาจาก `process.env.JWT_SECRET`
 6. Input validation ต้องทำใน API route ก่อน query
 7. **ห้าม** expose sensitive data (password, tokens) ใน response
+8. **ห้ามอ่าน, เปิดดู, grep, cat หรือ inspect ไฟล์ `.env` และไฟล์ตระกูล `.env.*` ทุกกรณีโดยเด็ดขาด** (Never view, read, grep, or cat any `.env` file).
+9. **หากต้องการเพิ่มตัวแปรใหม่หรือแก้ไขค่าใน `.env` ให้แจ้ง "ผู้ใช้ (USER)" เป็นคนใส่เองเสมอ** โดยบอกเฉพาะชื่อ Key และตัวอย่าง Template ที่ต้องใช้ ห้ามแตะต้องหรือเปิดดูไฟล์ `.env` เอง (If any env variable is needed, simply inform the USER to configure it).
 
 ---
 

@@ -9,14 +9,17 @@ interface User {
   name: string;
   role: string;
   avatar?: string | null;
+  emailVerified?: boolean;
   createdAt?: string;
 }
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<{ token: string; user: User }>;
-  register: (name: string, email: string, password: string, role?: string) => Promise<{ token: string; user: User }>;
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<{ token: string; user: User }>;
+  register: (name: string, email: string, password: string, role?: string) => Promise<{ message: string; email: string; requireVerification?: boolean; token?: string; user?: User }>;
+  verifyEmail: (email: string, code: string) => Promise<{ token: string; user: User }>;
+  resendCode: (email: string) => Promise<{ message: string }>;
   googleLogin: (credential: string) => Promise<{ token: string; user: User }>;
   logout: () => void;
   updateUser: (updatedUser: Partial<User>) => void;
@@ -39,8 +42,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
           localStorage.removeItem('token');
           localStorage.removeItem('user');
+          document.cookie = 'token=; Max-Age=0; path=/;';
           setUser(null);
         }
+      } else {
+        document.cookie = 'token=; Max-Age=0; path=/;';
+        setUser(null);
       }
       setLoading(false);
     };
@@ -49,6 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const handleUnauthorized = () => {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      document.cookie = 'token=; Max-Age=0; path=/;';
       setUser(null);
     };
 
@@ -58,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Token was removed in another tab (logout)
           setUser(null);
           localStorage.removeItem('user');
+          document.cookie = 'token=; Max-Age=0; path=/;';
         } else if (e.newValue !== e.oldValue) {
           // Token was updated / switched user in another tab
           initAuth();
@@ -73,19 +82,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const login = async (email: string, password: string) => {
-    const { data } = await api.post('/auth/login', { email, password });
+  const login = async (email: string, password: string, rememberMe?: boolean) => {
+    const { data } = await api.post('/auth/login', { email, password, rememberMe });
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
+    const maxAge = rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60;
+    document.cookie = `token=${data.token}; path=/; max-age=${maxAge}; SameSite=Lax`;
     setUser(data.user);
     return data;
   };
 
   const register = async (name: string, email: string, password: string, role?: string) => {
     const { data } = await api.post('/auth/register', { name, email, password, role });
-    localStorage.setItem('token', data.token);
-    localStorage.setItem('user', JSON.stringify(data.user));
-    setUser(data.user);
+    if (data.token && data.user) {
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      document.cookie = `token=${data.token}; path=/; max-age=604800; SameSite=Lax`;
+      setUser(data.user);
+    }
+    return data;
+  };
+
+  const verifyEmail = async (email: string, code: string) => {
+    const { data } = await api.post('/auth/verify-email', { email, code });
+    if (data.token && data.user) {
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      document.cookie = `token=${data.token}; path=/; max-age=604800; SameSite=Lax`;
+      setUser(data.user);
+    }
+    return data;
+  };
+
+  const resendCode = async (email: string) => {
+    const { data } = await api.post('/auth/resend-code', { email });
     return data;
   };
 
@@ -93,6 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data } = await api.post('/auth/google', { credential });
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
+    document.cookie = `token=${data.token}; path=/; max-age=604800; SameSite=Lax`;
     setUser(data.user);
     return data;
   };
@@ -105,6 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      document.cookie = 'token=; Max-Age=0; path=/;';
       setUser(null);
     }
   };
@@ -119,7 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, googleLogin, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, loading, login, register, verifyEmail, resendCode, googleLogin, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

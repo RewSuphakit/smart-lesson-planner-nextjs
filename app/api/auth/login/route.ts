@@ -3,15 +3,22 @@ import bcrypt from 'bcryptjs';
 import prisma from '@/lib/prisma';
 import { generateToken, setAuthCookie } from '@/lib/auth';
 import { LoginSchema, validateRequestBody } from '@/lib/validation';
+import { protectRequest, authLimiter } from '@/lib/arcjet';
 
 export async function POST(request: NextRequest) {
   try {
+    // Arcjet Rate Limiting & Brute Force Protection (5 attempts / 15 mins)
+    const arcjetCheck = await protectRequest(request, authLimiter);
+    if (!arcjetCheck.allowed) {
+      return arcjetCheck.response!;
+    }
+
     const validation = await validateRequestBody(request, LoginSchema);
     if (!validation.success) {
       return validation.response;
     }
 
-    const { email, password } = validation.data;
+    const { email, password, rememberMe } = validation.data;
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
@@ -27,7 +34,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Invalid email or password' }, { status: 401 });
     }
 
-    const token = generateToken(user);
+    if (!user.emailVerified) {
+      return NextResponse.json({
+        message: 'กรุณายืนยันอีเมลของคุณก่อนเข้าสู่ระบบ',
+        requireVerification: true,
+        email: user.email,
+      }, { status: 403 });
+    }
+
+    const token = generateToken(user, rememberMe);
 
     const response = NextResponse.json({
       message: 'Login successful',
@@ -35,7 +50,7 @@ export async function POST(request: NextRequest) {
       user: { id: user.id, email: user.email, name: user.name, role: user.role, avatar: user.avatar },
     });
 
-    setAuthCookie(response, token);
+    setAuthCookie(response, token, rememberMe);
     return response;
   } catch (error) {
     console.error('Login error:', error);

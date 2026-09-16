@@ -170,3 +170,56 @@ export function calculateAttendanceStats(
     };
   });
 }
+
+/**
+ * Calculate attendance statistics grouped by student for a given classroom (optimized for DB groupBy).
+ */
+export function calculateAttendanceStatsFromGrouped(
+  grouped: Array<{ studentId: number; status: string; _count: number }>,
+  classroom: {
+    lateToAbsentRatio?: number | null;
+    leaveToAbsentRatio?: number | null;
+    totalClasses?: number | null;
+    minAttendancePercent?: number | null;
+  }
+): AttendanceStudentStats[] {
+  const ratioLate = classroom.lateToAbsentRatio || 3;
+  const ratioLeave = classroom.leaveToAbsentRatio || 2;
+  const totalClasses = classroom.totalClasses || 40;
+  const minAttPercent = classroom.minAttendancePercent || 80;
+  const maxAllowedAbsences = Math.floor(totalClasses * ((100 - minAttPercent) / 100));
+
+  const studentMap = new Map<number, { present: number; late: number; absent: number; leave: number }>();
+  for (const r of grouped) {
+    if (!studentMap.has(r.studentId)) {
+      studentMap.set(r.studentId, { present: 0, late: 0, absent: 0, leave: 0 });
+    }
+    const s = studentMap.get(r.studentId)!;
+    if (r.status === 'present') s.present += r._count;
+    else if (r.status === 'late') s.late += r._count;
+    else if (r.status === 'absent') s.absent += r._count;
+    else if (r.status === 'leave') s.leave += r._count;
+  }
+
+  return Array.from(studentMap.entries()).map(([studentId, s]) => {
+    const convertedFromLate = Math.floor(s.late / ratioLate);
+    const convertedFromLeave = Math.floor(s.leave / ratioLeave);
+    const totalConverted = s.absent + convertedFromLate + convertedFromLeave;
+    return {
+      student_id: studentId,
+      present_count: s.present,
+      late_count: s.late,
+      absent_count: s.absent,
+      leave_count: s.leave,
+      converted_absent_count: totalConverted,
+      remaining_late_count: s.late % ratioLate,
+      remaining_leave_count: s.leave % ratioLeave,
+      is_f: totalConverted > maxAllowedAbsences,
+      max_allowed_absences: maxAllowedAbsences,
+      total_classes: totalClasses,
+      converted_from_late: convertedFromLate,
+      converted_from_leave: convertedFromLeave,
+    };
+  });
+}
+

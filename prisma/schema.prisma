@@ -53,6 +53,12 @@ model User {
   role      Role     @default(teacher)
   avatar    String?  @db.VarChar(500)
   googleId  String?  @unique @map("google_id") @db.VarChar(255)
+  emailVerified           Boolean   @default(false) @map("email_verified")
+  pendingEmail            String?   @map("pending_email") @db.VarChar(255)
+  verificationCode        String?   @map("verification_code") @db.VarChar(10)
+  verificationCodeExpiry  DateTime? @map("verification_code_expiry")
+  resetPasswordToken      String?   @map("reset_password_token") @db.VarChar(10)
+  resetPasswordExpiry     DateTime? @map("reset_password_expiry")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -82,6 +88,7 @@ model Schedule {
 
   @@index([userId], map: "idx_schedules_user")
   @@index([scheduledDate], map: "idx_schedules_date")
+  @@index([userId, scheduledDate], map: "idx_schedules_user_date")
   @@map("schedules")
 }
 
@@ -162,6 +169,7 @@ model Attendance {
   @@unique([studentId, classroomId, date], map: "unique_attendance")
   @@index([classroomId], map: "idx_attendance_classroom")
   @@index([studentId], map: "idx_attendance_student")
+  @@index([classroomId, date], map: "idx_attendance_classroom_date")
   @@map("attendance")
 }
 
@@ -216,6 +224,7 @@ model StudentScore {
   @@unique([studentId, classroomId, lessonNumber], map: "unique_student_score")
   @@index([classroomId], map: "idx_student_scores_classroom")
   @@index([studentId], map: "idx_student_scores_student")
+  @@index([classroomId, lessonNumber], map: "idx_student_scores_classroom_lesson")
   @@map("student_scores")
 }
 
@@ -247,5 +256,6 @@ model WeeklySchedule {
 
   @@index([userId], map: "idx_timetable_user")
   @@index([dayOfWeek], map: "idx_timetable_day")
+  @@index([userId, dayOfWeek], map: "idx_timetable_user_day")
   @@map("weekly_schedules")
 }
