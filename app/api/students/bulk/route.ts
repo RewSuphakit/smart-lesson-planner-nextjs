@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
       grade_level?: string;
       email?: string;
       classroom_id?: number | string;
+      avatar?: string;
     }
 
     const data = (students as StudentBulkInput[]).map((s) => ({
@@ -30,6 +31,7 @@ export async function POST(request: NextRequest) {
       gradeLevel: s.grade_level || null,
       email: s.email || null,
       classroomId: s.classroom_id ? Number(s.classroom_id) : null,
+      avatar: s.avatar || null,
     }));
 
     const result = await prisma.student.createMany({

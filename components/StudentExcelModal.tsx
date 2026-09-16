@@ -22,6 +22,7 @@ export interface Student {
   grade_level?: string;
   email?: string;
   classroom_id?: string | number | null;
+  avatar?: string | null;
 }
 
 interface StudentExcelModalProps {

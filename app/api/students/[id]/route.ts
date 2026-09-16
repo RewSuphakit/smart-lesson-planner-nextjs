@@ -24,6 +24,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       name: 'name', student_code: 'studentCode', grade_level: 'gradeLevel',
       email: 'email', classroom_id: 'classroomId',
       midterm_score: 'midtermScore', final_score: 'finalScore',
+      avatar: 'avatar',
     };
 
     // Lookup classroom max scores if updating exam scores
@@ -79,8 +80,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
               val = Math.min(maxScore, Math.max(0, num));
             }
           }
-        } else if (['studentCode', 'gradeLevel', 'email'].includes(prismaKey)) {
-          val = val || null;
+        } else if (['studentCode', 'gradeLevel', 'email', 'avatar'].includes(prismaKey)) {
+          val = val ? String(val).trim() : null;
         }
         updateData[prismaKey] = val;
       }

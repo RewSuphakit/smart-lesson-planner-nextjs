@@ -31,6 +31,7 @@ export const CreateStudentSchema = z.object({
   grade_level: z.string().trim().nullable().optional(),
   email: z.string().trim().email('Invalid email address').nullable().optional().or(z.literal('')),
   classroom_id: z.number().nullable().optional(),
+  avatar: z.string().nullable().optional(),
 });
 
 export const BulkCreateStudentSchema = z.object({

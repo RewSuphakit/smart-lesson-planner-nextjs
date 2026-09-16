@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
         grade_level: s.gradeLevel,
         email: s.email,
         classroom_id: s.classroomId,
+        avatar: s.avatar,
         midterm_score: s.midtermScore ? Number(s.midtermScore) : null,
         final_score: s.finalScore ? Number(s.finalScore) : null,
         affective_score: s.affectiveScore ? Number(s.affectiveScore) : null,
@@ -65,6 +66,7 @@ export async function GET(request: NextRequest) {
       grade_level: s.gradeLevel,
       email: s.email,
       classroom_id: s.classroomId,
+      avatar: s.avatar,
       midterm_score: s.midtermScore ? Number(s.midtermScore) : null,
       final_score: s.finalScore ? Number(s.finalScore) : null,
       affective_score: s.affectiveScore ? Number(s.affectiveScore) : null,
@@ -112,6 +114,7 @@ export async function POST(request: NextRequest) {
         gradeLevel: s.grade_level || null,
         email: s.email || null,
         classroomId: s.classroom_id ? Number(s.classroom_id) : null,
+        avatar: s.avatar || null,
       }));
 
       const result = await prisma.student.createMany({ data });
@@ -142,6 +145,7 @@ export async function POST(request: NextRequest) {
         gradeLevel: validation.data.grade_level || null,
         email: validation.data.email || null,
         classroomId: validation.data.classroom_id ? Number(validation.data.classroom_id) : null,
+        avatar: validation.data.avatar || null,
       },
     });
 

@@ -9,6 +9,7 @@ import {
   ThumbsUp, ThumbsDown, AlertCircle, HeartHandshake, CheckCircle2, AlertTriangle, Users, Award, X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import UserAvatar from '@/components/UserAvatar';
 
 const animalAvatars = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐧', '🐥', '🦉', '🦄', '🐙', '🐢', '🦖', '🦕', '🦦', '🦥'];
 
@@ -26,6 +27,7 @@ interface Student {
   affective_score: number;
   absent_count?: number;
   late_count?: number;
+  avatar?: string | null;
 }
 
 interface GradeReportStudent {
@@ -82,13 +84,14 @@ export default function Affective() {
       const rawStudents = studRes.data.data || [];
       const gradesData: GradeReportStudent[] = gradesRes.data.data || [];
 
-      return rawStudents.map((s: { id: string | number; name: string; student_code?: string; classroom_id?: string | number | null; affective_score: number | null }) => {
+      return rawStudents.map((s: { id: string | number; name: string; student_code?: string; classroom_id?: string | number | null; affective_score: number | null; avatar?: string | null }) => {
         const gradeInfo = gradesData.find(g => String(g.student_id) === String(s.id));
         return {
           id: s.id,
           name: s.name,
           student_code: s.student_code,
           classroom_id: s.classroom_id,
+          avatar: s.avatar,
           affective_score: s.affective_score !== null && s.affective_score !== undefined 
             ? Number(s.affective_score) 
             : Math.max(0, maxAffectiveWeight - ((gradeInfo?.absent_count || 0) * 2 + (gradeInfo?.late_count || 0) * 1)),
@@ -477,9 +480,13 @@ export default function Affective() {
                   {/* Left Side: Avatar, Name and Attendance Stats */}
                   <div className="flex flex-row md:flex-col items-center gap-3 shrink-0 md:w-36 text-center md:border-r border-indigo-100/70 md:pr-3">
                     {/* Avatar */}
-                    <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-3xl shadow-sm shrink-0">
-                      {animalAvatars[(Number(s.id) || 0) % animalAvatars.length]}
-                    </div>
+                    <UserAvatar
+                      avatar={s.avatar}
+                      name={s.name}
+                      userId={s.id}
+                      size="lg"
+                      className="rounded-2xl border border-indigo-100 shadow-sm shrink-0"
+                    />
                     
                     <div className="flex-1 md:flex-none text-left md:text-center min-w-0">
                       <p className="font-bold text-slate-800 text-sm truncate">{s.name}</p>

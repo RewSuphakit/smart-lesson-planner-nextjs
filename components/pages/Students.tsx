@@ -1,16 +1,20 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
-import { Plus, Edit, Trash2, X, Users as UsersIcon, Loader2, Search, GraduationCap, Upload, CheckCircle, FileSpreadsheet, Eye } from 'lucide-react';
+import { 
+  Plus, Edit, Trash2, X, Users as UsersIcon, Loader2, Search, 
+  GraduationCap, Upload, CheckCircle, FileSpreadsheet, Eye, 
+  Camera, Sparkles, Image as ImageIcon 
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import Pagination from '@/components/Pagination';
 import StudentExcelModal from '@/components/StudentExcelModal';
-
-const animalAvatars = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐧', '🐥', '🦉', '🦄', '🐙', '🐢', '🦖', '🦕', '🦦', '🦥'];
+import UserAvatar, { ANIMAL_AVATARS, TEACHER_EMOJIS } from '@/components/UserAvatar';
+import { compressImageFile, findMatchingStudentIndex } from '@/lib/avatarCompression';
 
 interface Classroom {
   id: string | number;
@@ -24,6 +28,7 @@ interface Student {
   grade_level?: string;
   email?: string;
   classroom_id?: string | number | null;
+  avatar?: string | null;
 }
 
 interface ImportRow {
@@ -31,6 +36,7 @@ interface ImportRow {
   name: string;
   grade_level?: string;
   email?: string;
+  avatar?: string | null;
 }
 
 export default function Students() {
@@ -50,12 +56,19 @@ export default function Students() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
 
-  const emptyForm = { name: '', student_code: '', grade_level: '', email: '', classroom_id: '' };
+  const emptyForm = { name: '', student_code: '', grade_level: '', email: '', classroom_id: '', avatar: '' };
   const [form, setForm] = useState(emptyForm);
 
-  // Import states
+  // Single student photo & emoji picker state
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [isCompressingSingle, setIsCompressingSingle] = useState(false);
+  const singlePhotoInputRef = useRef<HTMLInputElement>(null);
+
+  // Bulk Import states
   const [importData, setImportData] = useState<ImportRow[]>([]);
   const [importClassroomId, setImportClassroomId] = useState('');
+  const [isMatchingPhotos, setIsMatchingPhotos] = useState(false);
+  const bulkPhotoInputRef = useRef<HTMLInputElement>(null);
 
   // ─── Query: ดึงข้อมูลนักเรียน ───
   const { data: students = [], isLoading: loadingStudents } = useQuery<Student[]>({
@@ -228,15 +241,81 @@ export default function Students() {
     saveMutation.mutate(form);
   };
 
+  const handleSinglePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('กรุณาเลือกไฟล์รูปภาพ (JPG, PNG, WebP)');
+      return;
+    }
+
+    setIsCompressingSingle(true);
+    try {
+      const compressed = await compressImageFile(file, 160, 0.78);
+      setForm(prev => ({ ...prev, avatar: compressed }));
+      toast.success('บีบอัดรูปภาพเรียบร้อย (~4KB)');
+    } catch {
+      toast.error('ไม่สามารถประมวลผลรูปภาพได้');
+    } finally {
+      setIsCompressingSingle(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleBulkPhotosUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || importData.length === 0) return;
+
+    setIsMatchingPhotos(true);
+    try {
+      const fileList = Array.from(files);
+      const updated = [...importData];
+      let matchedCount = 0;
+
+      for (const file of fileList) {
+        if (!file.type.startsWith('image/')) continue;
+        const matchIdx = findMatchingStudentIndex(file.name, updated);
+        if (matchIdx !== -1) {
+          try {
+            const compressed = await compressImageFile(file, 160, 0.78);
+            updated[matchIdx] = {
+              ...updated[matchIdx],
+              avatar: compressed,
+            };
+            matchedCount++;
+          } catch (compressErr) {
+            console.error('Failed to compress photo:', file.name, compressErr);
+          }
+        }
+      }
+
+      setImportData(updated);
+      if (matchedCount > 0) {
+        toast.success(`จับคู่และบีบอัดรูปภาพนักเรียนสำเร็จ ${matchedCount} คน (~4KB/รูป) 🎉`);
+      } else {
+        toast.error('ไม่พบชื่อไฟล์รูปที่ตรงกับรหัสนักเรียนหรือชื่อในรายการ');
+      }
+    } catch {
+      toast.error('เกิดข้อผิดพลาดในการประมวลผลรูปภาพ');
+    } finally {
+      setIsMatchingPhotos(false);
+      e.target.value = '';
+    }
+  };
+
   const handleEdit = (s: Student) => {
     setForm({
       name: s.name,
       student_code: s.student_code || '',
       grade_level: s.grade_level || '',
       email: s.email || '',
-      classroom_id: s.classroom_id ? String(s.classroom_id) : ''
+      classroom_id: s.classroom_id ? String(s.classroom_id) : '',
+      avatar: s.avatar || ''
     });
-    setEditing(s.id); setShowForm(true);
+    setEditing(s.id);
+    setShowEmojiPicker(false);
+    setShowForm(true);
   };
 
   const handleDelete = (id: string | number) => {
@@ -308,11 +387,14 @@ export default function Students() {
             fullName = `${prefix} ${firstName} ${lastName}`.trim().replace(/\s+/g, ' ');
           }
 
+          const rawAvatar = row['รูปภาพ'] || row['รูปถ่าย'] || row['รูป'] || row['photo'] || row['image'] || row['avatar'] || row['picture'] || row['url'] || row['image_url'] || '';
+
           return {
             student_code: String(row['รหัสนักเรียน'] || row['student_code'] || ''),
             name: String(fullName),
             grade_level: String(row['ระดับชั้น'] || row['ชั้น'] || row['grade_level'] || ''),
             email: String(row['อีเมล'] || row['email'] || ''),
+            avatar: rawAvatar ? String(rawAvatar).trim() : null,
           };
         }).filter(item => item.name);
 
@@ -511,9 +593,13 @@ export default function Students() {
                   {selectedStudents.includes(student.id) && <CheckCircle className="w-3.5 h-3.5 text-slate-800" />}
                 </div>
               </label>
-              <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-2xl shadow-sm shrink-0">
-                {animalAvatars[(Number(student.id) || 0) % animalAvatars.length]}
-              </div>
+              <UserAvatar
+                avatar={student.avatar}
+                name={student.name}
+                userId={student.id}
+                size="lg"
+                className="rounded-2xl border border-indigo-100 shadow-sm shrink-0"
+              />
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-slate-800 text-[0.95rem]">{student.name}</p>
                 <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-0.5">
@@ -560,16 +646,108 @@ export default function Students() {
       {/* Student Form Modal */}
       {showForm && createPortal(
         <div className="modal-overlay" onClick={() => setShowForm(false)}>
-          <div className="glass w-full max-w-md p-7 animate-fade-in-up" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-5">
+          <div className="glass w-full max-w-md p-7 animate-fade-in-up max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                  <GraduationCap className="w-5 h-5 text-slate-800" />
+                  <GraduationCap className="w-5 h-5 text-white" />
                 </div>
                 <h2 className="text-lg font-bold text-slate-800">{editing ? 'แก้ไขข้อมูลนักเรียน' : 'เพิ่มนักเรียนใหม่'}</h2>
               </div>
               <button onClick={() => setShowForm(false)} className="p-2 hover:bg-indigo-50 rounded-xl"><X className="w-5 h-5 text-slate-500" /></button>
             </div>
+
+            {/* Avatar Section for Single Student */}
+            <div className="flex flex-col items-center justify-center gap-2.5 pb-4 mb-4 border-b border-indigo-100/70">
+              <div className="relative group">
+                <UserAvatar
+                  avatar={form.avatar}
+                  name={form.name || 'นักเรียน'}
+                  userId={editing || 1}
+                  size="xl"
+                  className="rounded-3xl border-2 border-indigo-200 shadow-md transition-transform duration-200 group-hover:scale-105"
+                />
+                <button
+                  type="button"
+                  onClick={() => singlePhotoInputRef.current?.click()}
+                  disabled={isCompressingSingle}
+                  className="absolute -bottom-1 -right-1 bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-xl shadow-md border-2 border-white transition-transform hover:scale-110"
+                  title="เลือกรูปภาพนักเรียน"
+                >
+                  {isCompressingSingle ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+
+              {/* Hidden file input */}
+              <input
+                ref={singlePhotoInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleSinglePhotoChange}
+                className="hidden"
+              />
+
+              {/* Photo & Emoji Action Buttons */}
+              <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => singlePhotoInputRef.current?.click()}
+                  disabled={isCompressingSingle}
+                  className="px-2.5 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold border border-indigo-200 inline-flex items-center gap-1 transition-colors"
+                >
+                  <Upload className="w-3 h-3" /> อัปโหลดรูปภาพ
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                  className="px-2.5 py-1 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-semibold border border-purple-200 inline-flex items-center gap-1 transition-colors"
+                >
+                  <Sparkles className="w-3 h-3" /> เลือกอิโมจิ
+                </button>
+                {form.avatar && (
+                  <button
+                    type="button"
+                    onClick={() => setForm(prev => ({ ...prev, avatar: '' }))}
+                    className="px-2 py-1 rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 text-xs font-semibold transition-colors"
+                    title="ลบรูปและใช้อิโมจิตามลำดับ"
+                  >
+                    <Trash2 className="w-3 h-3" /> ลบรูป (ใช้อิโมจิเดิม)
+                  </button>
+                )}
+              </div>
+
+              {/* Emoji Picker Popover */}
+              {showEmojiPicker && (
+                <div className="w-full p-3 bg-slate-50 border border-indigo-100 rounded-2xl animate-fade-in-up space-y-2">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
+                    <span>เลือกอิโมจิประจำตัว:</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowEmojiPicker(false)}
+                      className="text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-8 gap-1.5 max-h-36 overflow-y-auto p-1 bg-white rounded-xl border border-slate-200">
+                    {[...ANIMAL_AVATARS, ...TEACHER_EMOJIS].map((emoji, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setForm(prev => ({ ...prev, avatar: emoji }));
+                          setShowEmojiPicker(false);
+                        }}
+                        className="w-7 h-7 flex items-center justify-center text-lg rounded-lg hover:bg-indigo-50 hover:scale-125 transition-transform"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="form-label" htmlFor="student-name">ชื่อ-นามสกุล</label>
@@ -625,7 +803,7 @@ export default function Students() {
                   {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
-              <button type="submit" disabled={saveMutation.isPending} className="btn btn-primary w-full py-3" id="student-save-btn">
+              <button type="submit" disabled={saveMutation.isPending || isCompressingSingle} className="btn btn-primary w-full py-3" id="student-save-btn">
                 {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : editing ? 'อัปเดต' : <><Plus className="w-4 h-4" /> เพิ่มนักเรียน</>}
               </button>
             </form>
@@ -637,22 +815,23 @@ export default function Students() {
       {/* Import Form Modal */}
       {showImportForm && createPortal(
         <div className="modal-overlay" onClick={() => setShowImportForm(false)}>
-          <div className="glass w-full max-w-2xl p-7 animate-fade-in-up" onClick={e => e.stopPropagation()}>
+          <div className="glass w-full max-w-3xl p-7 animate-fade-in-up max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-lg">
-                  <Upload className="w-5 h-5 text-slate-800" />
+                <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-lg border border-indigo-100">
+                  <Upload className="w-5 h-5 text-indigo-600" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-slate-800">นำเข้ารายชื่อนักเรียนจาก Excel / CSV</h2>
-                  <p className="text-xs text-slate-500">รองรับคอลัมน์: รหัสนักเรียน, ชื่อ-นามสกุล, ระดับชั้น, อีเมล</p>
+                  <h2 className="text-lg font-bold text-slate-800">นำเข้ารายชื่อและรูปภาพนักเรียน</h2>
+                  <p className="text-xs text-slate-500">รองรับไฟล์ Excel/CSV และคอลัมน์รูปภาพ หรือแนบไฟล์ภาพจับคู่อัตโนมัติ</p>
                 </div>
               </div>
               <button onClick={() => setShowImportForm(false)} className="p-2 hover:bg-indigo-50 rounded-xl"><X className="w-5 h-5 text-slate-500" /></button>
             </div>
             
             <div className="space-y-4">
-              <div className="border-2 border-dashed border-slate-700 rounded-xl p-8 text-center hover:border-indigo-500 transition-colors cursor-pointer relative">
+              {/* Step 1: Select Excel/CSV File */}
+              <div className="border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-indigo-50/20 hover:bg-indigo-50/50 rounded-2xl p-6 text-center transition-colors cursor-pointer relative">
                 <input 
                   type="file" 
                   accept=".xlsx, .xls, .csv" 
@@ -661,21 +840,78 @@ export default function Students() {
                   id="import-file-input"
                   aria-label="อัปโหลดไฟล์ Excel หรือ CSV"
                 />
-                <Upload className="w-8 h-8 text-slate-500 mx-auto mb-3" />
-                <p className="text-slate-700 font-medium">คลิกเพื่อเลือกไฟล์ หรือลากไฟล์มาวาง</p>
-                <p className="text-slate-500 text-xs mt-1">.xlsx, .xls, .csv</p>
+                <FileSpreadsheet className="w-8 h-8 text-indigo-500 mx-auto mb-2" />
+                <p className="text-slate-800 font-bold text-sm">คลิกเพื่อเลือกไฟล์ Excel / CSV หรือลากไฟล์มาวาง</p>
+                <p className="text-slate-500 text-xs mt-1">
+                  รองรับคอลัมน์: รหัสนักเรียน, ชื่อ-นามสกุล, ระดับชั้น, อีเมล, รูปภาพ (URL หรืออิโมจิ)
+                </p>
               </div>
 
               {importData.length > 0 && (
-                <div className="space-y-4 mt-6 animate-fade-in-up">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-emerald-400">พบข้อมูล {importData.length} รายการ</h3>
+                <div className="space-y-4 animate-fade-in-up">
+                  {/* Step 2: Optional Bulk Photos Upload */}
+                  <div className="p-4 bg-gradient-to-r from-purple-50 via-indigo-50 to-blue-50 border border-indigo-100/80 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <h4 className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
+                        <ImageIcon className="w-4 h-4 text-indigo-600" />
+                        แนบไฟล์รูปภาพนักเรียน (หลายไฟล์พร้อมกัน)
+                      </h4>
+                      <p className="text-[11px] text-slate-600 leading-relaxed">
+                        ระบบจะจับคู่อัตโนมัติจากชื่อไฟล์ (เช่น <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-indigo-200">65010001.jpg</span> หรือชื่อนักเรียน) พร้อมบีบอัดเป็น WebP (~4KB/รูป) ทันที
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <input
+                        ref={bulkPhotoInputRef}
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={handleBulkPhotosUpload}
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => bulkPhotoInputRef.current?.click()}
+                        disabled={isMatchingPhotos}
+                        className="btn bg-white hover:bg-indigo-50 text-indigo-700 text-xs font-bold px-3.5 py-2 rounded-xl border border-indigo-200 shadow-xs flex items-center gap-1.5 transition-all"
+                      >
+                        {isMatchingPhotos ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" /> กำลังบีบอัดภาพ...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-3.5 h-3.5" /> เลือกไฟล์รูปภาพนักเรียน
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Summary & Classroom Selector */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="font-bold text-emerald-600 flex items-center gap-1">
+                        <CheckCircle className="w-4 h-4" /> พบข้อมูล {importData.length} รายการ
+                      </span>
+                      <span className="text-slate-400">|</span>
+                      <span className="font-medium text-indigo-700">
+                        มีรูปถ่ายแล้ว {importData.filter(d => d.avatar).length} คน
+                      </span>
+                      <span className="text-slate-500">
+                        (ไม่มีรูป {importData.filter(d => !d.avatar).length} คน จะใช้อิโมจิ)
+                      </span>
+                    </div>
+
                     <div className="flex items-center gap-2">
-                      <label className="text-sm text-slate-600" htmlFor="import-classroom">นำเข้าห้อง:</label>
+                      <label className="text-xs font-semibold text-slate-600 shrink-0" htmlFor="import-classroom">
+                        ห้องเรียน:
+                      </label>
                       <select 
                         value={importClassroomId} 
                         onChange={e => setImportClassroomId(e.target.value)} 
-                        className="form-input py-1.5 text-sm w-48"
+                        className="form-input py-1.5 text-xs w-44"
                         id="import-classroom"
                       >
                         <option value="">-- ไม่ระบุห้องเรียน --</option>
@@ -684,34 +920,67 @@ export default function Students() {
                     </div>
                   </div>
                   
-                  <div className="bg-white rounded-xl max-h-60 overflow-y-auto border border-indigo-100">
-                    <table className="w-full text-left text-sm border-collapse">
-                      <thead className="sticky top-0 bg-white">
+                  {/* Preview Table */}
+                  <div className="bg-white rounded-2xl max-h-64 overflow-y-auto border border-indigo-100 shadow-xs">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead className="sticky top-0 bg-slate-50 border-b border-indigo-100 z-10">
                         <tr>
-                          <th className="p-3 font-medium text-slate-700 w-24">รหัส</th>
-                          <th className="p-3 font-medium text-slate-700">ชื่อ-นามสกุล</th>
-                          <th className="p-3 font-medium text-slate-700">ระดับชั้น</th>
+                          <th className="p-2.5 font-bold text-slate-700 w-14 text-center">รูป</th>
+                          <th className="p-2.5 font-bold text-slate-700 w-28">รหัสนักเรียน</th>
+                          <th className="p-2.5 font-bold text-slate-700">ชื่อ-นามสกุล</th>
+                          <th className="p-2.5 font-bold text-slate-700 w-24">ระดับชั้น</th>
+                          <th className="p-2.5 font-bold text-slate-700 w-24 text-center">สถานะรูป</th>
                         </tr>
                       </thead>
-                      <tbody>
+                      <tbody className="divide-y divide-slate-100">
                         {importData.slice(0, 50).map((s, i) => (
-                          <tr key={i} className="border-b border-indigo-100">
-                            <td className="p-3 text-slate-600">{s.student_code || '-'}</td>
-                            <td className="p-3 text-slate-800">{s.name}</td>
-                            <td className="p-3 text-slate-600">{s.grade_level || '-'}</td>
+                          <tr key={i} className="hover:bg-indigo-50/40 transition-colors">
+                            <td className="p-2 text-center">
+                              <UserAvatar
+                                avatar={s.avatar}
+                                name={s.name}
+                                userId={i + 1}
+                                size="xs"
+                                className="mx-auto border border-indigo-100 rounded-lg"
+                              />
+                            </td>
+                            <td className="p-2.5 text-slate-600 font-mono">{s.student_code || '-'}</td>
+                            <td className="p-2.5 text-slate-800 font-semibold">{s.name}</td>
+                            <td className="p-2.5 text-slate-600">{s.grade_level || '-'}</td>
+                            <td className="p-2 text-center">
+                              {s.avatar ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
+                                  ✓ มีรูป
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500">
+                                  อิโมจิ
+                                </span>
+                              )}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                     {importData.length > 50 && (
-                      <div className="p-3 text-center text-xs text-slate-500 bg-indigo-50">
+                      <div className="p-2 text-center text-[11px] text-slate-500 bg-slate-50 border-t border-slate-100">
                         แสดงตัวอย่าง 50 รายการแรก จากทั้งหมด {importData.length} รายการ
                       </div>
                     )}
                   </div>
                   
-                  <button onClick={handleImportSubmit} disabled={importMutation.isPending} className="btn btn-primary w-full py-3">
-                    {importMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'ยืนยันการนำเข้าข้อมูล'}
+                  <button 
+                    onClick={handleImportSubmit} 
+                    disabled={importMutation.isPending || isMatchingPhotos} 
+                    className="btn btn-primary w-full py-3 text-sm font-bold shadow-md shadow-indigo-500/20"
+                  >
+                    {importMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" /> กำลังนำเข้าข้อมูล...
+                      </>
+                    ) : (
+                      `ยืนยันการนำเข้านักเรียน ${importData.length} คน`
+                    )}
                   </button>
                 </div>
               )}

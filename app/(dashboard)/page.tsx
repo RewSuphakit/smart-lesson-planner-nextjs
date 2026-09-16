@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/services/api';
+import UserAvatar from '@/components/UserAvatar';
 import {
   Presentation,
   Users,
@@ -78,6 +79,7 @@ interface DashboardData {
     absent_count?: number;
     max_allowed?: number;
     remaining?: number;
+    avatar?: string | null;
   }>;
   pendingTasks?: Array<{
     type: string;
@@ -733,11 +735,13 @@ export default function DashboardPage() {
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm shadow-xs shrink-0 ${
-                          isF ? 'bg-rose-100 border border-rose-200' : 'bg-amber-100 border border-amber-200'
-                        }`}>
-                          {animalAvatars[student.student_id % animalAvatars.length]}
-                        </div>
+                        <UserAvatar
+                          avatar={student.avatar}
+                          name={student.student_name}
+                          userId={student.student_id}
+                          size="sm"
+                          className="rounded-xl border border-indigo-200 shadow-xs shrink-0"
+                        />
                         <div className="min-w-0">
                           <p className="text-xs font-bold text-slate-800 truncate">
                             {student.student_name}

@@ -140,6 +140,7 @@ model Student {
   midtermScore   Decimal? @default(0) @map("midterm_score") @db.Decimal(5, 2)
   finalScore     Decimal? @default(0) @map("final_score") @db.Decimal(5, 2)
   affectiveScore Decimal? @map("affective_score") @db.Decimal(5, 2)
+  avatar         String?  @db.MediumText
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 

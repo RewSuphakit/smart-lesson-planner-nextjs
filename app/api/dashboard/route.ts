@@ -68,6 +68,7 @@ export async function GET(request: NextRequest) {
       absent_count?: number;
       max_allowed?: number;
       remaining?: number;
+      avatar?: string | null;
     }
 
     const atRiskStudents: AtRiskStudent[] = [];
@@ -81,6 +82,7 @@ export async function GET(request: NextRequest) {
             name: true,
             studentCode: true,
             classroomId: true,
+            avatar: true,
           },
         }),
         prisma.attendance.groupBy({
@@ -135,6 +137,7 @@ export async function GET(request: NextRequest) {
             absent_count: totalConverted,
             max_allowed: maxAllowedAbsences,
             remaining: 0,
+            avatar: student.avatar,
           });
         } else if (remaining <= 2 && remaining >= 0) {
           atRiskStudents.push({
@@ -147,6 +150,7 @@ export async function GET(request: NextRequest) {
             absent_count: totalConverted,
             max_allowed: maxAllowedAbsences,
             remaining: remaining,
+            avatar: student.avatar,
           });
         }
       }

@@ -76,6 +76,8 @@ export default function UserAvatar({
           alt={name || 'User avatar'}
           className={`w-full h-full object-cover ${imgClassName}`}
           referrerPolicy="no-referrer"
+          loading="lazy"
+          decoding="async"
           onError={() => setImgError(true)}
         />
       ) : (

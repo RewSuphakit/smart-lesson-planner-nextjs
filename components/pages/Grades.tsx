@@ -15,6 +15,7 @@ import { calculateAffectiveScore } from '@/lib/affective';
 import GradePdfModal from '@/components/GradePdfModal';
 import GradeCsvModal from '@/components/GradeCsvModal';
 import { useAuth } from '@/context/AuthContext';
+import UserAvatar from '@/components/UserAvatar';
 
 export interface Classroom {
   id: string;
@@ -37,6 +38,7 @@ export interface ReportStudent {
   student_id: string;
   student_code?: string;
   name: string;
+  avatar?: string | null;
   raw_assign?: number;
   max_assign?: number;
   scaled_assign?: number;
@@ -1398,9 +1400,13 @@ export default function Grades() {
                       {/* Card Header: Avatar, Name, Student Code, Grade Badge */}
                       <div className="flex items-start justify-between gap-2.5">
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-lg shrink-0">
-                            {animalAvatars[idx % animalAvatars.length]}
-                          </div>
+                          <UserAvatar
+                            avatar={student.avatar}
+                            name={student.name}
+                            userId={student.student_id}
+                            size="md"
+                            className="rounded-2xl border border-indigo-100 shadow-xs shrink-0"
+                          />
                           <div className="min-w-0">
                             <h4 className="text-sm font-bold text-slate-800 truncate">{student.name}</h4>
                             <p className="text-xs text-slate-500 font-mono">รหัส: {student.student_code || '-'}</p>
