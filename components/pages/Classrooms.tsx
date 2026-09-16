@@ -253,13 +253,21 @@ export default function Classrooms() {
   });
 
   // ─── Query: ดึงข้อมูลตารางเรียนสำหรับทำตัวเลือก ───
-  const { data: timetableData = [] } = useQuery<TimetableEntry[]>({
-    queryKey: ['timetable'],
+  const { data: rawTimetableData = [] } = useQuery<TimetableEntry[]>({
+    queryKey: ['timetable-classroom-options'],
     queryFn: async () => {
       const res = await api.get('/timetable');
       return res.data.data?.entries || [];
     },
   });
+
+  const timetableData: TimetableEntry[] = useMemo(() => {
+    if (Array.isArray(rawTimetableData)) return rawTimetableData;
+    if (rawTimetableData && Array.isArray((rawTimetableData as any).entries)) {
+      return (rawTimetableData as any).entries;
+    }
+    return [];
+  }, [rawTimetableData]);
 
   const timetableOptions = useMemo(() => {
     if (!timetableData || !Array.isArray(timetableData)) return [];
@@ -387,6 +395,8 @@ export default function Classrooms() {
               )
             );
             queryClient.invalidateQueries({ queryKey: ['timetable'] });
+            queryClient.invalidateQueries({ queryKey: ['timetable-schedule'] });
+            queryClient.invalidateQueries({ queryKey: ['timetable-classroom-options'] });
             queryClient.invalidateQueries({ queryKey: ['timetable-all'] });
             toast.success('เชื่อมโยงคาบในตารางสอนกับห้องเรียนนี้เรียบร้อย');
           } catch {

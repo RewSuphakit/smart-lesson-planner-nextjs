@@ -98,6 +98,14 @@ function defaultForm(date: Date) {
 export default function Schedule() {
   const queryClient = useQueryClient();
 
+  const invalidateAllTimetableQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['timetable-schedule'] });
+    queryClient.invalidateQueries({ queryKey: ['timetable'] });
+    queryClient.invalidateQueries({ queryKey: ['timetable-classroom-options'] });
+    queryClient.invalidateQueries({ queryKey: ['timetable-all'] });
+    queryClient.invalidateQueries({ queryKey: ['schedules'] });
+  };
+
   const [activeTab, setActiveTab] = useState('calendar');
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -164,19 +172,28 @@ export default function Schedule() {
     entries: TimetableEntry[];
     summary: TimetableSummaryItem[];
   }>({
-    queryKey: ['timetable'],
+    queryKey: ['timetable-schedule'],
     queryFn: async () => {
       const res = await api.get('/timetable');
       const data = res.data.data || {};
       return {
-        entries: Array.isArray(data.entries) ? data.entries : [],
+        entries: Array.isArray(data.entries) ? data.entries : (Array.isArray(data) ? data : []),
         summary: Array.isArray(data.summary) ? data.summary : []
       };
     }
   });
 
-  const timetableEntries = timetableData.entries;
-  const timetableSummary = timetableData.summary;
+  const rawEntries = (timetableData as any)?.entries;
+  const timetableEntries: TimetableEntry[] = Array.isArray(rawEntries)
+    ? rawEntries
+    : Array.isArray(timetableData)
+      ? (timetableData as unknown as TimetableEntry[])
+      : [];
+
+  const rawSummary = (timetableData as any)?.summary;
+  const timetableSummary: TimetableSummaryItem[] = Array.isArray(rawSummary)
+    ? rawSummary
+    : [];
 
   const loading = activeTab === 'calendar' ? loadingSchedules : loadingTimetable;
 
@@ -274,8 +291,7 @@ export default function Schedule() {
       toast.success(editTimetableTarget ? 'อัปเดตคาบเรียนเรียบร้อย' : 'เพิ่มคาบเรียนเรียบร้อย');
       setShowTimetableModal(false);
       setEditTimetableTarget(null);
-      queryClient.invalidateQueries({ queryKey: ['timetable'] });
-      queryClient.invalidateQueries({ queryKey: ['schedules'] });
+      invalidateAllTimetableQueries();
     },
     onError: (err: ApiError) => {
       toast.error(err.response?.data?.message || 'บันทึกคาบเรียนไม่สำเร็จ');
@@ -323,8 +339,7 @@ export default function Schedule() {
       toast.success('ลบคาบเรียนแล้ว');
       setShowTimetableModal(false);
       setEditTimetableTarget(null);
-      queryClient.invalidateQueries({ queryKey: ['timetable'] });
-      queryClient.invalidateQueries({ queryKey: ['schedules'] });
+      invalidateAllTimetableQueries();
     },
     onError: () => {
       toast.error('ลบคาบเรียนไม่สำเร็จ');
@@ -470,8 +485,7 @@ export default function Schedule() {
       toast.success(res.data.message || 'อัพโหลดสำเร็จ');
       setShowUpload(false);
       setUploadFile(null);
-      queryClient.invalidateQueries({ queryKey: ['timetable'] });
-      queryClient.invalidateQueries({ queryKey: ['schedules'] });
+      invalidateAllTimetableQueries();
     },
     onError: (err: ApiError) => {
       toast.error(err.response?.data?.message || 'อัพโหลดไม่สำเร็จ กรุณาตรวจสอบรูปแบบไฟล์');
@@ -496,8 +510,7 @@ export default function Schedule() {
     },
     onSuccess: () => {
       toast.success('ล้างตารางสอนแล้ว');
-      queryClient.invalidateQueries({ queryKey: ['timetable'] });
-      queryClient.invalidateQueries({ queryKey: ['schedules'] });
+      invalidateAllTimetableQueries();
     },
     onError: () => {
       toast.error('ทำรายการไม่สำเร็จ');
@@ -544,8 +557,7 @@ export default function Schedule() {
     },
     onSuccess: () => {
       toast.success('ย้ายตารางสอนสำเร็จ');
-      queryClient.invalidateQueries({ queryKey: ['timetable'] });
-      queryClient.invalidateQueries({ queryKey: ['schedules'] });
+      invalidateAllTimetableQueries();
     },
     onError: (err: ApiError) => {
       toast.error(err.response?.data?.message || 'ทำรายการไม่สำเร็จ');
@@ -558,8 +570,7 @@ export default function Schedule() {
     },
     onSuccess: () => {
       toast.success('ปรับขนาดคาบเรียนสำเร็จ');
-      queryClient.invalidateQueries({ queryKey: ['timetable'] });
-      queryClient.invalidateQueries({ queryKey: ['schedules'] });
+      invalidateAllTimetableQueries();
     },
     onError: (err: ApiError) => {
       toast.error(err.response?.data?.message || 'ทำรายการไม่สำเร็จ');
@@ -593,7 +604,8 @@ export default function Schedule() {
   };
 
   const days = getMonthGrid(currentMonth);
-  const schedulesForDay = (day: Date) => schedules.filter(s => isSameDay(parseISO(s.scheduled_date?.slice(0, 10)), day));
+  const safeSchedules = Array.isArray(schedules) ? schedules : [];
+  const schedulesForDay = (day: Date) => safeSchedules.filter(s => s && s.scheduled_date && isSameDay(parseISO(s.scheduled_date.slice(0, 10)), day));
   const selectedDaySchedules = schedulesForDay(selectedDay);
 
   const saving = scheduleMutation.isPending;
@@ -704,7 +716,7 @@ export default function Schedule() {
           </div>
         ) : (
           <div className="space-y-3 overflow-y-auto flex-1">
-            {selectedDaySchedules.sort((a, b) => a.start_time?.localeCompare(b.start_time)).map((sch) => (
+            {[...selectedDaySchedules].sort((a, b) => (a.start_time || '').localeCompare(b.start_time || '')).map((sch) => (
               <div key={sch.id} className="glass p-5 rounded-2xl group relative overflow-hidden border border-indigo-100 transition-all hover:shadow-lg">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
@@ -736,8 +748,11 @@ export default function Schedule() {
     const entriesByDay: Record<number, TimetableEntry[]> = {};
     for (let i = 0; i < 7; i++) entriesByDay[i] = [];
     
-    timetableEntries.forEach(entry => {
-      entriesByDay[entry.day_of_week].push(entry);
+    const safeEntries = Array.isArray(timetableEntries) ? timetableEntries : [];
+    safeEntries.forEach(entry => {
+      if (entry && typeof entry.day_of_week === 'number' && entriesByDay[entry.day_of_week]) {
+        entriesByDay[entry.day_of_week].push(entry);
+      }
     });
 
     const getBgColor = (type?: string) => {
@@ -962,7 +977,7 @@ export default function Schedule() {
             <div className="glass p-5 flex flex-col h-full rounded-2xl">
               <h3 className="text-sm font-bold text-slate-800 mb-4 pb-3 border-b border-slate-100">สรุปชั่วโมงสอน</h3>
               <div className="space-y-4 overflow-y-auto flex-1 pr-1">
-                {timetableSummary.map((sum, i) => (
+                {(Array.isArray(timetableSummary) ? timetableSummary : []).map((sum, i) => (
                   <div key={i} className="flex gap-3 items-start p-2 rounded-xl hover:bg-slate-50 transition-colors">
                     <div className="w-2 h-2 rounded-full mt-1.5 bg-indigo-500 shrink-0"></div>
                     <div className="flex-1 min-w-0">
@@ -1155,11 +1170,11 @@ export default function Schedule() {
                   <li>จำนวนคาบตาม <strong>จำนวนคาบทั้งหมด</strong> ที่ตั้งค่าไว้ในห้องเรียน</li>
                 </ul>
                 <div className="mt-3 space-y-1">
-                  <p className="text-xs text-emerald-700 font-semibold">✅ คาบที่เชื่อมแล้ว: {timetableEntries.filter(e => e.classroom_id).length} รายการ</p>
-                  {timetableEntries.filter(e => !e.classroom_id).length > 0 && (
-                    <p className="text-xs text-amber-600 font-semibold">⚠️ ยังไม่เชื่อม: {timetableEntries.filter(e => !e.classroom_id).length} รายการ — คลิกที่คาบในตารางเพื่อเชื่อม</p>
+                  <p className="text-xs text-emerald-700 font-semibold">✅ คาบที่เชื่อมแล้ว: {(Array.isArray(timetableEntries) ? timetableEntries : []).filter(e => e && e.classroom_id).length} รายการ</p>
+                  {(Array.isArray(timetableEntries) ? timetableEntries : []).filter(e => e && !e.classroom_id).length > 0 && (
+                    <p className="text-xs text-amber-600 font-semibold">⚠️ ยังไม่เชื่อม: {(Array.isArray(timetableEntries) ? timetableEntries : []).filter(e => e && !e.classroom_id).length} รายการ — คลิกที่คาบในตารางเพื่อเชื่อม</p>
                   )}
-                  {timetableEntries.filter(e => e.classroom_id).length === 0 && (
+                  {(Array.isArray(timetableEntries) ? timetableEntries : []).filter(e => e && e.classroom_id).length === 0 && (
                     <p className="text-xs text-red-600 font-bold mt-1">❌ ยังไม่มีคาบที่เชื่อมกับห้องเรียน — ต้องเชื่อมก่อนจึงจะสร้างได้</p>
                   )}
                 </div>
@@ -1390,7 +1405,7 @@ export default function Schedule() {
                       className="form-input"
                     >
                       <option value="">-- ไม่เชื่อม --</option>
-                      {classroomsList.map(c => (
+                      {(Array.isArray(classroomsList) ? classroomsList : []).map(c => (
                         <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
                     </select>

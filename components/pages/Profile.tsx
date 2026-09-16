@@ -8,9 +8,9 @@ import toast from 'react-hot-toast';
 import {
   User, Mail, Lock, Shield, Sparkles, Check,
   Eye, EyeOff, Save, KeyRound, Calendar,
-  Loader2, BadgeCheck, Edit2, ArrowRight, X,
+  Loader2, Edit2, ArrowRight, X,
   RotateCw, AlertCircle, CheckCircle2, Info,
-  Upload, Trash2, Camera, AlertTriangle, Image as ImageIcon
+  Upload, Trash2, Camera, AlertTriangle
 } from 'lucide-react';
 import UserAvatar, { ANIMAL_AVATARS, TEACHER_EMOJIS, isImageUrl, getDefaultAvatar } from '@/components/UserAvatar';
 
@@ -47,7 +47,7 @@ export default function ProfilePage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [hasPassword, setHasPassword] = useState(true);
-  const [isGoogleUser, setIsGoogleUser] = useState(false);
+  const [_isGoogleUser, setIsGoogleUser] = useState(false);
 
   // Delete account state & modal
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -374,11 +374,10 @@ export default function ProfilePage() {
           <button
             type="button"
             onClick={() => setActiveTab('profile')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 ${
-              activeTab === 'profile'
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 ${activeTab === 'profile'
                 ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-500/25'
                 : 'text-slate-600 hover:text-indigo-600 hover:bg-indigo-50/50'
-            }`}
+              }`}
           >
             <User className="w-4 h-4" />
             ข้อมูลส่วนตัว
@@ -386,11 +385,10 @@ export default function ProfilePage() {
           <button
             type="button"
             onClick={() => setActiveTab('security')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 ${
-              activeTab === 'security'
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 ${activeTab === 'security'
                 ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-500/25'
                 : 'text-slate-600 hover:text-indigo-600 hover:bg-indigo-50/50'
-            }`}
+              }`}
           >
             <Shield className="w-4 h-4" />
             ความปลอดภัย & รหัสผ่าน
@@ -455,16 +453,6 @@ export default function ProfilePage() {
                 {createdAt ? new Date(createdAt).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' }) : 'ไม่ระบุ'}
               </span>
             </div>
-          </div>
-
-          {/* Tips Box */}
-          <div className="w-full p-3.5 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200/60 rounded-2xl text-left">
-            <p className="text-xs font-bold text-amber-800 flex items-center gap-1.5 mb-1">
-              💡 ข้อแนะนำสำหรับครู
-            </p>
-            <p className="text-[0.72rem] text-amber-700/90 leading-relaxed">
-              การเลือกรูปประจำตัวช่วยให้นักเรียนและเพื่อนร่วมงานจดจำตารางสอนของคุณได้ง่ายขึ้น
-            </p>
           </div>
         </div>
 
@@ -559,11 +547,10 @@ export default function ProfilePage() {
                     <button
                       type="button"
                       onClick={() => setAvatarType('upload')}
-                      className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                        avatarType === 'upload'
+                      className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${avatarType === 'upload'
                           ? 'bg-white text-indigo-600 shadow-xs'
                           : 'text-slate-600 hover:text-slate-900'
-                      }`}
+                        }`}
                     >
                       <Upload className="w-3.5 h-3.5" />
                       อัปโหลดรูปภาพ
@@ -571,11 +558,10 @@ export default function ProfilePage() {
                     <button
                       type="button"
                       onClick={() => setAvatarType('emoji')}
-                      className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                        avatarType === 'emoji'
+                      className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${avatarType === 'emoji'
                           ? 'bg-white text-indigo-600 shadow-xs'
                           : 'text-slate-600 hover:text-slate-900'
-                      }`}
+                        }`}
                     >
                       <Sparkles className="w-3.5 h-3.5" />
                       เลือกอิโมจิ
@@ -587,11 +573,10 @@ export default function ProfilePage() {
                           setSelectedAvatar(googleAvatar);
                           setAvatarType('upload');
                         }}
-                        className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                          selectedAvatar === googleAvatar
+                        className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${selectedAvatar === googleAvatar
                             ? 'bg-white text-indigo-600 shadow-xs'
                             : 'text-slate-600 hover:text-slate-900'
-                        }`}
+                          }`}
                       >
                         <span>🌐</span>
                         รูป Google
@@ -673,22 +658,20 @@ export default function ProfilePage() {
                           <button
                             type="button"
                             onClick={() => { setEmojiCategory('animals'); setIsCustomAvatar(false); }}
-                            className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
-                              emojiCategory === 'animals' && !isCustomAvatar
+                            className={`px-3 py-1.5 rounded-xl font-bold transition-all ${emojiCategory === 'animals' && !isCustomAvatar
                                 ? 'bg-indigo-600 text-white shadow-xs'
                                 : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-                            }`}
+                              }`}
                           >
                             🐾 สัตว์น่ารัก
                           </button>
                           <button
                             type="button"
                             onClick={() => { setEmojiCategory('teacher'); setIsCustomAvatar(false); }}
-                            className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
-                              emojiCategory === 'teacher' && !isCustomAvatar
+                            className={`px-3 py-1.5 rounded-xl font-bold transition-all ${emojiCategory === 'teacher' && !isCustomAvatar
                                 ? 'bg-indigo-600 text-white shadow-xs'
                                 : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-                            }`}
+                              }`}
                           >
                             🎓 ครู & การศึกษา
                           </button>
@@ -735,11 +718,10 @@ export default function ProfilePage() {
                                   setSelectedAvatar(avatar);
                                   setIsCustomAvatar(false);
                                 }}
-                                className={`h-11 rounded-xl flex items-center justify-center text-2xl transition-all duration-200 relative ${
-                                  isSelected
+                                className={`h-11 rounded-xl flex items-center justify-center text-2xl transition-all duration-200 relative ${isSelected
                                     ? 'bg-indigo-50 shadow-md shadow-indigo-300/40 scale-110 ring-2 ring-indigo-500 border border-indigo-200'
                                     : 'hover:bg-slate-100 hover:scale-105'
-                                }`}
+                                  }`}
                               >
                                 <span>{avatar}</span>
                                 {isSelected && (
@@ -780,177 +762,176 @@ export default function ProfilePage() {
             /* ================= Tab 2: Security & Password ================= */
             <div className="space-y-6">
               <div className="glass p-6 sm:p-8 rounded-3xl border border-indigo-100 shadow-xl shadow-indigo-100/30 space-y-6">
-              <div className="border-b border-indigo-100/60 pb-4">
-                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                  <KeyRound className="w-5 h-5 text-indigo-600" /> เปลี่ยนรหัสผ่านเข้าใช้งาน
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  เพื่อความปลอดภัย แนะนำให้ใช้รหัสผ่านที่มีความยาวอย่างน้อย 8 ตัวอักษร
-                </p>
-              </div>
-
-              <form onSubmit={handleChangePassword} className="space-y-5">
-                {/* Current Password */}
-                <div className="space-y-2">
-                  <label htmlFor="current-pass" className="block text-xs font-semibold text-slate-700">
-                    รหัสผ่านเดิม <span className="text-slate-400 font-normal">(ถ้ามี)</span>
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                      <Lock className="w-4 h-4" />
-                    </div>
-                    <input
-                      id="current-pass"
-                      type={showCurrentPassword ? 'text' : 'password'}
-                      value={currentPassword}
-                      onChange={(e) => setCurrentPassword(e.target.value)}
-                      placeholder="กรอกรหัสผ่านปัจจุบัน"
-                      className="w-full pl-10 pr-11 py-2.5 rounded-xl bg-white/80 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm text-slate-800 font-medium shadow-sm transition-all"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600"
-                      tabIndex={-1}
-                    >
-                      {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* New Password */}
-                <div className="space-y-2">
-                  <label htmlFor="new-pass" className="block text-xs font-semibold text-slate-700">
-                    รหัสผ่านใหม่ <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                      <KeyRound className="w-4 h-4" />
-                    </div>
-                    <input
-                      id="new-pass"
-                      type={showNewPassword ? 'text' : 'password'}
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="กำหนดรหัสผ่านใหม่อย่างน้อย 6 ตัวอักษร"
-                      required
-                      minLength={6}
-                      className="w-full pl-10 pr-11 py-2.5 rounded-xl bg-white/80 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm text-slate-800 font-medium shadow-sm transition-all"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowNewPassword(!showNewPassword)}
-                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600"
-                      tabIndex={-1}
-                    >
-                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-
-                  {/* Password Strength Indicator */}
-                  {newPassword && (
-                    <div className="space-y-1 pt-1">
-                      <div className="flex items-center justify-between text-[0.68rem]">
-                        <span className="text-slate-500">ความปลอดภัยของรหัสผ่าน:</span>
-                        <span className="font-bold text-slate-700">{passStrength.label}</span>
-                      </div>
-                      <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden flex gap-1">
-                        {[1, 2, 3, 4, 5].map((level) => (
-                          <div
-                            key={level}
-                            className={`flex-1 h-full rounded-full transition-all duration-300 ${
-                              level <= passStrength.score ? passStrength.color : 'bg-slate-200'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Confirm New Password */}
-                <div className="space-y-2">
-                  <label htmlFor="confirm-pass" className="block text-xs font-semibold text-slate-700">
-                    ยืนยันรหัสผ่านใหม่ <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                      <Check className="w-4 h-4" />
-                    </div>
-                    <input
-                      id="confirm-pass"
-                      type={showConfirmPassword ? 'text' : 'password'}
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="กรอกรหัสผ่านใหม่อีกครั้ง"
-                      required
-                      className="w-full pl-10 pr-11 py-2.5 rounded-xl bg-white/80 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm text-slate-800 font-medium shadow-sm transition-all"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600"
-                      tabIndex={-1}
-                    >
-                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                  {confirmPassword && newPassword !== confirmPassword && (
-                    <p className="text-[0.7rem] text-rose-500 font-medium">
-                      ⚠️ รหัสผ่านไม่ตรงกัน กรุณาตรวจสอบอีกครั้ง
-                    </p>
-                  )}
-                </div>
-
-                {/* Submit Button */}
-                <div className="pt-4 flex justify-end">
-                  <button
-                    type="submit"
-                    disabled={savingPassword || (!!confirmPassword && newPassword !== confirmPassword)}
-                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold text-sm shadow-lg shadow-indigo-500/25 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-0.5"
-                  >
-                    {savingPassword ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" /> กำลังเปลี่ยนรหัสผ่าน...
-                      </>
-                    ) : (
-                      <>
-                        <Lock className="w-4 h-4" /> อัปเดตรหัสผ่าน
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            {/* Danger Zone: Delete Account */}
-            <div className="glass p-6 sm:p-7 rounded-3xl border border-rose-200/80 bg-rose-50/25 shadow-xl shadow-rose-100/20 space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <h3 className="text-base font-bold text-rose-800 flex items-center gap-2">
-                    <AlertTriangle className="w-5 h-5 text-rose-600" />
-                    พื้นที่อันตราย: ลบบัญชีผู้ใช้งาน (Delete ID)
+                <div className="border-b border-indigo-100/60 pb-4">
+                  <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <KeyRound className="w-5 h-5 text-indigo-600" /> เปลี่ยนรหัสผ่านเข้าใช้งาน
                   </h3>
-                  <p className="text-xs text-rose-700/90 leading-relaxed max-w-xl">
-                    เมื่อลบบัญชี ข้อมูลทั้งหมดของคุณในระบบ เช่น ห้องเรียน ตารางสอน นักเรียน สถิติการเข้าเรียน และผลการเรียนทั้งหมดจะถูกลบออกจากระบบอย่างถาวรทันที และไม่สามารถกู้คืนได้อีก
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    เพื่อความปลอดภัย แนะนำให้ใช้รหัสผ่านที่มีความยาวอย่างน้อย 8 ตัวอักษร
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDeletePassword('');
-                    setDeleteConfirmation('');
-                    setIsDeleteModalOpen(true);
-                  }}
-                  className="btn bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md shadow-rose-500/20 flex items-center gap-1.5 shrink-0 transition-all hover:scale-105"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  ลบบัญชีผู้ใช้
-                </button>
+
+                <form onSubmit={handleChangePassword} className="space-y-5">
+                  {/* Current Password */}
+                  <div className="space-y-2">
+                    <label htmlFor="current-pass" className="block text-xs font-semibold text-slate-700">
+                      รหัสผ่านเดิม <span className="text-slate-400 font-normal">(ถ้ามี)</span>
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                        <Lock className="w-4 h-4" />
+                      </div>
+                      <input
+                        id="current-pass"
+                        type={showCurrentPassword ? 'text' : 'password'}
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        placeholder="กรอกรหัสผ่านปัจจุบัน"
+                        className="w-full pl-10 pr-11 py-2.5 rounded-xl bg-white/80 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm text-slate-800 font-medium shadow-sm transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                        className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600"
+                        tabIndex={-1}
+                      >
+                        {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* New Password */}
+                  <div className="space-y-2">
+                    <label htmlFor="new-pass" className="block text-xs font-semibold text-slate-700">
+                      รหัสผ่านใหม่ <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                        <KeyRound className="w-4 h-4" />
+                      </div>
+                      <input
+                        id="new-pass"
+                        type={showNewPassword ? 'text' : 'password'}
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="กำหนดรหัสผ่านใหม่อย่างน้อย 6 ตัวอักษร"
+                        required
+                        minLength={6}
+                        className="w-full pl-10 pr-11 py-2.5 rounded-xl bg-white/80 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm text-slate-800 font-medium shadow-sm transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600"
+                        tabIndex={-1}
+                      >
+                        {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+
+                    {/* Password Strength Indicator */}
+                    {newPassword && (
+                      <div className="space-y-1 pt-1">
+                        <div className="flex items-center justify-between text-[0.68rem]">
+                          <span className="text-slate-500">ความปลอดภัยของรหัสผ่าน:</span>
+                          <span className="font-bold text-slate-700">{passStrength.label}</span>
+                        </div>
+                        <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden flex gap-1">
+                          {[1, 2, 3, 4, 5].map((level) => (
+                            <div
+                              key={level}
+                              className={`flex-1 h-full rounded-full transition-all duration-300 ${level <= passStrength.score ? passStrength.color : 'bg-slate-200'
+                                }`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Confirm New Password */}
+                  <div className="space-y-2">
+                    <label htmlFor="confirm-pass" className="block text-xs font-semibold text-slate-700">
+                      ยืนยันรหัสผ่านใหม่ <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                        <Check className="w-4 h-4" />
+                      </div>
+                      <input
+                        id="confirm-pass"
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="กรอกรหัสผ่านใหม่อีกครั้ง"
+                        required
+                        className="w-full pl-10 pr-11 py-2.5 rounded-xl bg-white/80 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm text-slate-800 font-medium shadow-sm transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600"
+                        tabIndex={-1}
+                      >
+                        {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    {confirmPassword && newPassword !== confirmPassword && (
+                      <p className="text-[0.7rem] text-rose-500 font-medium">
+                        ⚠️ รหัสผ่านไม่ตรงกัน กรุณาตรวจสอบอีกครั้ง
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Submit Button */}
+                  <div className="pt-4 flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={savingPassword || (!!confirmPassword && newPassword !== confirmPassword)}
+                      className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold text-sm shadow-lg shadow-indigo-500/25 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-0.5"
+                    >
+                      {savingPassword ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" /> กำลังเปลี่ยนรหัสผ่าน...
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="w-4 h-4" /> อัปเดตรหัสผ่าน
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Danger Zone: Delete Account */}
+              <div className="glass p-6 sm:p-7 rounded-3xl border border-rose-200/80 bg-rose-50/25 shadow-xl shadow-rose-100/20 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <h3 className="text-base font-bold text-rose-800 flex items-center gap-2">
+                      <AlertTriangle className="w-5 h-5 text-rose-600" />
+                      พื้นที่อันตราย: ลบบัญชีผู้ใช้งาน (Delete ID)
+                    </h3>
+                    <p className="text-xs text-rose-700/90 leading-relaxed max-w-xl">
+                      เมื่อลบบัญชี ข้อมูลทั้งหมดของคุณในระบบ เช่น ห้องเรียน ตารางสอน นักเรียน สถิติการเข้าเรียน และผลการเรียนทั้งหมดจะถูกลบออกจากระบบอย่างถาวรทันที และไม่สามารถกู้คืนได้อีก
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeletePassword('');
+                      setDeleteConfirmation('');
+                      setIsDeleteModalOpen(true);
+                    }}
+                    className="btn bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md shadow-rose-500/20 flex items-center gap-1.5 shrink-0 transition-all hover:scale-105"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    ลบบัญชีผู้ใช้
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
         </div>
       </div>
 
