@@ -12,8 +12,7 @@ import {
 import { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import ErrorBoundary from '@/components/ErrorBoundary';
-
-const animalAvatars = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐧', '🐥', '🦉', '🦄', '🐙', '🐢', '🦖', '🦕', '🦦', '🦥'];
+import UserAvatar, { ANIMAL_AVATARS as animalAvatars } from '@/components/UserAvatar';
 
 const navItems = [
   { path: '/', icon: LayoutDashboard, label: 'แดชบอร์ด' },
@@ -131,9 +130,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 className="flex items-center gap-3 flex-1 min-w-0 group"
                 title="แก้ไขข้อมูลส่วนตัว"
               >
-                <div className="w-10 h-10 rounded-xl bg-indigo-100 border border-indigo-200 flex items-center justify-center text-xl shadow-sm transition-transform duration-300 group-hover:scale-110">
-                  {user?.avatar || animalAvatars[(user?.id || 1) % animalAvatars.length]}
-                </div>
+                <UserAvatar
+                  avatar={user?.avatar}
+                  name={user?.name}
+                  userId={user?.id}
+                  size="md"
+                  className="transition-transform duration-300 group-hover:scale-110 shadow-sm"
+                />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-slate-700 truncate group-hover:text-indigo-600 transition-colors">
                     {user?.name}

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/services/api';
 import toast from 'react-hot-toast';
@@ -8,16 +9,10 @@ import {
   User, Mail, Lock, Shield, Sparkles, Check,
   Eye, EyeOff, Save, KeyRound, Calendar,
   Loader2, BadgeCheck, Edit2, ArrowRight, X,
-  RotateCw, AlertCircle, CheckCircle2, Info
+  RotateCw, AlertCircle, CheckCircle2, Info,
+  Upload, Trash2, Camera, AlertTriangle, Image as ImageIcon
 } from 'lucide-react';
-
-const ANIMAL_AVATARS = [
-  '🐶', '🐱', '🐭', '🐹', '🐰',
-  '🦊', '🐻', '🐼', '🐨', '🐯',
-  '🦁', '🐮', '🐷', '🐸', '🐵',
-  '🐧', '🐥', '🦉', '🦄', '🐙',
-  '🐢', '🦖', '🦕', '🦦', '🦥'
-];
+import UserAvatar, { ANIMAL_AVATARS, TEACHER_EMOJIS, isImageUrl, getDefaultAvatar } from '@/components/UserAvatar';
 
 interface ApiError {
   response?: {
@@ -28,7 +23,8 @@ interface ApiError {
 }
 
 export default function ProfilePage() {
-  const { user, updateUser } = useAuth();
+  const router = useRouter();
+  const { user, updateUser, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<'profile' | 'security'>('profile');
 
   // Profile form state
@@ -36,6 +32,10 @@ export default function ProfilePage() {
   const [selectedAvatar, setSelectedAvatar] = useState('');
   const [customAvatar, setCustomAvatar] = useState('');
   const [isCustomAvatar, setIsCustomAvatar] = useState(false);
+  const [avatarType, setAvatarType] = useState<'upload' | 'emoji'>('emoji');
+  const [emojiCategory, setEmojiCategory] = useState<'animals' | 'teacher'>('animals');
+  const [googleAvatar, setGoogleAvatar] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [savingProfile, setSavingProfile] = useState(false);
 
   // Security form state
@@ -46,6 +46,14 @@ export default function ProfilePage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  const [hasPassword, setHasPassword] = useState(true);
+  const [isGoogleUser, setIsGoogleUser] = useState(false);
+
+  // Delete account state & modal
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   // Account metadata
   const [createdAt, setCreatedAt] = useState<string | null>(null);
@@ -145,15 +153,28 @@ export default function ProfilePage() {
         const u = res.data.user;
         if (u) {
           setName(u.name || '');
-          const initialAvatar = u.avatar || ANIMAL_AVATARS[(u.id || 1) % ANIMAL_AVATARS.length];
+          const initialAvatar = u.avatar || getDefaultAvatar(u.id);
           setSelectedAvatar(initialAvatar);
-          if (!ANIMAL_AVATARS.includes(initialAvatar)) {
+          if (isImageUrl(initialAvatar)) {
+            setAvatarType('upload');
+            if (initialAvatar.includes('googleusercontent.com')) {
+              setGoogleAvatar(initialAvatar);
+            }
+          } else if (!ANIMAL_AVATARS.includes(initialAvatar) && !TEACHER_EMOJIS.includes(initialAvatar)) {
+            setAvatarType('emoji');
             setIsCustomAvatar(true);
             setCustomAvatar(initialAvatar);
+          } else {
+            setAvatarType('emoji');
+            if (TEACHER_EMOJIS.includes(initialAvatar)) {
+              setEmojiCategory('teacher');
+            }
           }
           if (u.createdAt) {
             setCreatedAt(u.createdAt);
           }
+          setHasPassword(u.hasPassword ?? true);
+          setIsGoogleUser(u.isGoogleUser ?? false);
         }
       } catch (err) {
         console.error('Failed to load profile:', err);
@@ -164,6 +185,49 @@ export default function ProfilePage() {
     fetchProfile();
   }, []);
 
+  // Handle client-side image compression & selection
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('กรุณาเลือกไฟล์รูปภาพ (JPG, PNG, WEBP, GIF)');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('ไฟล์รูปภาพต้องมีขนาดไม่เกิน 5MB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const targetSize = 256;
+        canvas.width = targetSize;
+        canvas.height = targetSize;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        const minDim = Math.min(img.width, img.height);
+        const startX = (img.width - minDim) / 2;
+        const startY = (img.height - minDim) / 2;
+
+        ctx.drawImage(img, startX, startY, minDim, minDim, 0, 0, targetSize, targetSize);
+
+        const compressedDataUrl = canvas.toDataURL('image/webp', 0.88);
+        setSelectedAvatar(compressedDataUrl);
+        setAvatarType('upload');
+        toast.success('เลือกรูปภาพสำเร็จ กด "บันทึกการเปลี่ยนแปลง" เพื่อใช้งาน');
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
@@ -171,7 +235,10 @@ export default function ProfilePage() {
       return;
     }
 
-    const finalAvatar = isCustomAvatar ? customAvatar.trim() || selectedAvatar : selectedAvatar;
+    let finalAvatar = selectedAvatar;
+    if (avatarType === 'emoji' && isCustomAvatar && customAvatar.trim()) {
+      finalAvatar = customAvatar.trim();
+    }
 
     setSavingProfile(true);
     try {
@@ -189,6 +256,28 @@ export default function ProfilePage() {
       toast.error(apiErr.response?.data?.message || 'ไม่สามารถอัปเดตข้อมูลได้');
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  const handleDeleteAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setDeletingAccount(true);
+    try {
+      const res = await api.delete('/auth/profile', {
+        data: {
+          password: deletePassword,
+          confirmation: deleteConfirmation,
+        },
+      });
+      toast.success(res.data.message || 'ลบบัญชีผู้ใช้เรียบร้อยแล้ว');
+      setIsDeleteModalOpen(false);
+      logout();
+      router.push('/login');
+    } catch (err: unknown) {
+      const apiErr = err as ApiError;
+      toast.error(apiErr.response?.data?.message || 'ไม่สามารถลบบัญชีได้');
+    } finally {
+      setDeletingAccount(false);
     }
   };
 
@@ -316,12 +405,25 @@ export default function ProfilePage() {
           {/* Avatar with Glow Effect */}
           <div className="relative group">
             <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-3xl blur-md opacity-40 group-hover:opacity-75 transition duration-500 animate-pulse-glow" />
-            <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-gradient-to-br from-indigo-100 via-white to-purple-100 border-2 border-white shadow-xl flex items-center justify-center text-5xl sm:text-6xl select-none transition-transform duration-300 group-hover:scale-105">
-              {currentAvatarDisplay}
-            </div>
-            <div className="absolute -bottom-2 -right-2 bg-emerald-500 text-white p-1.5 rounded-xl shadow-md border-2 border-white">
-              <BadgeCheck className="w-4 h-4" />
-            </div>
+            <UserAvatar
+              avatar={currentAvatarDisplay}
+              name={name || user?.name}
+              userId={user?.id}
+              size="2xl"
+              className="border-2 border-white shadow-xl transition-transform duration-300 group-hover:scale-105"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('profile');
+                setAvatarType('upload');
+                fileInputRef.current?.click();
+              }}
+              className="absolute -bottom-1 -right-1 bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-xl shadow-md border-2 border-white transition-transform hover:scale-110"
+              title="เปลี่ยนรูปภาพประจำตัว"
+            >
+              <Camera className="w-4 h-4" />
+            </button>
           </div>
 
           <div>
@@ -447,58 +549,209 @@ export default function ProfilePage() {
                 <div className="space-y-3 pt-2">
                   <div className="flex items-center justify-between">
                     <label className="block text-xs font-semibold text-slate-700">
-                      เลือกรูปอวตารประจำตัว
+                      รูปประจำตัวของคุณ (Avatar)
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => setIsCustomAvatar(!isCustomAvatar)}
-                      className="text-xs font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
-                    >
-                      {isCustomAvatar ? '← กลับไปเลือกสัตว์' : 'พิมพ์อิโมจิเอง ✏️'}
-                    </button>
+                    <span className="text-[11px] text-slate-400">เลือกอัปโหลดรูปถ่ายหรือใช้อิโมจิ</span>
                   </div>
 
-                  {isCustomAvatar ? (
-                    <div className="space-y-2 p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100">
-                      <p className="text-xs text-slate-600">
-                        พิมพ์ตัวการ์ตูนหรืออิโมจิที่คุณชอบ (เช่น 🎓, 💻, 🚀, 📚)
-                      </p>
-                      <input
-                        type="text"
-                        value={customAvatar}
-                        onChange={(e) => setCustomAvatar(e.target.value)}
-                        placeholder="วางหรือพิมพ์ Emoji ที่นี่..."
-                        maxLength={10}
-                        className="w-full px-4 py-2.5 rounded-xl bg-white border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-2xl text-center shadow-sm"
-                      />
+                  {/* Mode Selector Buttons */}
+                  <div className="flex gap-2 p-1 bg-slate-100 rounded-2xl border border-slate-200/80">
+                    <button
+                      type="button"
+                      onClick={() => setAvatarType('upload')}
+                      className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                        avatarType === 'upload'
+                          ? 'bg-white text-indigo-600 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      อัปโหลดรูปภาพ
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAvatarType('emoji')}
+                      className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                        avatarType === 'emoji'
+                          ? 'bg-white text-indigo-600 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      เลือกอิโมจิ
+                    </button>
+                    {googleAvatar && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedAvatar(googleAvatar);
+                          setAvatarType('upload');
+                        }}
+                        className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                          selectedAvatar === googleAvatar
+                            ? 'bg-white text-indigo-600 shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        <span>🌐</span>
+                        รูป Google
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Hidden File Input */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+
+                  {/* TAB 1: UPLOAD PHOTO */}
+                  {avatarType === 'upload' && (
+                    <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-200 space-y-3">
+                      {isImageUrl(selectedAvatar) ? (
+                        <div className="flex flex-col sm:flex-row items-center gap-4 p-3.5 bg-white rounded-2xl border border-indigo-100 shadow-xs">
+                          <UserAvatar
+                            avatar={selectedAvatar}
+                            name={name}
+                            size="xl"
+                            className="border-2 border-indigo-200"
+                          />
+                          <div className="space-y-1.5 text-center sm:text-left flex-1 min-w-0">
+                            <p className="text-xs font-bold text-slate-800">รูปภาพโปรไฟล์ปัจจุบัน</p>
+                            <p className="text-[11px] text-slate-500">
+                              รองรับไฟล์รูปภาพทั่วไป ระบบจะปรับขนาดและจัดกึ่งกลางให้อัตโนมัติ
+                            </p>
+                            <div className="flex flex-wrap gap-2 pt-1 justify-center sm:justify-start">
+                              <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="btn bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold px-3 py-1.5 rounded-xl border border-indigo-200 flex items-center gap-1.5"
+                              >
+                                <Camera className="w-3.5 h-3.5" /> เปลี่ยนรูปภาพใหม่
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedAvatar(ANIMAL_AVATARS[0]);
+                                  setAvatarType('emoji');
+                                }}
+                                className="btn bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 text-xs font-semibold px-3 py-1.5 rounded-xl border border-slate-200 flex items-center gap-1.5"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" /> ใช้อิโมจิแทน
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div
+                          onClick={() => fileInputRef.current?.click()}
+                          className="p-6 border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-indigo-50/30 hover:bg-indigo-50/60 rounded-2xl cursor-pointer text-center space-y-2 transition-colors"
+                        >
+                          <div className="w-12 h-12 mx-auto rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                            <Upload className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-indigo-900">คลิกที่นี่เพื่ออัปโหลดรูปภาพประจำตัวครู</p>
+                            <p className="text-[11px] text-slate-500 mt-0.5">
+                              รองรับไฟล์ JPG, PNG, WEBP (ขนาดไม่เกิน 5MB)
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-5 sm:grid-cols-7 md:grid-cols-9 gap-2 p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200/80 max-h-48 overflow-y-auto">
-                      {ANIMAL_AVATARS.map((avatar) => {
-                        const isSelected = selectedAvatar === avatar && !isCustomAvatar;
-                        return (
+                  )}
+
+                  {/* TAB 2: EMOJI */}
+                  {avatarType === 'emoji' && (
+                    <div className="space-y-3 p-4 bg-slate-50/80 rounded-2xl border border-slate-200">
+                      {/* Category selector */}
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex gap-1.5 text-xs">
                           <button
-                            key={avatar}
                             type="button"
-                            onClick={() => {
-                              setSelectedAvatar(avatar);
-                              setIsCustomAvatar(false);
-                            }}
-                            className={`h-11 rounded-xl flex items-center justify-center text-2xl transition-all duration-200 relative ${
-                              isSelected
-                                ? 'bg-white shadow-md shadow-indigo-300/40 scale-110 ring-2 ring-indigo-500 border border-indigo-200'
-                                : 'hover:bg-white/80 hover:scale-105'
+                            onClick={() => { setEmojiCategory('animals'); setIsCustomAvatar(false); }}
+                            className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
+                              emojiCategory === 'animals' && !isCustomAvatar
+                                ? 'bg-indigo-600 text-white shadow-xs'
+                                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
                             }`}
                           >
-                            <span>{avatar}</span>
-                            {isSelected && (
-                              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-indigo-600 text-white rounded-full flex items-center justify-center text-[8px]">
-                                <Check className="w-2.5 h-2.5" />
-                              </span>
-                            )}
+                            🐾 สัตว์น่ารัก
                           </button>
-                        );
-                      })}
+                          <button
+                            type="button"
+                            onClick={() => { setEmojiCategory('teacher'); setIsCustomAvatar(false); }}
+                            className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
+                              emojiCategory === 'teacher' && !isCustomAvatar
+                                ? 'bg-indigo-600 text-white shadow-xs'
+                                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                            }`}
+                          >
+                            🎓 ครู & การศึกษา
+                          </button>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setIsCustomAvatar(!isCustomAvatar)}
+                          className="text-xs font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
+                        >
+                          {isCustomAvatar ? '← ดูรายการอิโมจิ' : 'พิมพ์อิโมจิเอง ✏️'}
+                        </button>
+                      </div>
+
+                      {isCustomAvatar ? (
+                        <div className="space-y-2 p-3 bg-white rounded-2xl border border-indigo-100">
+                          <p className="text-xs text-slate-600">
+                            พิมพ์หรือวางตัวการ์ตูน/อิโมจิที่คุณชอบ (เช่น 🎓, 💻, 🚀, 📚)
+                          </p>
+                          <input
+                            type="text"
+                            value={customAvatar}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setCustomAvatar(val);
+                              if (val.trim()) {
+                                setSelectedAvatar(val.trim());
+                              }
+                            }}
+                            placeholder="วางหรือพิมพ์ Emoji ที่นี่..."
+                            maxLength={6}
+                            className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-3xl text-center shadow-sm"
+                          />
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 gap-2 max-h-48 overflow-y-auto p-2 bg-white rounded-2xl border border-slate-200">
+                          {(emojiCategory === 'animals' ? ANIMAL_AVATARS : TEACHER_EMOJIS).map((avatar) => {
+                            const isSelected = selectedAvatar === avatar && !isCustomAvatar;
+                            return (
+                              <button
+                                key={avatar}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedAvatar(avatar);
+                                  setIsCustomAvatar(false);
+                                }}
+                                className={`h-11 rounded-xl flex items-center justify-center text-2xl transition-all duration-200 relative ${
+                                  isSelected
+                                    ? 'bg-indigo-50 shadow-md shadow-indigo-300/40 scale-110 ring-2 ring-indigo-500 border border-indigo-200'
+                                    : 'hover:bg-slate-100 hover:scale-105'
+                                }`}
+                              >
+                                <span>{avatar}</span>
+                                {isSelected && (
+                                  <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-indigo-600 text-white rounded-full flex items-center justify-center text-[8px]">
+                                    <Check className="w-2.5 h-2.5" />
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -525,7 +778,8 @@ export default function ProfilePage() {
             </div>
           ) : (
             /* ================= Tab 2: Security & Password ================= */
-            <div className="glass p-6 sm:p-8 rounded-3xl border border-indigo-100 shadow-xl shadow-indigo-100/30 space-y-6">
+            <div className="space-y-6">
+              <div className="glass p-6 sm:p-8 rounded-3xl border border-indigo-100 shadow-xl shadow-indigo-100/30 space-y-6">
               <div className="border-b border-indigo-100/60 pb-4">
                 <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                   <KeyRound className="w-5 h-5 text-indigo-600" /> เปลี่ยนรหัสผ่านเข้าใช้งาน
@@ -668,7 +922,35 @@ export default function ProfilePage() {
                 </div>
               </form>
             </div>
-          )}
+
+            {/* Danger Zone: Delete Account */}
+            <div className="glass p-6 sm:p-7 rounded-3xl border border-rose-200/80 bg-rose-50/25 shadow-xl shadow-rose-100/20 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <h3 className="text-base font-bold text-rose-800 flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-rose-600" />
+                    พื้นที่อันตราย: ลบบัญชีผู้ใช้งาน (Delete ID)
+                  </h3>
+                  <p className="text-xs text-rose-700/90 leading-relaxed max-w-xl">
+                    เมื่อลบบัญชี ข้อมูลทั้งหมดของคุณในระบบ เช่น ห้องเรียน ตารางสอน นักเรียน สถิติการเข้าเรียน และผลการเรียนทั้งหมดจะถูกลบออกจากระบบอย่างถาวรทันที และไม่สามารถกู้คืนได้อีก
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeletePassword('');
+                    setDeleteConfirmation('');
+                    setIsDeleteModalOpen(true);
+                  }}
+                  className="btn bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md shadow-rose-500/20 flex items-center gap-1.5 shrink-0 transition-all hover:scale-105"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  ลบบัญชีผู้ใช้
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         </div>
       </div>
 
@@ -884,6 +1166,116 @@ export default function ProfilePage() {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ================= Delete Account Confirmation Modal ================= */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-rose-100 p-6 sm:p-7 space-y-5 animate-scale-up">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between pb-3 border-b border-rose-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-800">
+                    ยืนยันการลบบัญชีผู้ใช้งาน (Delete ID)
+                  </h3>
+                  <p className="text-xs text-rose-600 font-semibold">
+                    การกระทำนี้ไม่สามารถย้อนกลับได้
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => !deletingAccount && setIsDeleteModalOpen(false)}
+                disabled={deletingAccount}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Warning Details */}
+            <div className="p-4 bg-rose-50 rounded-2xl border border-rose-200 text-xs text-rose-800 space-y-2 leading-relaxed">
+              <p className="font-bold flex items-center gap-1.5 text-rose-900">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                สิ่งที่จะถูกลบออกจากระบบอย่างถาวร:
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-[0.75rem] text-rose-700">
+                <li>ข้อมูลห้องเรียนและตารางสอนทั้งหมดของคุณ</li>
+                <li>รายชื่อนักเรียนและประวัติการเช็คชื่อทั้งหมด</li>
+                <li>คะแนนเก็บ โครงสร้างคะแนน และเกรดที่คำนวณไว้</li>
+              </ul>
+            </div>
+
+            {/* Confirmation Form */}
+            <form onSubmit={handleDeleteAccount} className="space-y-4">
+              {hasPassword ? (
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-700">
+                    กรอกรหัสผ่านของคุณเพื่อยืนยัน <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    value={deletePassword}
+                    onChange={(e) => setDeletePassword(e.target.value)}
+                    placeholder="รหัสผ่านปัจจุบันของคุณ"
+                    required
+                    autoFocus
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500/30 focus:border-rose-500 text-sm"
+                  />
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-700">
+                    พิมพ์ยืนยันด้วยอีเมล <span className="text-rose-600 font-mono select-all font-extrabold">{user?.email}</span> หรือคำว่า <span className="text-rose-600 font-mono font-extrabold">ลบบัญชี</span> <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={deleteConfirmation}
+                    onChange={(e) => setDeleteConfirmation(e.target.value)}
+                    placeholder={user?.email || 'ลบบัญชี'}
+                    required
+                    autoFocus
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500/30 focus:border-rose-500 text-sm"
+                  />
+                </div>
+              )}
+
+              {/* Modal Buttons */}
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsDeleteModalOpen(false)}
+                  disabled={deletingAccount}
+                  className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  disabled={
+                    deletingAccount ||
+                    (hasPassword ? !deletePassword : !deleteConfirmation.trim())
+                  }
+                  className="btn bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md shadow-rose-500/25 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  {deletingAccount ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> กำลังลบบัญชี...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" /> ยืนยันลบบัญชีถาวร
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

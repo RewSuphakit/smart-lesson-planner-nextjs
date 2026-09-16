@@ -93,6 +93,13 @@ export async function POST(request: NextRequest) {
           },
         });
       }
+    } else {
+      if (picture && (!user.avatar || user.avatar.includes('googleusercontent.com'))) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { avatar: picture, emailVerified: true },
+        });
+      }
     }
 
     const token = generateToken(user);

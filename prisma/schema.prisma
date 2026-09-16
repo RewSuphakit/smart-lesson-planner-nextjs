@@ -51,7 +51,7 @@ model User {
   password  String?  @db.VarChar(255)
   name      String   @db.VarChar(255)
   role      Role     @default(teacher)
-  avatar    String?  @db.VarChar(500)
+  avatar    String?  @db.MediumText
   googleId  String?  @unique @map("google_id") @db.VarChar(255)
   emailVerified           Boolean   @default(false) @map("email_verified")
   pendingEmail            String?   @map("pending_email") @db.VarChar(255)
