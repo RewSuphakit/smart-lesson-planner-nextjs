@@ -4,6 +4,7 @@ import { Toaster as HotToaster } from 'react-hot-toast';
 import { Toaster as SonnerToaster } from 'sonner';
 import { AuthProvider } from '@/context/AuthContext';
 import QueryProvider from '@/components/QueryProvider';
+import { SemesterProvider } from '@/context/SemesterContext';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 
@@ -19,27 +20,37 @@ export default function RootLayout({
 }) {
   return (
     <html lang="th" className="h-full antialiased">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap"
+        />
+      </head>
       <body className="min-h-full flex flex-col">
         <QueryProvider>
           <AuthProvider>
-            <HotToaster
-              position="top-right"
-              toastOptions={{
-                style: {
-                  background: '#ffffff',
-                  color: '#334155',
-                  border: '1px solid rgba(165, 180, 252, 0.4)',
-                  borderRadius: '12px',
-                  boxShadow: '0 4px 12px rgba(99, 102, 241, 0.08)',
-                },
-                success: { iconTheme: { primary: '#10b981', secondary: '#fff' } },
-                error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
-              }}
-            />
-            <SonnerToaster richColors position="top-right" closeButton />
-            {children}
-            <Analytics />
-            <SpeedInsights />
+            <SemesterProvider>
+              <HotToaster
+                position="top-right"
+                toastOptions={{
+                  style: {
+                    background: '#ffffff',
+                    color: '#334155',
+                    border: '1px solid rgba(165, 180, 252, 0.4)',
+                    borderRadius: '12px',
+                    boxShadow: '0 4px 12px rgba(99, 102, 241, 0.08)',
+                  },
+                  success: { iconTheme: { primary: '#10b981', secondary: '#fff' } },
+                  error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
+                }}
+              />
+              <SonnerToaster richColors position="top-right" closeButton />
+              {children}
+              <Analytics />
+              <SpeedInsights />
+            </SemesterProvider>
           </AuthProvider>
         </QueryProvider>
       </body>

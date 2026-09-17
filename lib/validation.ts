@@ -67,6 +67,7 @@ export const ClassroomSchema = z.object({
   curriculum_type: z.enum(['pvch', 'pvs', 'custom']).optional().default('pvch'),
   total_weeks: z.number().int().min(1).max(52).optional().default(18),
   semester_start_date: z.string().nullable().optional(),
+  semester_id: z.number().int().positive().nullable().optional(),
 });
 
 export const UpdateClassroomSchema = z.object({
@@ -87,6 +88,30 @@ export const UpdateClassroomSchema = z.object({
   curriculum_type: z.enum(['pvch', 'pvs', 'custom']).optional(),
   total_weeks: z.number().int().min(1).max(52).optional(),
   semester_start_date: z.string().nullable().optional(),
+  semester_id: z.number().int().positive().nullable().optional(),
+});
+
+// ==================== Semester Schemas ====================
+export const SemesterSchema = z.object({
+  name: z.string().trim().min(1, 'Semester name is required'),
+  term_number: z.number().int().min(1).max(3),
+  academic_year: z.string().trim().min(1, 'Academic year is required'),
+  start_date: z.string().nullable().optional(),
+  end_date: z.string().nullable().optional(),
+  is_active: z.boolean().optional().default(false),
+  curriculum_type: z.enum(['pvch', 'pvs', 'custom']).optional().default('pvch'),
+  total_weeks: z.number().int().min(1).max(52).optional().default(18),
+});
+
+export const UpdateSemesterSchema = z.object({
+  name: z.string().trim().min(1, 'Semester name cannot be empty').optional(),
+  term_number: z.number().int().min(1).max(3).optional(),
+  academic_year: z.string().trim().min(1).optional(),
+  start_date: z.string().nullable().optional(),
+  end_date: z.string().nullable().optional(),
+  is_active: z.boolean().optional(),
+  curriculum_type: z.enum(['pvch', 'pvs', 'custom']).optional(),
+  total_weeks: z.number().int().min(1).max(52).optional(),
 });
 
 

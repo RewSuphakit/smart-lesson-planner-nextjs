@@ -15,6 +15,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const classroom = await prisma.classroom.findFirst({
       where: { id: numericId, userId: user.id },
+      include: { semester: { select: { id: true, name: true, termNumber: true, academicYear: true, startDate: true } } },
     });
     if (!classroom) return NextResponse.json({ message: 'Not found' }, { status: 404 });
 
@@ -66,6 +67,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       curriculum_type: 'curriculumType',
       total_weeks: 'totalWeeks',
       semester_start_date: 'semesterStartDate',
+      semester_id: 'semesterId',
     };
 
     for (const [key, prismaKey] of Object.entries(fieldMap)) {

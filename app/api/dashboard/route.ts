@@ -2,6 +2,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { PERIOD_TIMES } from '@/lib/constants';
+import {
+  isClassroomTeachingActive,
+  isClassroomSemesterEnded,
+  resolveTargetWeeks,
+  getSemesterEndDate,
+  getActiveSemester,
+} from '@/lib/semester';
+
+function isFlagpoleOrHomeroom(ws: { startPeriod?: number; entryType?: string; subjectName?: string | null; subjectCode?: string | null }) {
+  if (ws.startPeriod === 0) return true;
+  if (ws.entryType === 'homeroom') return true;
+  const name = `${ws.subjectName || ''} ${ws.subjectCode || ''}`.toLowerCase();
+  if (name.includes('เสาธง') || name.includes('โฮมรูม') || name.includes('เข้าแถว')) return true;
+  return false;
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,9 +31,13 @@ export async function GET(request: NextRequest) {
     const todayDateStr = nowThai.toISOString().split('T')[0];
     const todayDate = new Date(todayDateStr);
 
-    const [classroomCount, studentCount, upcomingSchedulesRaw, weeklyHoursAgg] = await Promise.all([
-      prisma.classroom.count({ where: { userId: user.id } }),
-      prisma.student.count({ where: { userId: user.id } }),
+    // Resolve active semester for scoping
+    const activeSemester = await getActiveSemester(user.id);
+    const semesterFilter = activeSemester ? { semesterId: activeSemester.id } : {};
+
+    const [classroomCount, studentCount, upcomingSchedulesRaw, weeklyHoursAgg, classrooms] = await Promise.all([
+      prisma.classroom.count({ where: { userId: user.id, ...semesterFilter } }),
+      prisma.student.count({ where: { userId: user.id, classroom: semesterFilter.semesterId ? { semesterId: semesterFilter.semesterId } : undefined } }),
       prisma.schedule.findMany({
         where: {
           userId: user.id,
@@ -26,36 +45,79 @@ export async function GET(request: NextRequest) {
           status: 'scheduled',
         },
         orderBy: [{ scheduledDate: 'asc' }, { startTime: 'asc' }],
-        take: 5,
+        take: 10,
       }),
       prisma.weeklySchedule.aggregate({
-        where: { userId: user.id },
+        where: { userId: user.id, ...(activeSemester ? { semesterId: activeSemester.id } : {}) },
         _sum: { hours: true },
+      }),
+      prisma.classroom.findMany({
+        where: { userId: user.id, ...semesterFilter },
+        select: {
+          id: true,
+          name: true,
+          lateToAbsentRatio: true,
+          leaveToAbsentRatio: true,
+          totalClasses: true,
+          minAttendancePercent: true,
+          semesterStartDate: true,
+          totalWeeks: true,
+          curriculumType: true,
+        },
       }),
     ]);
 
-    const upcomingSchedules = upcomingSchedulesRaw.map(s => ({
-      scheduled_date: s.scheduledDate.toISOString(),
-      start_time: s.startTime.toISOString().split('T')[1] || '',
-      end_time: s.endTime.toISOString().split('T')[1] || '',
-      status: s.status,
-      lesson_title: s.title,
-      subject: s.subject,
-    }));
+    // --- Semester Active & Ended Status Calculation ---
+    // Fallback to activeSemester startDate if classroom doesn't specify one
+    const classroomsWithDates = classrooms.filter(c => c.semesterStartDate || activeSemester?.startDate);
+    let maxSemesterEndDate: Date | null = null;
+    let allClassroomsEnded = classroomsWithDates.length > 0;
+    const classroomStatusMap = new Map<number, { isTeachingActive: boolean; isEnded: boolean; endDate: Date | null }>();
+
+    for (const c of classrooms) {
+      const effectiveStartDate = c.semesterStartDate || activeSemester?.startDate || null;
+      if (effectiveStartDate) {
+        const tempClassroom = { ...c, semesterStartDate: effectiveStartDate };
+        const isEnded = isClassroomSemesterEnded(tempClassroom, todayDate);
+        const isTeachingActive = isClassroomTeachingActive(tempClassroom, todayDate);
+        const endDate = getSemesterEndDate(effectiveStartDate, resolveTargetWeeks(c));
+
+        if (!maxSemesterEndDate || endDate > maxSemesterEndDate) {
+          maxSemesterEndDate = endDate;
+        }
+        if (!isEnded) {
+          allClassroomsEnded = false;
+        }
+        classroomStatusMap.set(c.id, { isTeachingActive, isEnded, endDate });
+      } else {
+        classroomStatusMap.set(c.id, { isTeachingActive: true, isEnded: false, endDate: null });
+      }
+    }
+
+    // If there are classrooms with dates and all have completed teaching / passed semester end
+    const isSemesterEnded = classroomsWithDates.length > 0 && allClassroomsEnded;
+
+    // Filter upcoming schedules:
+    // If the semester has ended, no upcoming schedules for this term.
+    // Also filter out any schedule exceeding maxSemesterEndDate.
+    const upcomingSchedules = (isSemesterEnded ? [] : upcomingSchedulesRaw)
+      .filter(s => {
+        if (maxSemesterEndDate && s.scheduledDate > maxSemesterEndDate) {
+          return false;
+        }
+        return true;
+      })
+      .slice(0, 5)
+      .map(s => ({
+        scheduled_date: s.scheduledDate.toISOString(),
+        start_time: s.startTime.toISOString().split('T')[1] || '',
+        end_time: s.endTime.toISOString().split('T')[1] || '',
+        status: s.status,
+        lesson_title: s.title,
+        subject: s.subject,
+      }));
 
     // --- At-Risk Students (Optimized via Aggregation) ---
-    const classrooms = await prisma.classroom.findMany({
-      where: { userId: user.id },
-      select: {
-        id: true,
-        name: true,
-        lateToAbsentRatio: true,
-        leaveToAbsentRatio: true,
-        totalClasses: true,
-        minAttendancePercent: true,
-      },
-    });
-
     const classroomIds = classrooms.map(c => c.id);
 
     interface AtRiskStudent {
@@ -166,11 +228,31 @@ export async function GET(request: NextRequest) {
 
     const pendingTasks: PendingTask[] = [];
 
-    const todayTimetable = await prisma.weeklySchedule.findMany({
-      where: { userId: user.id, dayOfWeek: schemaDayOfWeek },
+    const rawTodayTimetable = await prisma.weeklySchedule.findMany({
+      where: {
+        userId: user.id,
+        dayOfWeek: schemaDayOfWeek,
+        ...(activeSemester ? { semesterId: activeSemester.id } : {}),
+      },
       include: { classroom: true },
       orderBy: [{ startPeriod: 'asc' }],
     });
+
+    // Filter timetable slots according to semester active status:
+    // If the entire semester has ended, no timetable classes run today!
+    const todayTimetable = isSemesterEnded
+      ? []
+      : rawTodayTimetable.filter(slot => {
+          if (slot.classroomId) {
+            const status = classroomStatusMap.get(slot.classroomId);
+            if (status && !status.isTeachingActive) return false;
+          } else {
+            // Slots without classroom bound (e.g. general assembly / flagpole)
+            if (isFlagpoleOrHomeroom(slot)) return false;
+            if (classroomsWithDates.length > 0 && allClassroomsEnded) return false;
+          }
+          return true;
+        });
 
     const classroomIdsToCheck = todayTimetable
       .filter(e => e.classroomId && e.classroom)
@@ -261,8 +343,9 @@ export async function GET(request: NextRequest) {
     const todayStats = {
       totalClasses: todaySchedule.length,
       checkedClasses: todaySchedule.filter(s => s.classroom_id && s.is_attendance_checked).length,
-      totalWeeklyHours: weeklyHoursAgg._sum.hours || 0,
+      totalWeeklyHours: isSemesterEnded ? 0 : (weeklyHoursAgg._sum.hours || 0),
       todayAttendanceRate,
+      isSemesterEnded,
     };
 
     return NextResponse.json({
@@ -274,10 +357,19 @@ export async function GET(request: NextRequest) {
         pendingTasks,
         todaySchedule,
         todayStats,
+        isSemesterEnded,
+        activeSemester: activeSemester ? {
+          id: activeSemester.id,
+          name: activeSemester.name,
+          term_number: activeSemester.termNumber,
+          academic_year: activeSemester.academicYear,
+          is_active: true,
+        } : null,
       }
     });
   } catch (error) {
     if (error instanceof AuthError) return handleAuthError();
+    console.error('Dashboard error:', error);
     return NextResponse.json({ message: 'Failed to get dashboard' }, { status: 500 });
   }
 }

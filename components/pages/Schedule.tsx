@@ -36,6 +36,10 @@ interface ScheduleItem {
   end_time: string;
   notes?: string;
   status: 'scheduled' | 'completed' | 'cancelled';
+  week_number?: number | null;
+  is_final_week?: boolean;
+  total_weeks?: number;
+  classroom_name?: string | null;
 }
 
 interface TimetableEntry {
@@ -144,16 +148,30 @@ export default function Schedule() {
   const [hoverTooltip, setHoverTooltip] = useState<HoverTooltip | null>(null);
 
   const [showAutoGenerate, setShowAutoGenerate] = useState(false);
-  const [autoGenerateStartDate, setAutoGenerateStartDate] = useState(() => format(startOfMonth(new Date()), 'yyyy-MM-dd'));
+  const [autoGenerateStartDate, setAutoGenerateStartDate] = useState(() => '2026-05-18');
 
   // ─── Query: ดึงข้อมูลห้องเรียน ───
-  const { data: classroomsList = [] } = useQuery<Array<{ id: string; name: string }>>({
+  const { data: classroomsList = [] } = useQuery<Array<{
+    id: string | number;
+    name: string;
+    semester_start_date?: string | null;
+    semester_end_date?: string | null;
+    total_weeks?: number;
+  }>>({
     queryKey: ['classrooms'],
     queryFn: async () => {
       const res = await api.get('/classrooms');
       return res.data.data || [];
     }
   });
+
+  const openAutoGenerateModal = () => {
+    const earliest = classroomsList.find(c => c.semester_start_date)?.semester_start_date?.slice(0, 10);
+    if (earliest) {
+      setAutoGenerateStartDate(earliest);
+    }
+    setShowAutoGenerate(true);
+  };
 
   // ─── Query: ดึงข้อมูลตารางสอน (Calendar) ───
   const startStr = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
@@ -614,18 +632,55 @@ export default function Schedule() {
   const autoGenerating = autoGenerateMutation.isPending;
 
 
+  const goToFinalWeek = () => {
+    // 1. Check if safeSchedules has a final week schedule
+    const finalSch = safeSchedules.find(s => s.is_final_week);
+    if (finalSch) {
+      const d = parseISO(finalSch.scheduled_date.slice(0, 10));
+      setCurrentMonth(d);
+      setSelectedDay(d);
+      toast('ไปยังสัปดาห์สุดท้ายของภาคเรียน (สัปดาห์ที่ 18)', { icon: '🏁' });
+      return;
+    }
+
+    // 2. Or check classroomsList for the latest semester_end_date
+    let latestEnd: Date | null = null;
+    for (const c of classroomsList) {
+      if (c.semester_end_date) {
+        const d = new Date(c.semester_end_date);
+        if (!latestEnd || d > latestEnd) latestEnd = d;
+      }
+    }
+
+    const targetDate = latestEnd || new Date('2026-09-16');
+    setCurrentMonth(targetDate);
+    setSelectedDay(targetDate);
+    toast('ไปยังสัปดาห์สุดท้ายของภาคเรียน', { icon: '🏁' });
+  };
+
   const renderCalendar = () => (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6 animate-fade-in-up">
       <div className="glass p-5">
-        <div className="flex items-center justify-between mb-5">
-          <button onClick={() => setCurrentMonth(m => subMonths(m, 1))} className="p-2 rounded-xl hover:bg-indigo-50 transition-colors">
-            <ChevronLeft className="w-5 h-5 text-slate-600" />
-          </button>
-          <h2 className="text-base font-bold text-slate-800">
-            {format(currentMonth, 'MMMM yyyy', { locale: th })}
-          </h2>
-          <button onClick={() => setCurrentMonth(m => addMonths(m, 1))} className="p-2 rounded-xl hover:bg-indigo-50 transition-colors">
-            <ChevronRight className="w-5 h-5 text-slate-600" />
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+          <div className="flex items-center gap-2">
+            <button onClick={() => setCurrentMonth(m => subMonths(m, 1))} className="p-2 rounded-xl hover:bg-indigo-50 transition-colors">
+              <ChevronLeft className="w-5 h-5 text-slate-600" />
+            </button>
+            <h2 className="text-base font-bold text-slate-800">
+              {format(currentMonth, 'MMMM yyyy', { locale: th })}
+            </h2>
+            <button onClick={() => setCurrentMonth(m => addMonths(m, 1))} className="p-2 rounded-xl hover:bg-indigo-50 transition-colors">
+              <ChevronRight className="w-5 h-5 text-slate-600" />
+            </button>
+          </div>
+
+          <button
+            onClick={goToFinalWeek}
+            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/10 via-purple-500/10 to-indigo-500/10 hover:from-amber-500/20 hover:to-indigo-500/20 border border-amber-300/60 text-amber-900 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
+            title="เลื่อนปฏิทินไปยังสัปดาห์สุดท้ายของภาคเรียน"
+          >
+            <span>🏁</span>
+            <span>ไปยังสัปดาห์สุดท้าย (สัปดาห์ที่ 18)</span>
           </button>
         </div>
 
@@ -644,10 +699,13 @@ export default function Schedule() {
               const isToday  = isSameDay(day, new Date());
               const isCurMon = isSameMonth(day, currentMonth);
               const isSelected = isSameDay(day, selectedDay);
+              const hasFinalWeek = daySchs.some(s => s.is_final_week);
               
               let btnClass = "relative rounded-2xl p-2 min-h-[64px] text-left transition-all duration-300 border ";
               if (!isCurMon) {
                 btnClass += "opacity-30 border-transparent";
+              } else if (hasFinalWeek) {
+                btnClass += "border-amber-200/90 bg-amber-50/40";
               } else {
                 btnClass += "border-indigo-100 bg-indigo-50";
               }
@@ -673,9 +731,16 @@ export default function Schedule() {
                   onClick={() => setSelectedDay(day)}
                   className={btnClass}
                 >
-                  <span className={numClass}>
-                    {format(day, 'd')}
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className={numClass}>
+                      {format(day, 'd')}
+                    </span>
+                    {hasFinalWeek && (
+                      <span className="text-[0.52rem] font-extrabold px-1 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300/80 leading-none">
+                        สัปดาห์สุดท้าย
+                      </span>
+                    )}
+                  </div>
                   {daySchs.length > 0 && (
                     <div className="mt-1 space-y-0.5">
                       {daySchs.slice(0, 2).map((s, j) => {
@@ -699,13 +764,37 @@ export default function Schedule() {
       <div className="glass p-5 flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">{format(selectedDay, 'EEEE', { locale: th })}</p>
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">{format(selectedDay, 'EEEE', { locale: th })}</p>
+              {selectedDaySchedules.some(s => s.is_final_week) ? (
+                <span className="text-[0.62rem] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                  🏁 สัปดาห์สุดท้าย
+                </span>
+              ) : selectedDaySchedules[0]?.week_number ? (
+                <span className="text-[0.62rem] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  สัปดาห์ที่ {selectedDaySchedules[0].week_number}
+                </span>
+              ) : null}
+            </div>
             <h3 className="text-xl font-bold text-slate-800">{format(selectedDay, 'd MMMM yyyy', { locale: th })}</h3>
           </div>
           <button onClick={() => openCreate(selectedDay)} className="p-2.5 rounded-xl bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-700 transition-all">
             <Plus className="w-4 h-4" />
           </button>
         </div>
+
+        {selectedDaySchedules.some(s => s.is_final_week) && (
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/80 rounded-xl p-3 flex items-start gap-2.5">
+            <span className="text-lg leading-none">🏁</span>
+            <div>
+              <p className="text-xs font-bold text-amber-950">สัปดาห์สุดท้ายของภาคเรียน (สัปดาห์ที่ {selectedDaySchedules[0]?.week_number || 18})</p>
+              <p className="text-[0.68rem] text-amber-800 mt-0.5 leading-relaxed">
+                สัปดาห์ประเมินผลและสอบปลายภาค สิ้นสุดแผนการสอนประจำภาคเรียน
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="divider" />
         {loading ? (
           <div className="space-y-3">{[1,2].map(i => <div key={i} className="skeleton h-20 rounded-xl" />)}</div>
@@ -720,8 +809,11 @@ export default function Schedule() {
               <div key={sch.id} className="glass p-5 rounded-2xl group relative overflow-hidden border border-indigo-100 transition-all hover:shadow-lg">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
+                    <div className="flex items-center gap-3 mb-2 flex-wrap">
                       <span className="text-xs font-bold bg-indigo-50 px-2 py-1 rounded-md">{sch.start_time?.slice(0, 5)} - {sch.end_time?.slice(0, 5)}</span>
+                      {sch.is_final_week && (
+                        <span className="text-[0.62rem] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300">สัปดาห์สุดท้าย</span>
+                      )}
                       {sch.lesson_title?.includes('เสาธง') || sch.lesson_title?.includes('โฮมรูม') || sch.subject?.includes('เสาธง') || sch.lesson_title?.includes('เข้าแถว') ? (
                         <span className="text-[0.65rem] font-bold px-2 py-1 rounded-md bg-rose-50 text-rose-600 border border-rose-200">กิจกรรม/เข้าแถว</span>
                       ) : (
@@ -730,6 +822,9 @@ export default function Schedule() {
                     </div>
                     <p className="text-sm font-bold text-slate-800">{sch.lesson_title}</p>
                     <p className="text-xs text-slate-500 mt-1">วิชา: {sch.subject}</p>
+                    {sch.notes && (
+                      <p className="text-[0.68rem] text-slate-400 mt-1 truncate">{sch.notes}</p>
+                    )}
                   </div>
                   <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={() => openEdit(sch)} className="p-1.5 rounded-md hover:bg-indigo-100 text-slate-600"><Edit2 className="w-3.5 h-3.5" /></button>
@@ -1005,7 +1100,7 @@ export default function Schedule() {
           <p className="text-slate-500 text-sm">จัดการเวลาเรียนและการสอนของคุณ</p>
         </div>
         <button 
-          onClick={() => setShowAutoGenerate(true)} 
+          onClick={openAutoGenerateModal} 
           className="btn btn-primary bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold flex items-center gap-2 border-0 shadow-lg shadow-indigo-200/50"
         >
           <Table className="w-4 h-4" /> สร้างแผนสอนล่วงหน้าอัตโนมัติ
@@ -1167,7 +1262,7 @@ export default function Schedule() {
                   <li>ใช้คาบเรียนวิชาการที่ <strong>เชื่อมกับห้องเรียน</strong> แล้วเท่านั้น</li>
                   <li>ไม่รวมคาบกิจกรรมหน้าเสาธงหรือโฮมรูม (ไม่นับเป็นคาบสอน)</li>
                   <li>คำนวณวันและเวลาสอนแต่ละสัปดาห์ตามตารางเรียน</li>
-                  <li>จำนวนคาบตาม <strong>จำนวนคาบทั้งหมด</strong> ที่ตั้งค่าไว้ในห้องเรียน</li>
+                  <li>สร้างตารางสอนครอบคลุมทุกสัปดาห์จนถึง <strong>สัปดาห์สุดท้าย</strong> ของภาคเรียน (สัปดาห์ที่ 18 หรือ 15)</li>
                 </ul>
                 <div className="mt-3 space-y-1">
                   <p className="text-xs text-emerald-700 font-semibold">✅ คาบที่เชื่อมแล้ว: {(Array.isArray(timetableEntries) ? timetableEntries : []).filter(e => e && e.classroom_id).length} รายการ</p>

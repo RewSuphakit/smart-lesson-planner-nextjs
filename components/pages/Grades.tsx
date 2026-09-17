@@ -120,7 +120,12 @@ export default function Grades() {
   const [showCsvPreviewModal, setShowCsvPreviewModal] = useState(false);
 
   // View Mode: 'table' vs 'cards' (optimal for mobile)
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      return 'cards';
+    }
+    return 'table';
+  });
 
   // Filter & Search State
   const [searchQuery, setSearchQuery] = useState('');
@@ -1449,10 +1454,12 @@ export default function Grades() {
                         <div className="p-2.5 rounded-2xl bg-pink-50/50 border border-pink-100">
                           <span className="text-[10px] font-bold text-pink-700 uppercase">จิตพิสัย ({weights.affective_weight}%)</span>
                           <input 
-                            type="number" step="0.5" min="0" max={weights.affective_weight}
+                            type="number"
+                            inputMode="decimal"
+                            step="0.5" min="0" max={weights.affective_weight}
                             value={student.affective_score ?? ''}
                             onChange={e => handleExamScoreChange(student.student_id, 'affective_score', e.target.value)}
-                            className="form-input text-center py-1 px-1 w-full text-pink-900 font-bold border-pink-200 focus:border-pink-500 text-xs rounded-xl bg-white mt-1" 
+                            className="form-input text-center py-1.5 px-1 w-full text-pink-900 font-bold border-pink-200 focus:border-pink-500 text-base md:text-xs rounded-xl bg-white mt-1" 
                             placeholder="0"
                           />
                         </div>
@@ -1476,27 +1483,56 @@ export default function Grades() {
                         <div className="p-2.5 rounded-2xl bg-cyan-50/50 border border-cyan-100">
                           <span className="text-[10px] font-bold text-cyan-700 uppercase">กลางภาค ({weights.midterm_weight}%)</span>
                           <input 
-                            type="number" step="0.5" min="0" max={weights.midterm_max_score}
+                            type="number"
+                            inputMode="decimal"
+                            step="0.5" min="0" max={weights.midterm_max_score}
                             value={student.midterm_score ?? ''}
                             onChange={e => handleExamScoreChange(student.student_id, 'midterm_score', e.target.value)}
-                            className="form-input text-center py-1 px-1 w-full text-cyan-900 font-bold border-cyan-200 focus:border-cyan-500 text-xs rounded-xl bg-white mt-1" 
+                            className="form-input text-center py-1.5 px-1 w-full text-cyan-900 font-bold border-cyan-200 focus:border-cyan-500 text-base md:text-xs rounded-xl bg-white mt-1" 
                             placeholder="0"
                           />
                         </div>
 
                         <div className="p-2.5 rounded-2xl bg-blue-50/50 border border-blue-100">
-                          <span className="text-[10px] font-bold text-blue-700 uppercase">ปลายภาค ({weights.final_weight}%)</span>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-blue-700 uppercase">ปลายภาค ({weights.final_weight}%)</span>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                title="ขาดสอบ (ข.ส.)"
+                                onClick={() => handleExamScoreChange(student.student_id, 'final_score', '-1')}
+                                className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-white text-slate-600 hover:bg-amber-100 hover:text-amber-800 transition-colors border border-slate-200 shadow-2xs"
+                              >
+                                ข.ส.
+                              </button>
+                              <button
+                                type="button"
+                                title="ไม่สมบูรณ์ (ม.ส.)"
+                                onClick={() => handleExamScoreChange(student.student_id, 'final_score', '-2')}
+                                className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-white text-slate-600 hover:bg-purple-100 hover:text-purple-800 transition-colors border border-slate-200 shadow-2xs"
+                              >
+                                ม.ส.
+                              </button>
+                            </div>
+                          </div>
                           {student.final_score === -1 || student.is_absent_final ? (
-                            <div className="mt-1">
-                              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-amber-600 text-white inline-block">ข.ส.</span>
-                              <button type="button" onClick={() => handleExamScoreChange(student.student_id, 'final_score', '0')} className="text-[10px] text-blue-600 block hover:underline mt-0.5 font-semibold">แก้คะแนน</button>
+                            <div className="mt-1 flex items-center justify-between">
+                              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-amber-600 text-white inline-block shadow-2xs">ข.ส.</span>
+                              <button type="button" onClick={() => handleExamScoreChange(student.student_id, 'final_score', '0')} className="text-[11px] text-blue-600 hover:underline font-bold">แก้คะแนน</button>
+                            </div>
+                          ) : student.final_score === -2 || student.is_incomplete ? (
+                            <div className="mt-1 flex items-center justify-between">
+                              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-purple-600 text-white inline-block shadow-2xs">ม.ส.</span>
+                              <button type="button" onClick={() => handleExamScoreChange(student.student_id, 'final_score', '0')} className="text-[11px] text-blue-600 hover:underline font-bold">แก้คะแนน</button>
                             </div>
                           ) : (
                             <input 
-                              type="number" step="0.5" min="0" max={weights.final_max_score}
+                              type="number"
+                              inputMode="decimal"
+                              step="0.5" min="0" max={weights.final_max_score}
                               value={student.final_score ?? ''}
                               onChange={e => handleExamScoreChange(student.student_id, 'final_score', e.target.value)}
-                              className="form-input text-center py-1 px-1 w-full text-blue-900 font-bold border-blue-200 focus:border-blue-500 text-xs rounded-xl bg-white mt-1" 
+                              className="form-input text-center py-1.5 px-1 w-full text-blue-900 font-bold border-blue-200 focus:border-blue-500 text-base md:text-xs rounded-xl bg-white mt-1" 
                               placeholder="0"
                             />
                           )}

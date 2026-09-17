@@ -66,6 +66,7 @@ model User {
   students    Student[]
   classrooms  Classroom[]
   weeklySchedules WeeklySchedule[]
+  semesters   Semester[]
 
   @@map("users")
 }
@@ -96,6 +97,7 @@ model Schedule {
 model Classroom {
   id                   Int      @id @default(autoincrement())
   userId               Int      @map("user_id")
+  semesterId           Int?     @map("semester_id")
   name                 String   @db.VarChar(255)
   description          String?  @db.Text
   lateToAbsentRatio    Int      @default(3) @map("late_to_absent_ratio")
@@ -117,6 +119,7 @@ model Classroom {
   updatedAt            DateTime @updatedAt @map("updated_at")
 
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  semester        Semester?        @relation(fields: [semesterId], references: [id], onDelete: SetNull)
   students        Student[]
   attendance      Attendance[]
   gradeCriteria   GradeCriteria[]
@@ -125,6 +128,7 @@ model Classroom {
   weeklySchedules WeeklySchedule[]
 
   @@index([userId], map: "idx_classrooms_user")
+  @@index([semesterId], map: "idx_classrooms_semester")
   @@map("classrooms")
 }
 
@@ -229,12 +233,38 @@ model StudentScore {
   @@map("student_scores")
 }
 
+// ==================== Semesters (ภาคเรียน) ====================
+model Semester {
+  id              Int             @id @default(autoincrement())
+  userId          Int             @map("user_id")
+  name            String          @db.VarChar(255)
+  termNumber      Int             @map("term_number")
+  academicYear    String          @map("academic_year") @db.VarChar(10)
+  startDate       DateTime?       @map("start_date") @db.Date
+  endDate         DateTime?       @map("end_date") @db.Date
+  isActive        Boolean         @default(false) @map("is_active")
+  curriculumType  CurriculumType  @default(pvch) @map("curriculum_type")
+  totalWeeks      Int             @default(18) @map("total_weeks")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  classrooms       Classroom[]
+  weeklySchedules  WeeklySchedule[]
+
+  @@unique([userId, termNumber, academicYear], map: "unique_semester_per_user")
+  @@index([userId], map: "idx_semester_user")
+  @@index([userId, isActive], map: "idx_semester_user_active")
+  @@map("semesters")
+}
+
 // ==================== Weekly Schedules (Timetable) ====================
 model WeeklySchedule {
   id            Int       @id @default(autoincrement())
   userId        Int       @map("user_id")
   timetableName String    @default("ตารางสอน") @map("timetable_name") @db.VarChar(255)
   semester      String?   @db.VarChar(100)
+  semesterId    Int?      @map("semester_id")
   dayOfWeek     Int       @map("day_of_week") @db.TinyInt
   startPeriod   Int       @map("start_period")
   endPeriod     Int       @map("end_period")
@@ -254,9 +284,11 @@ model WeeklySchedule {
 
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   classroom Classroom? @relation(fields: [classroomId], references: [id], onDelete: SetNull)
+  semesterRef Semester? @relation(fields: [semesterId], references: [id], onDelete: SetNull)
 
   @@index([userId], map: "idx_timetable_user")
   @@index([dayOfWeek], map: "idx_timetable_day")
   @@index([userId, dayOfWeek], map: "idx_timetable_user_day")
+  @@index([semesterId], map: "idx_timetable_semester")
   @@map("weekly_schedules")
 }

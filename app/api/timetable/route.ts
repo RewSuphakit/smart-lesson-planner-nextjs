@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { PERIOD_TIMES, parseTimeToUtc } from '@/lib/constants';
+import { getActiveSemesterId } from '@/lib/semester';
 
 function normalizeEntryType(type?: string | null): 'lecture' | 'lab' | 'activity' | 'homeroom' {
   const lower = String(type || '').toLowerCase().trim();
@@ -14,8 +15,29 @@ function normalizeEntryType(type?: string | null): 'lecture' | 'lab' | 'activity
 export async function GET(request: NextRequest) {
   try {
     const user = requireAuth(request);
+    const { searchParams } = new URL(request.url);
+    const semesterIdParam = searchParams.get('semester_id');
+    const allSemesters = searchParams.get('all') === 'true';
+
+    // Build where clause with semester scoping
+    const where: Record<string, unknown> = { userId: user.id };
+
+    if (!allSemesters) {
+      if (semesterIdParam) {
+        const semesterId = Number(semesterIdParam);
+        if (!isNaN(semesterId) && semesterId > 0) {
+          where.semesterId = semesterId;
+        }
+      } else {
+        const activeSemesterId = await getActiveSemesterId(user.id);
+        if (activeSemesterId) {
+          where.semesterId = activeSemesterId;
+        }
+      }
+    }
+
     const entries = await prisma.weeklySchedule.findMany({
-      where: { userId: user.id },
+      where,
       orderBy: [{ dayOfWeek: 'asc' }, { startPeriod: 'asc' }],
     });
     const mappedEntries = entries.map(e => {
@@ -60,6 +82,9 @@ export async function POST(request: NextRequest) {
     const user = requireAuth(request);
     const body = await request.json();
 
+    // Resolve semester for new entries
+    const activeSemesterId = await getActiveSemesterId(user.id);
+
     // Bulk create
     if (Array.isArray(body.entries)) {
       const classroomIds: number[] = Array.from(
@@ -88,6 +113,7 @@ export async function POST(request: NextRequest) {
           userId: user.id,
           timetableName: (e.timetable_name as string) || 'ตารางสอน',
           semester: (e.semester as string) || null,
+          semesterId: e.semester_id ? Number(e.semester_id) : activeSemesterId,
           dayOfWeek: e.day_of_week as number,
           startPeriod,
           endPeriod,
@@ -130,6 +156,7 @@ export async function POST(request: NextRequest) {
         userId: user.id,
         timetableName: body.timetable_name || 'ตารางสอน',
         semester: body.semester || null,
+        semesterId: body.semester_id ? Number(body.semester_id) : activeSemesterId,
         dayOfWeek: Number(body.day_of_week),
         startPeriod,
         endPeriod,

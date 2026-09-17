@@ -441,7 +441,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
                         <input
                           type="email"
                           className="form-input pl-10 py-2 text-sm rounded-xl bg-slate-50/70 focus:bg-white border-slate-200 focus:border-indigo-500 transition-all w-full"
-                          placeholder="Teacher@Example.com"
+                          placeholder="Teacher@xample.com"
                           value={regEmail}
                           onChange={(e) => setRegEmail(e.target.value)}
                           required

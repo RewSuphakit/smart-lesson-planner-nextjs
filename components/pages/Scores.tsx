@@ -41,12 +41,13 @@ const MemoizedScoreInput = memo(({ value, maxScore, focusColor, onChange }: Memo
   return (
     <input
       type="number"
+      inputMode="decimal"
       step="0.5"
       min="0"
       max={maxScore}
       value={localVal}
       onChange={handleChange}
-      className={`w-full text-center py-1.5 px-1 rounded border border-indigo-100 font-medium text-slate-800 text-xs sm:text-xs touch-manipulation focus:outline-none transition-colors ${focusClass}`}
+      className={`w-full text-center py-1.5 px-1 rounded border border-indigo-100 font-medium text-slate-800 text-base md:text-xs touch-manipulation focus:outline-none transition-colors ${focusClass}`}
     />
   );
 });
@@ -117,7 +118,12 @@ export default function Scores() {
 
   const [selectedClass, setSelectedClass] = useState('');
   const [activeTab, setActiveTab] = useState('entry'); // 'entry' or 'settings'
-  const [viewMode, setViewMode] = useState<'matrix' | 'weekly'>('matrix'); // 'matrix' (ตารางรวมทั้งเทอม) vs 'weekly' (รายสัปดาห์)
+  const [viewMode, setViewMode] = useState<'matrix' | 'weekly'>(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      return 'weekly';
+    }
+    return 'matrix';
+  }); // 'matrix' (ตารางรวมทั้งเทอม) vs 'weekly' (รายสัปดาห์)
 
   // Settings State
   const [structures, setStructures] = useState<ScoreStructure[]>([]);
@@ -1527,6 +1533,20 @@ export default function Scores() {
                     </div>
                   </div>
 
+                  {/* Mobile Recommendation Banner for Matrix Mode */}
+                  <div className="md:hidden p-3 bg-amber-50 border-b border-amber-200/80 flex items-center justify-between gap-2 text-xs text-amber-900">
+                    <span className="font-medium">
+                      💡 บนโทรศัพท์ แนะนำใช้ <strong>&quot;โฟกัสรายสัปดาห์&quot;</strong> เพื่อกรอกคะแนนได้สะดวกที่สุด
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('weekly')}
+                      className="px-2.5 py-1 bg-white border border-amber-300 rounded-lg font-bold text-amber-900 shadow-2xs shrink-0 active:scale-95"
+                    >
+                      สลับโหมด
+                    </button>
+                  </div>
+
                   {matrixLoading ? (
                     <div className="p-12 text-center text-indigo-500 flex flex-col items-center gap-2">
                       <Loader2 className="w-8 h-8 animate-spin" />
@@ -1755,7 +1775,89 @@ export default function Scores() {
                     </div>
                   </div>
 
-                  <div className="overflow-x-auto">
+                  {/* Mobile Weekly Score Cards (Touch-Friendly & iOS-Optimized) */}
+                  <div className="block md:hidden p-3 space-y-3">
+                    {displayedStudents.map(student => {
+                      const scoreData = scores[student.id] || { assignment_score: '', post_test_score: '' };
+                      const directRecord = allClassAttendance.find(
+                        r => String(r.student_id) === String(student.id) && parseSafeDateStr(r.date) === attendanceDate
+                      );
+                      const attStatus = attendanceRecords[String(student.id)] 
+                        || directRecord?.status 
+                        || weekAttendanceMap[`${student.id}_${selectedLesson}`] 
+                        || '';
+
+                      return (
+                        <div key={student.id} className="p-3.5 bg-white rounded-2xl border border-indigo-100/90 shadow-xs space-y-3">
+                          {/* Student Info & Quick Zero Button */}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-slate-800 text-sm truncate">{student.name}</span>
+                                {getAttendanceBadge(attStatus)}
+                              </div>
+                              <p className="text-[11px] text-slate-400 font-mono">รหัส: {student.student_code || '-'}</p>
+                            </div>
+
+                            {!['midterm', 'final', 'affective'].includes(selectedLesson) && (
+                              <button
+                                type="button"
+                                onClick={() => handleFillSingleStudentZero(student.id)}
+                                className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-xs font-bold rounded-xl transition-colors shadow-2xs shrink-0 active:scale-95"
+                                title="กำหนดคะแนนเป็น 0 สำหรับนักเรียนที่ขาดเรียน"
+                              >
+                                ขาด = 0
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Score Inputs Grid */}
+                          {!['midterm', 'final', 'affective'].includes(selectedLesson) && (
+                            <div className="grid grid-cols-2 gap-2.5">
+                              <div className="p-2.5 bg-emerald-50/50 rounded-xl border border-emerald-100 space-y-1">
+                                <div className="flex items-center justify-between text-[11px] font-bold text-emerald-800">
+                                  <span>งานเก็บ</span>
+                                  <span className="text-[10px] text-emerald-600 font-normal">เต็ม {currentStruct.max_assignment_score}</span>
+                                </div>
+                                <input
+                                  type="number"
+                                  inputMode="decimal"
+                                  step="0.5"
+                                  min="0"
+                                  max={currentStruct.max_assignment_score}
+                                  value={scoreData.assignment_score}
+                                  onChange={e => handleWeeklyScoreChange(student.id, 'assignment_score', e.target.value)}
+                                  className="w-full text-center text-base py-2 font-black border border-emerald-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-400 focus:outline-none"
+                                  placeholder={`0 - ${currentStruct.max_assignment_score}`}
+                                />
+                              </div>
+
+                              <div className="p-2.5 bg-amber-50/50 rounded-xl border border-amber-100 space-y-1">
+                                <div className="flex items-center justify-between text-[11px] font-bold text-amber-800">
+                                  <span>สอบย่อย</span>
+                                  <span className="text-[10px] text-amber-600 font-normal">เต็ม {currentStruct.max_post_test_score}</span>
+                                </div>
+                                <input
+                                  type="number"
+                                  inputMode="decimal"
+                                  step="0.5"
+                                  min="0"
+                                  max={currentStruct.max_post_test_score}
+                                  value={scoreData.post_test_score}
+                                  onChange={e => handleWeeklyScoreChange(student.id, 'post_test_score', e.target.value)}
+                                  className="w-full text-center text-base py-2 font-black border border-amber-200 rounded-xl bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                                  placeholder={`0 - ${currentStruct.max_post_test_score}`}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Desktop Table View */}
+                  <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-left border-collapse text-xs">
                       <thead>
                         <tr className="bg-indigo-100/50 border-b border-indigo-200 font-bold text-slate-700">
@@ -1804,19 +1906,27 @@ export default function Scores() {
                                 <>
                                   <td className="p-2 text-center">
                                     <input
-                                      type="number" step="0.5" min="0" max={currentStruct.max_assignment_score}
+                                      type="number"
+                                      inputMode="decimal"
+                                      step="0.5"
+                                      min="0"
+                                      max={currentStruct.max_assignment_score}
                                       value={scoreData.assignment_score}
                                       onChange={e => handleWeeklyScoreChange(student.id, 'assignment_score', e.target.value)}
-                                      className="form-input text-center text-sm py-1 font-bold border-indigo-200"
+                                      className="form-input text-center text-base md:text-sm py-1 font-bold border-indigo-200"
                                       placeholder={`/${currentStruct.max_assignment_score}`}
                                     />
                                   </td>
                                   <td className="p-2 text-center">
                                     <input
-                                      type="number" step="0.5" min="0" max={currentStruct.max_post_test_score}
+                                      type="number"
+                                      inputMode="decimal"
+                                      step="0.5"
+                                      min="0"
+                                      max={currentStruct.max_post_test_score}
                                       value={scoreData.post_test_score}
                                       onChange={e => handleWeeklyScoreChange(student.id, 'post_test_score', e.target.value)}
-                                      className="form-input text-center text-sm py-1 font-bold border-indigo-200"
+                                      className="form-input text-center text-base md:text-sm py-1 font-bold border-indigo-200"
                                       placeholder={`/${currentStruct.max_post_test_score}`}
                                     />
                                   </td>

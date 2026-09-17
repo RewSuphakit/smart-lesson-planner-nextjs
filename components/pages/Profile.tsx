@@ -375,8 +375,8 @@ export default function ProfilePage() {
             type="button"
             onClick={() => setActiveTab('profile')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 ${activeTab === 'profile'
-                ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-500/25'
-                : 'text-slate-600 hover:text-indigo-600 hover:bg-indigo-50/50'
+              ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-500/25'
+              : 'text-slate-600 hover:text-indigo-600 hover:bg-indigo-50/50'
               }`}
           >
             <User className="w-4 h-4" />
@@ -386,8 +386,8 @@ export default function ProfilePage() {
             type="button"
             onClick={() => setActiveTab('security')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 ${activeTab === 'security'
-                ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-500/25'
-                : 'text-slate-600 hover:text-indigo-600 hover:bg-indigo-50/50'
+              ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-500/25'
+              : 'text-slate-600 hover:text-indigo-600 hover:bg-indigo-50/50'
               }`}
           >
             <Shield className="w-4 h-4" />
@@ -498,13 +498,7 @@ export default function ProfilePage() {
                     <label htmlFor="email-display" className="block text-xs font-semibold text-slate-700">
                       ที่อยู่อีเมลเข้าสู่ระบบ
                     </label>
-                    <button
-                      type="button"
-                      onClick={openEmailModal}
-                      className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 inline-flex items-center gap-1 hover:underline transition-colors"
-                    >
-                      <Edit2 className="w-3 h-3" /> เปลี่ยนอีเมล
-                    </button>
+
                   </div>
                   <div className="flex gap-2">
                     <div className="relative flex-1">
@@ -548,8 +542,8 @@ export default function ProfilePage() {
                       type="button"
                       onClick={() => setAvatarType('upload')}
                       className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${avatarType === 'upload'
-                          ? 'bg-white text-indigo-600 shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900'
+                        ? 'bg-white text-indigo-600 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
                         }`}
                     >
                       <Upload className="w-3.5 h-3.5" />
@@ -559,8 +553,8 @@ export default function ProfilePage() {
                       type="button"
                       onClick={() => setAvatarType('emoji')}
                       className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${avatarType === 'emoji'
-                          ? 'bg-white text-indigo-600 shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900'
+                        ? 'bg-white text-indigo-600 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
                         }`}
                     >
                       <Sparkles className="w-3.5 h-3.5" />
@@ -574,8 +568,8 @@ export default function ProfilePage() {
                           setAvatarType('upload');
                         }}
                         className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${selectedAvatar === googleAvatar
-                            ? 'bg-white text-indigo-600 shadow-xs'
-                            : 'text-slate-600 hover:text-slate-900'
+                          ? 'bg-white text-indigo-600 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
                           }`}
                       >
                         <span>🌐</span>
@@ -659,8 +653,8 @@ export default function ProfilePage() {
                             type="button"
                             onClick={() => { setEmojiCategory('animals'); setIsCustomAvatar(false); }}
                             className={`px-3 py-1.5 rounded-xl font-bold transition-all ${emojiCategory === 'animals' && !isCustomAvatar
-                                ? 'bg-indigo-600 text-white shadow-xs'
-                                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                              ? 'bg-indigo-600 text-white shadow-xs'
+                              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
                               }`}
                           >
                             🐾 สัตว์น่ารัก
@@ -669,8 +663,8 @@ export default function ProfilePage() {
                             type="button"
                             onClick={() => { setEmojiCategory('teacher'); setIsCustomAvatar(false); }}
                             className={`px-3 py-1.5 rounded-xl font-bold transition-all ${emojiCategory === 'teacher' && !isCustomAvatar
-                                ? 'bg-indigo-600 text-white shadow-xs'
-                                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                              ? 'bg-indigo-600 text-white shadow-xs'
+                              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
                               }`}
                           >
                             🎓 ครู & การศึกษา
@@ -719,8 +713,8 @@ export default function ProfilePage() {
                                   setIsCustomAvatar(false);
                                 }}
                                 className={`h-11 rounded-xl flex items-center justify-center text-2xl transition-all duration-200 relative ${isSelected
-                                    ? 'bg-indigo-50 shadow-md shadow-indigo-300/40 scale-110 ring-2 ring-indigo-500 border border-indigo-200'
-                                    : 'hover:bg-slate-100 hover:scale-105'
+                                  ? 'bg-indigo-50 shadow-md shadow-indigo-300/40 scale-110 ring-2 ring-indigo-500 border border-indigo-200'
+                                  : 'hover:bg-slate-100 hover:scale-105'
                                   }`}
                               >
                                 <span>{avatar}</span>

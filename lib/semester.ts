@@ -79,6 +79,27 @@ export function getCurrentWeek(startDate: Date, totalWeeks: number): number | nu
 }
 
 /**
+ * Calculates the week number (1-based) for any given target date.
+ * Returns null if before semester start or after totalWeeks.
+ */
+export function getWeekNumberForDate(targetDate: Date, startDate: Date, totalWeeks: number): number | null {
+  const targetStr = targetDate.toISOString().split('T')[0];
+  const target = new Date(targetStr);
+
+  const startStr = startDate.toISOString().split('T')[0];
+  const start = new Date(startStr);
+
+  const diffMs = target.getTime() - start.getTime();
+  if (diffMs < 0) return null; // Haven't started yet
+
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const weekNumber = Math.floor(diffDays / 7) + 1;
+
+  if (weekNumber > totalWeeks) return null; // Semester ended
+  return weekNumber;
+}
+
+/**
  * Generates date ranges for each week of the semester.
  */
 export function getWeekDateRanges(startDate: Date, totalWeeks: number): WeekRange[] {
@@ -155,3 +176,124 @@ export function buildSemesterInfo(classroomId: number, classroom: ClassroomSemes
     weeks,
   };
 }
+
+/**
+ * Checks whether a classroom's regular teaching schedule is still active as of a given date.
+ * In Thai vocational curriculum (สอศ.):
+ * - Regular teaching runs in weeks 1 to totalWeeks - 1.
+ * - The final week (week 18 for pvch, week 15 for pvs) is final examination week.
+ * - Once currentWeek is null or today is past semesterEndDate, teaching is ended.
+ */
+export function isClassroomTeachingActive(classroom: ClassroomSemesterFields, asOfDate?: Date): boolean {
+  if (!classroom.semesterStartDate) return true;
+  const totalWeeks = resolveTargetWeeks(classroom);
+  const currentWeek = getCurrentWeek(classroom.semesterStartDate, totalWeeks);
+
+  if (currentWeek === null) return false;
+  if (currentWeek >= totalWeeks) return false; // Final exam / evaluation week
+
+  const end = getSemesterEndDate(classroom.semesterStartDate, totalWeeks);
+  const today = asOfDate || new Date();
+  if (today > end) return false;
+
+  return true;
+}
+
+/**
+ * Checks whether a classroom's semester has completed / ended.
+ */
+export function isClassroomSemesterEnded(classroom: ClassroomSemesterFields, asOfDate?: Date): boolean {
+  if (!classroom.semesterStartDate) return false;
+  const totalWeeks = resolveTargetWeeks(classroom);
+  const currentWeek = getCurrentWeek(classroom.semesterStartDate, totalWeeks);
+  const end = getSemesterEndDate(classroom.semesterStartDate, totalWeeks);
+  const today = asOfDate || new Date();
+
+  // If today is past end date, or currentWeek is null, or in final exam week (currentWeek >= totalWeeks)
+  return today > end || currentWeek === null || currentWeek >= totalWeeks;
+}
+
+// ==================== Semester Model Helpers ====================
+
+import prisma from '@/lib/prisma';
+
+export interface SemesterRecord {
+  id: number;
+  userId: number;
+  name: string;
+  termNumber: number;
+  academicYear: string;
+  startDate: Date | null;
+  endDate: Date | null;
+  isActive: boolean;
+  curriculumType: string;
+  totalWeeks: number;
+}
+
+/**
+ * Retrieves the active semester for a user.
+ * Returns null if no active semester is set.
+ */
+export async function getActiveSemester(userId: number): Promise<SemesterRecord | null> {
+  const semester = await prisma.semester.findFirst({
+    where: { userId, isActive: true },
+  });
+  return semester;
+}
+
+/**
+ * Lightweight helper that returns only the active semester ID.
+ * Returns null if no active semester is set.
+ */
+export async function getActiveSemesterId(userId: number): Promise<number | null> {
+  const semester = await prisma.semester.findFirst({
+    where: { userId, isActive: true },
+    select: { id: true },
+  });
+  return semester?.id ?? null;
+}
+
+/**
+ * Builds semester info from a Semester model record.
+ * Uses Semester.startDate and Semester.totalWeeks for week calculations.
+ */
+export function buildSemesterInfoFromSemester(semester: SemesterRecord): SemesterInfo & { termNumber: number; academicYear: string; isActive: boolean } {
+  const curriculumType = (semester.curriculumType || 'pvch') as CurriculumType;
+  const totalWeeks = semester.totalWeeks || getDefaultWeeks(curriculumType);
+
+  if (!semester.startDate) {
+    return {
+      classroomId: 0, // Not classroom-specific
+      curriculumType,
+      totalWeeks,
+      semesterStartDate: null,
+      semesterEndDate: semester.endDate ? semester.endDate.toISOString().split('T')[0] : null,
+      currentWeek: null,
+      isSemesterActive: semester.isActive,
+      weeks: [],
+      termNumber: semester.termNumber,
+      academicYear: semester.academicYear,
+      isActive: semester.isActive,
+    };
+  }
+
+  const startDate = semester.startDate;
+  const endDate = semester.endDate || getSemesterEndDate(startDate, totalWeeks);
+  const currentWeek = getCurrentWeek(startDate, totalWeeks);
+  const weeks = getWeekDateRanges(startDate, totalWeeks);
+
+  return {
+    classroomId: 0,
+    curriculumType,
+    totalWeeks,
+    semesterStartDate: startDate.toISOString().split('T')[0],
+    semesterEndDate: endDate.toISOString().split('T')[0],
+    currentWeek,
+    isSemesterActive: currentWeek !== null,
+    weeks,
+    termNumber: semester.termNumber,
+    academicYear: semester.academicYear,
+    isActive: semester.isActive,
+  };
+}
+

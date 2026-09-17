@@ -548,6 +548,136 @@ interface StudentStats {
   is_f?: boolean;
 }
 
+interface MobileStudentAttendanceCardProps {
+  student: Student;
+  status: string | undefined;
+  stats: StudentStats;
+  maxAllowedAbsences: number;
+  onStatusSelect: (studentId: string, status: string) => void;
+  onViewHistory: (student: Student) => void;
+}
+
+const MobileStudentAttendanceCard = memo(({
+  student,
+  status,
+  stats,
+  maxAllowedAbsences,
+  onStatusSelect,
+  onViewHistory,
+}: MobileStudentAttendanceCardProps) => {
+  const isCloseToFRisk = stats.converted_absent_count >= maxAllowedAbsences * 0.75;
+
+  return (
+    <div className="p-3.5 bg-white rounded-2xl border border-indigo-100/90 shadow-sm space-y-2.5 transition-all">
+      {/* Header: Avatar, Name, Code, History, and Absence Badge */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-xs">
+            {student.name.charAt(0)}
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-slate-800 text-sm truncate">{student.name}</span>
+              <button
+                type="button"
+                onClick={() => onViewHistory(student)}
+                className="p-1 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors shrink-0"
+                title="ดูประวัติการมาเรียน"
+              >
+                <History className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-400 font-mono">รหัส: {student.student_code || '-'}</p>
+          </div>
+        </div>
+
+        {/* Absence Warning Pill */}
+        <div className="shrink-0 text-right">
+          {stats.is_f ? (
+            <span className="text-[10px] font-extrabold text-white bg-red-600 px-2 py-0.5 rounded-full animate-pulse border border-red-700">
+              หมดสิทธิ์เรียน
+            </span>
+          ) : (
+            <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg border ${
+              isCloseToFRisk 
+                ? 'bg-red-50 text-red-700 border-red-200 animate-pulse' 
+                : stats.converted_absent_count > 0 
+                ? 'bg-amber-50 text-amber-800 border-amber-200' 
+                : 'bg-slate-50 text-slate-600 border-slate-200'
+            }`}>
+              ขาด {stats.converted_absent_count}/{maxAllowedAbsences}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Status Buttons Grid - 4 large thumb-friendly buttons (min-h-[44px]) */}
+      <div className="grid grid-cols-4 gap-1.5 pt-0.5">
+        <button
+          type="button"
+          onClick={() => onStatusSelect(student.id, 'present')}
+          className={`min-h-[44px] py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 touch-manipulation active:scale-95 ${
+            status === 'present'
+              ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20 ring-2 ring-emerald-400 font-black'
+              : 'bg-slate-50 hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 border border-slate-200/80'
+          }`}
+        >
+          <CheckCircle className={`w-4 h-4 ${status === 'present' ? 'text-white' : 'text-emerald-600'}`} />
+          <span>มา</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onStatusSelect(student.id, 'late')}
+          className={`min-h-[44px] py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 touch-manipulation active:scale-95 ${
+            status === 'late'
+              ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20 ring-2 ring-amber-400 font-black'
+              : 'bg-slate-50 hover:bg-amber-50 text-slate-700 hover:text-amber-700 border border-slate-200/80'
+          }`}
+        >
+          <Clock className={`w-4 h-4 ${status === 'late' ? 'text-white' : 'text-amber-600'}`} />
+          <span>สาย</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onStatusSelect(student.id, 'absent')}
+          className={`min-h-[44px] py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 touch-manipulation active:scale-95 ${
+            status === 'absent'
+              ? 'bg-rose-500 text-white shadow-md shadow-rose-500/20 ring-2 ring-rose-400 font-black'
+              : 'bg-slate-50 hover:bg-rose-50 text-slate-700 hover:text-rose-700 border border-slate-200/80'
+          }`}
+        >
+          <XCircle className={`w-4 h-4 ${status === 'absent' ? 'text-white' : 'text-rose-500'}`} />
+          <span>ขาด</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onStatusSelect(student.id, 'leave')}
+          className={`min-h-[44px] py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 touch-manipulation active:scale-95 ${
+            status === 'leave'
+              ? 'bg-blue-500 text-white shadow-md shadow-blue-500/20 ring-2 ring-blue-400 font-black'
+              : 'bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200/80'
+          }`}
+        >
+          <FileText className={`w-4 h-4 ${status === 'leave' ? 'text-white' : 'text-blue-500'}`} />
+          <span>ลา</span>
+        </button>
+      </div>
+
+      {(stats.remaining_late_count > 0 || stats.remaining_leave_count > 0) && (
+        <div className="flex gap-2 text-[10px] text-slate-500 pt-0.5">
+          {stats.remaining_late_count > 0 && <span>สายสะสม {stats.remaining_late_count}</span>}
+          {stats.remaining_leave_count > 0 && <span>ลาสะสม {stats.remaining_leave_count}</span>}
+        </div>
+      )}
+    </div>
+  );
+});
+
+MobileStudentAttendanceCard.displayName = 'MobileStudentAttendanceCard';
+
 export default function Attendance() {
   const queryClient = useQueryClient();
 
@@ -808,26 +938,28 @@ export default function Attendance() {
     }
   });
 
-  const handleStatusChange = (studentId: string, status: string) => {
-    const current = attendance[studentId];
-    // Toggle off if clicking the active status
-    const newStatus = current === status ? '' : status;
+  const handleStatusChange = useCallback((studentId: string, status: string) => {
+    setAttendance(prev => {
+      const current = prev[studentId];
+      // Toggle off if clicking the active status
+      const newStatus = current === status ? '' : status;
 
-    setAttendance(prev => ({ ...prev, [studentId]: newStatus }));
-    
-    if (newStatus === '') {
-      api.delete(`/attendance?student_id=${studentId}&classroom_id=${selectedClass}&date=${date}`)
-        .then(() => {
-          queryClient.invalidateQueries({ queryKey: ['attendance-data', selectedClass, date] });
-          toast.success('ลบข้อมูลการเช็คชื่อรายบุคคลเรียบร้อยแล้ว');
-        })
-        .catch(() => {
-          toast.error('ลบข้อมูลไม่สำเร็จ');
-        });
-    } else if (autoSave) {
-      singleStatusMutation.mutate({ studentId, status: newStatus });
-    }
-  };
+      if (newStatus === '') {
+        api.delete(`/attendance?student_id=${studentId}&classroom_id=${selectedClass}&date=${date}`)
+          .then(() => {
+            queryClient.invalidateQueries({ queryKey: ['attendance-data', selectedClass, date] });
+            toast.success('ลบข้อมูลการเช็คชื่อรายบุคคลเรียบร้อยแล้ว');
+          })
+          .catch(() => {
+            toast.error('ลบข้อมูลไม่สำเร็จ');
+          });
+      } else if (autoSave) {
+        singleStatusMutation.mutate({ studentId, status: newStatus });
+      }
+
+      return { ...prev, [studentId]: newStatus };
+    });
+  }, [selectedClass, date, autoSave, singleStatusMutation, queryClient]);
 
   // ─── Mutation: บันทึกข้อมูลการเข้าเรียนด้วยตนเอง (Manual Save) ───
   const saveMutation = useMutation({
@@ -916,13 +1048,13 @@ export default function Attendance() {
     matrixCellDeleteMutation.mutate(record.id);
   };
 
-  const getStudentStats = (studentId: string) => {
+  const getStudentStats = useCallback((studentId: string) => {
     return stats.find(s => String(s.student_id) === String(studentId)) || {
       student_id: studentId,
       present_count: 0, late_count: 0, absent_count: 0,
       leave_count: 0, converted_absent_count: 0, remaining_late_count: 0, remaining_leave_count: 0
     };
-  };
+  }, [stats]);
 
   const statusBtn = (id: string, status: string, icon: React.ReactNode, label: string, activeClass: string) => {
     const isActive = attendance[id] === status;
@@ -1516,7 +1648,7 @@ export default function Attendance() {
               </div>
 
               {/* Student List View */}
-              <div className="glass overflow-hidden rounded-2xl border border-white/50 shadow-xl">
+              <div className="glass overflow-hidden rounded-2xl border border-white/50 shadow-xl pb-16 md:pb-0">
                 {/* Search and Bulk Operations Bar */}
                 <div className="p-4 border-b border-indigo-50/50 bg-white/40 flex flex-col md:flex-row items-center justify-between gap-4">
                   <div className="relative w-full md:w-72">
@@ -1553,7 +1685,23 @@ export default function Attendance() {
                   </div>
                 </div>
 
-                <div className="overflow-x-auto">
+                {/* Mobile Card List View (Thumb-Friendly & Super Fast) */}
+                <div className="block md:hidden p-3 space-y-3">
+                  {filteredStudents.map(student => (
+                    <MobileStudentAttendanceCard
+                      key={student.id}
+                      student={student}
+                      status={attendance[student.id]}
+                      stats={getStudentStats(student.id)}
+                      maxAllowedAbsences={maxAllowedAbsences}
+                      onStatusSelect={handleStatusChange}
+                      onViewHistory={setHistoryStudent}
+                    />
+                  ))}
+                </div>
+
+                {/* Desktop Table View */}
+                <div className="hidden md:block overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-indigo-50/70 border-b border-indigo-100/80">
@@ -1683,6 +1831,43 @@ export default function Attendance() {
                     ) : (
                       <span className="text-xs text-slate-500 font-medium">ทุกการเปลี่ยนแปลงจะถูกบันทึกลงระบบทันที</span>
                     )}
+                  </div>
+                </div>
+
+                {/* Mobile Sticky Quick Summary & Action Bar */}
+                <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-indigo-100 px-4 py-2.5 shadow-lg flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                    <div className="text-xs">
+                      <span className="font-extrabold text-slate-800">{dailyStats.marked}/{dailyStats.total}</span>
+                      <span className="text-slate-500 ml-1">เช็คแล้ว</span>
+                    </div>
+                    {autoSave && (
+                      <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
+                        {autoSaveStatus === 'saving' ? 'บันทึก...' : 'บันทึกอัตโนมัติ'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {!autoSave && (
+                      <button
+                        type="button"
+                        onClick={handleSave}
+                        disabled={saving || dailyStats.marked === 0}
+                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-xs font-bold shadow-md shadow-indigo-500/20 active:scale-95 flex items-center gap-1.5"
+                      >
+                        <Save className="w-3.5 h-3.5" />
+                        <span>บันทึก</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                      className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold"
+                      title="เลื่อนขึ้นบนสุด"
+                    >
+                      ↑
+                    </button>
                   </div>
                 </div>
               </div>

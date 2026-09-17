@@ -23,6 +23,8 @@ export interface FormattedClassroom {
   semester_start_date: string | null;
   semester_end_date: string | null;
   current_week: number | null;
+  semester_id: number | null;
+  semester_name: string | null;
 }
 
 /**
@@ -30,9 +32,12 @@ export interface FormattedClassroom {
  * Correctly preserves 0 values for weights and scores.
  */
 export function formatClassroomResponse(
-  classroom: Classroom & { _count?: { students?: number } }
+  classroom: Classroom & {
+    _count?: { students?: number };
+    semester?: { id: number; name: string; termNumber: number; academicYear: string; startDate?: Date | null; totalWeeks?: number | null } | null;
+  }
 ): FormattedClassroom {
-  const semesterStart = classroom.semesterStartDate ?? null;
+  const semesterStart = classroom.semesterStartDate ?? classroom.semester?.startDate ?? null;
   const totalWeeks = resolveTargetWeeks(classroom);
   const currentWeek = semesterStart ? getCurrentWeek(semesterStart, totalWeeks) : null;
   const semesterEnd = semesterStart ? getSemesterEndDate(semesterStart, totalWeeks) : null;
@@ -79,6 +84,8 @@ export function formatClassroomResponse(
     semester_start_date: semesterStart ? semesterStart.toISOString().split('T')[0] : null,
     semester_end_date: semesterEnd ? semesterEnd.toISOString().split('T')[0] : null,
     current_week: currentWeek,
+    semester_id: classroom.semesterId ?? null,
+    semester_name: classroom.semester?.name ?? null,
   };
 
   if (classroom._count?.students !== undefined) {

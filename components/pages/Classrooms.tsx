@@ -4,8 +4,9 @@ import { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
-import { Plus, Edit, Trash2, X, Loader2, Search, Calendar, ChevronDown, Users } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Loader2, Search, Calendar, ChevronDown, Users, Layers } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useSemester } from '@/context/SemesterContext';
 
 const animalAvatars = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐧', '🐥', '🦉', '🦄', '🐙', '🐢', '🦖', '🦕', '🦦', '🦥'];
 
@@ -23,6 +24,8 @@ interface Classroom {
   semester_start_date?: string | null;
   semester_end_date?: string | null;
   current_week?: number | null;
+  semester_id?: number | null;
+  semester_name?: string | null;
 }
 
 interface TimetableEntry {
@@ -216,6 +219,7 @@ function ClassroomCard({ c, onEdit, onDelete }: ClassroomCardProps) {
 
 export default function Classrooms() {
   const queryClient = useQueryClient();
+  const { activeSemester } = useSemester();
 
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
@@ -373,6 +377,7 @@ export default function Classrooms() {
         ...payload,
         total_weeks: totalWeeks,
         semester_start_date: payload.semester_start_date ? payload.semester_start_date : null,
+        semester_id: activeSemester?.id || undefined,
       };
 
       if (editing) {
@@ -458,6 +463,25 @@ export default function Classrooms() {
     setForm(prev => ({ ...prev, total_weeks: val, total_classes: periodsPerWeek * val }));
   };
 
+  const [curriculumFilter, setCurriculumFilter] = useState<'all' | 'pvch' | 'pvs'>('all');
+
+  const pvchCount = useMemo(() => {
+    return classrooms.filter(c => (c.curriculum_type || (c.name?.includes('ปวส') ? 'pvs' : 'pvch')) === 'pvch').length;
+  }, [classrooms]);
+
+  const pvsCount = useMemo(() => {
+    return classrooms.filter(c => (c.curriculum_type || (c.name?.includes('ปวส') ? 'pvs' : 'pvch')) === 'pvs').length;
+  }, [classrooms]);
+
+  const filtered = useMemo(() => {
+    return classrooms.filter(c => {
+      const curType = c.curriculum_type || (c.name?.includes('ปวส') ? 'pvs' : 'pvch');
+      const matchesCurriculum = curriculumFilter === 'all' || curType === curriculumFilter;
+      const matchesSearch = c.name?.toLowerCase().includes(search.toLowerCase());
+      return matchesCurriculum && matchesSearch;
+    });
+  }, [classrooms, curriculumFilter, search]);
+
   const handleEdit = (c: Classroom) => {
     const curType = c.curriculum_type || (c.name?.includes('ปวส') ? 'pvs' : 'pvch');
     const weeks = c.total_weeks || (curType === 'pvs' ? 15 : 18);
@@ -490,8 +514,6 @@ export default function Classrooms() {
     deleteMutation.mutate(id);
   };
 
-  const filtered = classrooms.filter(c => c.name?.toLowerCase().includes(search.toLowerCase()));
-
   const colors = [
     'from-blue-500 to-indigo-600',
     'from-emerald-500 to-teal-600',
@@ -511,8 +533,18 @@ export default function Classrooms() {
     <div className="space-y-6 animate-fade-in-up">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 mb-1">จัดการห้องเรียน</h1>
-          <p className="text-slate-500 text-sm">ทั้งหมด {classrooms.length} ห้อง</p>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="text-2xl font-bold text-slate-800">จัดการห้องเรียน</h1>
+            {activeSemester && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200/80 text-indigo-700 text-xs font-bold shadow-xs">
+                <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                <span>{activeSemester.name}</span>
+              </span>
+            )}
+          </div>
+          <p className="text-slate-500 text-sm mt-0.5">
+            ทั้งหมด {classrooms.length} ห้อง ({pvchCount > 0 ? `ปวช. ${pvchCount} ห้อง ` : ''}{pvsCount > 0 ? `· ปวส. ${pvsCount} ห้อง` : ''}) {activeSemester ? `ใน ${activeSemester.name}` : ''}
+          </p>
         </div>
         <button
           onClick={() => {
@@ -531,16 +563,55 @@ export default function Classrooms() {
         </button>
       </div>
 
-      <div className="relative max-w-md">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="form-input pl-11"
-          placeholder="ค้นหาห้องเรียน..."
-          id="search-classrooms"
-          aria-label="ค้นหาห้องเรียน"
-        />
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="relative max-w-md flex-1">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="form-input pl-11"
+            placeholder="ค้นหาห้องเรียน..."
+            id="search-classrooms"
+            aria-label="ค้นหาห้องเรียน"
+          />
+        </div>
+
+        {/* Level Filter Tabs: ทั้งหมด / ปวช. / ปวส. */}
+        <div className="inline-flex items-center p-1 rounded-xl bg-slate-100/90 border border-slate-200/80 self-start sm:self-auto gap-1">
+          <button
+            type="button"
+            onClick={() => setCurriculumFilter('all')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              curriculumFilter === 'all'
+                ? 'bg-white text-indigo-700 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            ทั้งหมด ({classrooms.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setCurriculumFilter('pvch')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              curriculumFilter === 'pvch'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-emerald-700'
+            }`}
+          >
+            ปวช. ({pvchCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => setCurriculumFilter('pvs')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              curriculumFilter === 'pvs'
+                ? 'bg-purple-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-purple-700'
+            }`}
+          >
+            ปวส. ({pvsCount})
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -569,7 +640,7 @@ export default function Classrooms() {
           <div 
             className="bg-white border border-slate-200/90 w-full max-w-md p-6 max-h-[90vh] overflow-y-auto animate-fade-in-up rounded-2xl shadow-2xl" 
           >
-            <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-bold text-slate-800">
                 {editing ? 'แก้ไขห้องเรียน' : 'สร้างห้องเรียน'}
               </h2>
@@ -581,6 +652,13 @@ export default function Classrooms() {
                 <X className="w-4 h-4" />
               </button>
             </div>
+
+            {activeSemester && !editing && (
+              <div className="mb-4 p-2.5 rounded-xl bg-indigo-50/80 border border-indigo-100 flex items-center gap-2 text-xs text-indigo-800">
+                <Layers className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                <span>จะถูกบันทึกลงใน: <strong>{activeSemester.name}</strong></span>
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* ตารางสอน Presets */}

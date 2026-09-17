@@ -1,8 +1,28 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ========== Mobile & Touch Optimizations ========== */
+html {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+input, button, select, textarea {
+  touch-action: manipulation;
+}
+
+/* iOS Safari auto-zoom prevention: ensure form inputs have at least 16px font size on mobile screens */
+@media screen and (max-width: 767px) {
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="date"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
 
 /* ========== Base Styles — Light Pastel Theme ========== */
 * {

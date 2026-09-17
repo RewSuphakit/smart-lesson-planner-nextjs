@@ -3,6 +3,7 @@ import { ScheduleStatus } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { parseTimeToUtc } from '@/lib/constants';
+import { getWeekNumberForDate, getSemesterEndDate, resolveTargetWeeks } from '@/lib/semester';
 
 function isFlagpoleOrHomeroom(ws: { startPeriod?: number; entryType?: string; subjectName?: string | null; subjectCode?: string | null }) {
   if (ws.startPeriod === 0) return true;
@@ -45,6 +46,33 @@ export async function GET(request: NextRequest) {
     const startUtc = new Date(Date.UTC(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0));
     const endUtc = new Date(Date.UTC(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999));
 
+    // Get classrooms with semester information
+    const classrooms = await prisma.classroom.findMany({
+      where: { userId: user.id },
+      select: {
+        id: true,
+        name: true,
+        semesterStartDate: true,
+        totalWeeks: true,
+        curriculumType: true,
+      },
+    });
+
+    let minSemesterStart: Date | null = null;
+    let maxSemesterEnd: Date | null = null;
+    let maxTotalWeeks = 18;
+
+    for (const c of classrooms) {
+      if (c.semesterStartDate) {
+        const sDate = new Date(c.semesterStartDate);
+        const cWeeks = resolveTargetWeeks(c);
+        const eDate = getSemesterEndDate(sDate, cWeeks);
+        if (!minSemesterStart || sDate < minSemesterStart) minSemesterStart = sDate;
+        if (!maxSemesterEnd || eDate > maxSemesterEnd) maxSemesterEnd = eDate;
+        if (cWeeks > maxTotalWeeks) maxTotalWeeks = cWeeks;
+      }
+    }
+
     // Get weekly schedules
     const weeklySchedules = await prisma.weeklySchedule.findMany({
       where: { userId: user.id },
@@ -59,16 +87,32 @@ export async function GET(request: NextRequest) {
       orderBy: [{ scheduledDate: 'asc' }, { startTime: 'asc' }],
     });
 
-    const mappedConcrete = concreteSchedules.map(s => ({
-      id: s.id,
-      lesson_title: s.title,
-      subject: s.subject,
-      scheduled_date: s.scheduledDate.toISOString(),
-      start_time: s.startTime.toISOString().split('T')[1],
-      end_time: s.endTime.toISOString().split('T')[1],
-      notes: s.notes,
-      status: s.status
-    }));
+    const mappedConcrete = concreteSchedules.map(s => {
+      const matchedRoom = classrooms.find(c => s.notes?.includes(c.name) || s.title?.includes(c.name));
+      const roomStart = matchedRoom?.semesterStartDate ? new Date(matchedRoom.semesterStartDate) : minSemesterStart;
+      const roomWeeks = matchedRoom ? resolveTargetWeeks(matchedRoom) : maxTotalWeeks;
+
+      let weekNumber: number | null = null;
+      if (roomStart) {
+        weekNumber = getWeekNumberForDate(s.scheduledDate, roomStart, roomWeeks);
+      }
+      const isFinalWeek = weekNumber !== null && weekNumber === roomWeeks;
+
+      return {
+        id: s.id,
+        lesson_title: s.title,
+        subject: s.subject,
+        scheduled_date: s.scheduledDate.toISOString(),
+        start_time: s.startTime.toISOString().split('T')[1],
+        end_time: s.endTime.toISOString().split('T')[1],
+        notes: s.notes,
+        status: s.status,
+        week_number: weekNumber,
+        is_final_week: isFinalWeek,
+        total_weeks: roomWeeks,
+        classroom_name: matchedRoom?.name || null,
+      };
+    });
 
     interface VirtualSchedule {
       id: string;
@@ -79,12 +123,17 @@ export async function GET(request: NextRequest) {
       end_time: string;
       notes: string;
       status: string;
+      week_number?: number | null;
+      is_final_week?: boolean;
+      total_weeks?: number;
+      classroom_name?: string | null;
     }
     const resultSchedules: VirtualSchedule[] = [];
     const current = new Date(startUtc);
 
     while (current <= endUtc) {
       const dateStr = current.toISOString().split('T')[0];
+      const currentDateObj = new Date(dateStr);
       const jsDay = current.getUTCDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
       const dbDay = jsDay === 0 ? 6 : jsDay - 1; // 0 = Mon, ..., 6 = Sun
 
@@ -93,6 +142,23 @@ export async function GET(request: NextRequest) {
 
       for (const slot of dayWeeklySlots) {
         if (isFlagpoleOrHomeroom(slot)) continue;
+
+        const matchedRoom = classrooms.find(c => c.id === slot.classroomId);
+        const roomStart = matchedRoom?.semesterStartDate ? new Date(matchedRoom.semesterStartDate) : minSemesterStart;
+        const roomWeeks = matchedRoom ? resolveTargetWeeks(matchedRoom) : maxTotalWeeks;
+        const roomEnd = roomStart ? getSemesterEndDate(roomStart, roomWeeks) : maxSemesterEnd;
+
+        // Skip virtual slots if the date is outside the classroom's semester bounds
+        // (Ensures schedules do not overflow past the final week of the semester)
+        if (roomStart && currentDateObj < roomStart) continue;
+        if (roomEnd && currentDateObj > roomEnd) continue;
+
+        let weekNumber: number | null = null;
+        if (roomStart) {
+          weekNumber = getWeekNumberForDate(currentDateObj, roomStart, roomWeeks);
+        }
+        const isFinalWeek = weekNumber !== null && weekNumber === roomWeeks;
+
         const slotStartStr = slot.startTime ? slot.startTime.toISOString().split('T')[1] : '08:30:00.000Z';
         const slotEndStr = slot.endTime ? slot.endTime.toISOString().split('T')[1] : '10:30:00.000Z';
 
@@ -114,8 +180,12 @@ export async function GET(request: NextRequest) {
             scheduled_date: `${dateStr}T12:00:00.000Z`, // Middle of the day for calendar parsing
             start_time: slotStartStr,
             end_time: slotEndStr,
-            notes: `ตารางเรียนประจำสัปดาห์ (ห้อง: ${slot.room || '-'})`,
+            notes: `ตารางเรียนประจำสัปดาห์ (ห้อง: ${slot.room || matchedRoom?.name || '-'})`,
             status: 'scheduled',
+            week_number: weekNumber,
+            is_final_week: isFinalWeek,
+            total_weeks: roomWeeks,
+            classroom_name: matchedRoom?.name || null,
           });
         }
       }
@@ -123,9 +193,18 @@ export async function GET(request: NextRequest) {
       current.setUTCDate(current.getUTCDate() + 1);
     }
 
-    // Combined virtual and concrete schedules
+    // Combined virtual and concrete schedules, sorted by date & time
     const data = [...resultSchedules, ...mappedConcrete];
-    return NextResponse.json({ data });
+    data.sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date));
+
+    return NextResponse.json({
+      data,
+      meta: {
+        min_semester_start: minSemesterStart ? minSemesterStart.toISOString().split('T')[0] : null,
+        max_semester_end: maxSemesterEnd ? maxSemesterEnd.toISOString().split('T')[0] : null,
+        max_total_weeks: maxTotalWeeks,
+      }
+    });
   } catch (error) {
     if (error instanceof AuthError) return handleAuthError();
     console.error('Get schedules error:', error);
@@ -139,16 +218,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     if (body.action === 'generate') {
-      const startDateStr = body.start_date;
-      if (!startDateStr) {
-        return NextResponse.json({ message: 'กรุณาระบุวันเริ่มต้นภาคเรียน' }, { status: 400 });
-      }
-
-      const startDate = new Date(startDateStr);
-      if (isNaN(startDate.getTime())) {
-        return NextResponse.json({ message: 'รูปแบบวันเริ่มต้นภาคเรียนไม่ถูกต้อง' }, { status: 400 });
-      }
-
       // Fetch classrooms, weekly schedules (with classroomId, excluding homeroom/flagpole)
       const classrooms = await prisma.classroom.findMany({ where: { userId: user.id } });
       const rawWeeklySchedules = await prisma.weeklySchedule.findMany({
@@ -160,6 +229,23 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           message: 'ไม่พบคาบเรียนวิชาการที่เชื่อมกับห้องเรียน กรุณาไปตั้งค่าที่เมนู "ตารางเรียน" → คลิกที่คาบวิชา → เลือกห้องเรียน (คาบกิจกรรมหน้าเสาธง/โฮมรูมไม่นับเป็นคาบสอน)',
         }, { status: 400 });
+      }
+
+      // Default start date to earliest semesterStartDate among classrooms, or provided date
+      const earliestStart = classrooms.reduce<Date | null>((earliest, c) => {
+        if (!c.semesterStartDate) return earliest;
+        const d = new Date(c.semesterStartDate);
+        return !earliest || d < earliest ? d : earliest;
+      }, null);
+
+      const startDateStr = body.start_date || (earliestStart ? earliestStart.toISOString().split('T')[0] : null);
+      if (!startDateStr) {
+        return NextResponse.json({ message: 'กรุณาระบุวันเริ่มต้นภาคเรียน' }, { status: 400 });
+      }
+
+      const startDate = new Date(startDateStr);
+      if (isNaN(startDate.getTime())) {
+        return NextResponse.json({ message: 'รูปแบบวันเริ่มต้นภาคเรียนไม่ถูกต้อง' }, { status: 400 });
       }
 
       // Track how many schedules generated per classroom
@@ -249,7 +335,7 @@ export async function POST(request: NextRequest) {
       })).filter(s => s.generated_schedules > 0);
 
       return NextResponse.json({
-        message: `สร้างตารางสอนล่วงหน้าสำเร็จ ${schedulesToCreate.length} รายการ`,
+        message: `สร้างตารางสอนล่วงหน้าสำเร็จ ${schedulesToCreate.length} รายการ (ครอบคลุมถึงสัปดาห์สุดท้าย)`,
         summary
       }, { status: 201 });
     }
