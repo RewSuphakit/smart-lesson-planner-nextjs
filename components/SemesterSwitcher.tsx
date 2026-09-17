@@ -93,7 +93,7 @@ export default function SemesterSwitcher({ className = '', isCompact = false }: 
   }
 
   return (
-    <div ref={dropdownRef} className={`relative ${className}`}>
+    <div ref={dropdownRef} className={`relative z-30 ${className}`}>
       {/* Trigger Button */}
       <button
         type="button"
@@ -137,7 +137,9 @@ export default function SemesterSwitcher({ className = '', isCompact = false }: 
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 sm:right-auto sm:w-80 mt-2 py-2.5 bg-white/95 backdrop-blur-2xl border border-indigo-200/80 rounded-2xl shadow-2xl shadow-indigo-500/15 z-50 animate-fade-in-up">
+        <div className={`absolute top-full mt-2 py-2.5 bg-white/95 backdrop-blur-2xl border border-indigo-200/80 rounded-2xl shadow-2xl shadow-indigo-500/15 z-[100] animate-fade-in-up ${
+          isCompact ? 'right-0 w-[290px] sm:w-80' : 'left-0 right-0 sm:right-auto sm:w-80'
+        }`}>
           {/* Header */}
           <div className="px-4 py-1.5 border-b border-slate-100 flex items-center justify-between">
             <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">

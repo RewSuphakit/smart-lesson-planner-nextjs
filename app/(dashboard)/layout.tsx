@@ -99,7 +99,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Sidebar */}
       <aside className={`
-        fixed lg:static inset-y-0 left-0 z-50 w-[270px]
+        fixed lg:sticky lg:top-0 lg:h-screen inset-y-0 left-0 z-40 w-[270px]
         bg-white/80 backdrop-blur-2xl
         border-r border-indigo-200/40
         flex flex-col
@@ -125,7 +125,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         {/* Semester Switcher */}
-        <div className="px-4 pb-2">
+        <div className="px-4 pb-2 relative z-30">
           <SemesterSwitcher />
         </div>
 
@@ -184,7 +184,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <p className="text-sm font-semibold text-slate-700 truncate group-hover:text-indigo-600 transition-colors">
                     {user?.name}
                   </p>
-                  <p className="text-[0.62rem] text-indigo-400 font-medium">
+                  <p className="text-[0.68rem] text-indigo-700 font-semibold">
                     {user?.role === 'admin' ? 'ผู้ดูแลระบบ' : 'ครูผู้สอน'}
                   </p>
                 </div>
@@ -204,7 +204,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-h-screen min-w-0">
         {/* Mobile Header */}
-        <header className="lg:hidden bg-white/80 backdrop-blur-xl border-b border-indigo-200/30 px-4 py-2.5 flex items-center justify-between gap-2 shadow-sm">
+        <header className="sticky top-0 z-40 lg:hidden bg-white/90 backdrop-blur-xl border-b border-indigo-200/30 px-4 py-2.5 flex items-center justify-between gap-2 shadow-sm">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setSidebarOpen(true)}
@@ -219,7 +219,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <h1 className="text-sm font-bold gradient-text hidden xs:inline-block">Smart Planner</h1>
             </div>
           </div>
-          <div className="w-48 max-w-[55%]">
+          <div className="w-48 max-w-[55%] relative z-50">
             <SemesterSwitcher isCompact />
           </div>
         </header>

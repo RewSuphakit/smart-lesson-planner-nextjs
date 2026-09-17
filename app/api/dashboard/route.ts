@@ -144,7 +144,6 @@ export async function GET(request: NextRequest) {
             name: true,
             studentCode: true,
             classroomId: true,
-            avatar: true,
           },
         }),
         prisma.attendance.groupBy({
@@ -199,7 +198,7 @@ export async function GET(request: NextRequest) {
             absent_count: totalConverted,
             max_allowed: maxAllowedAbsences,
             remaining: 0,
-            avatar: student.avatar,
+            avatar: null,
           });
         } else if (remaining <= 2 && remaining >= 0) {
           atRiskStudents.push({
@@ -212,8 +211,21 @@ export async function GET(request: NextRequest) {
             absent_count: totalConverted,
             max_allowed: maxAllowedAbsences,
             remaining: remaining,
-            avatar: student.avatar,
+            avatar: null,
           });
+        }
+      }
+
+      // Performance Optimization: Only fetch avatar for the few students who are actually at-risk
+      if (atRiskStudents.length > 0) {
+        const atRiskIds = atRiskStudents.map(s => s.student_id);
+        const studentAvatars = await prisma.student.findMany({
+          where: { id: { in: atRiskIds } },
+          select: { id: true, avatar: true },
+        });
+        const avatarMap = new Map(studentAvatars.map(a => [a.id, a.avatar]));
+        for (const s of atRiskStudents) {
+          s.avatar = avatarMap.get(s.student_id) || null;
         }
       }
     }
@@ -234,7 +246,14 @@ export async function GET(request: NextRequest) {
         dayOfWeek: schemaDayOfWeek,
         ...(activeSemester ? { semesterId: activeSemester.id } : {}),
       },
-      include: { classroom: true },
+      include: {
+        classroom: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
       orderBy: [{ startPeriod: 'asc' }],
     });
 

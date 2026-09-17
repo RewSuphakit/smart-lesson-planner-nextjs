@@ -1141,6 +1141,22 @@ export default function DashboardPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2.5">
               <Link
+                href="/semesters"
+                className="flex items-center justify-between p-3 rounded-2xl bg-white/75 border border-indigo-100/60 hover:border-indigo-300 hover:bg-indigo-50/30 transition-all duration-200 group shadow-xs"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-50 to-purple-50 text-indigo-600 flex items-center justify-center border border-indigo-100">
+                    <Layers className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-800 group-hover:text-indigo-700 transition-colors">ภาคเรียน & ปีการศึกษา</p>
+                    <p className="text-[0.68rem] text-slate-500">จัดการเทอม 1 / เทอม 2 และคัดลอกข้อมูล</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all" />
+              </Link>
+
+              <Link
                 href="/attendance"
                 className="flex items-center justify-between p-3 rounded-2xl bg-white/75 border border-indigo-100/60 hover:border-emerald-300 hover:bg-emerald-50/30 transition-all duration-200 group shadow-xs"
               >

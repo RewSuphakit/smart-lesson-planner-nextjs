@@ -7,8 +7,7 @@ import api from '@/services/api';
 import { Plus, Edit, Trash2, X, Loader2, Search, Calendar, ChevronDown, Users, Layers } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useSemester } from '@/context/SemesterContext';
-
-const animalAvatars = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐧', '🐥', '🦉', '🦄', '🐙', '🐢', '🦖', '🦕', '🦦', '🦥'];
+import { ANIMAL_AVATARS as animalAvatars } from '@/components/UserAvatar';
 
 interface Classroom {
   id: string;
