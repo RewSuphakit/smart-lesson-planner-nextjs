@@ -62,6 +62,95 @@ export default function GradePdfModal({
   const [showPrintDate, setShowPrintDate] = useState(true);
   const [paperOrientation, setPaperOrientation] = useState<'portrait' | 'landscape'>('portrait');
 
+  // Column Visibility Options (เลือกคอลัมน์ที่จะแสดง)
+  const [showStudentCode, setShowStudentCode] = useState(true);
+  const [showAffective, setShowAffective] = useState(true);
+  const [showPostTest, setShowPostTest] = useState(true);
+  const [showAssignment, setShowAssignment] = useState(true);
+  const [showMidterm, setShowMidterm] = useState(true);
+  const [showFinal, setShowFinal] = useState(true);
+  const [showTotal, setShowTotal] = useState(true);
+  const [showAttendance, setShowAttendance] = useState(true);
+  const [showGrade, setShowGrade] = useState(true);
+
+  // Quick Preset Handlers
+  const applyPresetAll = () => {
+    setShowStudentCode(true);
+    setShowAffective(true);
+    setShowPostTest(true);
+    setShowAssignment(true);
+    setShowMidterm(true);
+    setShowFinal(true);
+    setShowTotal(true);
+    setShowAttendance(true);
+    setShowGrade(true);
+    toast.success('เลือกแสดงทุกคอลัมน์แล้ว');
+  };
+
+  const applyPresetAnnouncement = () => {
+    setShowStudentCode(true);
+    setShowAffective(false);
+    setShowPostTest(false);
+    setShowAssignment(false);
+    setShowMidterm(false);
+    setShowFinal(false);
+    setShowTotal(true);
+    setShowAttendance(false);
+    setShowGrade(true);
+    toast.success('ใช้รูปแบบติดบอร์ด (รหัส, รวม, เกรด)');
+  };
+
+  const applyPresetContinuous = () => {
+    setShowStudentCode(true);
+    setShowAffective(true);
+    setShowPostTest(true);
+    setShowAssignment(true);
+    setShowMidterm(true);
+    setShowFinal(false);
+    setShowTotal(true);
+    setShowAttendance(false);
+    setShowGrade(false);
+    toast.success('ใช้รูปแบบคะแนนเก็บระหว่างภาค');
+  };
+
+  const applyPresetGradeOnly = () => {
+    setShowStudentCode(true);
+    setShowAffective(false);
+    setShowPostTest(false);
+    setShowAssignment(false);
+    setShowMidterm(false);
+    setShowFinal(false);
+    setShowTotal(true);
+    setShowAttendance(true);
+    setShowGrade(true);
+    toast.success('ใช้รูปแบบผลการเรียนและเวลาเรียน');
+  };
+
+  // Count active columns
+  const activeColumnsCount = useMemo(() => {
+    return [
+      showStudentCode, showAffective, showPostTest, showAssignment,
+      showMidterm, showFinal, showTotal, showAttendance, showGrade
+    ].filter(Boolean).length;
+  }, [
+    showStudentCode, showAffective, showPostTest, showAssignment,
+    showMidterm, showFinal, showTotal, showAttendance, showGrade
+  ]);
+
+  // Handle Orientation Change with auto-zoom adjustment
+  const handleOrientationChange = (newOrientation: 'portrait' | 'landscape') => {
+    setPaperOrientation(newOrientation);
+    if (newOrientation === 'landscape' && zoomLevel >= 80) {
+      setZoomLevel(68);
+    } else if (newOrientation === 'portrait' && zoomLevel <= 70) {
+      setZoomLevel(85);
+    }
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('grades_pdf_orientation', newOrientation);
+    }
+    toast.success(newOrientation === 'portrait' ? 'เปลี่ยนเป็น A4 แนวตั้ง' : 'เปลี่ยนเป็น A4 แนวนอน');
+  };
+
   // Initialize and load persisted preferences
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -89,6 +178,30 @@ export default function GradePdfModal({
 
       const savedDeputy = localStorage.getItem('grades_pdf_deputy_dir');
       if (savedDeputy) setDeputyDirector(savedDeputy);
+
+      const savedOrientation = localStorage.getItem('grades_pdf_orientation') as 'portrait' | 'landscape' | null;
+      if (savedOrientation === 'portrait' || savedOrientation === 'landscape') {
+        setPaperOrientation(savedOrientation);
+        if (savedOrientation === 'landscape') setZoomLevel(68);
+      }
+
+      const savedCols = localStorage.getItem('grades_pdf_columns');
+      if (savedCols) {
+        try {
+          const parsed = JSON.parse(savedCols);
+          if (typeof parsed.studentCode === 'boolean') setShowStudentCode(parsed.studentCode);
+          if (typeof parsed.affective === 'boolean') setShowAffective(parsed.affective);
+          if (typeof parsed.postTest === 'boolean') setShowPostTest(parsed.postTest);
+          if (typeof parsed.assignment === 'boolean') setShowAssignment(parsed.assignment);
+          if (typeof parsed.midterm === 'boolean') setShowMidterm(parsed.midterm);
+          if (typeof parsed.final === 'boolean') setShowFinal(parsed.final);
+          if (typeof parsed.total === 'boolean') setShowTotal(parsed.total);
+          if (typeof parsed.attendance === 'boolean') setShowAttendance(parsed.attendance);
+          if (typeof parsed.grade === 'boolean') setShowGrade(parsed.grade);
+        } catch (e) {
+          console.error('Failed to parse grades_pdf_columns', e);
+        }
+      }
     }
   }, [teacherNameDefault]);
 
@@ -135,6 +248,18 @@ export default function GradePdfModal({
       localStorage.setItem('grades_pdf_head_dept', headOfDepartment);
       localStorage.setItem('grades_pdf_head_curr', headOfCurriculum);
       localStorage.setItem('grades_pdf_deputy_dir', deputyDirector);
+      localStorage.setItem('grades_pdf_orientation', paperOrientation);
+      localStorage.setItem('grades_pdf_columns', JSON.stringify({
+        studentCode: showStudentCode,
+        affective: showAffective,
+        postTest: showPostTest,
+        assignment: showAssignment,
+        midterm: showMidterm,
+        final: showFinal,
+        total: showTotal,
+        attendance: showAttendance,
+        grade: showGrade,
+      }));
       toast.success('บันทึกรูปแบบตั้งต้นเรียบร้อย');
     }
   };
@@ -415,16 +540,16 @@ export default function GradePdfModal({
       <thead>
         <tr>
           <th style="width: 32px;">ลำดับ</th>
-          <th style="width: 90px;">รหัสนักศึกษา</th>
+          ${showStudentCode ? `<th style="width: 90px;">รหัสนักศึกษา</th>` : ''}
           <th>ชื่อ - สกุล</th>
-          <th style="width: 55px;">จิตพิสัย<br>(${weights.affective_weight}%)</th>
-          <th style="width: 65px;">สอบย่อย<br>(${weights.post_test_weight}%)</th>
-          <th style="width: 65px;">งานเก็บ<br>(${weights.assignment_weight}%)</th>
-          <th style="width: 55px;">กลางภาค<br>(${weights.midterm_weight}%)</th>
-          <th style="width: 55px;">ปลายภาค<br>(${weights.final_weight}%)</th>
-          <th class="col-total" style="width: 65px;">รวม<br>(100)</th>
-          <th style="width: 55px;">เวลาเรียน<br>(%)</th>
-          <th style="width: 55px;">ผลการเรียน</th>
+          ${showAffective ? `<th style="width: 55px;">จิตพิสัย<br>(${weights.affective_weight}%)</th>` : ''}
+          ${showPostTest ? `<th style="width: 65px;">สอบย่อย<br>(${weights.post_test_weight}%)</th>` : ''}
+          ${showAssignment ? `<th style="width: 65px;">งานเก็บ<br>(${weights.assignment_weight}%)</th>` : ''}
+          ${showMidterm ? `<th style="width: 55px;">กลางภาค<br>(${weights.midterm_weight}%)</th>` : ''}
+          ${showFinal ? `<th style="width: 55px;">ปลายภาค<br>(${weights.final_weight}%)</th>` : ''}
+          ${showTotal ? `<th class="col-total" style="width: 65px;">รวม<br>(100)</th>` : ''}
+          ${showAttendance ? `<th style="width: 55px;">เวลาเรียน<br>(%)</th>` : ''}
+          ${showGrade ? `<th style="width: 55px;">ผลการเรียน</th>` : ''}
         </tr>
       </thead>
       <tbody>
@@ -443,16 +568,16 @@ export default function GradePdfModal({
 
         return `<tr class="${rowClass}">
             <td>${idx + 1}</td>
-            <td style="font-family: monospace, monospace;">${s.student_code || '-'}</td>
+            ${showStudentCode ? `<td style="font-family: monospace, monospace;">${s.student_code || '-'}</td>` : ''}
             <td class="name">${s.name}</td>
-            <td>${Number(s.affective_score || 0).toFixed(1)}</td>
-            <td>${Number(s.precise_scaled_post_test || s.scaled_post_test || 0).toFixed(1)}${rawPostHint}</td>
-            <td>${Number(s.precise_scaled_assign || s.scaled_assign || 0).toFixed(1)}${rawAssignHint}</td>
-            <td>${Number(s.precise_scaled_midterm || s.scaled_midterm || 0).toFixed(1)}</td>
-            <td>${finalVal}</td>
-            <td class="col-total">${totalVal}</td>
-            <td>${s.attendance_percent ?? 100}%</td>
-            <td class="col-grade">${s.grade || '-'}</td>
+            ${showAffective ? `<td>${Number(s.affective_score || 0).toFixed(1)}</td>` : ''}
+            ${showPostTest ? `<td>${Number(s.precise_scaled_post_test || s.scaled_post_test || 0).toFixed(1)}${rawPostHint}</td>` : ''}
+            ${showAssignment ? `<td>${Number(s.precise_scaled_assign || s.scaled_assign || 0).toFixed(1)}${rawAssignHint}</td>` : ''}
+            ${showMidterm ? `<td>${Number(s.precise_scaled_midterm || s.scaled_midterm || 0).toFixed(1)}</td>` : ''}
+            ${showFinal ? `<td>${finalVal}</td>` : ''}
+            ${showTotal ? `<td class="col-total">${totalVal}</td>` : ''}
+            ${showAttendance ? `<td>${s.attendance_percent ?? 100}%</td>` : ''}
+            ${showGrade ? `<td class="col-grade">${s.grade || '-'}</td>` : ''}
           </tr>`;
       }).join('')}
       </tbody>
@@ -725,9 +850,200 @@ export default function GradePdfModal({
 
             {/* Tab 2: Display Options */}
             {activeTab === 'display' && (
-              <div className="space-y-3 text-xs">
+              <div className="space-y-3.5 text-xs">
+                {/* Column Selection Card */}
+                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                      <CheckSquare className="w-4 h-4 text-indigo-600" />
+                      เลือกคอลัมน์ข้อมูลที่ต้องการแสดง
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700">
+                      {activeColumnsCount} / 9 คอลัมน์
+                    </span>
+                  </div>
+
+                  {/* Quick Presets */}
+                  <div>
+                    <div className="text-[11px] font-medium text-slate-500 mb-1.5">ชุดตัวเลือกด่วน (Presets):</div>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={applyPresetAll}
+                        className="px-2 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-indigo-50 hover:border-indigo-300 text-slate-700 hover:text-indigo-700 font-medium text-[11px] transition-all text-left flex items-center justify-between shadow-2xs"
+                      >
+                        <span>🌟 แสดงทั้งหมด</span>
+                        <span className="text-[9px] text-slate-400">9/9</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={applyPresetAnnouncement}
+                        className="px-2 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-indigo-50 hover:border-indigo-300 text-slate-700 hover:text-indigo-700 font-medium text-[11px] transition-all text-left flex items-center justify-between shadow-2xs"
+                      >
+                        <span>📋 แบบติดบอร์ด</span>
+                        <span className="text-[9px] text-slate-400">3/9</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={applyPresetContinuous}
+                        className="px-2 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-indigo-50 hover:border-indigo-300 text-slate-700 hover:text-indigo-700 font-medium text-[11px] transition-all text-left flex items-center justify-between shadow-2xs"
+                      >
+                        <span>📝 เฉพาะคะแนนเก็บ</span>
+                        <span className="text-[9px] text-slate-400">6/9</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={applyPresetGradeOnly}
+                        className="px-2 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-indigo-50 hover:border-indigo-300 text-slate-700 hover:text-indigo-700 font-medium text-[11px] transition-all text-left flex items-center justify-between shadow-2xs"
+                      >
+                        <span>🎓 ผลการเรียน & เวลา</span>
+                        <span className="text-[9px] text-slate-400">4/9</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Individual Checkboxes */}
+                  <div className="pt-1.5 border-t border-slate-200/80 space-y-1">
+                    <label className="flex items-center justify-between p-1.5 rounded-lg hover:bg-white transition-colors cursor-pointer select-none">
+                      <span className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={showStudentCode}
+                          onChange={e => setShowStudentCode(e.target.checked)}
+                          className="rounded text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span className="text-slate-700 font-medium">รหัสนักศึกษา</span>
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono">student_code</span>
+                    </label>
+
+                    <label className="flex items-center justify-between p-1.5 rounded-lg hover:bg-white transition-colors cursor-pointer select-none">
+                      <span className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={showAffective}
+                          onChange={e => setShowAffective(e.target.checked)}
+                          className="rounded text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span className="text-slate-700 font-medium">จิตพิสัย</span>
+                      </span>
+                      <span className="text-[10px] font-semibold text-slate-500 bg-slate-200/70 px-1.5 py-0.5 rounded">
+                        {weights.affective_weight}%
+                      </span>
+                    </label>
+
+                    <label className="flex items-center justify-between p-1.5 rounded-lg hover:bg-white transition-colors cursor-pointer select-none">
+                      <span className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={showPostTest}
+                          onChange={e => setShowPostTest(e.target.checked)}
+                          className="rounded text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span className="text-slate-700 font-medium">แบบทดสอบ / สอบย่อย</span>
+                      </span>
+                      <span className="text-[10px] font-semibold text-slate-500 bg-slate-200/70 px-1.5 py-0.5 rounded">
+                        {weights.post_test_weight}%
+                      </span>
+                    </label>
+
+                    <label className="flex items-center justify-between p-1.5 rounded-lg hover:bg-white transition-colors cursor-pointer select-none">
+                      <span className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={showAssignment}
+                          onChange={e => setShowAssignment(e.target.checked)}
+                          className="rounded text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span className="text-slate-700 font-medium">ภาระงาน / งานเก็บ</span>
+                      </span>
+                      <span className="text-[10px] font-semibold text-slate-500 bg-slate-200/70 px-1.5 py-0.5 rounded">
+                        {weights.assignment_weight}%
+                      </span>
+                    </label>
+
+                    <label className="flex items-center justify-between p-1.5 rounded-lg hover:bg-white transition-colors cursor-pointer select-none">
+                      <span className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={showMidterm}
+                          onChange={e => setShowMidterm(e.target.checked)}
+                          className="rounded text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span className="text-slate-700 font-medium">สอบกลางภาค</span>
+                      </span>
+                      <span className="text-[10px] font-semibold text-slate-500 bg-slate-200/70 px-1.5 py-0.5 rounded">
+                        {weights.midterm_weight}%
+                      </span>
+                    </label>
+
+                    <label className="flex items-center justify-between p-1.5 rounded-lg hover:bg-white transition-colors cursor-pointer select-none">
+                      <span className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={showFinal}
+                          onChange={e => setShowFinal(e.target.checked)}
+                          className="rounded text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span className="text-slate-700 font-medium">สอบปลายภาค</span>
+                      </span>
+                      <span className="text-[10px] font-semibold text-slate-500 bg-slate-200/70 px-1.5 py-0.5 rounded">
+                        {weights.final_weight}%
+                      </span>
+                    </label>
+
+                    <label className="flex items-center justify-between p-1.5 rounded-lg hover:bg-white transition-colors cursor-pointer select-none">
+                      <span className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={showTotal}
+                          onChange={e => setShowTotal(e.target.checked)}
+                          className="rounded text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span className="text-slate-700 font-bold">รวมคะแนน (100)</span>
+                      </span>
+                      <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
+                        100 คะแนน
+                      </span>
+                    </label>
+
+                    <label className="flex items-center justify-between p-1.5 rounded-lg hover:bg-white transition-colors cursor-pointer select-none">
+                      <span className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={showAttendance}
+                          onChange={e => setShowAttendance(e.target.checked)}
+                          className="rounded text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span className="text-slate-700 font-medium">เวลาเรียน / เข้าเรียน (%)</span>
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono">% เข้าเรียน</span>
+                    </label>
+
+                    <label className="flex items-center justify-between p-1.5 rounded-lg hover:bg-white transition-colors cursor-pointer select-none">
+                      <span className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={showGrade}
+                          onChange={e => setShowGrade(e.target.checked)}
+                          className="rounded text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span className="text-slate-700 font-bold text-indigo-950">ระดับผลการเรียน (เกรด)</span>
+                      </span>
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
+                        เกรด
+                      </span>
+                    </label>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-200/80 text-[11px] text-slate-500 italic">
+                    * คอลัมน์ &quot;ลำดับ&quot; และ &quot;ชื่อ - สกุล&quot; จะแสดงเสมอเพื่อระบุตัวตนนักเรียน
+                  </div>
+                </div>
+
+                {/* Additional Elements */}
                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2.5">
-                  <div className="font-bold text-slate-700 mb-1">องค์ประกอบในตาราง:</div>
+                  <div className="font-bold text-slate-700 mb-1">องค์ประกอบเพิ่มเติมในเอกสาร:</div>
 
                   <label className="flex items-center gap-2.5 cursor-pointer select-none">
                     <input
@@ -775,19 +1091,19 @@ export default function GradePdfModal({
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      onClick={() => setPaperOrientation('portrait')}
-                      className={`p-2 rounded-lg border text-center font-bold text-xs ${paperOrientation === 'portrait' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-700 border-slate-200'
+                      onClick={() => handleOrientationChange('portrait')}
+                      className={`p-2 rounded-lg border text-center font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${paperOrientation === 'portrait' ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                         }`}
                     >
-                      แนวตั้ง (Portrait)
+                      <span>📄</span> แนวตั้ง (Portrait)
                     </button>
                     <button
                       type="button"
-                      onClick={() => setPaperOrientation('landscape')}
-                      className={`p-2 rounded-lg border text-center font-bold text-xs ${paperOrientation === 'landscape' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-700 border-slate-200'
+                      onClick={() => handleOrientationChange('landscape')}
+                      className={`p-2 rounded-lg border text-center font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${paperOrientation === 'landscape' ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                         }`}
                     >
-                      แนวนอน (Landscape)
+                      <span>📑</span> แนวนอน (Landscape)
                     </button>
                   </div>
                 </div>
@@ -869,16 +1185,37 @@ export default function GradePdfModal({
 
             {/* Preview Toolbar */}
             <div className="px-4 py-2 bg-slate-100 border-b border-slate-300 flex items-center justify-between text-xs text-slate-600 shrink-0">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-slate-700">ตัวอย่างก่อนพิมพ์ (A4 Live Preview)</span>
-                <span className="px-2 py-0.5 rounded bg-white text-[10px] font-semibold text-slate-500 border border-slate-200">
-                  {paperOrientation === 'portrait' ? 'A4 แนวตั้ง' : 'A4 แนวนอน'}
-                </span>
+              <div className="flex items-center gap-2.5">
+                <span className="font-bold text-slate-700 hidden sm:inline">ทิศทางกระดาษ:</span>
+                <div className="flex items-center bg-white p-0.5 rounded-lg border border-slate-200 shadow-2xs">
+                  <button
+                    type="button"
+                    onClick={() => handleOrientationChange('portrait')}
+                    className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition-all ${paperOrientation === 'portrait'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                      }`}
+                  >
+                    <span>📄</span>
+                    <span>แนวตั้ง</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOrientationChange('landscape')}
+                    className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition-all ${paperOrientation === 'landscape'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                      }`}
+                  >
+                    <span>📑</span>
+                    <span>แนวนอน</span>
+                  </button>
+                </div>
               </div>
 
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setZoomLevel(prev => Math.max(50, prev - 10))}
+                  onClick={() => setZoomLevel(prev => Math.max(40, prev - 10))}
                   className="p-1 rounded bg-white hover:bg-slate-50 border border-slate-200 text-slate-700"
                   title="ลดขนาด"
                 >
@@ -893,9 +1230,9 @@ export default function GradePdfModal({
                   <ZoomIn className="w-3.5 h-3.5" />
                 </button>
                 <button
-                  onClick={() => setZoomLevel(85)}
+                  onClick={() => setZoomLevel(paperOrientation === 'landscape' ? 68 : 85)}
                   className="p-1 rounded bg-white hover:bg-slate-50 border border-slate-200 text-slate-700"
-                  title="รีเซ็ตขนาด"
+                  title="รีเซ็ตขนาดพอดี"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                 </button>
@@ -903,17 +1240,24 @@ export default function GradePdfModal({
             </div>
 
             {/* Simulated Paper Scrollable Area */}
-            <div className="flex-1 overflow-auto p-4 sm:p-8 flex justify-center items-start">
+            <div className="flex-1 overflow-auto p-4 sm:p-8 flex justify-center items-start bg-slate-200/90">
               <div
                 style={{
-                  transform: `scale(${zoomLevel / 100})`,
-                  transformOrigin: 'top center',
-                  width: paperOrientation === 'portrait' ? '210mm' : '297mm',
-                  minHeight: paperOrientation === 'portrait' ? '297mm' : '210mm',
-                  padding: paperOrientation === 'portrait' ? '14mm 16mm' : '10mm 12mm'
+                  width: paperOrientation === 'portrait' ? `${210 * (zoomLevel / 100)}mm` : `${297 * (zoomLevel / 100)}mm`,
+                  transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
                 }}
-                className="bg-white text-slate-900 shadow-2xl rounded-sm border border-slate-300 font-sans transition-transform duration-100 select-text"
+                className="shrink-0 flex justify-center"
               >
+                <div
+                  style={{
+                    width: paperOrientation === 'portrait' ? '210mm' : '297mm',
+                    minHeight: paperOrientation === 'portrait' ? '297mm' : '210mm',
+                    transform: `scale(${zoomLevel / 100})`,
+                    transformOrigin: 'top center',
+                    padding: paperOrientation === 'portrait' ? '12mm 15mm' : '9mm 12mm'
+                  }}
+                  className="shrink-0 bg-white text-slate-900 shadow-2xl rounded-sm border border-slate-300 font-sans transition-all duration-300 select-text"
+                >
                 {/* Printable Content Replica */}
                 <div className="text-center border-b-2 border-slate-900 pb-2 mb-3">
                   <div className="text-lg sm:text-xl font-bold text-slate-950 tracking-wide">{institutionName}</div>
@@ -944,30 +1288,44 @@ export default function GradePdfModal({
                   <thead>
                     <tr className="bg-slate-100 text-slate-900 font-bold">
                       <th className="border border-slate-600 p-1 w-8 text-center">ลำดับ</th>
-                      <th className="border border-slate-600 p-1 w-24 text-center">รหัสนักศึกษา</th>
+                      {showStudentCode && <th className="border border-slate-600 p-1 w-24 text-center">รหัสนักศึกษา</th>}
                       <th className="border border-slate-600 p-1 text-left pl-2">ชื่อ - สกุล</th>
-                      <th className="border border-slate-600 p-1 text-center w-14">
-                        จิตพิสัย<br /><span className="text-[10px] font-normal">({weights.affective_weight}%)</span>
-                      </th>
-                      <th className="border border-slate-600 p-1 text-center w-16">
-                        สอบย่อย<br /><span className="text-[10px] font-normal">({weights.post_test_weight}%)</span>
-                      </th>
-                      <th className="border border-slate-600 p-1 text-center w-16">
-                        งานเก็บ<br /><span className="text-[10px] font-normal">({weights.assignment_weight}%)</span>
-                      </th>
-                      <th className="border border-slate-600 p-1 text-center w-14">
-                        กลางภาค<br /><span className="text-[10px] font-normal">({weights.midterm_weight}%)</span>
-                      </th>
-                      <th className="border border-slate-600 p-1 text-center w-14">
-                        ปลายภาค<br /><span className="text-[10px] font-normal">({weights.final_weight}%)</span>
-                      </th>
-                      <th className="border border-slate-600 p-1 text-center w-16 font-extrabold bg-slate-200">
-                        รวม<br /><span className="text-[10px] font-normal">(100)</span>
-                      </th>
-                      <th className="border border-slate-600 p-1 text-center w-14">
-                        เวลาเรียน<br /><span className="text-[10px] font-normal">(%)</span>
-                      </th>
-                      <th className="border border-slate-600 p-1 text-center w-14 font-extrabold">ผลการเรียน</th>
+                      {showAffective && (
+                        <th className="border border-slate-600 p-1 text-center w-14">
+                          จิตพิสัย<br /><span className="text-[10px] font-normal">({weights.affective_weight}%)</span>
+                        </th>
+                      )}
+                      {showPostTest && (
+                        <th className="border border-slate-600 p-1 text-center w-16">
+                          สอบย่อย<br /><span className="text-[10px] font-normal">({weights.post_test_weight}%)</span>
+                        </th>
+                      )}
+                      {showAssignment && (
+                        <th className="border border-slate-600 p-1 text-center w-16">
+                          งานเก็บ<br /><span className="text-[10px] font-normal">({weights.assignment_weight}%)</span>
+                        </th>
+                      )}
+                      {showMidterm && (
+                        <th className="border border-slate-600 p-1 text-center w-14">
+                          กลางภาค<br /><span className="text-[10px] font-normal">({weights.midterm_weight}%)</span>
+                        </th>
+                      )}
+                      {showFinal && (
+                        <th className="border border-slate-600 p-1 text-center w-14">
+                          ปลายภาค<br /><span className="text-[10px] font-normal">({weights.final_weight}%)</span>
+                        </th>
+                      )}
+                      {showTotal && (
+                        <th className="border border-slate-600 p-1 text-center w-16 font-extrabold bg-slate-200">
+                          รวม<br /><span className="text-[10px] font-normal">(100)</span>
+                        </th>
+                      )}
+                      {showAttendance && (
+                        <th className="border border-slate-600 p-1 text-center w-14">
+                          เวลาเรียน<br /><span className="text-[10px] font-normal">(%)</span>
+                        </th>
+                      )}
+                      {showGrade && <th className="border border-slate-600 p-1 text-center w-14 font-extrabold">ผลการเรียน</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -987,36 +1345,46 @@ export default function GradePdfModal({
                       return (
                         <tr key={s.student_id} className={`border-b border-slate-400 ${bgClass}`}>
                           <td className="border border-slate-400 p-1 text-center">{idx + 1}</td>
-                          <td className="border border-slate-400 p-1 text-center font-mono">{s.student_code || '-'}</td>
+                          {showStudentCode && <td className="border border-slate-400 p-1 text-center font-mono">{s.student_code || '-'}</td>}
                           <td className="border border-slate-400 p-1 pl-2 text-left">{s.name}</td>
-                          <td className="border border-slate-400 p-1 text-center">
-                            {Number(s.affective_score || 0).toFixed(1)}
-                          </td>
-                          <td className="border border-slate-400 p-1 text-center">
-                            {Number(s.precise_scaled_post_test || s.scaled_post_test || 0).toFixed(1)}
-                            {showRawScore && (
-                              <span className="block text-[9px] text-slate-500">
-                                ({Number(s.raw_post_test || 0).toFixed(0)}/{s.max_post_test || (isPws ? 150 : 180)})
-                              </span>
-                            )}
-                          </td>
-                          <td className="border border-slate-400 p-1 text-center">
-                            {Number(s.precise_scaled_assign || s.scaled_assign || 0).toFixed(1)}
-                            {showRawScore && (
-                              <span className="block text-[9px] text-slate-500">
-                                ({Number(s.raw_assign || 0).toFixed(0)}/{s.max_assign || (isPws ? 150 : 180)})
-                              </span>
-                            )}
-                          </td>
-                          <td className="border border-slate-400 p-1 text-center">
-                            {Number(s.precise_scaled_midterm || s.scaled_midterm || 0).toFixed(1)}
-                          </td>
-                          <td className="border border-slate-400 p-1 text-center">{finalVal}</td>
-                          <td className="border border-slate-400 p-1 text-center font-bold bg-slate-50">
-                            {totalVal}
-                          </td>
-                          <td className="border border-slate-400 p-1 text-center">{s.attendance_percent ?? 100}%</td>
-                          <td className="border border-slate-400 p-1 text-center font-extrabold text-slate-950">{s.grade || '-'}</td>
+                          {showAffective && (
+                            <td className="border border-slate-400 p-1 text-center">
+                              {Number(s.affective_score || 0).toFixed(1)}
+                            </td>
+                          )}
+                          {showPostTest && (
+                            <td className="border border-slate-400 p-1 text-center">
+                              {Number(s.precise_scaled_post_test || s.scaled_post_test || 0).toFixed(1)}
+                              {showRawScore && (
+                                <span className="block text-[9px] text-slate-500">
+                                  ({Number(s.raw_post_test || 0).toFixed(0)}/{s.max_post_test || (isPws ? 150 : 180)})
+                                </span>
+                              )}
+                            </td>
+                          )}
+                          {showAssignment && (
+                            <td className="border border-slate-400 p-1 text-center">
+                              {Number(s.precise_scaled_assign || s.scaled_assign || 0).toFixed(1)}
+                              {showRawScore && (
+                                <span className="block text-[9px] text-slate-500">
+                                  ({Number(s.raw_assign || 0).toFixed(0)}/{s.max_assign || (isPws ? 150 : 180)})
+                                </span>
+                              )}
+                            </td>
+                          )}
+                          {showMidterm && (
+                            <td className="border border-slate-400 p-1 text-center">
+                              {Number(s.precise_scaled_midterm || s.scaled_midterm || 0).toFixed(1)}
+                            </td>
+                          )}
+                          {showFinal && <td className="border border-slate-400 p-1 text-center">{finalVal}</td>}
+                          {showTotal && (
+                            <td className="border border-slate-400 p-1 text-center font-bold bg-slate-50">
+                              {totalVal}
+                            </td>
+                          )}
+                          {showAttendance && <td className="border border-slate-400 p-1 text-center">{s.attendance_percent ?? 100}%</td>}
+                          {showGrade && <td className="border border-slate-400 p-1 text-center font-extrabold text-slate-950">{s.grade || '-'}</td>}
                         </tr>
                       );
                     })}
@@ -1111,6 +1479,7 @@ export default function GradePdfModal({
                 )}
               </div>
             </div>
+          </div>
           </div>
         </div>
       </div>

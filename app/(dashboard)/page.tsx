@@ -372,10 +372,10 @@ export default function DashboardPage() {
       subtitle: isSemesterEnded
         ? 'สิ้นสุดการเช็คชื่อของภาคเรียนนี้แล้ว'
         : (todayClassesCount > 0 && checkedClassesCount === todayClassesCount
-            ? 'เช็คชื่อครบถ้วนทุกคาบแล้ว'
-            : (todayClassesCount === 0
-                ? 'ไม่มีคาบสอนตามตารางวันนี้'
-                : `รอเช็คชื่ออีก ${todayClassesCount - checkedClassesCount} ห้องเรียน`)),
+          ? 'เช็คชื่อครบถ้วนทุกคาบแล้ว'
+          : (todayClassesCount === 0
+            ? 'ไม่มีคาบสอนตามตารางวันนี้'
+            : `รอเช็คชื่ออีก ${todayClassesCount - checkedClassesCount} ห้องเรียน`)),
       icon: CheckCircle2,
       gradient: 'from-violet-500 to-purple-600',
       iconBg: 'bg-violet-50/90 text-violet-600 border border-violet-100',
@@ -645,11 +645,10 @@ export default function DashboardPage() {
               return (
                 <div
                   key={entry.id || idx}
-                  className={`p-4 rounded-2xl border transition-all duration-300 hover:shadow-lg flex flex-col justify-between group relative overflow-hidden ${
-                    entry.is_attendance_checked
+                  className={`p-4 rounded-2xl border transition-all duration-300 hover:shadow-lg flex flex-col justify-between group relative overflow-hidden ${entry.is_attendance_checked
                       ? 'bg-gradient-to-br from-white via-white to-emerald-50/30 border-emerald-200/90 shadow-emerald-500/5'
                       : 'bg-white/95 border-indigo-100/90 shadow-indigo-500/5 hover:border-indigo-300'
-                  }`}
+                    }`}
                 >
                   {/* Left Accent Bar */}
                   <div className={`absolute top-0 left-0 bottom-0 w-1.5 ${entry.is_attendance_checked ? 'bg-emerald-500' : 'bg-indigo-500'}`} />
@@ -706,11 +705,10 @@ export default function DashboardPage() {
                     {entry.classroom_id ? (
                       <Link
                         href={`/attendance?classroom_id=${entry.classroom_id}`}
-                        className={`inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-xl transition-all duration-200 ${
-                          entry.is_attendance_checked
+                        className={`inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-xl transition-all duration-200 ${entry.is_attendance_checked
                             ? 'text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 border border-transparent hover:border-indigo-200'
                             : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm shadow-indigo-600/20 hover:shadow-indigo-600/30 hover:scale-[1.02]'
-                        }`}
+                          }`}
                       >
                         <span>{entry.is_attendance_checked ? 'ดูข้อมูล' : 'เช็คชื่อทันที'}</span>
                         <ChevronRight className="w-3.5 h-3.5" />
@@ -894,31 +892,28 @@ export default function DashboardPage() {
                 <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-xl border border-slate-200/60">
                   <button
                     onClick={() => setRiskFilter('all')}
-                    className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all ${
-                      riskFilter === 'all'
+                    className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all ${riskFilter === 'all'
                         ? 'bg-white text-slate-800 shadow-xs'
                         : 'text-slate-600 hover:text-slate-800'
-                    }`}
+                      }`}
                   >
                     ทั้งหมด ({atRiskCount})
                   </button>
                   <button
                     onClick={() => setRiskFilter('attendance_f')}
-                    className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all ${
-                      riskFilter === 'attendance_f'
+                    className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all ${riskFilter === 'attendance_f'
                         ? 'bg-rose-600 text-white shadow-xs'
                         : 'text-rose-700 hover:bg-rose-50'
-                    }`}
+                      }`}
                   >
                     หมดสิทธิ์ ({fRiskCount})
                   </button>
                   <button
                     onClick={() => setRiskFilter('attendance_warning')}
-                    className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all ${
-                      riskFilter === 'attendance_warning'
+                    className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all ${riskFilter === 'attendance_warning'
                         ? 'bg-amber-600 text-white shadow-xs'
                         : 'text-amber-700 hover:bg-amber-50'
-                    }`}
+                      }`}
                   >
                     เสี่ยง ({warningRiskCount})
                   </button>
@@ -954,11 +949,10 @@ export default function DashboardPage() {
                     return (
                       <div
                         key={i}
-                        className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 transition-all duration-200 hover:shadow-xs ${
-                          isF
+                        className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 transition-all duration-200 hover:shadow-xs ${isF
                             ? 'bg-rose-50/70 border-rose-200/80 hover:bg-rose-100/70'
                             : 'bg-amber-50/70 border-amber-200/80 hover:bg-amber-100/70'
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
                           <UserAvatar
@@ -984,9 +978,8 @@ export default function DashboardPage() {
                         </div>
 
                         <div className="shrink-0">
-                          <span className={`text-[0.65rem] font-bold px-2 py-0.5 rounded-full ${
-                            isF ? 'bg-rose-600 text-white' : 'bg-amber-500 text-white'
-                          }`}>
+                          <span className={`text-[0.65rem] font-bold px-2 py-0.5 rounded-full ${isF ? 'bg-rose-600 text-white' : 'bg-amber-500 text-white'
+                            }`}>
                             {isF ? 'หมดสิทธิ์สอบ' : 'เตือน'}
                           </span>
                         </div>
@@ -1081,13 +1074,12 @@ export default function DashboardPage() {
                     </p>
                   </div>
 
-                  <span className={`text-[0.65rem] font-bold px-2.5 py-1 rounded-full shrink-0 ${
-                    s.status === 'scheduled'
+                  <span className={`text-[0.65rem] font-bold px-2.5 py-1 rounded-full shrink-0 ${s.status === 'scheduled'
                       ? 'bg-amber-100 text-amber-800 border border-amber-200'
                       : s.status === 'completed'
                         ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                         : 'bg-slate-100 text-slate-700'
-                  }`}>
+                    }`}>
                     {s.status === 'scheduled' ? 'รอสอน' : s.status === 'completed' ? 'สอนแล้ว' : 'ยกเลิก'}
                   </span>
                 </div>

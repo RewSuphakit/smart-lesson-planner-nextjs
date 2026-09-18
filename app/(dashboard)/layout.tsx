@@ -73,6 +73,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [user, loading, router]);
 
+  // Lock body scroll when mobile sidebar is open
+  useEffect(() => {
+    if (sidebarOpen) {
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = prevOverflow;
+      };
+    }
+  }, [sidebarOpen]);
+
   if (loading || !user) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-slate-50">
@@ -89,22 +100,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen">
-      {/* Mobile overlay */}
+      {/* Mobile overlay - zero blur for 60fps mobile animation */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-indigo-100/50 backdrop-blur-sm z-40 lg:hidden"
+          className="fixed inset-0 bg-slate-900/40 z-40 lg:hidden transition-opacity duration-200"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar - GPU accelerated, blur disabled on mobile animation for maximum fluidity */}
       <aside className={`
-        fixed lg:sticky lg:top-0 lg:h-screen inset-y-0 left-0 z-40 w-[270px]
-        bg-white/80 backdrop-blur-2xl
+        fixed lg:sticky lg:top-0 lg:h-screen inset-y-0 left-0 z-50 w-[270px]
+        bg-white lg:bg-white/80 lg:backdrop-blur-2xl
         border-r border-indigo-200/40
         flex flex-col
-        transition-transform duration-300 ease-in-out
-        shadow-lg shadow-indigo-100/30
+        transition-transform duration-300 ease-out will-change-transform transform-gpu
+        shadow-2xl shadow-indigo-950/20 lg:shadow-lg lg:shadow-indigo-100/30
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         {/* Logo */}
@@ -204,7 +215,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-h-screen min-w-0">
         {/* Mobile Header */}
-        <header className="sticky top-0 z-40 lg:hidden bg-white/90 backdrop-blur-xl border-b border-indigo-200/30 px-4 py-2.5 flex items-center justify-between gap-2 shadow-sm">
+        <header className="sticky top-0 z-40 lg:hidden bg-white/95 border-b border-indigo-200/40 px-4 py-2.5 flex items-center justify-between gap-2 shadow-xs">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setSidebarOpen(true)}
