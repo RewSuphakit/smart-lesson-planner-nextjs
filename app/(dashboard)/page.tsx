@@ -136,6 +136,24 @@ const teacherQuotes = [
   '“การจัดการชั้นเรียนที่ดี ช่วยสร้างบรรยากาศแห่งการเรียนรู้อย่างยั่งยืน”',
 ];
 
+function LiveClock() {
+  const [time, setTime] = useState<string>('');
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2, '0');
+      const mins = String(now.getMinutes()).padStart(2, '0');
+      const secs = String(now.getSeconds()).padStart(2, '0');
+      setTime(`${hours}:${mins}:${secs} น.`);
+    };
+    updateTime();
+    const timer = setInterval(updateTime, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return <span className="min-w-[85px]">{time || '--:--:-- น.'}</span>;
+}
+
 export default function DashboardPage() {
   const { user } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
@@ -143,21 +161,6 @@ export default function DashboardPage() {
   const [exporting, setExporting] = useState(false);
   const [riskFilter, setRiskFilter] = useState<'all' | 'attendance_f' | 'attendance_warning'>('all');
   const [searchRisk, setSearchRisk] = useState('');
-  const [currentTime, setCurrentTime] = useState<string>('');
-
-  // Live real-time clock (client-only to eliminate hydration mismatch and CLS)
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      const hours = String(now.getHours()).padStart(2, '0');
-      const mins = String(now.getMinutes()).padStart(2, '0');
-      const secs = String(now.getSeconds()).padStart(2, '0');
-      setCurrentTime(`${hours}:${mins}:${secs} น.`);
-    };
-    updateTime();
-    const timer = setInterval(updateTime, 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   // Fetch Dashboard Data
   useEffect(() => {
@@ -410,7 +413,7 @@ export default function DashboardPage() {
               <span className="w-1 h-1 rounded-full bg-indigo-300/80" />
               <div className="flex items-center gap-1.5 font-mono tabular-nums text-indigo-200">
                 <Clock className="w-3 h-3 text-indigo-300" />
-                <span className="min-w-[85px]">{currentTime || '--:--:-- น.'}</span>
+                <LiveClock />
               </div>
               {data?.activeSemester ? (
                 <Link

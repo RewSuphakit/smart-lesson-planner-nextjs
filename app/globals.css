@@ -32,7 +32,7 @@ input, button, select, textarea {
 }
 
 body {
-  font-family: 'IBM Plex Sans Thai', 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-ibm-plex-sans-thai), var(--font-inter), 'IBM Plex Sans Thai', 'Inter', system-ui, -apple-system, sans-serif;
   background: #f0f4ff;
   min-height: 100vh;
   color: #334155;
@@ -54,6 +54,8 @@ body::before {
     linear-gradient(180deg, #f0f4ff 0%, #e8eeff 50%, #f5f3ff 100%);
   z-index: -1;
   pointer-events: none;
+  will-change: transform;
+  transform: translateZ(0);
 }
 
 /* Scrollbar — Light */

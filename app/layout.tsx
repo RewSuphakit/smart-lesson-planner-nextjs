@@ -1,4 +1,5 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
+import { IBM_Plex_Sans_Thai, Inter } from 'next/font/google';
 import './globals.css';
 import { Toaster as HotToaster } from 'react-hot-toast';
 import { Toaster as SonnerToaster } from 'sonner';
@@ -7,6 +8,27 @@ import QueryProvider from '@/components/QueryProvider';
 import { SemesterProvider } from '@/context/SemesterContext';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
+
+const ibmPlexSansThai = IBM_Plex_Sans_Thai({
+  weight: ['300', '400', '500', '600', '700'],
+  subsets: ['thai', 'latin'],
+  display: 'swap',
+  variable: '--font-ibm-plex-sans-thai',
+});
+
+const inter = Inter({
+  weight: ['300', '400', '500', '600', '700', '800'],
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-inter',
+});
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: '#6366f1',
+};
 
 export const metadata: Metadata = {
   title: 'Smart Lesson Planner — ระบบวางแผนการสอนอัจฉริยะ',
@@ -19,15 +41,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="th" className="h-full antialiased">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap"
-        />
-      </head>
+    <html lang="th" className={`h-full antialiased ${ibmPlexSansThai.variable} ${inter.variable}`}>
       <body className="min-h-full flex flex-col">
         <QueryProvider>
           <AuthProvider>

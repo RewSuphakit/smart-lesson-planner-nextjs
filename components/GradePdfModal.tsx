@@ -167,6 +167,7 @@ export default function GradePdfModal({
   }, [report]);
 
   // Execute Native Print
+  // Execute Native Print
   const handlePrint = () => {
     handleSavePreferences();
     const printWindow = window.open('', '_blank');
@@ -187,53 +188,65 @@ export default function GradePdfModal({
 <html lang="th">
 <head>
   <meta charset="UTF-8">
-  <title>รายงานผลการเรียน_${subjectCodeAndName.replace(/[^a-zA-Z0-9ก-๙_-]/g, '_')}</title>
+  <title>แบบบันทึกผลการเรียน_${subjectCodeAndName.replace(/[^a-zA-Z0-9ก-๙_-]/g, '_')}</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap');
+
     @page {
       size: A4 ${paperOrientation};
-      margin: ${isLand ? '10mm 12mm 10mm 12mm' : '12mm 15mm 12mm 15mm'};
+      margin: 0 !important;
     }
     * {
       box-sizing: border-box;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
-    body {
-      font-family: 'Sarabun', 'TH Sarabun New', 'Segoe UI', Tahoma, sans-serif;
-      margin: 0;
-      padding: 0;
-      color: #111827;
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
       background: #ffffff;
-      font-size: 11pt;
+    }
+    body {
+      font-family: 'Sarabun', 'TH Sarabun New', 'Prompt', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #0f172a;
+      background: #ffffff;
+      font-size: 10pt;
       line-height: 1.35;
+    }
+    .print-sheet {
+      width: 100%;
+      box-sizing: border-box;
+      padding: ${isLand ? '8mm 12mm 8mm 12mm' : '10mm 14mm 10mm 14mm'};
     }
     .header-block {
       text-align: center;
-      margin-bottom: 12px;
-      border-bottom: 2px solid #1e293b;
+      margin-bottom: 10px;
+      border-bottom: 2px solid #0f172a;
       padding-bottom: 8px;
     }
     .emblem-title {
       font-size: 16pt;
-      font-weight: bold;
+      font-weight: 700;
       color: #0f172a;
+      letter-spacing: 0.3px;
       margin-bottom: 2px;
     }
     .emblem-sub {
       font-size: 13pt;
-      font-weight: bold;
+      font-weight: 700;
       color: #1e293b;
-      margin-bottom: 4px;
+      margin-bottom: 3px;
     }
     .emblem-dept {
-      font-size: 10.5pt;
-      color: #334155;
+      font-size: 10pt;
+      color: #475569;
     }
     .meta-grid {
       display: table;
       width: 100%;
-      margin-bottom: 10px;
-      font-size: 10pt;
+      margin-bottom: 8px;
+      font-size: 9.5pt;
+      line-height: 1.45;
     }
     .meta-row {
       display: table-row;
@@ -241,41 +254,57 @@ export default function GradePdfModal({
     .meta-cell-left {
       display: table-cell;
       width: 58%;
-      padding: 2px 0;
+      padding: 1px 0;
       vertical-align: top;
     }
     .meta-cell-right {
       display: table-cell;
       width: 42%;
-      padding: 2px 0;
+      padding: 1px 0;
       vertical-align: top;
       text-align: right;
     }
     .strong {
-      font-weight: bold;
+      font-weight: 700;
       color: #0f172a;
     }
     table.data-table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 6px;
-      margin-bottom: 12px;
-      font-size: 9.5pt;
+      margin-top: 4px;
+      margin-bottom: 10px;
+      font-size: 9pt;
     }
     table.data-table th, table.data-table td {
-      border: 1px solid #475569;
-      padding: 4px 5px;
+      border: 1px solid #334155;
+      padding: 3.5px 4px;
       text-align: center;
     }
     table.data-table th {
       background-color: #f1f5f9;
       color: #0f172a;
-      font-weight: bold;
-      font-size: 9.5pt;
+      font-weight: 700;
+      font-size: 9pt;
+    }
+    table.data-table th.col-total {
+      background-color: #e2e8f0;
     }
     table.data-table td.name {
       text-align: left;
       padding-left: 8px;
+    }
+    table.data-table td.col-total {
+      background-color: #f8fafc;
+      font-weight: 700;
+    }
+    table.data-table td.col-grade {
+      font-weight: 800;
+    }
+    table.data-table tr {
+      page-break-inside: avoid;
+    }
+    table.data-table tr:nth-child(even) {
+      background-color: #fafbfc;
     }
     table.data-table tr.kr { background-color: #fee2e2 !important; color: #991b1b; }
     table.data-table tr.ks { background-color: #fef3c7 !important; color: #92400e; }
@@ -285,29 +314,31 @@ export default function GradePdfModal({
       font-size: 7.5pt;
       color: #64748b;
       display: block;
+      margin-top: 1px;
     }
     .stats-container {
-      margin-top: 10px;
-      margin-bottom: 12px;
+      margin-top: 8px;
+      margin-bottom: 10px;
       page-break-inside: avoid;
     }
     table.stats-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 9pt;
-      margin-bottom: 8px;
+      font-size: 8.5pt;
+      margin-bottom: 6px;
     }
     table.stats-table th, table.stats-table td {
-      border: 1px solid #94a3b8;
-      padding: 3px 6px;
+      border: 1px solid #64748b;
+      padding: 3px 5px;
       text-align: center;
     }
     table.stats-table th {
       background-color: #f8fafc;
-      font-weight: bold;
+      font-weight: 700;
+      color: #0f172a;
     }
     .signatures-block {
-      margin-top: 18px;
+      margin-top: 16px;
       display: table;
       width: 100%;
       page-break-inside: avoid;
@@ -320,23 +351,34 @@ export default function GradePdfModal({
       width: 25%;
       text-align: center;
       vertical-align: top;
-      padding: 0 6px;
-      font-size: 9.5pt;
+      padding: 0 4px;
+      font-size: 9pt;
     }
     .sig-line {
-      margin-top: 32px;
+      margin-top: 28px;
       border-bottom: 1px dotted #475569;
-      width: 80%;
+      width: 82%;
       margin-left: auto;
       margin-right: auto;
       margin-bottom: 4px;
     }
+    .sig-name {
+      font-weight: 500;
+      color: #0f172a;
+      margin-top: 2px;
+    }
     .sig-title {
       font-size: 8.5pt;
       color: #475569;
+      margin-top: 1px;
+    }
+    .sig-date {
+      font-size: 8pt;
+      color: #64748b;
+      margin-top: 4px;
     }
     .footer-note {
-      margin-top: 14px;
+      margin-top: 10px;
       font-size: 8pt;
       color: #64748b;
       display: flex;
@@ -347,144 +389,150 @@ export default function GradePdfModal({
   </style>
 </head>
 <body>
-  <div class="header-block">
-    <div class="emblem-title">${institutionName}</div>
-    <div class="emblem-sub">แบบรายงานและบันทึกผลการเรียนรายวิชา</div>
-    <div class="emblem-dept">สังกัดสำนักงานคณะกรรมการการอาชีวศึกษา (สอศ.) กระทรวงศึกษาธิการ</div>
-  </div>
+  <div class="print-sheet">
+    <div class="header-block">
+      <div class="emblem-title">${institutionName}</div>
+      <div class="emblem-sub">แบบรายงานและบันทึกผลการเรียนรายวิชา</div>
+      <div class="emblem-dept">สังกัดสำนักงานคณะกรรมการการอาชีวศึกษา (สอศ.) กระทรวงศึกษาธิการ</div>
+    </div>
 
-  <div class="meta-grid">
-    <div class="meta-row">
-      <div class="meta-cell-left">
-        <div><span class="strong">รายวิชา / ห้องเรียน:</span> ${subjectCodeAndName}</div>
-        <div><span class="strong">หลักสูตร:</span> ${curriculumLevel}</div>
-        <div><span class="strong">แผนกวิชา:</span> ${departmentName}</div>
-      </div>
-      <div class="meta-cell-right">
-        <div><span class="strong">ภาคเรียน / ปีการศึกษา:</span> ${academicYear}</div>
-        <div><span class="strong">ครูผู้สอน:</span> ${teacherName}</div>
-        <div><span class="strong">จำนวนผู้เรียนทั้งหมด:</span> ${report.length} คน</div>
+    <div class="meta-grid">
+      <div class="meta-row">
+        <div class="meta-cell-left">
+          <div><span class="strong">รายวิชา / ห้องเรียน:</span> ${subjectCodeAndName}</div>
+          <div><span class="strong">หลักสูตร:</span> ${curriculumLevel}</div>
+          <div><span class="strong">แผนกวิชา:</span> ${departmentName}</div>
+        </div>
+        <div class="meta-cell-right">
+          <div><span class="strong">ภาคเรียน / ปีการศึกษา:</span> ${academicYear}</div>
+          <div><span class="strong">ครูผู้สอน:</span> ${teacherName}</div>
+          <div><span class="strong">จำนวนผู้เรียนทั้งหมด:</span> ${report.length} คน</div>
+        </div>
       </div>
     </div>
-  </div>
 
-  <table class="data-table">
-    <thead>
-      <tr>
-        <th style="width: 32px;">ลำดับ</th>
-        <th style="width: 90px;">รหัสนักศึกษา</th>
-        <th>ชื่อ - สกุล</th>
-        <th style="width: 55px;">จิตพิสัย<br>(${weights.affective_weight}%)</th>
-        <th style="width: 65px;">สอบย่อย<br>(${weights.post_test_weight}%)</th>
-        <th style="width: 65px;">งานเก็บ<br>(${weights.assignment_weight}%)</th>
-        <th style="width: 55px;">กลางภาค<br>(${weights.midterm_weight}%)</th>
-        <th style="width: 55px;">ปลายภาค<br>(${weights.final_weight}%)</th>
-        <th style="width: 65px;">รวม<br>(100)</th>
-        <th style="width: 55px;">เวลาเรียน<br>(%)</th>
-        <th style="width: 55px;">ผลการเรียน</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${report.map((s, idx) => {
-      const isKr = s.grade === 'ข.ร.' || s.grade === 'ขร' || s.is_f;
-      const isKs = s.grade === 'ข.ส.' || s.is_absent_final;
-      const isMs = s.grade === 'ม.ส.' || s.is_incomplete;
-      const isFail = s.grade === '0' || s.grade === 'F';
-      const rowClass = isKr ? 'kr' : isKs ? 'ks' : isMs ? 'ms' : isFail ? 'fail' : '';
-
-      const finalVal = isKs ? 'ข.ส.' : isMs ? 'ม.ส.' : Number(s.precise_scaled_final || s.scaled_final || 0).toFixed(1);
-      const totalVal = (isKs || isMs) ? '-' : Number(s.total_score_precise ?? s.total_score ?? 0).toFixed(1);
-
-      const rawAssignHint = showRawScore ? `<span class="raw-hint">(${Number(s.raw_assign || 0).toFixed(0)}/${s.max_assign || (isPws ? 150 : 180)})</span>` : '';
-      const rawPostHint = showRawScore ? `<span class="raw-hint">(${Number(s.raw_post_test || 0).toFixed(0)}/${s.max_post_test || (isPws ? 150 : 180)})</span>` : '';
-
-      return `<tr class="${rowClass}">
-          <td>${idx + 1}</td>
-          <td>${s.student_code || '-'}</td>
-          <td class="name">${s.name}</td>
-          <td>${Number(s.affective_score || 0).toFixed(1)}</td>
-          <td>${Number(s.precise_scaled_post_test || s.scaled_post_test || 0).toFixed(1)}${rawPostHint}</td>
-          <td>${Number(s.precise_scaled_assign || s.scaled_assign || 0).toFixed(1)}${rawAssignHint}</td>
-          <td>${Number(s.precise_scaled_midterm || s.scaled_midterm || 0).toFixed(1)}</td>
-          <td>${finalVal}</td>
-          <td><strong>${totalVal}</strong></td>
-          <td>${s.attendance_percent ?? 100}%</td>
-          <td><strong>${s.grade || '-'}</strong></td>
-        </tr>`;
-    }).join('')}
-    </tbody>
-  </table>
-
-  ${showStats ? `
-  <div class="stats-container">
-    <div style="font-weight: bold; margin-bottom: 4px; font-size: 9.5pt;">สรุปสถิติผลการประเมินการเรียนรู้:</div>
-    <table class="stats-table">
+    <table class="data-table">
       <thead>
         <tr>
-          <th>เกรด</th>
-          <th>4</th><th>3.5</th><th>3</th><th>2.5</th><th>2</th><th>1.5</th><th>1</th><th>0</th>
-          <th>ข.ร.</th><th>ข.ส.</th><th>ม.ส.</th>
-          <th>รวม (คน)</th>
-          <th>คะแนนเฉลี่ย</th>
-          <th>ร้อยละที่ผ่าน</th>
+          <th style="width: 32px;">ลำดับ</th>
+          <th style="width: 90px;">รหัสนักศึกษา</th>
+          <th>ชื่อ - สกุล</th>
+          <th style="width: 55px;">จิตพิสัย<br>(${weights.affective_weight}%)</th>
+          <th style="width: 65px;">สอบย่อย<br>(${weights.post_test_weight}%)</th>
+          <th style="width: 65px;">งานเก็บ<br>(${weights.assignment_weight}%)</th>
+          <th style="width: 55px;">กลางภาค<br>(${weights.midterm_weight}%)</th>
+          <th style="width: 55px;">ปลายภาค<br>(${weights.final_weight}%)</th>
+          <th class="col-total" style="width: 65px;">รวม<br>(100)</th>
+          <th style="width: 55px;">เวลาเรียน<br>(%)</th>
+          <th style="width: 55px;">ผลการเรียน</th>
         </tr>
       </thead>
       <tbody>
-        <tr>
-          <td style="font-weight:bold;">จำนวน</td>
-          <td>${analytics.dist['4'] || 0}</td>
-          <td>${analytics.dist['3.5'] || 0}</td>
-          <td>${analytics.dist['3'] || 0}</td>
-          <td>${analytics.dist['2.5'] || 0}</td>
-          <td>${analytics.dist['2'] || 0}</td>
-          <td>${analytics.dist['1.5'] || 0}</td>
-          <td>${analytics.dist['1'] || 0}</td>
-          <td>${analytics.dist['0'] || 0}</td>
-          <td style="color:#b91c1c; font-weight:bold;">${analytics.krCount}</td>
-          <td style="color:#b45309; font-weight:bold;">${analytics.ksCount}</td>
-          <td style="color:#7e22ce; font-weight:bold;">${analytics.msCount}</td>
-          <td style="font-weight:bold;">${report.length}</td>
-          <td style="font-weight:bold; color:#1e40af;">${analytics.avg}</td>
-          <td style="font-weight:bold; color:#15803d;">${report.length > 0 ? ((analytics.passCount / report.length) * 100).toFixed(1) : 0}%</td>
-        </tr>
+        ${report.map((s, idx) => {
+        const isKr = s.grade === 'ข.ร.' || s.grade === 'ขร' || s.is_f;
+        const isKs = s.grade === 'ข.ส.' || s.is_absent_final;
+        const isMs = s.grade === 'ม.ส.' || s.is_incomplete;
+        const isFail = s.grade === '0' || s.grade === 'F';
+        const rowClass = isKr ? 'kr' : isKs ? 'ks' : isMs ? 'ms' : isFail ? 'fail' : '';
+
+        const finalVal = isKs ? 'ข.ส.' : isMs ? 'ม.ส.' : Number(s.precise_scaled_final || s.scaled_final || 0).toFixed(1);
+        const totalVal = (isKs || isMs) ? '-' : Number(s.total_score_precise ?? s.total_score ?? 0).toFixed(1);
+
+        const rawAssignHint = showRawScore ? `<span class="raw-hint">(${Number(s.raw_assign || 0).toFixed(0)}/${s.max_assign || (isPws ? 150 : 180)})</span>` : '';
+        const rawPostHint = showRawScore ? `<span class="raw-hint">(${Number(s.raw_post_test || 0).toFixed(0)}/${s.max_post_test || (isPws ? 150 : 180)})</span>` : '';
+
+        return `<tr class="${rowClass}">
+            <td>${idx + 1}</td>
+            <td style="font-family: monospace, monospace;">${s.student_code || '-'}</td>
+            <td class="name">${s.name}</td>
+            <td>${Number(s.affective_score || 0).toFixed(1)}</td>
+            <td>${Number(s.precise_scaled_post_test || s.scaled_post_test || 0).toFixed(1)}${rawPostHint}</td>
+            <td>${Number(s.precise_scaled_assign || s.scaled_assign || 0).toFixed(1)}${rawAssignHint}</td>
+            <td>${Number(s.precise_scaled_midterm || s.scaled_midterm || 0).toFixed(1)}</td>
+            <td>${finalVal}</td>
+            <td class="col-total">${totalVal}</td>
+            <td>${s.attendance_percent ?? 100}%</td>
+            <td class="col-grade">${s.grade || '-'}</td>
+          </tr>`;
+      }).join('')}
       </tbody>
     </table>
-  </div>
-  ` : ''}
 
-  ${(showSignatures && reportType === 'official_vocational') ? `
-  <div class="signatures-block">
-    <div class="sig-row">
-      <div class="sig-cell">
-        <div>ลงชื่อ ....................................................</div>
-        <div style="margin-top:3px;">(${teacherName})</div>
-        <div class="sig-title">ครูผู้สอน</div>
-      </div>
-      <div class="sig-cell">
-        <div>ลงชื่อ ....................................................</div>
-        <div style="margin-top:3px;">(${headOfDepartment})</div>
-        <div class="sig-title">หัวหน้าแผนกวิชา</div>
-      </div>
-      <div class="sig-cell">
-        <div>ลงชื่อ ....................................................</div>
-        <div style="margin-top:3px;">(${headOfCurriculum})</div>
-        <div class="sig-title">หัวหน้างานวัดผลและประเมินผล</div>
-      </div>
-      <div class="sig-cell">
-        <div>ลงชื่อ ....................................................</div>
-        <div style="margin-top:3px;">(${deputyDirector})</div>
-        <div class="sig-title">รองผู้อำนวยการฝ่ายวิชาการ</div>
+    ${showStats ? `
+    <div class="stats-container">
+      <div style="font-weight: 700; margin-bottom: 4px; font-size: 9pt; color: #0f172a;">สรุปสถิติผลการประเมินการเรียนรู้:</div>
+      <table class="stats-table">
+        <thead>
+          <tr>
+            <th>เกรด</th>
+            <th>4</th><th>3.5</th><th>3</th><th>2.5</th><th>2</th><th>1.5</th><th>1</th><th>0</th>
+            <th>ข.ร.</th><th>ข.ส.</th><th>ม.ส.</th>
+            <th>รวม (คน)</th>
+            <th>คะแนนเฉลี่ย</th>
+            <th>ร้อยละที่ผ่าน</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="font-weight: 700;">จำนวน</td>
+            <td>${analytics.dist['4'] || 0}</td>
+            <td>${analytics.dist['3.5'] || 0}</td>
+            <td>${analytics.dist['3'] || 0}</td>
+            <td>${analytics.dist['2.5'] || 0}</td>
+            <td>${analytics.dist['2'] || 0}</td>
+            <td>${analytics.dist['1.5'] || 0}</td>
+            <td>${analytics.dist['1'] || 0}</td>
+            <td>${analytics.dist['0'] || 0}</td>
+            <td style="color: #b91c1c; font-weight: 700;">${analytics.krCount}</td>
+            <td style="color: #b45309; font-weight: 700;">${analytics.ksCount}</td>
+            <td style="color: #7e22ce; font-weight: 700;">${analytics.msCount}</td>
+            <td style="font-weight: 700;">${report.length}</td>
+            <td style="font-weight: 700; color: #1d4ed8;">${analytics.avg}</td>
+            <td style="font-weight: 700; color: #15803d;">${report.length > 0 ? ((analytics.passCount / report.length) * 100).toFixed(1) : 0}%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    ` : ''}
+
+    ${(showSignatures && reportType === 'official_vocational') ? `
+    <div class="signatures-block">
+      <div class="sig-row">
+        <div class="sig-cell">
+          <div class="sig-line"></div>
+          <div class="sig-name">(${teacherName})</div>
+          <div class="sig-title">ครูผู้สอน</div>
+          <div class="sig-date">วันที่ ...... / ...... / ......</div>
+        </div>
+        <div class="sig-cell">
+          <div class="sig-line"></div>
+          <div class="sig-name">(${headOfDepartment})</div>
+          <div class="sig-title">หัวหน้าแผนกวิชา</div>
+          <div class="sig-date">วันที่ ...... / ...... / ......</div>
+        </div>
+        <div class="sig-cell">
+          <div class="sig-line"></div>
+          <div class="sig-name">(${headOfCurriculum})</div>
+          <div class="sig-title">หัวหน้างานวัดผลและประเมินผล</div>
+          <div class="sig-date">วันที่ ...... / ...... / ......</div>
+        </div>
+        <div class="sig-cell">
+          <div class="sig-line"></div>
+          <div class="sig-name">(${deputyDirector})</div>
+          <div class="sig-title">รองผู้อำนวยการฝ่ายวิชาการ</div>
+          <div class="sig-date">วันที่ ...... / ...... / ......</div>
+        </div>
       </div>
     </div>
-  </div>
-  ` : ''}
+    ` : ''}
 
-  ${showPrintDate ? `
-  <div class="footer-note">
-    <span>พิมพ์จากระบบบริหารจัดการการสอนอัจฉริยะ (Smart Lesson Planner) — เทียบเคียง ศธ.02 ออนไลน์</span>
-    <span>วันที่ออกรายงาน: ${printDateStr}</span>
+    ${showPrintDate ? `
+    <div class="footer-note">
+      <span></span>
+      <span>วันที่ออกรายงาน: ${printDateStr}</span>
+    </div>
+    ` : ''}
   </div>
-  ` : ''}
 
   <script>
     window.onload = function() {
@@ -503,10 +551,7 @@ export default function GradePdfModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-5 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200"
-      onClick={e => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-5 bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-200"
     >
       <div
         className="bg-slate-50 rounded-2xl shadow-2xl border border-indigo-200 w-full max-w-7xl max-h-[95vh] flex flex-col overflow-hidden"
@@ -516,13 +561,13 @@ export default function GradePdfModal({
         {/* Modal Header */}
         <div className="px-6 py-4 bg-white border-b border-slate-200 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-violet-100 text-violet-700">
+            <div className="p-2.5 rounded-xl bg-violet-100 text-violet-700 shadow-sm">
               <Printer className="w-5 h-5" />
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
                 พรีวิวและจัดรูปแบบรายงานผลการเรียน PDF
-                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-200">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-200">
                   สไตล์ ศธ.02 ออนไลน์
                 </span>
               </h2>
@@ -530,16 +575,18 @@ export default function GradePdfModal({
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <button
               onClick={handlePrint}
-              className="btn bg-violet-600 hover:bg-violet-700 text-white flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl shadow-md shadow-violet-500/25 transition-all"
+              className="btn bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white flex items-center gap-2 text-xs font-bold px-4 py-2.5 rounded-xl shadow-md shadow-indigo-500/20 transition-all active:scale-95"
             >
               <Printer className="w-4 h-4" /> พิมพ์เอกสาร / บันทึก PDF
             </button>
             <button
               onClick={onClose}
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition-all duration-150 shadow-sm"
+              title="ปิดหน้าต่าง (กดกากบาทเพื่อปิด)"
+              aria-label="ปิดหน้าต่าง"
             >
               <X className="w-5 h-5" />
             </button>
@@ -719,7 +766,7 @@ export default function GradePdfModal({
                       onChange={e => setShowPrintDate(e.target.checked)}
                       className="rounded text-indigo-600 focus:ring-indigo-500"
                     />
-                    <span className="text-slate-700 font-medium">แสดงวันที่พิมพ์และแหล่งที่มาระบบ</span>
+                    <span className="text-slate-700 font-medium">แสดงวันที่ออกรายงานที่ส่วนท้ายเอกสาร</span>
                   </label>
                 </div>
 
@@ -868,27 +915,27 @@ export default function GradePdfModal({
                 className="bg-white text-slate-900 shadow-2xl rounded-sm border border-slate-300 font-sans transition-transform duration-100 select-text"
               >
                 {/* Printable Content Replica */}
-                <div className="text-center border-b-2 border-slate-800 pb-2 mb-3">
-                  <div className="text-xl font-bold text-slate-900">{institutionName}</div>
-                  <div className="text-sm font-bold text-slate-800">
+                <div className="text-center border-b-2 border-slate-900 pb-2 mb-3">
+                  <div className="text-lg sm:text-xl font-bold text-slate-950 tracking-wide">{institutionName}</div>
+                  <div className="text-sm font-bold text-slate-900 mt-0.5">
                     แบบรายงานและบันทึกผลการเรียนรายวิชา
                   </div>
-                  <div className="text-xs text-slate-600">
+                  <div className="text-[11px] text-slate-600 mt-0.5">
                     สังกัดสำนักงานคณะกรรมการการอาชีวศึกษา (สอศ.) กระทรวงศึกษาธิการ
                   </div>
                 </div>
 
                 {/* Metadata Grid */}
-                <div className="flex justify-between text-xs mb-3 text-slate-700">
+                <div className="flex justify-between text-[11px] mb-3 text-slate-800 leading-relaxed">
                   <div className="space-y-0.5">
-                    <div><span className="font-bold text-slate-900">รายวิชา / ห้องเรียน:</span> {subjectCodeAndName}</div>
-                    <div><span className="font-bold text-slate-900">หลักสูตร:</span> {curriculumLevel}</div>
-                    <div><span className="font-bold text-slate-900">แผนกวิชา:</span> {departmentName}</div>
+                    <div><span className="font-bold text-slate-950">รายวิชา / ห้องเรียน:</span> {subjectCodeAndName}</div>
+                    <div><span className="font-bold text-slate-950">หลักสูตร:</span> {curriculumLevel}</div>
+                    <div><span className="font-bold text-slate-950">แผนกวิชา:</span> {departmentName}</div>
                   </div>
                   <div className="space-y-0.5 text-right">
-                    <div><span className="font-bold text-slate-900">ภาคเรียน / ปีการศึกษา:</span> {academicYear}</div>
-                    <div><span className="font-bold text-slate-900">ครูผู้สอน:</span> {teacherName}</div>
-                    <div><span className="font-bold text-slate-900">จำนวนผู้เรียน:</span> {report.length} คน</div>
+                    <div><span className="font-bold text-slate-950">ภาคเรียน / ปีการศึกษา:</span> {academicYear}</div>
+                    <div><span className="font-bold text-slate-950">ครูผู้สอน:</span> {teacherName}</div>
+                    <div><span className="font-bold text-slate-950">จำนวนผู้เรียนทั้งหมด:</span> {report.length} คน</div>
                   </div>
                 </div>
 
@@ -914,7 +961,7 @@ export default function GradePdfModal({
                       <th className="border border-slate-600 p-1 text-center w-14">
                         ปลายภาค<br /><span className="text-[10px] font-normal">({weights.final_weight}%)</span>
                       </th>
-                      <th className="border border-slate-600 p-1 text-center w-16 font-extrabold bg-slate-200/70">
+                      <th className="border border-slate-600 p-1 text-center w-16 font-extrabold bg-slate-200">
                         รวม<br /><span className="text-[10px] font-normal">(100)</span>
                       </th>
                       <th className="border border-slate-600 p-1 text-center w-14">
@@ -969,7 +1016,7 @@ export default function GradePdfModal({
                             {totalVal}
                           </td>
                           <td className="border border-slate-400 p-1 text-center">{s.attendance_percent ?? 100}%</td>
-                          <td className="border border-slate-400 p-1 text-center font-extrabold">{s.grade || '-'}</td>
+                          <td className="border border-slate-400 p-1 text-center font-extrabold text-slate-950">{s.grade || '-'}</td>
                         </tr>
                       );
                     })}
@@ -1027,35 +1074,39 @@ export default function GradePdfModal({
 
                 {/* Signatures */}
                 {showSignatures && reportType === 'official_vocational' && (
-                  <div className="grid grid-cols-4 gap-3 text-center text-xs mt-6 pt-2">
+                  <div className="grid grid-cols-4 gap-2 text-center text-xs mt-6 pt-2">
                     <div className="space-y-1">
                       <div>ลงชื่อ ..........................................</div>
-                      <div className="font-medium">({teacherName})</div>
-                      <div className="text-[10px] text-slate-500">ครูผู้สอน</div>
+                      <div className="font-medium text-slate-900">({teacherName})</div>
+                      <div className="text-[10px] text-slate-600">ครูผู้สอน</div>
+                      <div className="text-[9px] text-slate-400 mt-1">วันที่ ...... / ...... / ......</div>
                     </div>
                     <div className="space-y-1">
                       <div>ลงชื่อ ..........................................</div>
-                      <div className="font-medium">({headOfDepartment})</div>
-                      <div className="text-[10px] text-slate-500">หัวหน้าแผนกวิชา</div>
+                      <div className="font-medium text-slate-900">({headOfDepartment})</div>
+                      <div className="text-[10px] text-slate-600">หัวหน้าแผนกวิชา</div>
+                      <div className="text-[9px] text-slate-400 mt-1">วันที่ ...... / ...... / ......</div>
                     </div>
                     <div className="space-y-1">
                       <div>ลงชื่อ ..........................................</div>
-                      <div className="font-medium">({headOfCurriculum})</div>
-                      <div className="text-[10px] text-slate-500">หัวหน้างานวัดผลและประเมินผล</div>
+                      <div className="font-medium text-slate-900">({headOfCurriculum})</div>
+                      <div className="text-[10px] text-slate-600">หัวหน้างานวัดผลและประเมินผล</div>
+                      <div className="text-[9px] text-slate-400 mt-1">วันที่ ...... / ...... / ......</div>
                     </div>
                     <div className="space-y-1">
                       <div>ลงชื่อ ..........................................</div>
-                      <div className="font-medium">({deputyDirector})</div>
-                      <div className="text-[10px] text-slate-500">รองผู้อำนวยการฝ่ายวิชาการ</div>
+                      <div className="font-medium text-slate-900">({deputyDirector})</div>
+                      <div className="text-[10px] text-slate-600">รองผู้อำนวยการฝ่ายวิชาการ</div>
+                      <div className="text-[9px] text-slate-400 mt-1">วันที่ ...... / ...... / ......</div>
                     </div>
                   </div>
                 )}
 
                 {/* Footer */}
                 {showPrintDate && (
-                  <div className="flex justify-between items-center text-[10px] text-slate-400 mt-6 pt-2 border-t border-slate-200">
-                    <span>ระบบบริหารจัดการการสอนอัจฉริยะ (Smart Lesson Planner) — เทียบเคียง ศธ.02 ออนไลน์</span>
-                    <span>พิมพ์เมื่อ: {new Date().toLocaleDateString('th-TH')}</span>
+                  <div className="flex justify-between items-center text-[10px] text-slate-500 mt-6 pt-2 border-t border-slate-200">
+                    <span></span>
+                    <span>วันที่ออกรายงาน: {new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                   </div>
                 )}
               </div>
