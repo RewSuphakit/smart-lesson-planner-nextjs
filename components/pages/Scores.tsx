@@ -1,15 +1,14 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, memo, Fragment, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback, memo, Fragment } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
 import {
   Loader2, Save, FileText, Settings, Users, BookOpen, AlertCircle, Upload,
   Calculator, FileSpreadsheet, Grid, Table, CheckCircle2, TrendingUp,
-  Award, AlertTriangle, Eye, EyeOff
+  Award, Eye, EyeOff
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import * as XLSX from 'xlsx';
 import { checkThaiHoliday } from '@/lib/thaiHolidays';
 import ScoreExcelModal from '@/components/ScoreExcelModal';
 import ScoreImportModal from '@/components/ScoreImportModal';
@@ -21,16 +20,18 @@ interface MemoizedScoreInputProps {
   onChange: (value: string) => void;
 }
 
-const MemoizedScoreInput = memo(({ value, maxScore, focusColor, onChange }: MemoizedScoreInputProps) => {
-  const [localVal, setLocalVal] = useState<string | number>(value ?? '');
-
-  useEffect(() => {
-    setLocalVal(value ?? '');
-  }, [value]);
-
+const MemoizedScoreInput = memo(function MemoizedScoreInput({
+  value,
+  maxScore,
+  focusColor,
+  onChange,
+}: MemoizedScoreInputProps) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setLocalVal(val);
+    let val = e.target.value;
+    const num = parseFloat(val);
+    if (!isNaN(num) && maxScore > 0 && num > maxScore) {
+      val = String(maxScore);
+    }
     onChange(val);
   };
 
@@ -44,11 +45,17 @@ const MemoizedScoreInput = memo(({ value, maxScore, focusColor, onChange }: Memo
       inputMode="decimal"
       step="0.5"
       min="0"
-      max={maxScore}
-      value={localVal}
+      max={maxScore > 0 ? maxScore : undefined}
+      value={value !== null && value !== undefined ? value : ''}
       onChange={handleChange}
-      className={`w-full text-center py-1.5 px-1 rounded border border-indigo-100 font-medium text-slate-800 text-base md:text-xs touch-manipulation focus:outline-none transition-colors ${focusClass}`}
+      className={`w-full text-center py-1 px-1 rounded-lg border border-indigo-100 bg-white font-medium text-slate-800 text-xs touch-manipulation focus:outline-none transition-colors ${focusClass}`}
     />
+  );
+}, (prev, next) => {
+  return (
+    prev.value === next.value &&
+    prev.maxScore === next.maxScore &&
+    prev.focusColor === next.focusColor
   );
 });
 
@@ -86,16 +93,6 @@ interface ScoreStructure {
   hours: number;
 }
 
-interface StudentScoreEntry {
-  student_id: string | number;
-  student_name?: string;
-  lesson_number: number;
-  assignment_score?: number;
-  post_test_score?: number;
-  midterm_score?: number;
-  final_score?: number;
-  affective_score?: number;
-}
 
 interface ScoreValue {
   assignment_score: number | string;
@@ -112,6 +109,114 @@ interface FullMatrixScoresMap {
     post_test_score: number | string;
   };
 }
+
+interface MatrixStudentRowProps {
+  student: Student;
+  idx: number;
+  structures: ScoreStructure[];
+  matrixScores: FullMatrixScoresMap;
+  onScoreChange: (studentId: string | number, lessonNum: number, field: 'assignment_score' | 'post_test_score', value: string) => void;
+}
+
+const MatrixStudentRow = memo(function MatrixStudentRow({
+  student,
+  idx,
+  structures,
+  matrixScores,
+  onScoreChange,
+}: MatrixStudentRowProps) {
+  let totalStudentScore = 0;
+  for (let i = 0; i < structures.length; i++) {
+    const struct = structures[i];
+    const key = `${student.id}_${struct.lesson_number}`;
+    const val = matrixScores[key];
+    if (val) {
+      if (val.assignment_score !== '' && val.assignment_score !== null && val.assignment_score !== undefined) {
+        totalStudentScore += Number(val.assignment_score);
+      }
+      if (val.post_test_score !== '' && val.post_test_score !== null && val.post_test_score !== undefined) {
+        totalStudentScore += Number(val.post_test_score);
+      }
+    }
+  }
+  totalStudentScore += Number(student.midterm_score || 0) + Number(student.final_score || 0) + Number(student.affective_score || 0);
+
+  const roundedTotal = Math.round(totalStudentScore * 10) / 10;
+  const isEven = idx % 2 === 0;
+  const rowBg = isEven ? 'bg-white' : 'bg-slate-50/50';
+  const cellBg = isEven ? '#ffffff' : '#f8fafc';
+
+  return (
+    <tr className={`border-b border-indigo-50 hover:bg-indigo-50/60 ${rowBg} h-9`}>
+      <td
+        className="p-2 sticky left-0 z-10 font-medium text-slate-500 text-center shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)] border-r border-indigo-100 whitespace-nowrap overflow-hidden text-ellipsis text-xs h-9"
+        style={{ left: 0, width: 120, minWidth: 120, maxWidth: 120, backgroundColor: cellBg, backfaceVisibility: 'hidden' }}
+      >
+        {student.student_code || '-'}
+      </td>
+      <td
+        className="p-2 pl-3 sticky z-10 font-semibold text-slate-800 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)] border-r border-indigo-100 whitespace-nowrap overflow-hidden text-ellipsis text-xs h-9"
+        style={{ left: 120, width: 200, minWidth: 200, maxWidth: 200, backgroundColor: cellBg, backfaceVisibility: 'hidden' }}
+        title={student.name}
+      >
+        {student.name}
+      </td>
+      {structures.map(struct => {
+        const key = `${student.id}_${struct.lesson_number}`;
+        const val = matrixScores[key];
+        return (
+          <Fragment key={struct.lesson_number}>
+            <td className="p-1 border-l border-indigo-100 text-center h-9">
+              <MemoizedScoreInput
+                value={val?.assignment_score ?? ''}
+                maxScore={Number(struct.max_assignment_score || 0)}
+                focusColor="indigo"
+                onChange={valStr => onScoreChange(student.id, struct.lesson_number, 'assignment_score', valStr)}
+              />
+            </td>
+            <td className="p-1 border-l border-indigo-50 text-center h-9">
+              <MemoizedScoreInput
+                value={val?.post_test_score ?? ''}
+                maxScore={Number(struct.max_post_test_score || 0)}
+                focusColor="amber"
+                onChange={valStr => onScoreChange(student.id, struct.lesson_number, 'post_test_score', valStr)}
+              />
+            </td>
+          </Fragment>
+        );
+      })}
+      <td className="p-1 border-l border-indigo-100 bg-cyan-50/30 text-center font-bold text-cyan-800 text-xs h-9">
+        {student.midterm_score ?? '-'}
+      </td>
+      <td className="p-1 border-l border-indigo-50 bg-blue-50/30 text-center font-bold text-blue-800 text-xs h-9">
+        {student.final_score ?? '-'}
+      </td>
+      <td className="p-1 border-l border-indigo-50 bg-pink-50/30 text-center font-bold text-pink-800 text-xs h-9">
+        {student.affective_score ?? '-'}
+      </td>
+      <td className="p-2 border-l border-indigo-100 bg-indigo-50 text-center font-black text-indigo-700 text-sm h-9">
+        {roundedTotal}
+      </td>
+    </tr>
+  );
+}, (prev, next) => {
+  if (prev.student !== next.student) return false;
+  if (prev.idx !== next.idx) return false;
+  if (prev.structures !== next.structures) return false;
+  if (prev.onScoreChange !== next.onScoreChange) return false;
+
+  for (let i = 0; i < next.structures.length; i++) {
+    const lessonNum = next.structures[i].lesson_number;
+    const key = `${next.student.id}_${lessonNum}`;
+    const pVal = prev.matrixScores[key];
+    const nVal = next.matrixScores[key];
+    if ((pVal?.assignment_score ?? '') !== (nVal?.assignment_score ?? '')) return false;
+    if ((pVal?.post_test_score ?? '') !== (nVal?.post_test_score ?? '')) return false;
+  }
+  return true;
+});
+
+MatrixStudentRow.displayName = 'MatrixStudentRow';
 
 export default function Scores() {
   const queryClient = useQueryClient();
@@ -135,45 +240,12 @@ export default function Scores() {
 
   // Full Matrix State
   const [matrixScores, setMatrixScores] = useState<FullMatrixScoresMap>({});
-  const [isAutoSaving, setIsAutoSaving] = useState(false);
-  const [lastAutoSavedTime, setLastAutoSavedTime] = useState<string | null>(null);
-  const [autoSaveEnabled, setAutoSaveEnabled] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('scores_auto_save_enabled');
-      return saved !== null ? saved === 'true' : true;
-    }
-    return true;
-  });
+  const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
   const [hasPendingChanges, setHasPendingChanges] = useState(false);
-  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const matrixScoresRef = useRef(matrixScores);
-  const scoresRef = useRef(scores);
 
-  useEffect(() => {
-    matrixScoresRef.current = matrixScores;
-  }, [matrixScores]);
-
-  useEffect(() => {
-    scoresRef.current = scores;
-  }, [scores]);
-
-  // Protect against navigating away when there are unsaved score changes
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasPendingChanges) {
-        e.preventDefault();
-        e.returnValue = '';
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [hasPendingChanges]);
-
-  // Bulk Import State
-  const [importData, setImportData] = useState<StudentScoreEntry[]>([]);
-  const [showImportPreview, setShowImportPreview] = useState(false);
+  // Modals State
   const [showExcelImportModal, setShowExcelImportModal] = useState(false);
-  const [importType, setImportType] = useState('assignment');
+  const [showExportModal, setShowExportModal] = useState(false);
 
   // Test Blueprint Calculator State
   const [showCalculator, setShowCalculator] = useState(false);
@@ -189,17 +261,10 @@ export default function Scores() {
   const [attendanceDate, setAttendanceDate] = useState<string>(() => {
     return new Date().toISOString().split('T')[0];
   });
-
-  // Export State
-  const [showExportModal, setShowExportModal] = useState(false);
-  const [exportType, setExportType] = useState('full_matrix');
-  const [exportFormat, setExportFormat] = useState('xlsx');
-  const [exporting, setExporting] = useState(false);
-  const [filterCameOnly, setFilterCameOnly] = useState(false);
   const [hideAbsentInWeekly, setHideAbsentInWeekly] = useState(true);
 
   // ─── Query: ดึงข้อมูลการเข้าเรียนตามวันที่ ───
-  const { data: attendanceRecords = {} as Record<string, string>, isLoading: attendanceLoading } = useQuery<Record<string, string>>({
+  const { data: attendanceRecords = {} as Record<string, string> } = useQuery<Record<string, string>>({
     queryKey: ['attendance-for-scores', selectedClass, attendanceDate],
     queryFn: async () => {
       const res = await api.get(`/attendance?classroom_id=${selectedClass}&date=${attendanceDate}`);
@@ -223,14 +288,14 @@ export default function Scores() {
     enabled: !!selectedClass,
   });
 
-  const parseSafeDateStr = (rawDate: any): string => {
+  const parseSafeDateStr = (rawDate: unknown): string => {
     if (!rawDate) return '';
     if (typeof rawDate === 'string') {
       const clean = rawDate.split('T')[0];
       if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
     }
     try {
-      const d = new Date(rawDate);
+      const d = new Date(rawDate as string | number | Date);
       if (isNaN(d.getTime())) return '';
       return d.toISOString().split('T')[0];
     } catch {
@@ -272,7 +337,7 @@ export default function Scores() {
   const [semesterStartDate, setSemesterStartDate] = useState<string>('');
 
   // ─── Query: ดึงข้อมูลตารางเรียนทั้งหมด (All Timetable Entries) ───
-  const { data: allTimetableEntries = [] } = useQuery<{ classroom_id: number | string; day_of_week: number }[]>({
+  const { data: allTimetableEntries = [] } = useQuery<{ classroom_id: number | string; day_of_week: number; hours?: number; entry_type?: string; entryType?: string }[]>({
     queryKey: ['timetable-all'],
     queryFn: async () => {
       const res = await api.get('/timetable');
@@ -347,7 +412,7 @@ export default function Scores() {
 
     const getSchemaDay = (d: Date) => (d.getDay() + 6) % 7;
 
-    let current = new Date(start);
+    const current = new Date(start);
     while (!classTeachingDays.includes(getSchemaDay(current))) {
       current.setDate(current.getDate() + 1);
     }
@@ -531,7 +596,7 @@ export default function Scores() {
         setAttendanceDate(targetDate);
       }
     }
-  }, [selectedLesson, calculatedWeekDates, weekDateMap]);
+  }, [selectedLesson, calculatedWeekDates, weekDateMap, attendanceDate]);
 
   // ─── Analytics Summary Computations ───
   const analyticsSummary = useMemo(() => {
@@ -550,7 +615,7 @@ export default function Scores() {
     let maxStudentScore = 0;
     let minStudentScore = Infinity;
     let gradedCount = 0;
-    let totalPossibleCells = students.length * structures.length * 2;
+    const totalPossibleCells = students.length * structures.length * 2;
 
     students.forEach(student => {
       let currentStudentTotal = 0;
@@ -627,24 +692,22 @@ export default function Scores() {
 
     return students.filter(student => {
       const status = getStudentAttendanceStatus(student.id, weekNum);
-      if (hideAbsentInWeekly && status === 'absent') return false;
+      if (hideAbsentInWeekly && (status === 'absent' || status === 'leave')) {
+        return false;
+      }
       return true;
     });
   }, [students, selectedLesson, hideAbsentInWeekly, getStudentAttendanceStatus]);
 
-  // Weekly attendance summary counts for currently selected week
+  // Attendance stats for the active weekly lesson
   const weeklyAttendanceCounts = useMemo(() => {
-    const weekNum = parseInt(selectedLesson);
-    if (isNaN(weekNum) || weekNum <= 0) {
+    if (!selectedLesson || ['midterm', 'final', 'affective'].includes(selectedLesson)) {
       return { absent: 0, leave: 0, present: 0, late: 0, noData: 0, total: students.length };
     }
+    const weekNum = parseInt(selectedLesson);
+    if (isNaN(weekNum)) return { absent: 0, leave: 0, present: 0, late: 0, noData: 0, total: students.length };
 
-    let absent = 0;
-    let leave = 0;
-    let present = 0;
-    let late = 0;
-    let noData = 0;
-
+    let absent = 0, leave = 0, present = 0, late = 0, noData = 0;
     students.forEach(student => {
       const status = getStudentAttendanceStatus(student.id, weekNum);
       if (status === 'absent') absent++;
@@ -665,72 +728,47 @@ export default function Scores() {
 
     let changedWeekly = false;
     let changedMatrix = false;
-    const nextScores = { ...scores };
-    const nextMatrixScores = { ...matrixScores };
 
-    students.forEach(student => {
-      const status = getStudentAttendanceStatus(student.id, weekNum);
-      if (status === 'absent' || status === 'leave') {
-        const idStr = String(student.id);
-        const matrixKey = `${student.id}_${weekNum}`;
-
-        const currWeekly = nextScores[idStr];
-        if (!currWeekly || currWeekly.assignment_score === '' || currWeekly.post_test_score === '') {
-          nextScores[idStr] = {
-            assignment_score: currWeekly?.assignment_score !== '' && currWeekly?.assignment_score !== undefined ? currWeekly.assignment_score : 0,
-            post_test_score: currWeekly?.post_test_score !== '' && currWeekly?.post_test_score !== undefined ? currWeekly.post_test_score : 0
-          };
-          changedWeekly = true;
+    setScores(prevScores => {
+      const nextScores = { ...prevScores };
+      students.forEach(student => {
+        const status = getStudentAttendanceStatus(student.id, weekNum);
+        if (status === 'absent' || status === 'leave') {
+          const idStr = String(student.id);
+          const currWeekly = nextScores[idStr];
+          if (!currWeekly || currWeekly.assignment_score === '' || currWeekly.post_test_score === '') {
+            nextScores[idStr] = {
+              assignment_score: currWeekly?.assignment_score !== '' && currWeekly?.assignment_score !== undefined ? currWeekly.assignment_score : 0,
+              post_test_score: currWeekly?.post_test_score !== '' && currWeekly?.post_test_score !== undefined ? currWeekly.post_test_score : 0
+            };
+            changedWeekly = true;
+          }
         }
+      });
+      return changedWeekly ? nextScores : prevScores;
+    });
 
-        const currMatrix = nextMatrixScores[matrixKey];
-        if (!currMatrix || currMatrix.assignment_score === '' || currMatrix.post_test_score === '') {
-          nextMatrixScores[matrixKey] = {
-            assignment_score: currMatrix?.assignment_score !== '' && currMatrix?.assignment_score !== undefined ? currMatrix.assignment_score : 0,
-            post_test_score: currMatrix?.post_test_score !== '' && currMatrix?.post_test_score !== undefined ? currMatrix.post_test_score : 0
-          };
-          changedMatrix = true;
+    setMatrixScores(prevMatrix => {
+      const nextMatrixScores = { ...prevMatrix };
+      students.forEach(student => {
+        const status = getStudentAttendanceStatus(student.id, weekNum);
+        if (status === 'absent' || status === 'leave') {
+          const matrixKey = `${student.id}_${weekNum}`;
+          const currMatrix = nextMatrixScores[matrixKey];
+          if (!currMatrix || currMatrix.assignment_score === '' || currMatrix.post_test_score === '') {
+            nextMatrixScores[matrixKey] = {
+              assignment_score: currMatrix?.assignment_score !== '' && currMatrix?.assignment_score !== undefined ? currMatrix.assignment_score : 0,
+              post_test_score: currMatrix?.post_test_score !== '' && currMatrix?.post_test_score !== undefined ? currMatrix.post_test_score : 0
+            };
+            changedMatrix = true;
+          }
         }
-      }
+      });
+      return changedMatrix ? nextMatrixScores : prevMatrix;
     });
+  }, [selectedLesson, selectedClass, students, getStudentAttendanceStatus]);
 
-    if (changedWeekly) {
-      setScores(nextScores);
-    }
-    if (changedMatrix) {
-      setMatrixScores(nextMatrixScores);
-    }
-    if (changedWeekly || changedMatrix) {
-      setHasPendingChanges(true);
-    }
-  }, [selectedLesson, selectedClass, students, attendanceRecords, allClassAttendance, weekAttendanceMap, getStudentAttendanceStatus]);
 
-  const displayedStudents = useMemo(() => {
-    if (!showAttendance || !filterCameOnly) return students;
-    return students.filter(student => {
-      const status = attendanceRecords[String(student.id)];
-      return status === 'present' || status === 'late';
-    });
-  }, [students, showAttendance, filterCameOnly, attendanceRecords]);
-
-  const attendanceStats = useMemo(() => {
-    let present = 0, late = 0, absent = 0, leave = 0, noData = 0;
-
-    students.forEach(student => {
-      const status = attendanceRecords[String(student.id)];
-      if (status === 'present') present++;
-      else if (status === 'late') late++;
-      else if (status === 'absent') absent++;
-      else if (status === 'leave') leave++;
-      else noData++;
-    });
-
-    return {
-      present, late, absent, leave, noData,
-      total: students.length,
-      came: present + late
-    };
-  }, [students, attendanceRecords]);
 
   const getAttendanceBadge = (status: string) => {
     switch (status) {
@@ -805,7 +843,7 @@ export default function Scores() {
     toast.success('กำหนดคะแนน 0 สำหรับนักเรียนที่ขาด/ลาแล้ว');
   };
 
-  const handleStructureChange = (index: number, field: keyof ScoreStructure, value: any) => {
+  const handleStructureChange = (index: number, field: keyof ScoreStructure, value: string | number) => {
     const newStructs = [...structures];
     newStructs[index] = { ...newStructs[index], [field]: value };
     setStructures(newStructs);
@@ -876,9 +914,8 @@ export default function Scores() {
 
   // ─── Mutation: บันทึกคะแนนแบบ Bulk Matrix Transaction ───
   const saveMatrixScoresMutation = useMutation({
-    mutationFn: async (options?: { isAuto?: boolean }) => {
-      setIsAutoSaving(true);
-      const currentMatrix = matrixScoresRef.current;
+    mutationFn: async () => {
+      const currentMatrix = matrixScores;
       const bulkScores: {
         student_id: string | number;
         lesson_number: number;
@@ -905,34 +942,24 @@ export default function Scores() {
         classroom_id: selectedClass,
         scores: bulkScores
       });
-      return options;
     },
-    onSuccess: (options) => {
-      setIsAutoSaving(false);
+    onSuccess: () => {
       setHasPendingChanges(false);
       const now = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      setLastAutoSavedTime(now);
-      if (!options?.isAuto) {
-        toast.success('บันทึกคะแนนรวมเรียบร้อยแล้ว');
-      }
+      setLastSavedTime(now);
+      toast.success('บันทึกคะแนนรวมเรียบร้อยแล้ว');
       queryClient.invalidateQueries({ queryKey: ['grades'] });
       refetchMatrix();
     },
-    onError: (_err, options) => {
-      setIsAutoSaving(false);
-      if (options?.isAuto) {
-        toast.error('บันทึกอัตโนมัติไม่สำเร็จ กรุณากดปุ่มบันทึกคะแนน');
-      } else {
-        toast.error('บันทึกคะแนนไม่สำเร็จ');
-      }
+    onError: () => {
+      toast.error('บันทึกคะแนนไม่สำเร็จ');
     },
   });
 
   // ─── Mutation: บันทึกคะแนนสัปดาห์เดียว ───
   const saveWeeklyScoresMutation = useMutation({
-    mutationFn: async (options?: { isAuto?: boolean }) => {
-      setIsAutoSaving(true);
-      const currentScores = scoresRef.current;
+    mutationFn: async () => {
+      const currentScores = scores;
       if (['midterm', 'final', 'affective'].includes(selectedLesson)) {
         const examScores = Object.keys(currentScores).map(studentId => {
           const val = currentScores[studentId]?.assignment_score;
@@ -965,79 +992,59 @@ export default function Scores() {
           scores: scoresArray
         });
       }
-      return options;
     },
-    onSuccess: (options) => {
-      setIsAutoSaving(false);
+    onSuccess: () => {
       setHasPendingChanges(false);
       const now = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      setLastAutoSavedTime(now);
-      if (!options?.isAuto) {
-        toast.success('บันทึกคะแนนเรียบร้อย');
-      }
+      setLastSavedTime(now);
+      toast.success('บันทึกคะแนนเรียบร้อย');
       queryClient.invalidateQueries({ queryKey: ['grades'] });
       refetchMatrix();
     },
-    onError: (_err, options) => {
-      setIsAutoSaving(false);
-      if (options?.isAuto) {
-        toast.error('บันทึกอัตโนมัติไม่สำเร็จ กรุณากดปุ่มบันทึกคะแนน');
-      } else {
-        toast.error('บันทึกคะแนนไม่สำเร็จ');
-      }
+    onError: () => {
+      toast.error('บันทึกคะแนนไม่สำเร็จ');
     },
   });
 
-  const saveScores = useCallback((isAuto = false) => {
+  const saveScores = () => {
     if (!selectedClass) return;
     if (viewMode === 'matrix') {
-      saveMatrixScoresMutation.mutate({ isAuto });
+      saveMatrixScoresMutation.mutate();
     } else {
-      saveWeeklyScoresMutation.mutate({ isAuto });
-    }
-  }, [selectedClass, viewMode, saveMatrixScoresMutation, saveWeeklyScoresMutation]);
-
-  const handleManualSave = () => {
-    if (autoSaveTimerRef.current) {
-      clearTimeout(autoSaveTimerRef.current);
-    }
-    saveScores(false);
-  };
-
-  const handleToggleAutoSave = () => {
-    const next = !autoSaveEnabled;
-    setAutoSaveEnabled(next);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('scores_auto_save_enabled', String(next));
-    }
-    if (next) {
-      toast.success('เปิดระบบบันทึกคะแนนอัตโนมัติแล้ว');
-      if (hasPendingChanges) {
-        saveScores(true);
-      }
-    } else {
-      toast('ปิดระบบบันทึกคะแนนอัตโนมัติ (กรุณากดปุ่มบันทึกด้วยตนเอง)', { icon: 'ℹ️' });
+      saveWeeklyScoresMutation.mutate();
     }
   };
 
-  // ─── Debounced Auto-Save Effect (1.5 วินาทีหลังจากพิมพ์เสร็จ) ───
-  useEffect(() => {
-    if (!hasPendingChanges || !autoSaveEnabled || !selectedClass) return;
+  const handleClassroomSelectChange = (newClassId: string) => {
+    if (newClassId === selectedClass) return;
+    setHasPendingChanges(false);
+    setSelectedClass(newClassId);
+  };
 
-    if (autoSaveTimerRef.current) {
-      clearTimeout(autoSaveTimerRef.current);
-    }
+  const handleTabChange = (tab: string) => {
+    if (tab === activeTab) return;
+    setHasPendingChanges(false);
+    setActiveTab(tab);
+  };
 
-    autoSaveTimerRef.current = setTimeout(() => {
-      saveScores(true);
-    }, 1500);
+  const handleViewModeChange = (mode: 'matrix' | 'weekly') => {
+    if (mode === viewMode) return;
+    setHasPendingChanges(false);
+    setViewMode(mode);
+  };
 
-    return () => {
-      if (autoSaveTimerRef.current) {
-        clearTimeout(autoSaveTimerRef.current);
+  const handleLessonChange = (newLesson: string) => {
+    if (newLesson === selectedLesson) return;
+    setHasPendingChanges(false);
+    setSelectedLesson(newLesson);
+    const weekNum = parseInt(newLesson);
+    if (!isNaN(weekNum) && weekNum > 0) {
+      const targetDate = calculatedWeekDates[weekNum] || weekDateMap[weekNum];
+      if (targetDate) {
+        setAttendanceDate(targetDate);
       }
-    };
-  }, [hasPendingChanges, autoSaveEnabled, selectedClass, saveScores]);
+    }
+  };
 
   // --- Open Test Blueprint Calculator with Smart Auto-Prefill ---
   const handleOpenCalculator = () => {
@@ -1073,7 +1080,7 @@ export default function Scores() {
       if (classEntries.length > 0) {
         let tHours = 0;
         let pHours = 0;
-        classEntries.forEach((entry: any) => {
+        classEntries.forEach((entry: { hours?: number; entry_type?: string; entryType?: string }) => {
           const h = Number(entry.hours) || 1;
           if (entry.entry_type === 'lab' || entry.entryType === 'lab') {
             pHours += h;
@@ -1194,225 +1201,7 @@ export default function Scores() {
     setShowCalculator(false);
   };
 
-  const handleBlueprintImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const bstr = evt.target?.result;
-        if (!bstr) return;
-        const wb = XLSX.read(bstr, { type: 'binary' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
-
-        let lessonCol = -1, hoursCol = -1, skillCol = -1, postTestCol = -1;
-        for (let i = 0; i < Math.min(20, data.length); i++) {
-          const row = data[i] || [];
-          for (let j = 0; j < row.length; j++) {
-            const cell = String(row[j] || '').trim().toLowerCase();
-            if (cell.includes('บทเรียนที่') || cell.includes('หน่วยที่')) lessonCol = j;
-            if (cell.includes('ชั่วโมง')) hoursCol = j;
-            if (cell.includes('คะแนนทักษะ') && !cell.includes('ใหม่')) skillCol = j;
-            if (cell.includes('คะแนนรายบทเรียนใหม่') || cell.includes('พุทธิพิสัย')) postTestCol = j;
-          }
-          if (lessonCol !== -1 && skillCol !== -1 && postTestCol !== -1) break;
-        }
-
-        if (lessonCol === -1 || skillCol === -1 || postTestCol === -1) {
-          toast.error('ไม่พบโครงสร้างตารางที่รองรับ');
-          return;
-        }
-
-        const newStructs = [...structures];
-        let importedCount = 0;
-        for (let i = 0; i < data.length; i++) {
-          const row = data[i] || [];
-          const lessonNum = parseInt(String(row[lessonCol] || '').trim());
-          if (!isNaN(lessonNum) && lessonNum > 0 && lessonNum <= structures.length) {
-            const index = newStructs.findIndex(s => s.lesson_number === lessonNum);
-            if (index !== -1) {
-              newStructs[index] = {
-                ...newStructs[index],
-                max_assignment_score: parseFloat(row[skillCol]) || 0,
-                max_post_test_score: parseFloat(row[postTestCol]) || 0,
-                hours: hoursCol !== -1 ? (parseFloat(row[hoursCol]) || newStructs[index].hours) : newStructs[index].hours
-              };
-              importedCount++;
-            }
-          }
-        }
-        if (importedCount > 0) {
-          setStructures(newStructs);
-          toast.success(`นำเข้าโครงสร้างคะแนนสำเร็จ ${importedCount} บทเรียน`);
-        }
-      } catch (err) {
-        toast.error('ไม่สามารถอ่านไฟล์ได้');
-      }
-    };
-    reader.readAsBinaryString(file);
-    e.target.value = '';
-  };
-
-  const handleScoreImport = (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImportType(type);
-
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const bstr = evt.target?.result;
-        if (!bstr) return;
-        const wb = XLSX.read(bstr, { type: 'binary' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
-
-        let headerRowIndex = -1;
-        let weekColumns: { [key: string]: number } = {};
-        let idColIndex = -1, nameColIndex = -1, lastNameColIndex = -1;
-
-        for (let i = 0; i < Math.min(20, data.length); i++) {
-          const row = data[i] || [];
-          let foundWeeks = 0;
-          for (let j = 0; j < row.length; j++) {
-            const cell = String(row[j]).trim();
-            if (['1', '2', '3'].includes(cell)) foundWeeks++;
-          }
-          if (foundWeeks >= 3) {
-            headerRowIndex = i;
-            for (let j = 0; j < row.length; j++) {
-              const cell = String(row[j]).trim();
-              if (!isNaN(parseInt(cell))) weekColumns[cell] = j;
-              else if (cell.includes('เลข') || cell.includes('รหัส')) idColIndex = j;
-              else if (cell.includes('ชื่อ')) nameColIndex = j;
-              else if (cell.includes('นามสกุล')) lastNameColIndex = j;
-            }
-            break;
-          }
-        }
-
-        if (headerRowIndex === -1) {
-          toast.error('ไม่พบหัวคอลัมน์ที่เป็นตัวเลขสัปดาห์ในไฟล์นี้');
-          return;
-        }
-
-        const parsedScores: StudentScoreEntry[] = [];
-        for (let i = headerRowIndex + 1; i < data.length; i++) {
-          const row = data[i] || [];
-          if (row.length === 0) continue;
-          let studentCode = idColIndex !== -1 ? String(row[idColIndex] || '').trim() : '';
-          let fullName = (nameColIndex !== -1 ? String(row[nameColIndex] || '').trim() : '') +
-            (lastNameColIndex !== -1 && row[lastNameColIndex] ? ' ' + String(row[lastNameColIndex]).trim() : '');
-
-          let matchedStudent = null;
-          if (studentCode) matchedStudent = students.find(s => s.student_code === studentCode);
-          if (!matchedStudent && fullName) matchedStudent = students.find(s => fullName.includes(s.name) || s.name.includes(fullName.replace(/นาย|นางสาว|เด็กชาย|เด็กหญิง/g, '').trim()));
-
-          if (matchedStudent) {
-            Object.keys(weekColumns).forEach(weekNum => {
-              const colIdx = weekColumns[weekNum];
-              const scoreVal = row[colIdx];
-              if (scoreVal !== undefined && scoreVal !== null && scoreVal !== '') {
-                const scoreEntry: StudentScoreEntry = {
-                  student_id: matchedStudent.id,
-                  student_name: matchedStudent.name,
-                  lesson_number: parseInt(weekNum),
-                };
-                if (type === 'assignment') scoreEntry.assignment_score = parseFloat(String(scoreVal));
-                else if (type === 'post_test') scoreEntry.post_test_score = parseFloat(String(scoreVal));
-                parsedScores.push(scoreEntry);
-              }
-            });
-          }
-        }
-
-        if (parsedScores.length === 0) {
-          toast.error('ไม่พบข้อมูลคะแนนที่สามารถจับคู่กับนักเรียนในห้องนี้ได้');
-        } else {
-          setImportData(parsedScores);
-          setShowImportPreview(true);
-        }
-      } catch (err) {
-        toast.error('ไม่สามารถอ่านไฟล์ได้');
-      }
-    };
-    reader.readAsBinaryString(file);
-    e.target.value = '';
-  };
-
-  const bulkImportMutation = useMutation({
-    mutationFn: async () => {
-      await api.post(`/scores?classroom_id=${selectedClass}`, {
-        classroom_id: selectedClass,
-        scores: importData.map(d => ({
-          student_id: d.student_id,
-          lesson_number: d.lesson_number,
-          ...(importType === 'assignment' ? { assignment_score: d.assignment_score } : { post_test_score: d.post_test_score })
-        }))
-      });
-    },
-    onSuccess: () => {
-      toast.success('นำเข้าคะแนนสำเร็จ');
-      setShowImportPreview(false);
-      setImportData([]);
-      queryClient.invalidateQueries({ queryKey: ['grades'] });
-      refetchMatrix();
-    },
-    onError: () => { toast.error('นำเข้าไม่สำเร็จ'); },
-  });
-
-  const submitBulkImport = () => bulkImportMutation.mutate();
-
-  const handleExportScores = async () => {
-    if (!selectedClass) return;
-    setExporting(true);
-    try {
-      const token = localStorage.getItem('token');
-      const params = new URLSearchParams({
-        classroom_id: selectedClass,
-        export_type: exportType,
-        lesson_number: selectedLesson,
-        file_format: exportFormat
-      });
-
-      const response = await fetch(`/api/scores/export?${params.toString()}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (!response.ok) throw new Error('Export failed');
-      const blob = await response.blob();
-
-      const contentDisposition = response.headers.get('content-disposition');
-      let defaultExt = exportFormat === 'xlsx' ? 'xlsx' : 'csv';
-      let filename = `scores_export.${defaultExt}`;
-      if (contentDisposition) {
-        const matchesStar = /filename\*=(?:UTF-8'')?([^;]+)/i.exec(contentDisposition);
-        if (matchesStar && matchesStar[1]) {
-          filename = decodeURIComponent(matchesStar[1]).replace(/['"]/g, '');
-        } else {
-          const matchesReg = /filename="?([^";]+)"?/i.exec(contentDisposition);
-          if (matchesReg && matchesReg[1]) filename = decodeURIComponent(matchesReg[1]).replace(/['"]/g, '');
-        }
-      }
-
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', filename);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      setShowExportModal(false);
-      toast.success('ส่งออกข้อมูลคะแนนสำเร็จ');
-    } catch (err) {
-      toast.error('ส่งออกข้อมูลคะแนนไม่สำเร็จ');
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  const saving = saveStructureMutation.isPending || saveMatrixScoresMutation.isPending || saveWeeklyScoresMutation.isPending || bulkImportMutation.isPending;
+  const saving = saveStructureMutation.isPending || saveMatrixScoresMutation.isPending || saveWeeklyScoresMutation.isPending;
   const currentStruct = structures.find(s => s.lesson_number.toString() === selectedLesson.toString()) || { max_assignment_score: 0, max_post_test_score: 0 };
 
   if (loadingClassrooms) return (
@@ -1437,7 +1226,7 @@ export default function Scores() {
           <label className="text-sm font-semibold text-slate-700 shrink-0">ห้องเรียน:</label>
           <select
             value={selectedClass}
-            onChange={e => setSelectedClass(e.target.value)}
+            onChange={e => handleClassroomSelectChange(e.target.value)}
             className="form-input text-base py-2 font-medium bg-white border-indigo-200 focus:border-indigo-500 shadow-sm min-w-[200px]"
           >
             <option value="">-- เลือกห้องเรียน --</option>
@@ -1499,22 +1288,20 @@ export default function Scores() {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-indigo-100 pb-3">
             <div className="flex gap-2">
               <button
-                onClick={() => setActiveTab('entry')}
-                className={`flex items-center gap-2 px-4 py-2 font-medium rounded-xl transition-all ${
-                  activeTab === 'entry'
+                onClick={() => handleTabChange('entry')}
+                className={`flex items-center gap-2 px-4 py-2 font-medium rounded-xl transition-all ${activeTab === 'entry'
                     ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20'
                     : 'text-slate-600 hover:bg-indigo-50'
-                }`}
+                  }`}
               >
                 <FileText className="w-4 h-4" /> ตารางกรอกคะแนน
               </button>
               <button
-                onClick={() => setActiveTab('settings')}
-                className={`flex items-center gap-2 px-4 py-2 font-medium rounded-xl transition-all ${
-                  activeTab === 'settings'
+                onClick={() => handleTabChange('settings')}
+                className={`flex items-center gap-2 px-4 py-2 font-medium rounded-xl transition-all ${activeTab === 'settings'
                     ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20'
                     : 'text-slate-600 hover:bg-indigo-50'
-                }`}
+                  }`}
               >
                 <Settings className="w-4 h-4" /> ตั้งค่าคะแนนเต็ม (Blueprint)
               </button>
@@ -1523,18 +1310,16 @@ export default function Scores() {
             {activeTab === 'entry' && (
               <div className="flex items-center gap-2 bg-indigo-50/80 p-1 rounded-xl border border-indigo-100">
                 <button
-                  onClick={() => setViewMode('matrix')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                    viewMode === 'matrix' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'
-                  }`}
+                  onClick={() => handleViewModeChange('matrix')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${viewMode === 'matrix' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                    }`}
                 >
                   <Grid className="w-3.5 h-3.5" /> ตารางรวมทั้งเทอม (Excel View)
                 </button>
                 <button
-                  onClick={() => setViewMode('weekly')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                    viewMode === 'weekly' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'
-                  }`}
+                  onClick={() => handleViewModeChange('weekly')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${viewMode === 'weekly' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                    }`}
                 >
                   <Table className="w-3.5 h-3.5" /> โฟกัสรายสัปดาห์ (Weekly Focus)
                 </button>
@@ -1574,9 +1359,8 @@ export default function Scores() {
                           setCurriculumWeeks(18);
                         }
                       }}
-                      className={`px-2.5 py-1 rounded-md font-medium transition-all ${
-                        structures.length >= 18 ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-indigo-600'
-                      }`}
+                      className={`px-2.5 py-1 rounded-md font-medium transition-all ${structures.length >= 18 ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-indigo-600'
+                        }`}
                     >
                       ปวช. (18 สัปดาห์)
                     </button>
@@ -1588,9 +1372,8 @@ export default function Scores() {
                           setCurriculumWeeks(15);
                         }
                       }}
-                      className={`px-2.5 py-1 rounded-md font-medium transition-all ${
-                        structures.length === 15 ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-indigo-600'
-                      }`}
+                      className={`px-2.5 py-1 rounded-md font-medium transition-all ${structures.length === 15 ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-indigo-600'
+                        }`}
                     >
                       ปวส. (15 สัปดาห์)
                     </button>
@@ -1599,9 +1382,9 @@ export default function Scores() {
                     <Calculator className="w-4 h-4" />
                     คำนวณสัดส่วนอัตโนมัติ
                   </button>
-                  <button 
+                  <button
                     type="button"
-                    onClick={() => setShowExcelImportModal(true)} 
+                    onClick={() => setShowExcelImportModal(true)}
                     className="btn bg-indigo-100 hover:bg-indigo-200 text-indigo-700 cursor-pointer flex items-center gap-2 text-xs font-semibold shadow-xs"
                     title="เปิดหน้าต่างนำเข้า Blueprint พร้อมดูตัวอย่างรูปแบบและดาวน์โหลดเทมเพลต"
                   >
@@ -1686,38 +1469,17 @@ export default function Scores() {
               {/* Control Action Toolbar */}
               <div className="glass p-4 rounded-2xl border border-indigo-100 flex flex-wrap items-center justify-between gap-3 bg-white">
                 <div className="flex items-center gap-2.5 flex-wrap">
-                  {/* Auto-Save Toggle Button */}
-                  <button
-                    type="button"
-                    onClick={handleToggleAutoSave}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-xl border flex items-center gap-2 transition-all shadow-2xs cursor-pointer active:scale-95 ${
-                      autoSaveEnabled
-                        ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300 ring-2 ring-emerald-400/20'
-                        : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-300'
-                    }`}
-                    title={autoSaveEnabled ? 'เปิดระบบบันทึกอัตโนมัติอยู่ (คลิกเพื่อปิด)' : 'ปิดระบบบันทึกอัตโนมัติอยู่ (คลิกเพื่อเปิด)'}
-                  >
-                    <span className={`w-2 h-2 rounded-full ${autoSaveEnabled ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
-                    <span>บันทึกอัตโนมัติ: {autoSaveEnabled ? 'เปิด' : 'ปิด'}</span>
-                  </button>
-
-                  {/* Auto-Save Realtime Status Badges */}
-                  {isAutoSaving && (
+                  {/* Realtime Save Status Badges */}
+                  {saving && (
                     <span className="inline-flex items-center gap-1.5 text-xs text-indigo-700 font-bold bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-200 animate-pulse shadow-2xs">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" /> กำลังบันทึกอัตโนมัติ...
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" /> กำลังบันทึกข้อมูล...
                     </span>
                   )}
 
-                  {!isAutoSaving && hasPendingChanges && (
-                    <span className="inline-flex items-center gap-1.5 text-xs text-amber-800 font-bold bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 shadow-2xs">
-                      <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
-                      {autoSaveEnabled ? 'กำลังเตรียมบันทึกอัตโนมัติ...' : 'มีคะแนนที่ยังไม่ได้บันทึก'}
-                    </span>
-                  )}
 
-                  {!isAutoSaving && !hasPendingChanges && lastAutoSavedTime && (
+                  {!saving && !hasPendingChanges && lastSavedTime && (
                     <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 font-semibold bg-emerald-50/90 px-3 py-1.5 rounded-xl border border-emerald-200 shadow-2xs">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> บันทึกล่าสุด {lastAutoSavedTime}
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> บันทึกล่าสุดเมื่อ {lastSavedTime}
                     </span>
                   )}
                 </div>
@@ -1752,7 +1514,14 @@ export default function Scores() {
                   <button onClick={() => setShowExportModal(true)} className="btn bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 text-xs flex items-center gap-1.5 font-semibold shadow-2xs">
                     <FileSpreadsheet className="w-3.5 h-3.5" /> พรีวิว & ส่งออก Excel
                   </button>
-                  <button onClick={handleManualSave} disabled={saving} className={`btn text-xs flex items-center gap-1.5 shadow-md shadow-indigo-500/20 ${hasPendingChanges && !autoSaveEnabled ? 'bg-amber-600 hover:bg-amber-700 text-white animate-pulse' : 'btn-primary'}`}>
+                  <button
+                    onClick={saveScores}
+                    disabled={saving}
+                    className={`btn text-xs flex items-center gap-1.5 shadow-md ${hasPendingChanges
+                        ? 'bg-indigo-600 hover:bg-indigo-700 text-white ring-2 ring-indigo-400/50 font-bold animate-pulse shadow-indigo-500/30'
+                        : 'btn-primary shadow-indigo-500/20'
+                      }`}
+                  >
                     {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                     บันทึกคะแนน
                   </button>
@@ -1774,7 +1543,7 @@ export default function Scores() {
                       <button
                         type="button"
                         onClick={() => handleFillZeroForAbsentees()}
-                        className="btn bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 text-xs py-1.5 px-3 rounded-xl font-bold flex items-center gap-1.5 transition-all shadow-2xs active:scale-95"
+                        className="btn bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 text-xs py-1.5 px-3 rounded-xl font-bold flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
                         title="ตรวจจับและเติม 0 ให้อัตโนมัติทุกสัปดาห์ที่มีการเช็คชื่อว่า ขาด หรือ ลา"
                       >
                         ⚡ ใส่ 0 คนขาด/ลา ทุกสัปดาห์
@@ -1789,7 +1558,7 @@ export default function Scores() {
                     </span>
                     <button
                       type="button"
-                      onClick={() => setViewMode('weekly')}
+                      onClick={() => handleViewModeChange('weekly')}
                       className="px-2.5 py-1 bg-white border border-amber-300 rounded-lg font-bold text-amber-900 shadow-2xs shrink-0 active:scale-95"
                     >
                       สลับโหมด
@@ -1797,110 +1566,148 @@ export default function Scores() {
                   </div>
 
                   {matrixLoading ? (
-                    <div className="p-12 text-center text-indigo-500 flex flex-col items-center gap-2">
-                      <Loader2 className="w-8 h-8 animate-spin" />
-                      <span className="text-sm font-medium">กำลังโหลดข้อมูลคะแนนทั้งเทอม...</span>
+                    <div className="p-16 text-center text-indigo-500 flex flex-col items-center gap-3">
+                      <Loader2 className="w-9 h-9 animate-spin text-indigo-600" />
+                      <span className="text-sm font-semibold text-slate-700">กำลังโหลดข้อมูลคะแนนและโครงสร้างทั้งเทอม...</span>
                     </div>
                   ) : (
-                    <div className="overflow-x-auto max-h-[600px] overflow-y-auto relative">
-                      <table className="w-full text-left border-collapse text-xs">
-                        <thead className="sticky top-0 z-20 bg-indigo-100/90 backdrop-blur-md text-slate-700">
-                          <tr>
-                            <th className="p-3 sticky left-0 z-30 bg-indigo-100 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)] w-16 text-center font-bold border-r border-indigo-200">รหัส</th>
-                            <th className="p-3 sticky left-16 z-30 bg-indigo-100 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)] min-w-[220px] font-bold border-r border-indigo-200">ชื่อ-นามสกุล</th>
+                    <div
+                      className="overflow-x-auto max-h-[620px] overflow-y-auto relative scrollbar-thin"
+                      style={{
+                        overscrollBehavior: 'contain',
+                        contain: 'paint',
+                        WebkitOverflowScrolling: 'touch',
+                        touchAction: 'pan-x pan-y',
+                      }}
+                    >
+                      <table
+                        className="text-left border-separate border-spacing-0 text-xs table-fixed"
+                        style={{
+                          width: 120 + 200 + (structures.length * 104) + 260,
+                          minWidth: 120 + 200 + (structures.length * 104) + 260
+                        }}
+                      >
+                        <colgroup>
+                          <col style={{ width: 120, minWidth: 120, maxWidth: 120 }} />
+                          <col style={{ width: 200, minWidth: 200, maxWidth: 200 }} />
+                          {structures.map(s => (
+                            <Fragment key={s.lesson_number}>
+                              <col style={{ width: 52, minWidth: 52, maxWidth: 52 }} />
+                              <col style={{ width: 52, minWidth: 52, maxWidth: 52 }} />
+                            </Fragment>
+                          ))}
+                          <col style={{ width: 65, minWidth: 65, maxWidth: 65 }} />
+                          <col style={{ width: 65, minWidth: 65, maxWidth: 65 }} />
+                          <col style={{ width: 65, minWidth: 65, maxWidth: 65 }} />
+                          <col style={{ width: 65, minWidth: 65, maxWidth: 65 }} />
+                        </colgroup>
+                        <thead className="sticky top-0 z-30 bg-indigo-100">
+                          <tr className="h-[44px] bg-indigo-100">
+                            <th
+                              rowSpan={2}
+                              className="p-3 sticky top-0 left-0 z-40 bg-indigo-100 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)] text-center font-bold border-r border-indigo-200 text-slate-700"
+                              style={{ left: 0, top: 0, width: 120, minWidth: 120, maxWidth: 120, backgroundColor: '#e0e7ff', backfaceVisibility: 'hidden' }}
+                            >
+                              รหัส
+                            </th>
+                            <th
+                              rowSpan={2}
+                              className="p-3 sticky top-0 z-40 bg-indigo-100 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)] font-bold border-r border-indigo-200 text-slate-700 text-left pl-3"
+                              style={{ left: 120, top: 0, width: 200, minWidth: 200, maxWidth: 200, backgroundColor: '#e0e7ff', backfaceVisibility: 'hidden' }}
+                            >
+                              ชื่อ-นามสกุล
+                            </th>
                             {structures.map(struct => {
                               const dateStr = calculatedWeekDates[struct.lesson_number] || weekDateMap[struct.lesson_number];
                               const dateInfo = formatThaiFullDateHeader(dateStr);
                               const holiday = dateStr ? checkThaiHoliday(dateStr) : null;
                               return (
-                                <th key={struct.lesson_number} colSpan={2} className="p-2 text-center border-l border-indigo-200 font-bold min-w-[115px]">
+                                <th
+                                  key={struct.lesson_number}
+                                  colSpan={2}
+                                  className="p-2 text-center border-l border-indigo-200 font-bold sticky top-0 z-20 bg-indigo-100 text-slate-800"
+                                  style={{ top: 0, height: 44, width: 104, minWidth: 104, maxWidth: 104, backgroundColor: '#e0e7ff', backfaceVisibility: 'hidden' }}
+                                >
                                   <div className="flex flex-col items-center gap-0.5">
                                     <span className="text-xs font-black text-slate-800">W{struct.lesson_number}</span>
                                     {dateInfo ? (
-                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border inline-flex items-center gap-1 shadow-2xs ${holiday ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-indigo-100/90 text-indigo-800 border-indigo-200/60'}`} title={holiday ? `วันหยุด: ${holiday.name}` : `วันที่สอน: ${dateStr}`}>
+                                      <span
+                                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full border inline-flex items-center gap-1 shadow-2xs ${holiday
+                                            ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                            : 'bg-white text-indigo-800 border-indigo-200'
+                                          }`}
+                                        title={holiday ? `วันหยุด: ${holiday.name}` : `วันที่สอน: ${dateStr}`}
+                                      >
                                         {holiday ? '🏖️' : ''} {dateInfo.label}
                                       </span>
                                     ) : (
-                                      <span className="text-[10px] font-normal text-slate-400">({struct.max_assignment_score}/{struct.max_post_test_score})</span>
+                                      <span className="text-[10px] font-normal text-slate-400">
+                                        ({struct.max_assignment_score}/{struct.max_post_test_score})
+                                      </span>
                                     )}
                                   </div>
                                 </th>
                               );
                             })}
-                            <th className="p-3 text-center border-l border-indigo-200 bg-cyan-100/80 min-w-[70px] font-bold">กลางภาค</th>
-                            <th className="p-3 text-center bg-blue-100/80 min-w-[70px] font-bold">ปลายภาค</th>
-                            <th className="p-3 text-center bg-pink-100/80 min-w-[70px] font-bold">จิตพิสัย</th>
-                            <th className="p-3 text-center bg-indigo-200/80 min-w-[80px] font-extrabold text-indigo-900">รวมคะแนน</th>
+                            <th
+                              rowSpan={2}
+                              className="p-3 text-center border-l border-indigo-200 bg-cyan-100 font-bold sticky top-0 z-20 text-cyan-950"
+                              style={{ top: 0, width: 65, minWidth: 65, maxWidth: 65, backgroundColor: '#cffafe', backfaceVisibility: 'hidden' }}
+                            >
+                              กลางภาค
+                            </th>
+                            <th
+                              rowSpan={2}
+                              className="p-3 text-center bg-blue-100 font-bold sticky top-0 z-20 text-blue-950"
+                              style={{ top: 0, width: 65, minWidth: 65, maxWidth: 65, backgroundColor: '#dbeafe', backfaceVisibility: 'hidden' }}
+                            >
+                              ปลายภาค
+                            </th>
+                            <th
+                              rowSpan={2}
+                              className="p-3 text-center bg-pink-100 font-bold sticky top-0 z-20 text-pink-950"
+                              style={{ top: 0, width: 65, minWidth: 65, maxWidth: 65, backgroundColor: '#fce7f3', backfaceVisibility: 'hidden' }}
+                            >
+                              จิตพิสัย
+                            </th>
+                            <th
+                              rowSpan={2}
+                              className="p-3 text-center bg-indigo-200 font-extrabold text-indigo-950 sticky top-0 z-20"
+                              style={{ top: 0, width: 65, minWidth: 65, maxWidth: 65, backgroundColor: '#c7d2fe', backfaceVisibility: 'hidden' }}
+                            >
+                              รวมคะแนน
+                            </th>
                           </tr>
-                          <tr className="bg-indigo-50 text-[10px] text-slate-500 border-b border-indigo-200">
-                            <th className="p-1 sticky left-0 z-30 bg-indigo-50 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)] border-r border-indigo-200"></th>
-                            <th className="p-1 sticky left-16 z-30 bg-indigo-50 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)] border-r border-indigo-200"></th>
+                          <tr className="h-[26px] bg-indigo-50">
                             {structures.map(struct => (
                               <Fragment key={struct.lesson_number}>
-                                <th className="p-1 text-center border-l border-indigo-200 text-emerald-700 font-semibold">งาน</th>
-                                <th className="p-1 text-center text-amber-700 font-semibold">สอบ</th>
+                                <th
+                                  className="p-1 text-center border-l border-indigo-200 text-emerald-700 font-semibold sticky z-20 bg-indigo-50 border-b"
+                                  style={{ top: 44, width: 52, minWidth: 52, maxWidth: 52, backgroundColor: '#eef2ff', backfaceVisibility: 'hidden' }}
+                                >
+                                  งาน
+                                </th>
+                                <th
+                                  className="p-1 text-center text-amber-700 font-semibold sticky z-20 bg-indigo-50 border-b border-l border-indigo-200/50"
+                                  style={{ top: 44, width: 52, minWidth: 52, maxWidth: 52, backgroundColor: '#eef2ff', backfaceVisibility: 'hidden' }}
+                                >
+                                  สอบ
+                                </th>
                               </Fragment>
                             ))}
-                            <th className="p-1 border-l border-indigo-200"></th>
-                            <th className="p-1"></th>
-                            <th className="p-1"></th>
-                            <th className="p-1"></th>
                           </tr>
                         </thead>
                         <tbody>
-                          {students.map((student, idx) => {
-                            let totalStudentScore = 0;
-                            structures.forEach(struct => {
-                              const key = `${student.id}_${struct.lesson_number}`;
-                              const val = matrixScores[key];
-                              if (val) {
-                                if (val.assignment_score !== '' && val.assignment_score !== null) totalStudentScore += Number(val.assignment_score);
-                                if (val.post_test_score !== '' && val.post_test_score !== null) totalStudentScore += Number(val.post_test_score);
-                              }
-                            });
-                            totalStudentScore += Number(student.midterm_score || 0) + Number(student.final_score || 0) + Number(student.affective_score || 0);
-
-                            const rowBg = idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50';
-
-                            return (
-                              <tr key={student.id} className={`border-b border-indigo-50 hover:bg-indigo-50/60 ${rowBg}`}>
-                                <td className={`p-2 sticky left-0 z-10 ${rowBg} font-medium text-slate-500 text-center shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)] border-r border-indigo-100`}>
-                                  {student.student_code || '-'}
-                                </td>
-                                <td className={`p-2 sticky left-16 z-10 ${rowBg} font-semibold text-slate-800 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)] border-r border-indigo-100 whitespace-nowrap`}>
-                                  {student.name}
-                                </td>
-                                {structures.map(struct => {
-                                  const key = `${student.id}_${struct.lesson_number}`;
-                                  const val = matrixScores[key] || { assignment_score: '', post_test_score: '' };
-                                  return (
-                                    <Fragment key={struct.lesson_number}>
-                                      <td className="p-1 border-l border-indigo-100 min-w-[50px]">
-                                        <MemoizedScoreInput
-                                          value={val.assignment_score}
-                                          maxScore={struct.max_assignment_score}
-                                          focusColor="indigo"
-                                          onChange={valStr => handleMatrixScoreChange(student.id, struct.lesson_number, 'assignment_score', valStr)}
-                                        />
-                                      </td>
-                                      <td className="p-1 min-w-[50px]">
-                                        <MemoizedScoreInput
-                                          value={val.post_test_score}
-                                          maxScore={struct.max_post_test_score}
-                                          focusColor="amber"
-                                          onChange={valStr => handleMatrixScoreChange(student.id, struct.lesson_number, 'post_test_score', valStr)}
-                                        />
-                                      </td>
-                                    </Fragment>
-                                  );
-                                })}
-                                <td className="p-1 border-l border-indigo-100 bg-cyan-50/30 text-center font-bold text-cyan-800">{student.midterm_score ?? '-'}</td>
-                                <td className="p-1 bg-blue-50/30 text-center font-bold text-blue-800">{student.final_score ?? '-'}</td>
-                                <td className="p-1 bg-pink-50/30 text-center font-bold text-pink-800">{student.affective_score ?? '-'}</td>
-                                <td className="p-2 bg-indigo-50 text-center font-black text-indigo-700 text-sm">{Math.round(totalStudentScore * 10) / 10}</td>
-                              </tr>
-                            );
-                          })}
+                          {students.map((student, idx) => (
+                            <MatrixStudentRow
+                              key={student.id}
+                              student={student}
+                              idx={idx}
+                              structures={structures}
+                              matrixScores={matrixScores}
+                              onScoreChange={handleMatrixScoreChange}
+                            />
+                          ))}
                         </tbody>
                       </table>
                     </div>
@@ -1914,19 +1721,9 @@ export default function Scores() {
                   <div className="p-4 border-b border-indigo-100 flex flex-col md:flex-row gap-4 items-end justify-between bg-indigo-50/60">
                     <div className="w-full md:w-1/3">
                       <label className="form-label text-indigo-800 font-bold">เลือกบทเรียน/สัปดาห์ หรือการสอบ</label>
-                      <select 
-                        value={selectedLesson} 
-                        onChange={e => {
-                          const newLesson = e.target.value;
-                          setSelectedLesson(newLesson);
-                          const weekNum = parseInt(newLesson);
-                          if (!isNaN(weekNum) && weekNum > 0) {
-                            const targetDate = calculatedWeekDates[weekNum] || weekDateMap[weekNum];
-                            if (targetDate) {
-                              setAttendanceDate(targetDate);
-                            }
-                          }
-                        }} 
+                      <select
+                        value={selectedLesson}
+                        onChange={e => handleLessonChange(e.target.value)}
                         className="form-input bg-white border-indigo-200"
                       >
                         <optgroup label="คะแนนภาคผลงาน (รายสัปดาห์)">
@@ -2060,11 +1857,10 @@ export default function Scores() {
                         <button
                           type="button"
                           onClick={() => setHideAbsentInWeekly(!hideAbsentInWeekly)}
-                          className={`btn text-xs py-1 px-2.5 rounded-xl flex items-center gap-1.5 font-bold transition-all shadow-2xs ${
-                            hideAbsentInWeekly
+                          className={`btn text-xs py-1 px-2.5 rounded-xl flex items-center gap-1.5 font-bold transition-all shadow-2xs ${hideAbsentInWeekly
                               ? 'bg-rose-100/90 hover:bg-rose-200 text-rose-800 border border-rose-300 ring-2 ring-rose-300/30'
                               : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-300'
-                          }`}
+                            }`}
                           title={hideAbsentInWeekly ? 'กำลังซ่อนคนขาดเรียน (คลิกเพื่อแสดงทุกคน)' : 'กำลังแสดงทุกคน (คลิกเพื่อซ่อนคนขาดเรียน)'}
                         >
                           {hideAbsentInWeekly ? (
@@ -2293,329 +2089,323 @@ export default function Scores() {
             </div>
           )}
 
-      {/* Calculator Modal */}
-      {showCalculator && (() => {
-        const contactHours = (Number(theoryHoursPerWeek) || 0) + (Number(practiceHoursPerWeek) || 0);
-        const tRatio = contactHours > 0 ? (Number(theoryHoursPerWeek) || 0) / contactHours : 0;
-        const pRatio = contactHours > 0 ? (Number(practiceHoursPerWeek) || 0) / contactHours : 0;
-        const tPct = Math.round(tRatio * 1000) / 10;
-        const pPct = Math.round(pRatio * 1000) / 10;
+          {/* Calculator Modal */}
+          {showCalculator && (() => {
+            const contactHours = (Number(theoryHoursPerWeek) || 0) + (Number(practiceHoursPerWeek) || 0);
+            const tRatio = contactHours > 0 ? (Number(theoryHoursPerWeek) || 0) / contactHours : 0;
+            const pRatio = contactHours > 0 ? (Number(practiceHoursPerWeek) || 0) / contactHours : 0;
+            const tPct = Math.round(tRatio * 1000) / 10;
+            const pPct = Math.round(pRatio * 1000) / 10;
 
-        // Preview values based on scoreScaleMode
-        let previewAssign = 10;
-        let previewPostTest = 10;
-        if (pRatio > tRatio) {
-          previewAssign = standardWeeklyBaseScore;
-          previewPostTest = Math.max(1, Math.round(standardWeeklyBaseScore * (tRatio / pRatio)));
-        } else if (tRatio > pRatio) {
-          previewPostTest = standardWeeklyBaseScore;
-          previewAssign = Math.max(1, Math.round(standardWeeklyBaseScore * (pRatio / tRatio)));
-        }
-        const totalWeeklyStandard = previewAssign + previewPostTest;
-        const totalTermRawStandard = totalWeeklyStandard * curriculumWeeks;
+            // Preview values based on scoreScaleMode
+            let previewAssign = 10;
+            let previewPostTest = 10;
+            if (pRatio > tRatio) {
+              previewAssign = standardWeeklyBaseScore;
+              previewPostTest = Math.max(1, Math.round(standardWeeklyBaseScore * (tRatio / pRatio)));
+            } else if (tRatio > pRatio) {
+              previewPostTest = standardWeeklyBaseScore;
+              previewAssign = Math.max(1, Math.round(standardWeeklyBaseScore * (pRatio / tRatio)));
+            }
+            const totalWeeklyStandard = previewAssign + previewPostTest;
+            const totalTermRawStandard = totalWeeklyStandard * curriculumWeeks;
 
-        const directSkillTotal = Math.round((Number(totalAcademicScore) || 0) * pRatio);
-        const directTestTotal = (Number(totalAcademicScore) || 0) - directSkillTotal;
-        const directAvgAssign = Math.round((directSkillTotal / curriculumWeeks) * 10) / 10;
-        const directAvgTest = Math.round((directTestTotal / curriculumWeeks) * 10) / 10;
+            const directSkillTotal = Math.round((Number(totalAcademicScore) || 0) * pRatio);
+            const directTestTotal = (Number(totalAcademicScore) || 0) - directSkillTotal;
+            const directAvgAssign = Math.round((directSkillTotal / curriculumWeeks) * 10) / 10;
+            const directAvgTest = Math.round((directTestTotal / curriculumWeeks) * 10) / 10;
 
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="bg-white border border-indigo-200 rounded-2xl p-6 max-w-lg w-full shadow-2xl">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                  <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
-                    <Calculator className="w-5 h-5" />
-                  </div>
-                  คำนวณสัดส่วนคะแนนอัตโนมัติ
-                </h3>
-              </div>
-              <p className="text-slate-600 mb-4 text-xs">
-                กำหนดสัดส่วนชั่วโมงและคำนวณคะแนนเต็มของงานเก็บและสอบย่อยให้เหมาะสมกับหลักสูตร ปวช. และ ปวส.
-              </p>
-
-              <div className="space-y-4 mb-5">
-                {/* 1. เลือกระดับหลักสูตร (ปวช. 18 สัปดาห์ vs ปวส. 15 สัปดาห์) */}
-                <div className="p-3 bg-indigo-50/80 border border-indigo-100 rounded-xl">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-800">เลือกระดับหลักสูตร:</span>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setCurriculumWeeks(18)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                          curriculumWeeks === 18
-                            ? 'bg-indigo-600 text-white shadow-sm'
-                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                        }`}
-                      >
-                        ปวช. (18 สัปดาห์)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCurriculumWeeks(15)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                          curriculumWeeks === 15
-                            ? 'bg-indigo-600 text-white shadow-sm'
-                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                        }`}
-                      >
-                        ปวส. (15 สัปดาห์)
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. เลือกรูปแบบคะแนนเต็ม (แก้ปัญหาได้ 1 คะแนน) */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">รูปแบบคะแนนเต็มรายสัปดาห์</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setScoreScaleMode('standard_10')}
-                      className={`p-2.5 rounded-xl border text-left transition-all ${
-                        scoreScaleMode === 'standard_10'
-                          ? 'bg-indigo-50/90 border-indigo-500 ring-2 ring-indigo-500/20'
-                          : 'bg-white border-slate-200 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className="text-xs font-bold text-slate-800 flex items-center justify-between">
-                        <span>คะแนนเต็มมาตรฐาน</span>
-                        <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">แนะนำ</span>
+            return (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                <div className="bg-white border border-indigo-200 rounded-2xl p-6 max-w-lg w-full shadow-2xl">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                      <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                        <Calculator className="w-5 h-5" />
                       </div>
-                      <p className="text-[11px] text-slate-500 mt-1">
-                        เต็ม 5-10 ตรวจง่าย ระบบจะทอนคะแนนตามน้ำหนัก {totalAcademicScore} คะแนนในหน้าตัดเกรดอัตโนมัติ
-                      </p>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setScoreScaleMode('direct_weight')}
-                      className={`p-2.5 rounded-xl border text-left transition-all ${
-                        scoreScaleMode === 'direct_weight'
-                          ? 'bg-indigo-50/90 border-indigo-500 ring-2 ring-indigo-500/20'
-                          : 'bg-white border-slate-200 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className="text-xs font-bold text-slate-800">เกลี่ยตามค่าน้ำหนักรวม</div>
-                      <p className="text-[11px] text-slate-500 mt-1">
-                        หารคะแนนรวม {totalAcademicScore} เฉลี่ย {curriculumWeeks} สัปดาห์ (คะแนนต่อช่องจะเฉลี่ย ~1-2 คะแนน)
-                      </p>
-                    </button>
+                      คำนวณสัดส่วนคะแนนอัตโนมัติ
+                    </h3>
                   </div>
-                </div>
+                  <p className="text-slate-600 mb-4 text-xs">
+                    กำหนดสัดส่วนชั่วโมงและคำนวณคะแนนเต็มของงานเก็บและสอบย่อยให้เหมาะสมกับหลักสูตร ปวช. และ ปวส.
+                  </p>
 
-                {/* ถ้าเลือกโหมดมาตรฐาน สามารถเลือกฐานคะแนนเต็มได้ (เช่น เต็ม 10 หรือ 5) */}
-                {scoreScaleMode === 'standard_10' ? (
-                  <div className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
-                    <span className="text-xs font-semibold text-slate-700">ฐานคะแนนเต็มต่อช่องงานเก็บ:</span>
-                    <div className="flex gap-1.5">
-                      {[5, 10, 20].map(pts => (
+                  <div className="space-y-4 mb-5">
+                    {/* 1. เลือกระดับหลักสูตร (ปวช. 18 สัปดาห์ vs ปวส. 15 สัปดาห์) */}
+                    <div className="p-3 bg-indigo-50/80 border border-indigo-100 rounded-xl">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-800">เลือกระดับหลักสูตร:</span>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setCurriculumWeeks(18)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${curriculumWeeks === 18
+                                ? 'bg-indigo-600 text-white shadow-sm'
+                                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                              }`}
+                          >
+                            ปวช. (18 สัปดาห์)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCurriculumWeeks(15)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${curriculumWeeks === 15
+                                ? 'bg-indigo-600 text-white shadow-sm'
+                                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                              }`}
+                          >
+                            ปวส. (15 สัปดาห์)
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 2. เลือกรูปแบบคะแนนเต็ม (แก้ปัญหาได้ 1 คะแนน) */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">รูปแบบคะแนนเต็มรายสัปดาห์</label>
+                      <div className="grid grid-cols-2 gap-2">
                         <button
-                          key={pts}
                           type="button"
-                          onClick={() => setStandardWeeklyBaseScore(pts)}
-                          className={`px-2.5 py-1 text-xs rounded-lg font-bold border transition-all ${
-                            standardWeeklyBaseScore === pts
-                              ? 'bg-indigo-600 text-white border-indigo-600'
-                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                          }`}
+                          onClick={() => setScoreScaleMode('standard_10')}
+                          className={`p-2.5 rounded-xl border text-left transition-all ${scoreScaleMode === 'standard_10'
+                              ? 'bg-indigo-50/90 border-indigo-500 ring-2 ring-indigo-500/20'
+                              : 'bg-white border-slate-200 hover:bg-slate-50'
+                            }`}
                         >
-                          เต็ม {pts}
+                          <div className="text-xs font-bold text-slate-800 flex items-center justify-between">
+                            <span>คะแนนเต็มมาตรฐาน</span>
+                            <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">แนะนำ</span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-1">
+                            เต็ม 5-10 ตรวจง่าย ระบบจะทอนคะแนนตามน้ำหนัก {totalAcademicScore} คะแนนในหน้าตัดเกรดอัตโนมัติ
+                          </p>
                         </button>
-                      ))}
+
+                        <button
+                          type="button"
+                          onClick={() => setScoreScaleMode('direct_weight')}
+                          className={`p-2.5 rounded-xl border text-left transition-all ${scoreScaleMode === 'direct_weight'
+                              ? 'bg-indigo-50/90 border-indigo-500 ring-2 ring-indigo-500/20'
+                              : 'bg-white border-slate-200 hover:bg-slate-50'
+                            }`}
+                        >
+                          <div className="text-xs font-bold text-slate-800">เกลี่ยตามค่าน้ำหนักรวม</div>
+                          <p className="text-[11px] text-slate-500 mt-1">
+                            หารคะแนนรวม {totalAcademicScore} เฉลี่ย {curriculumWeeks} สัปดาห์ (คะแนนต่อช่องจะเฉลี่ย ~1-2 คะแนน)
+                          </p>
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="form-label text-slate-800 text-xs font-semibold mb-0">คะแนนวิชาการรวม (งานเก็บ + สอบย่อย)</label>
-                      <span className="text-[11px] text-indigo-600 font-medium bg-indigo-50 px-2 py-0.5 rounded-md">
-                        ค่าน้ำหนักวิชา: {totalAcademicScore} คะแนน
-                      </span>
-                    </div>
-                    <input
-                      type="number"
-                      value={totalAcademicScore}
-                      onChange={e => setTotalAcademicScore(parseFloat(e.target.value) || 0)}
-                      className="form-input text-lg font-bold text-slate-800"
-                    />
-                  </div>
-                )}
 
-                {/* 3. สัดส่วนชั่วโมงเรียน (ท-ป-น) */}
-                <div>
-                  <div className="flex justify-between items-center mb-1.5">
-                    <span className="text-xs font-semibold text-slate-700">สัดส่วนชั่วโมงเรียนตามหลักสูตร (ท-ป-น)</span>
-                    <span className="text-[11px] text-slate-500">พรีเซ็ตด่วน:</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5 mb-2.5">
-                    {[
-                      { label: '1-2-2 (3 ชม.)', t: 1, p: 2 },
-                      { label: '2-2-3 (4 ชม.)', t: 2, p: 2 },
-                      { label: '2-0-2 (2 ชม.)', t: 2, p: 0 },
-                      { label: '1-4-3 (5 ชม.)', t: 1, p: 4 },
-                      { label: '3-0-3 (3 ชม.)', t: 3, p: 0 },
-                    ].map(preset => (
-                      <button
-                        key={preset.label}
-                        type="button"
-                        onClick={() => {
-                          setTheoryHoursPerWeek(preset.t);
-                          setPracticeHoursPerWeek(preset.p);
-                        }}
-                        className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
-                          theoryHoursPerWeek === preset.t && practiceHoursPerWeek === preset.p
-                            ? 'bg-indigo-600 text-white border-indigo-600 font-semibold shadow-sm'
-                            : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200'
-                        }`}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="p-3 rounded-xl border border-amber-200 bg-amber-50/50">
-                      <label className="block text-xs font-semibold text-amber-800 mb-1">ทฤษฎี ชม./สัปดาห์</label>
-                      <input
-                        type="number" min="0" step="1"
-                        value={theoryHoursPerWeek}
-                        onChange={e => setTheoryHoursPerWeek(parseFloat(e.target.value) || 0)}
-                        className="form-input text-lg text-center font-bold text-amber-700 bg-white border-amber-300"
-                      />
-                    </div>
-                    <div className="p-3 rounded-xl border border-emerald-200 bg-emerald-50/50">
-                      <label className="block text-xs font-semibold text-emerald-800 mb-1">ปฏิบัติ ชม./สัปดาห์</label>
-                      <input
-                        type="number" min="0" step="1"
-                        value={practiceHoursPerWeek}
-                        onChange={e => setPracticeHoursPerWeek(parseFloat(e.target.value) || 0)}
-                        className="form-input text-lg text-center font-bold text-emerald-700 bg-white border-emerald-300"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Real-time Preview Card */}
-                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
-                  <div className="flex justify-between items-center text-xs font-semibold text-slate-700 mb-2">
-                    <span>ผลลัพธ์ที่จะบันทึกลงตาราง ({curriculumWeeks === 15 ? 'ปวส. 15 สัปดาห์' : 'ปวช. 18 สัปดาห์'})</span>
-                    <span className="text-slate-500 font-normal">รวม {contactHours} ชม./สัปดาห์</span>
-                  </div>
-
-                  {/* Dual color progress bar */}
-                  <div className="h-2.5 w-full bg-slate-200 rounded-full overflow-hidden flex mb-2.5 shadow-inner">
-                    <div
-                      style={{ width: `${tPct}%` }}
-                      className="bg-amber-500 h-full transition-all duration-300"
-                      title={`ทฤษฎี ${tPct}%`}
-                    />
-                    <div
-                      style={{ width: `${pPct}%` }}
-                      className="bg-emerald-500 h-full transition-all duration-300"
-                      title={`ปฏิบัติ ${pPct}%`}
-                    />
-                  </div>
-
-                  {scoreScaleMode === 'standard_10' ? (
-                    <div>
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div className="p-2 rounded-lg bg-amber-100/70 border border-amber-200">
-                          <div className="text-amber-800 font-medium">สอบย่อย (ทฤษฎี)</div>
-                          <div className="text-sm font-bold text-amber-900 mt-0.5">เต็ม {previewPostTest} คะแนน/สัปดาห์</div>
-                        </div>
-                        <div className="p-2 rounded-lg bg-emerald-100/70 border border-emerald-200">
-                          <div className="text-emerald-800 font-medium">งานเก็บ (ปฏิบัติ)</div>
-                          <div className="text-sm font-bold text-emerald-900 mt-0.5">เต็ม {previewAssign} คะแนน/สัปดาห์</div>
+                    {/* ถ้าเลือกโหมดมาตรฐาน สามารถเลือกฐานคะแนนเต็มได้ (เช่น เต็ม 10 หรือ 5) */}
+                    {scoreScaleMode === 'standard_10' ? (
+                      <div className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+                        <span className="text-xs font-semibold text-slate-700">ฐานคะแนนเต็มต่อช่องงานเก็บ:</span>
+                        <div className="flex gap-1.5">
+                          {[5, 10, 20].map(pts => (
+                            <button
+                              key={pts}
+                              type="button"
+                              onClick={() => setStandardWeeklyBaseScore(pts)}
+                              className={`px-2.5 py-1 text-xs rounded-lg font-bold border transition-all ${standardWeeklyBaseScore === pts
+                                  ? 'bg-indigo-600 text-white border-indigo-600'
+                                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                                }`}
+                            >
+                              เต็ม {pts}
+                            </button>
+                          ))}
                         </div>
                       </div>
-                      <p className="mt-2 text-[11px] text-indigo-700 bg-indigo-50 p-2 rounded-lg border border-indigo-100 flex items-center gap-1.5">
-                        <span>✨</span>
-                        <span>คะแนนดิบรวมทั้งเทอม {totalTermRawStandard} คะแนน — ในหน้าตัดเกรด ระบบจะทอนสัดส่วนให้ตรงกับค่าน้ำหนัก {totalAcademicScore} คะแนนให้อัตโนมัติ</span>
-                      </p>
-                    </div>
-                  ) : (
-                    <div>
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div className="p-2 rounded-lg bg-amber-100/70 border border-amber-200">
-                          <div className="text-amber-800 font-medium">สอบย่อย (ทฤษฎี)</div>
-                          <div className="text-sm font-bold text-amber-900 mt-0.5">รวม {directTestTotal} คะแนน (~{directAvgTest}/สัปดาห์)</div>
+                    ) : (
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="form-label text-slate-800 text-xs font-semibold mb-0">คะแนนวิชาการรวม (งานเก็บ + สอบย่อย)</label>
+                          <span className="text-[11px] text-indigo-600 font-medium bg-indigo-50 px-2 py-0.5 rounded-md">
+                            ค่าน้ำหนักวิชา: {totalAcademicScore} คะแนน
+                          </span>
                         </div>
-                        <div className="p-2 rounded-lg bg-emerald-100/70 border border-emerald-200">
-                          <div className="text-emerald-800 font-medium">งานเก็บ (ปฏิบัติ)</div>
-                          <div className="text-sm font-bold text-emerald-900 mt-0.5">รวม {directSkillTotal} คะแนน (~{directAvgAssign}/สัปดาห์)</div>
+                        <input
+                          type="number"
+                          value={totalAcademicScore}
+                          onChange={e => setTotalAcademicScore(parseFloat(e.target.value) || 0)}
+                          className="form-input text-lg font-bold text-slate-800"
+                        />
+                      </div>
+                    )}
+
+                    {/* 3. สัดส่วนชั่วโมงเรียน (ท-ป-น) */}
+                    <div>
+                      <div className="flex justify-between items-center mb-1.5">
+                        <span className="text-xs font-semibold text-slate-700">สัดส่วนชั่วโมงเรียนตามหลักสูตร (ท-ป-น)</span>
+                        <span className="text-[11px] text-slate-500">พรีเซ็ตด่วน:</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 mb-2.5">
+                        {[
+                          { label: '1-2-2 (3 ชม.)', t: 1, p: 2 },
+                          { label: '2-2-3 (4 ชม.)', t: 2, p: 2 },
+                          { label: '2-0-2 (2 ชม.)', t: 2, p: 0 },
+                          { label: '1-4-3 (5 ชม.)', t: 1, p: 4 },
+                          { label: '3-0-3 (3 ชม.)', t: 3, p: 0 },
+                        ].map(preset => (
+                          <button
+                            key={preset.label}
+                            type="button"
+                            onClick={() => {
+                              setTheoryHoursPerWeek(preset.t);
+                              setPracticeHoursPerWeek(preset.p);
+                            }}
+                            className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all ${theoryHoursPerWeek === preset.t && practiceHoursPerWeek === preset.p
+                                ? 'bg-indigo-600 text-white border-indigo-600 font-semibold shadow-sm'
+                                : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200'
+                              }`}
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-3 rounded-xl border border-amber-200 bg-amber-50/50">
+                          <label className="block text-xs font-semibold text-amber-800 mb-1">ทฤษฎี ชม./สัปดาห์</label>
+                          <input
+                            type="number" min="0" step="1"
+                            value={theoryHoursPerWeek}
+                            onChange={e => setTheoryHoursPerWeek(parseFloat(e.target.value) || 0)}
+                            className="form-input text-lg text-center font-bold text-amber-700 bg-white border-amber-300"
+                          />
+                        </div>
+                        <div className="p-3 rounded-xl border border-emerald-200 bg-emerald-50/50">
+                          <label className="block text-xs font-semibold text-emerald-800 mb-1">ปฏิบัติ ชม./สัปดาห์</label>
+                          <input
+                            type="number" min="0" step="1"
+                            value={practiceHoursPerWeek}
+                            onChange={e => setPracticeHoursPerWeek(parseFloat(e.target.value) || 0)}
+                            className="form-input text-lg text-center font-bold text-emerald-700 bg-white border-emerald-300"
+                          />
                         </div>
                       </div>
-                      <p className="mt-2 text-[11px] text-slate-500">
-                        * คะแนนเฉลี่ยต่อสัปดาห์จะได้ประมาณ 1-2 คะแนน เพื่อให้ยอดรวมทั้ง {curriculumWeeks} สัปดาห์เท่ากับ {totalAcademicScore} คะแนนพอดี
-                      </p>
                     </div>
-                  )}
+
+                    {/* Real-time Preview Card */}
+                    <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+                      <div className="flex justify-between items-center text-xs font-semibold text-slate-700 mb-2">
+                        <span>ผลลัพธ์ที่จะบันทึกลงตาราง ({curriculumWeeks === 15 ? 'ปวส. 15 สัปดาห์' : 'ปวช. 18 สัปดาห์'})</span>
+                        <span className="text-slate-500 font-normal">รวม {contactHours} ชม./สัปดาห์</span>
+                      </div>
+
+                      {/* Dual color progress bar */}
+                      <div className="h-2.5 w-full bg-slate-200 rounded-full overflow-hidden flex mb-2.5 shadow-inner">
+                        <div
+                          style={{ width: `${tPct}%` }}
+                          className="bg-amber-500 h-full transition-all duration-300"
+                          title={`ทฤษฎี ${tPct}%`}
+                        />
+                        <div
+                          style={{ width: `${pPct}%` }}
+                          className="bg-emerald-500 h-full transition-all duration-300"
+                          title={`ปฏิบัติ ${pPct}%`}
+                        />
+                      </div>
+
+                      {scoreScaleMode === 'standard_10' ? (
+                        <div>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className="p-2 rounded-lg bg-amber-100/70 border border-amber-200">
+                              <div className="text-amber-800 font-medium">สอบย่อย (ทฤษฎี)</div>
+                              <div className="text-sm font-bold text-amber-900 mt-0.5">เต็ม {previewPostTest} คะแนน/สัปดาห์</div>
+                            </div>
+                            <div className="p-2 rounded-lg bg-emerald-100/70 border border-emerald-200">
+                              <div className="text-emerald-800 font-medium">งานเก็บ (ปฏิบัติ)</div>
+                              <div className="text-sm font-bold text-emerald-900 mt-0.5">เต็ม {previewAssign} คะแนน/สัปดาห์</div>
+                            </div>
+                          </div>
+                          <p className="mt-2 text-[11px] text-indigo-700 bg-indigo-50 p-2 rounded-lg border border-indigo-100 flex items-center gap-1.5">
+                            <span>✨</span>
+                            <span>คะแนนดิบรวมทั้งเทอม {totalTermRawStandard} คะแนน — ในหน้าตัดเกรด ระบบจะทอนสัดส่วนให้ตรงกับค่าน้ำหนัก {totalAcademicScore} คะแนนให้อัตโนมัติ</span>
+                          </p>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className="p-2 rounded-lg bg-amber-100/70 border border-amber-200">
+                              <div className="text-amber-800 font-medium">สอบย่อย (ทฤษฎี)</div>
+                              <div className="text-sm font-bold text-amber-900 mt-0.5">รวม {directTestTotal} คะแนน (~{directAvgTest}/สัปดาห์)</div>
+                            </div>
+                            <div className="p-2 rounded-lg bg-emerald-100/70 border border-emerald-200">
+                              <div className="text-emerald-800 font-medium">งานเก็บ (ปฏิบัติ)</div>
+                              <div className="text-sm font-bold text-emerald-900 mt-0.5">รวม {directSkillTotal} คะแนน (~{directAvgAssign}/สัปดาห์)</div>
+                            </div>
+                          </div>
+                          <p className="mt-2 text-[11px] text-slate-500">
+                            * คะแนนเฉลี่ยต่อสัปดาห์จะได้ประมาณ 1-2 คะแนน เพื่อให้ยอดรวมทั้ง {curriculumWeeks} สัปดาห์เท่ากับ {totalAcademicScore} คะแนนพอดี
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2.5 justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setShowCalculator(false)}
+                      className="btn bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-4"
+                    >
+                      ยกเลิก
+                    </button>
+                    <button
+                      type="button"
+                      onClick={calculateBlueprint}
+                      className="btn btn-primary text-xs px-5 flex items-center gap-1.5 shadow-md shadow-indigo-500/20"
+                    >
+                      <Calculator className="w-4 h-4" />
+                      คำนวณและนำลงตาราง ({curriculumWeeks} สัปดาห์)
+                    </button>
+                  </div>
                 </div>
               </div>
+            );
+          })()}
 
-              <div className="flex gap-2.5 justify-end">
-                <button
-                  type="button"
-                  onClick={() => setShowCalculator(false)}
-                  className="btn bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-4"
-                >
-                  ยกเลิก
-                </button>
-                <button
-                  type="button"
-                  onClick={calculateBlueprint}
-                  className="btn btn-primary text-xs px-5 flex items-center gap-1.5 shadow-md shadow-indigo-500/20"
-                >
-                  <Calculator className="w-4 h-4" />
-                  คำนวณและนำลงตาราง ({curriculumWeeks} สัปดาห์)
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+          {/* Excel Live Preview & Export Modal */}
+          <ScoreExcelModal
+            isOpen={showExportModal}
+            onClose={() => setShowExportModal(false)}
+            classroom={classroomObj || null}
+            students={students}
+            structures={structures}
+            matrixScores={matrixScores}
+            calculatedWeekDates={calculatedWeekDates}
+            weekAttendanceMap={weekAttendanceMap}
+            analyticsSummary={analyticsSummary}
+          />
 
-      {/* Excel Live Preview & Export Modal */}
-      <ScoreExcelModal
-        isOpen={showExportModal}
-        onClose={() => setShowExportModal(false)}
-        classroom={classroomObj || null}
-        students={students}
-        structures={structures}
-        matrixScores={matrixScores}
-        calculatedWeekDates={calculatedWeekDates}
-        weekAttendanceMap={weekAttendanceMap}
-        analyticsSummary={analyticsSummary}
-      />
-
-      {/* Excel Import & Template Modal */}
-      {selectedClass && (
-        <ScoreImportModal
-          isOpen={showExcelImportModal}
-          onClose={() => setShowExcelImportModal(false)}
-          classroomName={classroomObj?.name || 'ห้องเรียน'}
-          students={students}
-          structures={structures}
-          onImportScores={async (scores, type) => {
-            await api.post(`/scores?classroom_id=${selectedClass}`, {
-              classroom_id: selectedClass,
-              scores: scores.map(d => ({
-                student_id: d.student_id,
-                lesson_number: d.lesson_number,
-                ...(type === 'assignment' ? { assignment_score: d.assignment_score } : { post_test_score: d.post_test_score })
-              }))
-            });
-            toast.success(`นำเข้าคะแนนสำเร็จ ${scores.length} รายการ`);
-            refetchMatrix();
-          }}
-          onImportBlueprint={(newStructs) => {
-            setStructures(newStructs);
-            saveStructureMutation.mutate();
-          }}
-        />
-      )}
+          {/* Excel Import & Template Modal */}
+          {selectedClass && (
+            <ScoreImportModal
+              isOpen={showExcelImportModal}
+              onClose={() => setShowExcelImportModal(false)}
+              classroomName={classroomObj?.name || 'ห้องเรียน'}
+              students={students}
+              structures={structures}
+              onImportScores={async (scores, type) => {
+                await api.post(`/scores?classroom_id=${selectedClass}`, {
+                  classroom_id: selectedClass,
+                  scores: scores.map(d => ({
+                    student_id: d.student_id,
+                    lesson_number: d.lesson_number,
+                    ...(type === 'assignment' ? { assignment_score: d.assignment_score } : { post_test_score: d.post_test_score })
+                  }))
+                });
+                toast.success(`นำเข้าคะแนนสำเร็จ ${scores.length} รายการ`);
+                refetchMatrix();
+              }}
+              onImportBlueprint={(newStructs) => {
+                setStructures(newStructs);
+                saveStructureMutation.mutate();
+              }}
+            />
+          )}
         </>
       )}
     </div>

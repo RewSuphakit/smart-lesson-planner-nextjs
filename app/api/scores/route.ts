@@ -238,7 +238,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Structure saved successfully' });
     }
 
-    // Save student scores for a single lesson (Batch Transaction)
+    // Save student scores for a single lesson (Optimized Batch)
     if (body.scores && body.lesson_number !== undefined) {
       interface ScoreInput {
         student_id: number | string;
@@ -247,7 +247,7 @@ export async function POST(request: NextRequest) {
       }
       const scores = body.scores as ScoreInput[];
       const studentIds = Array.from(new Set(scores.map(s => Number(s.student_id)).filter(id => !isNaN(id))));
-      
+
       const ownedStudents = await prisma.student.findMany({
         where: { id: { in: studentIds }, userId: user.id },
         select: { id: true },
@@ -259,46 +259,80 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ message: 'Invalid lesson number' }, { status: 400 });
       }
 
-      const scoreOperations = [];
-
+      // Deduplicate by studentId
+      const sanitizedMap = new Map<number, { assignVal?: number | null; postVal?: number | null }>();
       for (const score of scores) {
         const studentId = Number(score.student_id);
         if (!ownedStudentIds.has(studentId) || isNaN(studentId)) continue; // Security isolation check
 
-        const assignVal = sanitizeScore(score.assignment_score);
-        const postVal = sanitizeScore(score.post_test_score);
-
-        scoreOperations.push(
-          prisma.studentScore.upsert({
-            where: {
-              studentId_classroomId_lessonNumber: {
-                studentId,
-                classroomId,
-                lessonNumber: lessonNum,
-              },
-            },
-            update: {
-              assignmentScore: assignVal,
-              postTestScore: postVal,
-            },
-            create: {
-              studentId,
-              classroomId,
-              lessonNumber: lessonNum,
-              assignmentScore: assignVal,
-              postTestScore: postVal,
-            },
-          })
-        );
+        sanitizedMap.set(studentId, {
+          assignVal: sanitizeScore(score.assignment_score),
+          postVal: sanitizeScore(score.post_test_score),
+        });
       }
 
-      if (scoreOperations.length > 0) {
-        await prisma.$transaction(scoreOperations);
+      const existingScores = await prisma.studentScore.findMany({
+        where: {
+          classroomId,
+          lessonNumber: lessonNum,
+          studentId: { in: Array.from(sanitizedMap.keys()) },
+        },
+        select: { id: true, studentId: true },
+      });
+
+      const existingMap = new Map<number, number>();
+      for (const es of existingScores) {
+        existingMap.set(es.studentId, es.id);
       }
-      return NextResponse.json({ message: 'Scores saved successfully', updatedCount: scoreOperations.length });
+
+      const updates: Array<{ id: number; assignmentScore?: number | null; postTestScore?: number | null }> = [];
+      const creates: Array<{
+        studentId: number;
+        classroomId: number;
+        lessonNumber: number;
+        assignmentScore: number | null;
+        postTestScore: number | null;
+      }> = [];
+
+      for (const [studentId, data] of sanitizedMap.entries()) {
+        const existingId = existingMap.get(studentId);
+        if (existingId) {
+          updates.push({
+            id: existingId,
+            assignmentScore: data.assignVal,
+            postTestScore: data.postVal,
+          });
+        } else {
+          creates.push({
+            studentId,
+            classroomId,
+            lessonNumber: lessonNum,
+            assignmentScore: data.assignVal ?? null,
+            postTestScore: data.postVal ?? null,
+          });
+        }
+      }
+
+      await prisma.$transaction(async (tx) => {
+        if (creates.length > 0) {
+          await tx.studentScore.createMany({
+            data: creates,
+            skipDuplicates: true,
+          });
+        }
+        for (const upd of updates) {
+          const { id, ...updateData } = upd;
+          await tx.studentScore.update({
+            where: { id },
+            data: updateData,
+          });
+        }
+      });
+
+      return NextResponse.json({ message: 'Scores saved successfully', updatedCount: creates.length + updates.length });
     }
 
-    // Bulk weekly scores (Full Matrix Save via Batch Transaction)
+    // Bulk weekly scores (Full Matrix Save via Optimized Batch)
     if (body.scores && body.lesson_number === undefined) {
       interface BulkScoreInput {
         student_id: number | string;
@@ -315,45 +349,148 @@ export async function POST(request: NextRequest) {
       });
       const ownedStudentIds = new Set(ownedStudents.map(s => s.id));
 
-      const bulkOperations = [];
+      // 1. Deduplicate by studentId + lessonNumber (keep the latest valid entry)
+      const sanitizedMap = new Map<string, {
+        studentId: number;
+        lessonNumber: number;
+        assignmentScore?: number | null;
+        postTestScore?: number | null;
+      }>();
+
       for (const score of bulkScores) {
         const studentId = Number(score.student_id);
         const lessonNum = Number(score.lesson_number);
         if (!ownedStudentIds.has(studentId) || isNaN(lessonNum) || lessonNum < 1) continue;
 
-        const data: { assignmentScore?: number | null; postTestScore?: number | null } = {};
+        const key = `${studentId}_${lessonNum}`;
+        const item = sanitizedMap.get(key) || {
+          studentId,
+          lessonNumber: lessonNum,
+        };
+
         if (score.assignment_score !== undefined) {
-          data.assignmentScore = sanitizeScore(score.assignment_score);
+          item.assignmentScore = sanitizeScore(score.assignment_score);
         }
         if (score.post_test_score !== undefined) {
-          data.postTestScore = sanitizeScore(score.post_test_score);
+          item.postTestScore = sanitizeScore(score.post_test_score);
         }
 
-        bulkOperations.push(
-          prisma.studentScore.upsert({
-            where: {
-              studentId_classroomId_lessonNumber: {
-                studentId,
-                classroomId,
-                lessonNumber: lessonNum,
-              },
-            },
-            update: data,
-            create: {
-              studentId,
-              classroomId,
-              lessonNumber: lessonNum,
-              assignmentScore: data.assignmentScore ?? null,
-              postTestScore: data.postTestScore ?? null,
-            },
-          })
+        sanitizedMap.set(key, item);
+      }
+
+      if (sanitizedMap.size === 0) {
+        return NextResponse.json({ message: 'No valid scores to save', updatedCount: 0 });
+      }
+
+      // 2. Fetch existing records in this classroom to separate into UPDATE vs CREATE
+      const existingScores = await prisma.studentScore.findMany({
+        where: {
+          classroomId,
+          studentId: { in: Array.from(ownedStudentIds) },
+        },
+        select: {
+          id: true,
+          studentId: true,
+          lessonNumber: true,
+          assignmentScore: true,
+          postTestScore: true,
+        },
+      });
+
+      const existingMap = new Map<string, { id: number; assignmentScore: number | null; postTestScore: number | null }>();
+      for (const es of existingScores) {
+        existingMap.set(`${es.studentId}_${es.lessonNumber}`, {
+          id: es.id,
+          assignmentScore: es.assignmentScore !== null ? Number(es.assignmentScore) : null,
+          postTestScore: es.postTestScore !== null ? Number(es.postTestScore) : null,
+        });
+      }
+
+      const updates: Array<{ id: number; assignmentScore?: number | null; postTestScore?: number | null }> = [];
+      const creates: Array<{
+        studentId: number;
+        classroomId: number;
+        lessonNumber: number;
+        assignmentScore: number | null;
+        postTestScore: number | null;
+      }> = [];
+
+      for (const [key, item] of sanitizedMap.entries()) {
+        const existing = existingMap.get(key);
+        if (existing) {
+          // Compare with existing score to avoid redundant updates for unchanged cells
+          let hasDiff = false;
+          const updateData: { id: number; assignmentScore?: number | null; postTestScore?: number | null } = { id: existing.id };
+
+          if (item.assignmentScore !== undefined) {
+            const currentVal = existing.assignmentScore;
+            const newVal = item.assignmentScore;
+            if (currentVal !== newVal) {
+              updateData.assignmentScore = newVal;
+              hasDiff = true;
+            }
+          }
+          if (item.postTestScore !== undefined) {
+            const currentVal = existing.postTestScore;
+            const newVal = item.postTestScore;
+            if (currentVal !== newVal) {
+              updateData.postTestScore = newVal;
+              hasDiff = true;
+            }
+          }
+
+          if (hasDiff) {
+            updates.push(updateData);
+          }
+        } else {
+          creates.push({
+            studentId: item.studentId,
+            classroomId,
+            lessonNumber: item.lessonNumber,
+            assignmentScore: item.assignmentScore ?? null,
+            postTestScore: item.postTestScore ?? null,
+          });
+        }
+      }
+
+      // 3. Execute creates and updates cleanly in a transaction with proper batching & timeout
+      if (creates.length > 0 || updates.length > 0) {
+        await prisma.$transaction(
+          async (tx) => {
+            // Fast batch insert for new scores
+            if (creates.length > 0) {
+              await tx.studentScore.createMany({
+                data: creates,
+                skipDuplicates: true,
+              });
+            }
+
+            // Concurrent chunked updates (25 queries per batch) to prevent P2028 transaction timeout
+            const BATCH_SIZE = 25;
+            for (let i = 0; i < updates.length; i += BATCH_SIZE) {
+              const batch = updates.slice(i, i + BATCH_SIZE);
+              await Promise.all(
+                batch.map((upd) => {
+                  const { id, ...data } = upd;
+                  return tx.studentScore.update({
+                    where: { id },
+                    data,
+                  });
+                })
+              );
+            }
+          },
+          {
+            maxWait: 10000,
+            timeout: 30000,
+          }
         );
       }
 
-      if (bulkOperations.length > 0) {
-        await prisma.$transaction(bulkOperations);
-      }
-      return NextResponse.json({ message: 'Bulk scores saved successfully', updatedCount: bulkOperations.length });
+      return NextResponse.json({
+        message: 'Bulk scores saved successfully',
+        updatedCount: creates.length + updates.length,
+      });
     }
 
     return NextResponse.json({ message: 'Invalid request payload' }, { status: 400 });
