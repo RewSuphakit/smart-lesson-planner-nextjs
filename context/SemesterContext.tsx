@@ -97,7 +97,11 @@ export function SemesterProvider({ children }: { children: ReactNode }) {
       });
       return true;
     } catch (err: unknown) {
-      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'ไม่สามารถเปลี่ยนภาคเรียนได้';
+      console.error('[switchSemester] full error:', err);
+      const axiosErr = err as { response?: { status?: number; data?: { message?: string } } };
+      console.error('[switchSemester] response status:', axiosErr?.response?.status);
+      console.error('[switchSemester] response data:', axiosErr?.response?.data);
+      const message = axiosErr?.response?.data?.message || 'ไม่สามารถเปลี่ยนภาคเรียนได้';
       toast.error(message);
       return false;
     }

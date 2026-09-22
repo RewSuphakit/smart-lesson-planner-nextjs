@@ -15,14 +15,19 @@ export async function POST(
     const user = requireAuth(request);
     const { id } = await params;
     const semesterId = Number(id);
+    const userId = Number(user.id);
 
     if (isNaN(semesterId) || semesterId <= 0) {
       return NextResponse.json({ message: 'Invalid semester ID' }, { status: 400 });
     }
 
+    if (isNaN(userId) || userId <= 0) {
+      return NextResponse.json({ message: 'Invalid user ID' }, { status: 401 });
+    }
+
     // Verify ownership
     const semester = await prisma.semester.findFirst({
-      where: { id: semesterId, userId: user.id },
+      where: { id: semesterId, userId },
     });
 
     if (!semester) {
@@ -46,7 +51,7 @@ export async function POST(
     // Atomically: deactivate all, activate target
     await prisma.$transaction([
       prisma.semester.updateMany({
-        where: { userId: user.id, isActive: true },
+        where: { userId, isActive: true },
         data: { isActive: false },
       }),
       prisma.semester.update({

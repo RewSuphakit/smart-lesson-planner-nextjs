@@ -18,13 +18,14 @@ export async function GET(
     const user = requireAuth(request);
     const { id } = await params;
     const semesterId = Number(id);
+    const userId = Number(user.id);
 
     if (isNaN(semesterId) || semesterId <= 0) {
       return NextResponse.json({ message: 'Invalid semester ID' }, { status: 400 });
     }
 
     const semester = await prisma.semester.findFirst({
-      where: { id: semesterId, userId: user.id },
+      where: { id: semesterId, userId },
       include: {
         classrooms: {
           select: {
@@ -116,6 +117,7 @@ export async function PUT(
     const user = requireAuth(request);
     const { id } = await params;
     const semesterId = Number(id);
+    const userId = Number(user.id);
 
     if (isNaN(semesterId) || semesterId <= 0) {
       return NextResponse.json({ message: 'Invalid semester ID' }, { status: 400 });
@@ -123,7 +125,7 @@ export async function PUT(
 
     // Verify ownership
     const existing = await prisma.semester.findFirst({
-      where: { id: semesterId, userId: user.id },
+      where: { id: semesterId, userId },
     });
     if (!existing) {
       return NextResponse.json({ message: 'Semester not found or unauthorized' }, { status: 404 });
@@ -149,7 +151,7 @@ export async function PUT(
     if (data.is_active === true) {
       // Deactivate all others first
       await prisma.semester.updateMany({
-        where: { userId: user.id, isActive: true, id: { not: semesterId } },
+        where: { userId, isActive: true, id: { not: semesterId } },
         data: { isActive: false },
       });
       updateData.isActive = true;
@@ -164,7 +166,7 @@ export async function PUT(
 
       const duplicate = await prisma.semester.findFirst({
         where: {
-          userId: user.id,
+          userId,
           termNumber: checkTermNumber,
           academicYear: checkAcademicYear,
           id: { not: semesterId },
@@ -217,13 +219,14 @@ export async function DELETE(
     const user = requireAuth(request);
     const { id } = await params;
     const semesterId = Number(id);
+    const userId = Number(user.id);
 
     if (isNaN(semesterId) || semesterId <= 0) {
       return NextResponse.json({ message: 'Invalid semester ID' }, { status: 400 });
     }
 
     const semester = await prisma.semester.findFirst({
-      where: { id: semesterId, userId: user.id },
+      where: { id: semesterId, userId },
     });
 
     if (!semester) {

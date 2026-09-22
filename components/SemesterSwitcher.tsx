@@ -12,7 +12,9 @@ import {
   Calendar,
   Settings,
   ArrowRightLeft,
-  Loader2
+  Loader2,
+  AlertTriangle,
+  X
 } from 'lucide-react';
 
 interface SemesterSwitcherProps {
@@ -24,6 +26,7 @@ export default function SemesterSwitcher({ className = '', isCompact = false }: 
   const { semesters, activeSemester, switchSemester, loading } = useSemester();
   const [isOpen, setIsOpen] = useState(false);
   const [isSwitchingId, setIsSwitchingId] = useState<number | null>(null);
+  const [pendingSemester, setPendingSemester] = useState<Semester | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown on outside click
@@ -41,18 +44,30 @@ export default function SemesterSwitcher({ className = '', isCompact = false }: 
     };
   }, [isOpen]);
 
-  const handleSelect = async (id: number) => {
+  const handleSelect = (id: number) => {
     if (id === activeSemester?.id) {
       setIsOpen(false);
       return;
     }
-    setIsSwitchingId(id);
+    const target = semesters.find((s) => s.id === id);
+    if (!target) return;
+    setIsOpen(false);
+    setPendingSemester(target);
+  };
+
+  const handleConfirmSwitch = async () => {
+    if (!pendingSemester) return;
+    setIsSwitchingId(pendingSemester.id);
+    setPendingSemester(null);
     try {
-      await switchSemester(id);
+      await switchSemester(pendingSemester.id);
     } finally {
       setIsSwitchingId(null);
-      setIsOpen(false);
     }
+  };
+
+  const handleCancelSwitch = () => {
+    setPendingSemester(null);
   };
 
   // Group semesters by Academic Year (ปีการศึกษา)
@@ -294,6 +309,96 @@ export default function SemesterSwitcher({ className = '', isCompact = false }: 
               <Settings className="w-3.5 h-3.5" />
               <span>จัดการและคัดลอกข้อมูลภาคเรียน</span>
             </Link>
+          </div>
+        </div>
+      )}
+
+      {/* ── Confirmation Modal ── */}
+      {pendingSemester && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-semester-title"
+        >
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            onClick={handleCancelSwitch}
+          />
+
+          {/* Dialog Card */}
+          <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl shadow-indigo-500/20 border border-indigo-100 overflow-hidden animate-fade-in-up">
+            {/* Top accent bar */}
+            <div className="h-1 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-400" />
+
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={handleCancelSwitch}
+              className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              aria-label="ปิด"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="px-6 py-5">
+              {/* Icon + Title */}
+              <div className="flex items-start gap-3 mb-3">
+                <div className="shrink-0 w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-amber-500" />
+                </div>
+                <div>
+                  <h3
+                    id="confirm-semester-title"
+                    className="text-sm font-extrabold text-slate-800"
+                  >
+                    เปลี่ยนภาคเรียน?
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    กำลังจะสลับไปยัง{' '}
+                    <span className="font-bold text-indigo-600">
+                      {pendingSemester.name}
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Warning message */}
+              <div className="bg-amber-50 border border-amber-200/80 rounded-xl px-4 py-3 text-xs text-amber-800 leading-relaxed mb-5">
+                ข้อมูลทุกหน้าจะถูกโหลดใหม่ตามภาคเรียนที่เลือก<br />
+                หากมีการแก้ไขที่ยังไม่ได้บันทึก ข้อมูลอาจสูญหาย
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2.5">
+                <button
+                  type="button"
+                  onClick={handleCancelSwitch}
+                  className="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 transition-colors"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmSwitch}
+                  disabled={isSwitchingId === pendingSemester.id}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-colors flex items-center justify-center gap-2 shadow-sm shadow-indigo-600/30 disabled:opacity-70"
+                >
+                  {isSwitchingId ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>กำลังเปลี่ยน...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ArrowRightLeft className="w-3.5 h-3.5" />
+                      <span>ยืนยันเปลี่ยนภาคเรียน</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

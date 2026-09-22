@@ -17,6 +17,7 @@ import { getDefaultWeeks } from '@/lib/semester';
 export async function GET(request: NextRequest) {
   try {
     const user = requireAuth(request);
+    const userId = Number(user.id);
     const { searchParams } = new URL(request.url);
     const academicYear = searchParams.get('academic_year');
     const activeOnly = searchParams.get('active_only') === 'true';
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
 
       const { buildSemesterInfo } = await import('@/lib/semester');
       const classroom = await prisma.classroom.findFirst({
-        where: { id: numericClassroomId, userId: user.id },
+        where: { id: numericClassroomId, userId },
       });
 
       if (!classroom) {
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Build where clause
-    const where: Record<string, unknown> = { userId: user.id };
+    const where: Record<string, unknown> = { userId };
     if (academicYear) where.academicYear = academicYear;
     if (activeOnly) where.isActive = true;
 
