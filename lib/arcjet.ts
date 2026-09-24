@@ -20,20 +20,14 @@ export const aj = arcjetKey
   : null;
 
 /**
- * Dedicated rate limiter for authentication routes (login / register)
- * Protects against brute-force attacks: max 30 requests per 10 minutes per IP
- * (Prevents blocking multiple teachers sharing the same school public IP/NAT)
+ * Dedicated security guard for authentication routes (login / register)
+ * Uses Arcjet Shield for attack protection; bot & brute-force defense is handled by Cloudflare Turnstile
  */
 export const authLimiter = arcjetKey
   ? arcjet({
       key: arcjetKey,
       rules: [
         shield({ mode: 'LIVE' }),
-        slidingWindow({
-          mode: 'LIVE',
-          interval: '10m',
-          max: 30,
-        }),
       ],
     })
   : null;
