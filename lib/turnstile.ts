@@ -28,7 +28,7 @@ async function verifyWithSecret(
 
     const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
       method: 'POST',
-      body: formData,
+      body: formData.toString(),
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
