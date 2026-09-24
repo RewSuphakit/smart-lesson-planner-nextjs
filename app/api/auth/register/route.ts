@@ -3,9 +3,16 @@ import bcrypt from 'bcryptjs';
 import prisma from '@/lib/prisma';
 import { RegisterSchema, validateRequestBody } from '@/lib/validation';
 import { generateOtpCode, sendVerificationEmail } from '@/lib/email';
+import { protectRequest, authLimiter } from '@/lib/arcjet';
 
 export async function POST(request: NextRequest) {
   try {
+    // Arcjet Rate Limiting & Abuse Protection (5 attempts / 15 mins)
+    const arcjetCheck = await protectRequest(request, authLimiter);
+    if (!arcjetCheck.allowed) {
+      return arcjetCheck.response!;
+    }
+
     const validation = await validateRequestBody(request, RegisterSchema);
     if (!validation.success) {
       return validation.response;

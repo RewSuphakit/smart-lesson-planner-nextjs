@@ -23,6 +23,18 @@ export async function PUT(request: NextRequest) {
 
     const updateOperations = [];
 
+    // Helper to sanitize score values: converts empty/null to null, validates numbers, and clamps between 0 and 999.99
+    const sanitizeExamScore = (val: unknown, allowSpecialCodes = false): number | null => {
+      if (val === undefined || val === null || val === '') return null;
+      const num = Number(val);
+      if (isNaN(num)) return null;
+      // Allow special vocational education status codes: -1 = ข.ส. (ขาดสอบ), -2 = ม.ส. (ไม่สมบูรณ์)
+      if (allowSpecialCodes && (num === -1 || num === -2)) {
+        return num;
+      }
+      return Math.min(999.99, Math.max(0, num));
+    };
+
     for (const score of body.scores) {
       const studentId = Number(score.student_id);
       if (!ownedSet.has(studentId)) {
@@ -31,17 +43,13 @@ export async function PUT(request: NextRequest) {
 
       const dataToUpdate: Record<string, unknown> = {};
       if (score.midterm_score !== undefined) {
-        dataToUpdate.midtermScore = score.midterm_score === '' || score.midterm_score === null ? null : Number(score.midterm_score);
+        dataToUpdate.midtermScore = sanitizeExamScore(score.midterm_score, false);
       }
       if (score.final_score !== undefined) {
-        dataToUpdate.finalScore = score.final_score === '' || score.final_score === null ? null : Number(score.final_score);
+        dataToUpdate.finalScore = sanitizeExamScore(score.final_score, true);
       }
       if (score.affective_score !== undefined) {
-        if (score.affective_score === '' || score.affective_score === null) {
-          dataToUpdate.affectiveScore = null;
-        } else {
-          dataToUpdate.affectiveScore = Math.max(0, Number(score.affective_score));
-        }
+        dataToUpdate.affectiveScore = sanitizeExamScore(score.affective_score, false);
       }
 
       if (Object.keys(dataToUpdate).length > 0) {

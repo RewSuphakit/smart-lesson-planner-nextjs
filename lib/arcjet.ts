@@ -58,6 +58,27 @@ export const aiLimiter = arcjetKey
       ],
     })
   : null;
+/**
+ * Dedicated rate limiter for public Student Portal search
+ * Protects against automated student ID scraping / enumeration: max 25 requests per 5 minutes per IP
+ */
+export const portalLimiter = arcjetKey
+  ? arcjet({
+      key: arcjetKey,
+      rules: [
+        shield({ mode: 'LIVE' }),
+        detectBot({
+          mode: 'LIVE',
+          allow: [],
+        }),
+        slidingWindow({
+          mode: 'LIVE',
+          interval: '5m',
+          max: 25,
+        }),
+      ],
+    })
+  : null;
 
 export interface ProtectOptions {
   requested?: number;
@@ -70,7 +91,7 @@ export interface ProtectOptions {
  */
 export async function protectRequest(
   request: NextRequest,
-  limiterInstance: typeof aj | typeof authLimiter | typeof aiLimiter = aj,
+  limiterInstance: typeof aj | typeof authLimiter | typeof aiLimiter | typeof portalLimiter = aj,
   options?: ProtectOptions
 ): Promise<{ allowed: boolean; response?: NextResponse }> {
   if (!limiterInstance || !arcjetKey) {

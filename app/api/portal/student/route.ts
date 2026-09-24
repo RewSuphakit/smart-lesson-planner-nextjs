@@ -2,9 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { calculateAffectiveScore } from '@/lib/affective';
 import { resolveTargetWeeks } from '@/lib/semester';
+import { protectRequest, portalLimiter } from '@/lib/arcjet';
 
 export async function GET(request: NextRequest) {
   try {
+    // Arcjet Rate Limiting & Bot Protection against student ID scraping / enumeration
+    const arcjetCheck = await protectRequest(request, portalLimiter);
+    if (!arcjetCheck.allowed) {
+      return arcjetCheck.response!;
+    }
+
     const { searchParams } = new URL(request.url);
     const code = searchParams.get('code')?.trim();
     const classroomIdParam = searchParams.get('classroom_id');
