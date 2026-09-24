@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
                      request.headers.get('x-real-ip') ||
                      undefined;
-    const turnstileCheck = await verifyTurnstileToken(turnstileToken, clientIp);
+    const turnstileCheck = await verifyTurnstileToken(turnstileToken, clientIp, 'login');
     if (!turnstileCheck.success) {
       return NextResponse.json(
         { message: turnstileCheck.error || 'การตรวจสอบความปลอดภัยไม่ผ่าน' },

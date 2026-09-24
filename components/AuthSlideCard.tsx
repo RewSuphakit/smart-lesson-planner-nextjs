@@ -353,6 +353,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
                 {/* Cloudflare Turnstile Verification */}
                 <Turnstile
                   ref={turnstileRef}
+                  action="login"
                   onSuccess={(token) => setTurnstileToken(token)}
                   onError={() => setTurnstileToken(null)}
                   onExpire={() => setTurnstileToken(null)}

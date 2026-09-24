@@ -9,6 +9,7 @@ declare global {
         container: HTMLElement | string,
         params: {
           sitekey: string;
+          action?: string;
           callback?: (token: string) => void;
           'error-callback'?: (errorCode?: string) => void;
           'expired-callback'?: () => void;
@@ -30,20 +31,21 @@ interface TurnstileProps {
   onSuccess: (token: string) => void;
   onError?: (error?: string) => void;
   onExpire?: () => void;
+  action?: string;
   theme?: 'light' | 'dark' | 'auto';
   className?: string;
 }
 
-const TURNSTILE_TEST_SITE_KEY = '1x00000000000000000000AA'; // Cloudflare official test sitekey (always passes)
+// Canonical Site key provided for this project
+const PROJECT_TURNSTILE_SITE_KEY = '0x4AAAAAAFCRQit4e4wzNoHm';
 
 export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(
-  ({ onSuccess, onError, onExpire, theme = 'light', className = '' }, ref) => {
+  ({ onSuccess, onError, onExpire, action = 'login', theme = 'light', className = '' }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const widgetIdRef = useRef<string | null>(null);
 
     const siteKey =
-      process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ||
-      (process.env.NODE_ENV !== 'production' ? TURNSTILE_TEST_SITE_KEY : '');
+      process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || PROJECT_TURNSTILE_SITE_KEY;
 
     const renderWidget = () => {
       if (!window.turnstile || !containerRef.current || widgetIdRef.current) return;
@@ -52,6 +54,7 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(
       try {
         const id = window.turnstile.render(containerRef.current, {
           sitekey: siteKey,
+          action,
           theme,
           size: 'normal',
           callback: (token: string) => {
@@ -116,7 +119,7 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(
           widgetIdRef.current = null;
         }
       };
-    }, [siteKey, theme]);
+    }, [siteKey, theme, action]);
 
     if (!siteKey) {
       return null;
