@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useSemester } from '@/context/SemesterContext';
 import { Semester } from '@/services/semester';
@@ -28,6 +29,11 @@ export default function SemesterSwitcher({ className = '', isCompact = false }: 
   const [isSwitchingId, setIsSwitchingId] = useState<number | null>(null);
   const [pendingSemester, setPendingSemester] = useState<Semester | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -314,7 +320,7 @@ export default function SemesterSwitcher({ className = '', isCompact = false }: 
       )}
 
       {/* ── Confirmation Modal ── */}
-      {pendingSemester && (
+      {pendingSemester && mounted && createPortal(
         <div
           className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
           role="dialog"
@@ -400,7 +406,8 @@ export default function SemesterSwitcher({ className = '', isCompact = false }: 
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
