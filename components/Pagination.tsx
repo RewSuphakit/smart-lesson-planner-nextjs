@@ -37,7 +37,7 @@ export default function Pagination({
   const getPageNumbers = () => {
     const pages = [];
     let start = Math.max(1, page - 2);
-    let end = Math.min(totalPages, start + 4);
+    const end = Math.min(totalPages, start + 4);
     start = Math.max(1, end - 4);
 
     for (let i = start; i <= end; i++) {

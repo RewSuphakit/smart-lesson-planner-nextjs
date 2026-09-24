@@ -242,7 +242,7 @@ export default function StudentExcelModal({
       const { headers, rows } = generateExportData();
       const wb = XLSX.utils.book_new();
 
-      let sheetData: (string | number)[][] = [];
+      const sheetData: (string | number)[][] = [];
 
       if (includeHeaderSummary) {
         sheetData.push([`รายงานรายชื่อนักเรียน — ${currentClassName}`]);

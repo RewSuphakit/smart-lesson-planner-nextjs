@@ -10,10 +10,10 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Pagination from '@/components/Pagination';
-import * as XLSX from 'xlsx';
+import dynamic from 'next/dynamic';
 import { calculateAffectiveScore } from '@/lib/affective';
-import GradePdfModal from '@/components/GradePdfModal';
-import GradeCsvModal from '@/components/GradeCsvModal';
+const GradePdfModal = dynamic(() => import('@/components/GradePdfModal'), { ssr: false });
+const GradeCsvModal = dynamic(() => import('@/components/GradeCsvModal'), { ssr: false });
 import { useAuth } from '@/context/AuthContext';
 import UserAvatar from '@/components/UserAvatar';
 
@@ -491,7 +491,7 @@ export default function Grades() {
   };
 
   // Export Std02 Online (ศธ.02 ออนไลน์ Template - สอศ.)
-  const exportStd02 = (fileType: 'xlsx' | 'csv' = 'xlsx') => {
+  const exportStd02 = async (fileType: 'xlsx' | 'csv' = 'xlsx') => {
     if (!report || report.length === 0) {
       toast.error('ไม่พบข้อมูลสำหรับส่งออก');
       return;
@@ -546,6 +546,7 @@ export default function Grades() {
 
     if (fileType === 'xlsx') {
       try {
+        const XLSX = await import('xlsx');
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
         

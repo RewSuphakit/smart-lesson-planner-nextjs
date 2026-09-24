@@ -620,7 +620,7 @@ export default function Classrooms() {
               🏫
             </div>
             <p className="text-slate-500 text-sm font-medium">ยังไม่มีข้อมูลห้องเรียน</p>
-            <p className="text-slate-600 text-xs mt-1">กดปุ่ม "สร้างห้องเรียน" เพื่อเริ่มต้น</p>
+            <p className="text-slate-600 text-xs mt-1">กดปุ่ม &quot;สร้างห้องเรียน&quot; เพื่อเริ่มต้น</p>
           </div>
         ) : filtered.map((c, i) => (
           <ClassroomCard

@@ -129,6 +129,7 @@ model Classroom {
 
   @@index([userId], map: "idx_classrooms_user")
   @@index([semesterId], map: "idx_classrooms_semester")
+  @@index([userId, semesterId], map: "idx_classrooms_user_semester")
   @@map("classrooms")
 }
 
@@ -155,6 +156,9 @@ model Student {
 
   @@index([userId], map: "idx_students_user")
   @@index([classroomId], map: "idx_students_classroom")
+  @@index([userId, classroomId], map: "idx_students_user_classroom")
+  @@index([classroomId, name], map: "idx_students_classroom_name")
+  @@index([classroomId, studentCode], map: "idx_students_classroom_code")
   @@map("students")
 }
 
@@ -175,6 +179,7 @@ model Attendance {
   @@index([classroomId], map: "idx_attendance_classroom")
   @@index([studentId], map: "idx_attendance_student")
   @@index([classroomId, date], map: "idx_attendance_classroom_date")
+  @@index([classroomId, status], map: "idx_attendance_classroom_status")
   @@map("attendance")
 }
 
@@ -290,5 +295,6 @@ model WeeklySchedule {
   @@index([dayOfWeek], map: "idx_timetable_day")
   @@index([userId, dayOfWeek], map: "idx_timetable_user_day")
   @@index([semesterId], map: "idx_timetable_semester")
+  @@index([userId, semesterId], map: "idx_timetable_user_semester")
   @@map("weekly_schedules")
 }

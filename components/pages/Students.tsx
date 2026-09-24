@@ -10,9 +10,9 @@ import {
   Camera, Sparkles, Image as ImageIcon 
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import * as XLSX from 'xlsx';
+import dynamic from 'next/dynamic';
 import Pagination from '@/components/Pagination';
-import StudentExcelModal from '@/components/StudentExcelModal';
+const StudentExcelModal = dynamic(() => import('@/components/StudentExcelModal'), { ssr: false });
 import UserAvatar, { ANIMAL_AVATARS, TEACHER_EMOJIS } from '@/components/UserAvatar';
 import { compressImageFile, findMatchingStudentIndex } from '@/lib/avatarCompression';
 
@@ -211,12 +211,13 @@ export default function Students() {
 
   const isMutating = saveMutation.isPending || deleteMutation.isPending || bulkAssignMutation.isPending || bulkDeleteMutation.isPending || deleteAllMutation.isPending || importMutation.isPending;
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (filtered.length === 0) {
       toast.error('ไม่มีข้อมูลนักเรียนสำหรับส่งออก');
       return;
     }
     
+    const XLSX = await import('xlsx');
     const exportData = filtered.map(s => ({
       'รหัสนักเรียน': s.student_code || '',
       'ชื่อ-นามสกุล': s.name || '',
@@ -368,16 +369,17 @@ export default function Students() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
         const bstr = evt.target?.result;
         if (typeof bstr !== 'string') return;
+        const XLSX = await import('xlsx');
         const wb = XLSX.read(bstr, { type: 'binary' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json<Record<string, string>>(ws);
         
-        const mappedData = data.map(row => {
+        const mappedData = data.map((row: Record<string, string>) => {
           const prefix = row['คำนำหน้า'] || '';
           const firstName = row['ชื่อ'] || row['name'] || '';
           const lastName = row['นามสกุล'] || '';
@@ -396,7 +398,7 @@ export default function Students() {
             email: String(row['อีเมล'] || row['email'] || ''),
             avatar: rawAvatar ? String(rawAvatar).trim() : null,
           };
-        }).filter(item => item.name);
+        }).filter((item: { name: string }) => item.name);
 
         setImportData(mappedData);
       } catch {

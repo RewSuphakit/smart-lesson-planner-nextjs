@@ -14,6 +14,32 @@ export async function GET(request: NextRequest) {
 
     const pageStr = searchParams.get('page');
     const limitStr = searchParams.get('limit');
+    const includeAvatar = searchParams.get('include_avatar') === 'true';
+
+    const selectFields = includeAvatar
+      ? {
+          id: true,
+          name: true,
+          studentCode: true,
+          gradeLevel: true,
+          email: true,
+          classroomId: true,
+          avatar: true,
+          midtermScore: true,
+          finalScore: true,
+          affectiveScore: true,
+        }
+      : {
+          id: true,
+          name: true,
+          studentCode: true,
+          gradeLevel: true,
+          email: true,
+          classroomId: true,
+          midtermScore: true,
+          finalScore: true,
+          affectiveScore: true,
+        };
 
     if (pageStr || limitStr) {
       const page = Math.max(1, parseInt(pageStr || '1') || 1);
@@ -24,6 +50,7 @@ export async function GET(request: NextRequest) {
         prisma.student.count({ where }),
         prisma.student.findMany({
           where,
+          select: selectFields,
           orderBy: { name: 'asc' },
           skip,
           take: limit,
@@ -37,7 +64,7 @@ export async function GET(request: NextRequest) {
         grade_level: s.gradeLevel,
         email: s.email,
         classroom_id: s.classroomId,
-        avatar: s.avatar,
+        avatar: 'avatar' in s ? (s.avatar as string | null) : null,
         midterm_score: s.midtermScore ? Number(s.midtermScore) : null,
         final_score: s.finalScore ? Number(s.finalScore) : null,
         affective_score: s.affectiveScore ? Number(s.affectiveScore) : null,
@@ -56,6 +83,7 @@ export async function GET(request: NextRequest) {
 
     const students = await prisma.student.findMany({
       where,
+      select: selectFields,
       orderBy: { name: 'asc' },
     });
 
@@ -66,7 +94,7 @@ export async function GET(request: NextRequest) {
       grade_level: s.gradeLevel,
       email: s.email,
       classroom_id: s.classroomId,
-      avatar: s.avatar,
+      avatar: 'avatar' in s ? (s.avatar as string | null) : null,
       midterm_score: s.midtermScore ? Number(s.midtermScore) : null,
       final_score: s.finalScore ? Number(s.finalScore) : null,
       affective_score: s.affectiveScore ? Number(s.affectiveScore) : null,
