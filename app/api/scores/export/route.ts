@@ -31,6 +31,14 @@ export async function GET(request: NextRequest) {
     // Fetch students
     const students = await prisma.student.findMany({
       where: { classroomId: Number(classroomId), userId: user.id },
+      select: {
+        id: true,
+        name: true,
+        studentCode: true,
+        midtermScore: true,
+        finalScore: true,
+        affectiveScore: true,
+      },
       orderBy: [
         { studentCode: 'asc' },
         { name: 'asc' }

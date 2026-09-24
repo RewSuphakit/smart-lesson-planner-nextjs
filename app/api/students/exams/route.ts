@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
+import { UpdateStudentExamScoresSchema, validateRequestBody } from '@/lib/validation';
 
 export async function PUT(request: NextRequest) {
   try {
     const user = requireAuth(request);
-    const body = await request.json();
-
-    if (!Array.isArray(body.scores) || body.scores.length === 0) {
-      return NextResponse.json({ message: 'Invalid scores format' }, { status: 400 });
+    const validation = await validateRequestBody(request, UpdateStudentExamScoresSchema);
+    if (!validation.success) {
+      return validation.response;
     }
+
+    const body = validation.data;
 
     const studentIds: number[] = Array.from(
       new Set(body.scores.map((s: { student_id: string | number }) => Number(s.student_id)).filter((id: number) => !isNaN(id)))

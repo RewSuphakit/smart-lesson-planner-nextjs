@@ -15,7 +15,14 @@ export async function GET(request: NextRequest) {
       }),
       prisma.student.findMany({
         where: { userId: user.id },
-        include: {
+        select: {
+          id: true,
+          name: true,
+          studentCode: true,
+          classroomId: true,
+          midtermScore: true,
+          finalScore: true,
+          affectiveScore: true,
           classroom: { select: { id: true, name: true } },
         },
         orderBy: { name: 'asc' },

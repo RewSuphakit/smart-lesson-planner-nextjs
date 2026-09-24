@@ -19,6 +19,12 @@ services:
       - NODE_ENV=production
     volumes:
       - uploads_data:/app/public/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     networks:
       - coolify
     restart: unless-stopped
