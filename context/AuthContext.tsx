@@ -16,7 +16,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string, rememberMe?: boolean) => Promise<{ token: string; user: User }>;
+  login: (email: string, password: string, rememberMe?: boolean, turnstileToken?: string) => Promise<{ token: string; user: User }>;
   register: (name: string, email: string, password: string, role?: string) => Promise<{ message: string; email: string; requireVerification?: boolean; token?: string; user?: User }>;
   verifyEmail: (email: string, code: string) => Promise<{ token: string; user: User }>;
   resendCode: (email: string) => Promise<{ message: string }>;
@@ -82,8 +82,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const login = async (email: string, password: string, rememberMe?: boolean) => {
-    const { data } = await api.post('/auth/login', { email, password, rememberMe });
+  const login = async (email: string, password: string, rememberMe?: boolean, turnstileToken?: string) => {
+    const { data } = await api.post('/auth/login', { email, password, rememberMe, turnstileToken });
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
     const maxAge = rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -11,6 +11,7 @@ import {
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import GoogleSignInButton from '@/components/GoogleSignInButton';
+import Turnstile, { TurnstileRef } from '@/components/Turnstile';
 
 interface AuthSlideCardProps {
   initialMode?: 'login' | 'register';
@@ -29,6 +30,8 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [loginLoading, setLoginLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileRef>(null);
 
   // ─── Register States ───
   const [regName, setRegName] = useState('');
@@ -120,10 +123,12 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
         // Ignore
       }
 
-      await login(loginEmail, loginPassword, rememberMe);
+      await login(loginEmail, loginPassword, rememberMe, turnstileToken || undefined);
       toast.success('เข้าสู่ระบบสำเร็จ!');
       router.push('/');
     } catch (error: unknown) {
+      turnstileRef.current?.reset();
+      setTurnstileToken(null);
       const err = error as { response?: { data?: { message?: string; requireVerification?: boolean; email?: string } } };
       if (err.response?.data?.requireVerification) {
         toast('กรุณายืนยันอีเมลก่อนเข้าใช้งาน', {
@@ -344,6 +349,14 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
                     <span>จดจำการเข้าสู่ระบบ</span>
                   </label>
                 </div>
+
+                {/* Cloudflare Turnstile Verification */}
+                <Turnstile
+                  ref={turnstileRef}
+                  onSuccess={(token) => setTurnstileToken(token)}
+                  onError={() => setTurnstileToken(null)}
+                  onExpire={() => setTurnstileToken(null)}
+                />
 
                 {/* Submit Button */}
                 <button

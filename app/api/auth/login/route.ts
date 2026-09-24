@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma';
 import { generateToken, setAuthCookie } from '@/lib/auth';
 import { LoginSchema, validateRequestBody } from '@/lib/validation';
 import { protectRequest, authLimiter } from '@/lib/arcjet';
+import { verifyTurnstileToken } from '@/lib/turnstile';
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,7 +19,19 @@ export async function POST(request: NextRequest) {
       return validation.response;
     }
 
-    const { email, password, rememberMe } = validation.data;
+    const { email, password, rememberMe, turnstileToken } = validation.data;
+
+    // Verify Cloudflare Turnstile token
+    const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
+                     request.headers.get('x-real-ip') ||
+                     undefined;
+    const turnstileCheck = await verifyTurnstileToken(turnstileToken, clientIp);
+    if (!turnstileCheck.success) {
+      return NextResponse.json(
+        { message: turnstileCheck.error || 'การตรวจสอบความปลอดภัยไม่ผ่าน' },
+        { status: 400 }
+      );
+    }
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
