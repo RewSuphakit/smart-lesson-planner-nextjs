@@ -21,7 +21,8 @@ export const aj = arcjetKey
 
 /**
  * Dedicated rate limiter for authentication routes (login / register)
- * Protects against brute-force attacks: max 5 requests per 15 minutes per IP
+ * Protects against brute-force attacks: max 30 requests per 10 minutes per IP
+ * (Prevents blocking multiple teachers sharing the same school public IP/NAT)
  */
 export const authLimiter = arcjetKey
   ? arcjet({
@@ -30,8 +31,8 @@ export const authLimiter = arcjetKey
         shield({ mode: 'LIVE' }),
         slidingWindow({
           mode: 'LIVE',
-          interval: '15m',
-          max: 5,
+          interval: '10m',
+          max: 30,
         }),
       ],
     })

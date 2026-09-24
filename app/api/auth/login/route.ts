@@ -8,12 +8,6 @@ import { verifyTurnstileToken } from '@/lib/turnstile';
 
 export async function POST(request: NextRequest) {
   try {
-    // Arcjet Rate Limiting & Brute Force Protection (5 attempts / 15 mins)
-    const arcjetCheck = await protectRequest(request, authLimiter);
-    if (!arcjetCheck.allowed) {
-      return arcjetCheck.response!;
-    }
-
     const validation = await validateRequestBody(request, LoginSchema);
     if (!validation.success) {
       return validation.response;
@@ -21,7 +15,7 @@ export async function POST(request: NextRequest) {
 
     const { email, password, rememberMe, turnstileToken } = validation.data;
 
-    // Verify Cloudflare Turnstile token
+    // 1. Verify Cloudflare Turnstile token FIRST (Ensures siteverify is always called)
     const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
                      request.headers.get('x-real-ip') ||
                      undefined;
@@ -31,6 +25,12 @@ export async function POST(request: NextRequest) {
         { message: turnstileCheck.error || 'การตรวจสอบความปลอดภัยไม่ผ่าน' },
         { status: 400 }
       );
+    }
+
+    // 2. Arcjet Rate Limiting & Brute Force Protection
+    const arcjetCheck = await protectRequest(request, authLimiter);
+    if (!arcjetCheck.allowed) {
+      return arcjetCheck.response!;
     }
 
     const user = await prisma.user.findUnique({ where: { email } });
