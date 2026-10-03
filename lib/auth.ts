@@ -13,11 +13,13 @@ interface JwtPayload {
   id: number;
   email: string;
   role: string;
+  authMethod?: 'credentials' | 'google';
 }
 
 export function generateToken(
   user: { id: number; email: string; role: string },
-  rememberMe?: boolean
+  rememberMe?: boolean,
+  authMethod?: 'credentials' | 'google'
 ): string {
   let expiresIn: string;
   if (rememberMe === true) {
@@ -29,7 +31,7 @@ export function generateToken(
   }
 
   return jwt.sign(
-    { id: user.id, email: user.email, role: user.role },
+    { id: user.id, email: user.email, role: user.role, authMethod: authMethod || 'credentials' },
     getJwtSecret(),
     { expiresIn: expiresIn as jwt.SignOptions['expiresIn'] }
   );

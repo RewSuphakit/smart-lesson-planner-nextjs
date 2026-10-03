@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
 
     if (!new_password || typeof new_password !== 'string' || new_password.length < 6) {
       return NextResponse.json(
-        { message: 'New password must be at least 6 characters long' },
+        { message: 'รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 6 ตัวอักษร' },
         { status: 400 }
       );
     }
@@ -22,14 +22,15 @@ export async function POST(request: NextRequest) {
     });
 
     if (!user) {
-      return NextResponse.json({ message: 'User not found' }, { status: 404 });
+      return NextResponse.json({ message: 'ไม่พบบัญชีผู้ใช้งาน' }, { status: 404 });
     }
 
-    // If user has an existing password, verify current password
-    if (user.password) {
+    // If user has an existing password AND logged in via credentials (not Google OAuth),
+    // require current password verification
+    if (user.password && authUser.authMethod !== 'google') {
       if (!current_password) {
         return NextResponse.json(
-          { message: 'Current password is required' },
+          { message: 'กรุณากรอกรหัสผ่านปัจจุบัน' },
           { status: 400 }
         );
       }
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
       const isMatch = await bcrypt.compare(current_password, user.password);
       if (!isMatch) {
         return NextResponse.json(
-          { message: 'Current password does not match' },
+          { message: 'รหัสผ่านปัจจุบันไม่ถูกต้อง' },
           { status: 400 }
         );
       }
@@ -50,10 +51,10 @@ export async function POST(request: NextRequest) {
       data: { password: hashedPassword },
     });
 
-    return NextResponse.json({ message: 'Password changed successfully' });
+    return NextResponse.json({ message: 'เปลี่ยนรหัสผ่านเรียบร้อยแล้ว' });
   } catch (error) {
     if (error instanceof AuthError) return handleAuthError();
     console.error('Change password error:', error);
-    return NextResponse.json({ message: 'Failed to change password' }, { status: 500 });
+    return NextResponse.json({ message: 'ไม่สามารถเปลี่ยนรหัสผ่านได้ กรุณาลองใหม่อีกครั้ง' }, { status: 500 });
   }
 }

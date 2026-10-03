@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const token = generateToken(user);
+    const token = generateToken(user, undefined, 'google');
 
     const response = NextResponse.json({
       message: 'Google login successful',
