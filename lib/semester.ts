@@ -215,7 +215,8 @@ export function isClassroomSemesterEnded(classroom: ClassroomSemesterFields, asO
 
 // ==================== Semester Model Helpers ====================
 
-import prisma from '@/lib/prisma';
+import prisma, { withDbRetry } from '@/lib/prisma';
+import { getOrSetCache, userCacheKey } from '@/lib/cache';
 
 export interface SemesterRecord {
   id: number;
@@ -231,26 +232,42 @@ export interface SemesterRecord {
 }
 
 /**
- * Retrieves the active semester for a user.
+ * Retrieves the active semester for a user (cached for 120s).
  * Returns null if no active semester is set.
  */
 export async function getActiveSemester(userId: number): Promise<SemesterRecord | null> {
-  const semester = await prisma.semester.findFirst({
-    where: { userId, isActive: true },
-  });
-  return semester;
+  return getOrSetCache(
+    userCacheKey(userId, 'semester', 'active'),
+    120,
+    async () => {
+      const semester = await withDbRetry(() =>
+        prisma.semester.findFirst({
+          where: { userId, isActive: true },
+        })
+      );
+      return semester;
+    }
+  );
 }
 
 /**
- * Lightweight helper that returns only the active semester ID.
+ * Lightweight helper that returns only the active semester ID (cached for 120s).
  * Returns null if no active semester is set.
  */
 export async function getActiveSemesterId(userId: number): Promise<number | null> {
-  const semester = await prisma.semester.findFirst({
-    where: { userId, isActive: true },
-    select: { id: true },
-  });
-  return semester?.id ?? null;
+  return getOrSetCache(
+    userCacheKey(userId, 'semester', 'active_id'),
+    120,
+    async () => {
+      const semester = await withDbRetry(() =>
+        prisma.semester.findFirst({
+          where: { userId, isActive: true },
+          select: { id: true },
+        })
+      );
+      return semester?.id ?? null;
+    }
+  );
 }
 
 /**

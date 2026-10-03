@@ -4,6 +4,7 @@ import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { UpdateSemesterSchema, validateRequestBody } from '@/lib/validation';
 import { CurriculumType } from '@prisma/client';
 import { getCurrentWeek, getWeekDateRanges, getSemesterEndDate } from '@/lib/semester';
+import { invalidateCache, userCacheKey } from '@/lib/cache';
 
 /**
  * GET /api/semester/:id
@@ -185,6 +186,10 @@ export async function PUT(
       data: updateData,
     });
 
+    invalidateCache(userCacheKey(userId, 'semester'));
+    invalidateCache(userCacheKey(userId, 'classrooms'));
+    invalidateCache(userCacheKey(userId, 'dashboard'));
+
     return NextResponse.json({
       data: {
         id: updated.id,
@@ -241,6 +246,10 @@ export async function DELETE(
     }
 
     await prisma.semester.delete({ where: { id: semesterId } });
+
+    invalidateCache(userCacheKey(userId, 'semester'));
+    invalidateCache(userCacheKey(userId, 'classrooms'));
+    invalidateCache(userCacheKey(userId, 'dashboard'));
 
     return NextResponse.json({ message: 'ลบภาคเรียนสำเร็จ' });
   } catch (error) {

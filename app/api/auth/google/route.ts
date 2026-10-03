@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { OAuth2Client } from 'google-auth-library';
-import prisma from '@/lib/prisma';
+import prisma, { withDbRetry } from '@/lib/prisma';
 import { generateToken, setAuthCookie } from '@/lib/auth';
 
 function cleanString(str?: string | null): string {
@@ -67,38 +67,44 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Email not provided by Google account' }, { status: 400 });
     }
 
-    let user = await prisma.user.findUnique({ where: { googleId } });
+    let user = await withDbRetry(() => prisma.user.findUnique({ where: { googleId } }));
 
     if (!user) {
-      const existingByEmail = await prisma.user.findUnique({ where: { email } });
+      const existingByEmail = await withDbRetry(() => prisma.user.findUnique({ where: { email } }));
       if (existingByEmail) {
         // Link Google ID to existing user account and ensure email is verified
-        user = await prisma.user.update({
-          where: { id: existingByEmail.id },
-          data: {
-            googleId,
-            avatar: existingByEmail.avatar || picture,
-            emailVerified: true,
-          },
-        });
+        user = await withDbRetry(() =>
+          prisma.user.update({
+            where: { id: existingByEmail.id },
+            data: {
+              googleId,
+              avatar: existingByEmail.avatar || picture,
+              emailVerified: true,
+            },
+          })
+        );
       } else {
-        user = await prisma.user.create({
-          data: {
-            email,
-            name: name || 'User',
-            googleId,
-            avatar: picture,
-            role: 'teacher',
-            emailVerified: true,
-          },
-        });
+        user = await withDbRetry(() =>
+          prisma.user.create({
+            data: {
+              email,
+              name: name || 'User',
+              googleId,
+              avatar: picture,
+              role: 'teacher',
+              emailVerified: true,
+            },
+          })
+        );
       }
     } else {
       if (picture && (!user.avatar || user.avatar.includes('googleusercontent.com'))) {
-        user = await prisma.user.update({
-          where: { id: user.id },
-          data: { avatar: picture, emailVerified: true },
-        });
+        user = await withDbRetry(() =>
+          prisma.user.update({
+            where: { id: user.id },
+            data: { avatar: picture, emailVerified: true },
+          })
+        );
       }
     }
 

@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import prisma, { withDbRetry } from '@/lib/prisma';
 import { CurriculumType } from '@prisma/client';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { ClassroomSchema, validateRequestBody } from '@/lib/validation';
 import { getDefaultWeeks, getActiveSemesterId } from '@/lib/semester';
 import { formatClassroomResponse } from '@/lib/formatters';
+import { getOrSetCache, userCacheKey, invalidateCache } from '@/lib/cache';
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,36 +14,42 @@ export async function GET(request: NextRequest) {
     const semesterIdParam = searchParams.get('semester_id');
     const allSemesters = searchParams.get('all') === 'true';
 
-    // Build where clause with semester scoping
-    const where: Record<string, unknown> = { userId: user.id };
+    const cacheKey = userCacheKey(user.id, 'classrooms', allSemesters ? 'all' : (semesterIdParam || 'active'));
 
-    if (!allSemesters) {
-      if (semesterIdParam) {
-        // Explicit semester filter
-        const semesterId = Number(semesterIdParam);
-        if (!isNaN(semesterId) && semesterId > 0) {
-          where.semesterId = semesterId;
+    const result = await getOrSetCache(cacheKey, 60, async () => {
+      // Build where clause with semester scoping
+      const where: Record<string, unknown> = { userId: user.id };
+
+      if (!allSemesters) {
+        if (semesterIdParam) {
+          // Explicit semester filter
+          const semesterId = Number(semesterIdParam);
+          if (!isNaN(semesterId) && semesterId > 0) {
+            where.semesterId = semesterId;
+          }
+        } else {
+          // Default: scope to active semester (if one exists)
+          const activeSemesterId = await getActiveSemesterId(user.id);
+          if (activeSemesterId) {
+            where.semesterId = activeSemesterId;
+          }
+          // If no active semester, show all classrooms (backward compat)
         }
-      } else {
-        // Default: scope to active semester (if one exists)
-        const activeSemesterId = await getActiveSemesterId(user.id);
-        if (activeSemesterId) {
-          where.semesterId = activeSemesterId;
-        }
-        // If no active semester, show all classrooms (backward compat)
       }
-    }
 
-    const classrooms = await prisma.classroom.findMany({
-      where,
-      include: {
-        _count: { select: { students: true } },
-        semester: { select: { id: true, name: true, termNumber: true, academicYear: true, startDate: true } },
-      },
-      orderBy: { createdAt: 'desc' },
+      const classrooms = await withDbRetry(() =>
+        prisma.classroom.findMany({
+          where,
+          include: {
+            _count: { select: { students: true } },
+            semester: { select: { id: true, name: true, termNumber: true, academicYear: true, startDate: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+        })
+      );
+
+      return classrooms.map((classroom) => formatClassroomResponse(classroom));
     });
-
-    const result = classrooms.map((classroom) => formatClassroomResponse(classroom));
 
     return NextResponse.json({ data: result });
   } catch (error) {
@@ -112,6 +119,9 @@ export async function POST(request: NextRequest) {
         semesterStartDate: semester_start_date ? new Date(semester_start_date) : null,
       },
     });
+
+    invalidateCache(userCacheKey(user.id, 'classrooms'));
+    invalidateCache(userCacheKey(user.id, 'dashboard'));
 
     return NextResponse.json({ data: classroom }, { status: 201 });
   } catch (error) {

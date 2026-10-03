@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import prisma, { withDbRetry } from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 
 import bcrypt from 'bcryptjs';
@@ -8,20 +8,22 @@ export async function GET(request: NextRequest) {
   try {
     const authUser = requireAuth(request);
 
-    const user = await prisma.user.findUnique({
-      where: { id: authUser.id },
-      select: { 
-        id: true, 
-        email: true, 
-        name: true, 
-        role: true, 
-        avatar: true, 
-        emailVerified: true, 
-        createdAt: true,
-        password: true,
-        googleId: true 
-      },
-    });
+    const user = await withDbRetry(() =>
+      prisma.user.findUnique({
+        where: { id: authUser.id },
+        select: { 
+          id: true, 
+          email: true, 
+          name: true, 
+          role: true, 
+          avatar: true, 
+          emailVerified: true, 
+          createdAt: true,
+          password: true,
+          googleId: true 
+        },
+      })
+    );
 
     if (!user) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 });

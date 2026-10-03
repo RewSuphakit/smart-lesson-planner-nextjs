@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { CreateStudentSchema, BulkCreateStudentSchema, validateRequestBody } from '@/lib/validation';
+import { invalidateCache, userCacheKey } from '@/lib/cache';
 
 export async function GET(request: NextRequest) {
   try {
@@ -146,6 +147,8 @@ export async function POST(request: NextRequest) {
       }));
 
       const result = await prisma.student.createMany({ data });
+      invalidateCache(userCacheKey(user.id, 'classrooms'));
+      invalidateCache(userCacheKey(user.id, 'dashboard'));
       return NextResponse.json({ message: `Created ${result.count} students` }, { status: 201 });
     }
 
@@ -177,6 +180,9 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    invalidateCache(userCacheKey(user.id, 'classrooms'));
+    invalidateCache(userCacheKey(user.id, 'dashboard'));
+
     return NextResponse.json({ data: student }, { status: 201 });
   } catch (error) {
     if (error instanceof AuthError) return handleAuthError();
@@ -205,6 +211,8 @@ export async function PATCH(request: NextRequest) {
         where: { id: { in: body.student_ids }, userId: user.id },
         data: { classroomId: body.classroom_id ? Number(body.classroom_id) : null },
       });
+      invalidateCache(userCacheKey(user.id, 'classrooms'));
+      invalidateCache(userCacheKey(user.id, 'dashboard'));
       return NextResponse.json({ message: 'Students updated' });
     }
 
@@ -282,6 +290,8 @@ export async function DELETE(request: NextRequest) {
           userId: user.id,
         },
       });
+      invalidateCache(userCacheKey(user.id, 'classrooms'));
+      invalidateCache(userCacheKey(user.id, 'dashboard'));
       return NextResponse.json({ message: `Deleted ${result.count} students`, count: result.count });
     }
 
@@ -300,6 +310,8 @@ export async function DELETE(request: NextRequest) {
         classroomId: cid,
       },
     });
+    invalidateCache(userCacheKey(user.id, 'classrooms'));
+    invalidateCache(userCacheKey(user.id, 'dashboard'));
     return NextResponse.json({ message: `Deleted ${result.count} students`, count: result.count });
   } catch (error) {
     if (error instanceof AuthError) return handleAuthError();

@@ -110,16 +110,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Sidebar - GPU accelerated, blur disabled on mobile animation for maximum fluidity */}
       <aside className={`
-        fixed lg:sticky lg:top-0 lg:h-screen inset-y-0 left-0 z-50 w-[270px]
+        fixed lg:sticky lg:top-0 h-screen h-[100dvh] max-h-screen inset-y-0 left-0 z-50 w-[270px]
         bg-white lg:bg-white/80 lg:backdrop-blur-2xl
         border-r border-indigo-200/40
-        flex flex-col
+        flex flex-col justify-between overflow-hidden
         transition-transform duration-300 ease-out will-change-transform transform-gpu
         shadow-2xl shadow-indigo-950/20 lg:shadow-lg lg:shadow-indigo-100/30
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         {/* Logo */}
-        <div className="p-6 pb-3">
+        <div className="p-6 pb-3 shrink-0">
           <div className="flex items-center gap-3.5">
             <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-400 via-purple-400 to-emerald-400 flex items-center justify-center shadow-lg shadow-indigo-300/30 animate-pulse-glow">
               <GraduationCap className="w-5 h-5 text-white" />
@@ -136,11 +136,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         {/* Semester Switcher */}
-        <div className="px-4 pb-2 relative z-30">
+        <div className="px-4 pb-2 relative z-30 shrink-0">
           <SemesterSwitcher />
         </div>
 
-        <div className="divider mx-5" />
+        <div className="divider mx-5 shrink-0" />
 
         {/* Navigation */}
         <nav className="flex-1 px-4 py-2 space-y-3 overflow-y-auto min-h-0">
@@ -176,7 +176,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
 
         {/* User Profile */}
-        <div className="p-4 pt-2">
+        <div className="p-4 pt-2 shrink-0 border-t border-indigo-100/60 bg-white/95">
           <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-200/30 p-3.5 rounded-2xl transition-all duration-300 hover:shadow-md hover:border-indigo-300/60">
             <div className="flex items-center gap-3">
               <Link
@@ -205,7 +205,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 className="p-2 rounded-xl hover:bg-rose-100 text-slate-600 hover:text-rose-500 transition-all duration-300"
                 title="ออกจากระบบ"
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut className="w-4 h-4 text-rose-500" />
               </button>
             </div>
           </div>
@@ -215,7 +215,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-h-screen min-w-0">
         {/* Mobile Header */}
-        <header className="sticky top-0 z-40 lg:hidden bg-white/95 border-b border-indigo-200/40 px-4 py-2.5 flex items-center justify-between gap-2 shadow-xs">
+        <header className="sticky top-0 z-40 lg:hidden bg-white/95 border-b border-indigo-200/40 px-3 py-2.5 flex items-center justify-between gap-2 shadow-xs">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setSidebarOpen(true)}
@@ -230,8 +230,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <h1 className="text-sm font-bold gradient-text hidden xs:inline-block">Smart Planner</h1>
             </div>
           </div>
-          <div className="w-48 max-w-[55%] relative z-50">
-            <SemesterSwitcher isCompact />
+          <div className="flex items-center gap-1.5 max-w-[62%]">
+            <div className="flex-1 min-w-0">
+              <SemesterSwitcher isCompact />
+            </div>
+            <button
+              onClick={handleLogout}
+              className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0"
+              title="ออกจากระบบ"
+            >
+              <LogOut className="w-4 h-4 text-rose-500" />
+            </button>
           </div>
         </header>
 

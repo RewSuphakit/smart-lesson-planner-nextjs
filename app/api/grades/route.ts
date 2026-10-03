@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { calculateAffectiveScore } from '@/lib/affective';
 import { resolveTargetWeeks } from '@/lib/semester';
+import { getOrSetCache, userCacheKey, invalidateCache } from '@/lib/cache';
 
 export async function GET(request: NextRequest) {
   try {
@@ -24,18 +25,24 @@ export async function GET(request: NextRequest) {
 
     // Get criteria
     if (searchParams.get('type') === 'criteria') {
-      const criteria = await prisma.gradeCriteria.findMany({
-        where: { classroomId: numericClassroomId },
-        orderBy: { minScore: 'desc' },
-      });
-      const mappedCriteria = criteria.map(c => ({
-        id: c.id,
-        classroom_id: c.classroomId,
-        grade: c.grade,
-        min_score: Number(c.minScore),
-        created_at: c.createdAt,
-        updated_at: c.updatedAt
-      }));
+      const mappedCriteria = await getOrSetCache(
+        userCacheKey(user.id, 'grades:criteria', numericClassroomId),
+        120,
+        async () => {
+          const criteria = await prisma.gradeCriteria.findMany({
+            where: { classroomId: numericClassroomId },
+            orderBy: { minScore: 'desc' },
+          });
+          return criteria.map(c => ({
+            id: c.id,
+            classroom_id: c.classroomId,
+            grade: c.grade,
+            min_score: Number(c.minScore),
+            created_at: c.createdAt,
+            updated_at: c.updatedAt
+          }));
+        }
+      );
       return NextResponse.json({ data: mappedCriteria });
     }
 
@@ -281,6 +288,8 @@ export async function POST(request: NextRequest) {
         });
       }
     });
+
+    invalidateCache(userCacheKey(user.id, 'grades:criteria', classroomId));
 
     return NextResponse.json({ message: 'Criteria saved' });
   } catch (error) {

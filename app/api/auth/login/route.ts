@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import prisma from '@/lib/prisma';
+import prisma, { withDbRetry } from '@/lib/prisma';
 import { generateToken, setAuthCookie } from '@/lib/auth';
 import { LoginSchema, validateRequestBody } from '@/lib/validation';
 import { protectRequest, authLimiter } from '@/lib/arcjet';
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       return arcjetCheck.response!;
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await withDbRetry(() => prisma.user.findUnique({ where: { email } }));
     if (!user) {
       return NextResponse.json({ message: 'Invalid email or password' }, { status: 401 });
     }

@@ -4,6 +4,7 @@ import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { SemesterSchema, validateRequestBody } from '@/lib/validation';
 import { CurriculumType } from '@prisma/client';
 import { getDefaultWeeks } from '@/lib/semester';
+import { invalidateCache, userCacheKey } from '@/lib/cache';
 
 /**
  * GET /api/semester
@@ -156,6 +157,10 @@ export async function POST(request: NextRequest) {
         totalWeeks: resolvedWeeks,
       },
     });
+
+    invalidateCache(userCacheKey(user.id, 'semester'));
+    invalidateCache(userCacheKey(user.id, 'classrooms'));
+    invalidateCache(userCacheKey(user.id, 'dashboard'));
 
     return NextResponse.json({
       data: {

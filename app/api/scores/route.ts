@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
+import { getOrSetCache, userCacheKey, invalidateCache } from '@/lib/cache';
 
 export async function GET(request: NextRequest) {
   try {
@@ -88,21 +89,27 @@ export async function GET(request: NextRequest) {
 
     // Get structures
     if (searchParams.get('type') === 'structure') {
-      const structures = await prisma.scoreStructure.findMany({
-        where: { classroomId: numericClassroomId },
-        orderBy: { lessonNumber: 'asc' },
-      });
-      const mappedStructures = structures.map(s => ({
-        id: s.id,
-        classroom_id: s.classroomId,
-        lesson_number: s.lessonNumber,
-        lesson_name: s.lessonName,
-        max_assignment_score: s.maxAssignmentScore,
-        max_post_test_score: s.maxPostTestScore,
-        hours: s.hours,
-        created_at: s.createdAt,
-        updated_at: s.updatedAt
-      }));
+      const mappedStructures = await getOrSetCache(
+        userCacheKey(user.id, 'scores:structure', numericClassroomId),
+        120,
+        async () => {
+          const structures = await prisma.scoreStructure.findMany({
+            where: { classroomId: numericClassroomId },
+            orderBy: { lessonNumber: 'asc' },
+          });
+          return structures.map(s => ({
+            id: s.id,
+            classroom_id: s.classroomId,
+            lesson_number: s.lessonNumber,
+            lesson_name: s.lessonName,
+            max_assignment_score: s.maxAssignmentScore,
+            max_post_test_score: s.maxPostTestScore,
+            hours: s.hours,
+            created_at: s.createdAt,
+            updated_at: s.updatedAt
+          }));
+        }
+      );
       return NextResponse.json({ data: mappedStructures });
     }
 
@@ -235,6 +242,7 @@ export async function POST(request: NextRequest) {
           });
         }
       }
+      invalidateCache(userCacheKey(user.id, 'scores:structure', classroomId));
       return NextResponse.json({ message: 'Structure saved successfully' });
     }
 

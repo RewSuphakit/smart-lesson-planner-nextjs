@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { formatAttendanceRecord, calculateAttendanceStatsFromGrouped } from '@/lib/formatters';
+import { invalidateCache, userCacheKey } from '@/lib/cache';
 
 export async function GET(request: NextRequest) {
   try {
@@ -150,6 +151,7 @@ export async function POST(request: NextRequest) {
       if (attendanceOperations.length > 0) {
         await prisma.$transaction(attendanceOperations);
       }
+      invalidateCache(userCacheKey(user.id, 'dashboard'));
       return NextResponse.json({ message: 'Attendance marked' });
     }
 
@@ -203,6 +205,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    invalidateCache(userCacheKey(user.id, 'dashboard'));
     return NextResponse.json({ message: 'Attendance marked' });
   } catch (error) {
     if (error instanceof AuthError) return handleAuthError();
@@ -237,6 +240,7 @@ export async function DELETE(request: NextRequest) {
       if (!attendance) return NextResponse.json({ message: 'Attendance record not found' }, { status: 404 });
 
       await prisma.attendance.delete({ where: { id: numericId } });
+      invalidateCache(userCacheKey(user.id, 'dashboard'));
       return NextResponse.json({ message: 'Attendance deleted' });
     }
 
@@ -285,6 +289,7 @@ export async function DELETE(request: NextRequest) {
       });
     }
 
+    invalidateCache(userCacheKey(user.id, 'dashboard'));
     return NextResponse.json({ message: 'Attendance deleted' });
   } catch (error) {
     if (error instanceof AuthError) return handleAuthError();
