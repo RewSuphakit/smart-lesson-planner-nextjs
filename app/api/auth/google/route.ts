@@ -98,14 +98,19 @@ export async function POST(request: NextRequest) {
         );
       }
     } else {
-      if (picture && (!user.avatar || user.avatar.includes('googleusercontent.com'))) {
+      const existingUser = user;
+      if (picture && (!existingUser.avatar || existingUser.avatar.includes('googleusercontent.com'))) {
         user = await withDbRetry(() =>
           prisma.user.update({
-            where: { id: user.id },
+            where: { id: existingUser.id },
             data: { avatar: picture, emailVerified: true },
           })
         );
       }
+    }
+
+    if (!user) {
+      return NextResponse.json({ message: 'User not found or creation failed' }, { status: 500 });
     }
 
     const token = generateToken(user, undefined, 'google');
