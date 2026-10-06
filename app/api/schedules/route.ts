@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { parseTimeToUtc } from '@/lib/constants';
 import { getWeekNumberForDate, getSemesterEndDate, resolveTargetWeeks } from '@/lib/semester';
+import { invalidateCache, userCacheKey } from '@/lib/cache';
 
 function isFlagpoleOrHomeroom(ws: { startPeriod?: number; entryType?: string; subjectName?: string | null; subjectCode?: string | null }) {
   if (ws.startPeriod === 0) return true;
@@ -309,11 +310,19 @@ export async function POST(request: NextRequest) {
         daysProcessed++;
       }
 
-      // Execute delete existing and create new atomically in a transaction to prevent data loss
+      const firstDate = schedulesToCreate.length > 0 ? schedulesToCreate[0].scheduledDate : startDate;
+      const lastDate = schedulesToCreate.length > 0 ? schedulesToCreate[schedulesToCreate.length - 1].scheduledDate : currentDate;
+
+      // Execute delete existing and create new atomically in a transaction to prevent data loss.
+      // Scoped strictly to the target generated date range to protect historical data in previous semesters.
       await prisma.$transaction([
         prisma.schedule.deleteMany({
           where: {
             userId: user.id,
+            scheduledDate: {
+              gte: firstDate,
+              lte: lastDate,
+            },
             OR: [
               { notes: { startsWith: 'สร้างอัตโนมัติ:' } },
               { title: { contains: 'เสาธง' } },
@@ -327,6 +336,8 @@ export async function POST(request: NextRequest) {
           ? [prisma.schedule.createMany({ data: schedulesToCreate })]
           : []),
       ]);
+
+      invalidateCache(userCacheKey(user.id, 'dashboard'));
 
       const summary = classrooms.map(room => ({
         classroom_name: room.name,
@@ -373,6 +384,8 @@ export async function POST(request: NextRequest) {
         status,
       },
     });
+
+    invalidateCache(userCacheKey(user.id, 'dashboard'));
 
     return NextResponse.json({ data: schedule }, { status: 201 });
   } catch (error) {

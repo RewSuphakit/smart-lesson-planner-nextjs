@@ -56,7 +56,7 @@ export default function Students() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
 
-  const emptyForm = { name: '', student_code: '', grade_level: '', email: '', classroom_id: '', avatar: '' };
+  const emptyForm = { name: '', student_code: '', grade_level: '', email: '', classroom_id: '', avatar: '', remove_avatar: false };
   const [form, setForm] = useState(emptyForm);
 
   // Single student photo & emoji picker state
@@ -74,7 +74,7 @@ export default function Students() {
   const { data: students = [], isLoading: loadingStudents } = useQuery<Student[]>({
     queryKey: ['students'],
     queryFn: async () => {
-      const res = await api.get('/students');
+      const res = await api.get('/students?include_avatar=true');
       return res.data.data || [];
     },
   });
@@ -254,7 +254,7 @@ export default function Students() {
     setIsCompressingSingle(true);
     try {
       const compressed = await compressImageFile(file, 160, 0.78);
-      setForm(prev => ({ ...prev, avatar: compressed }));
+      setForm(prev => ({ ...prev, avatar: compressed, remove_avatar: false }));
       toast.success('บีบอัดรูปภาพเรียบร้อย (~4KB)');
     } catch {
       toast.error('ไม่สามารถประมวลผลรูปภาพได้');
@@ -312,7 +312,8 @@ export default function Students() {
       grade_level: s.grade_level || '',
       email: s.email || '',
       classroom_id: s.classroom_id ? String(s.classroom_id) : '',
-      avatar: s.avatar || ''
+      avatar: s.avatar || '',
+      remove_avatar: false
     });
     setEditing(s.id);
     setShowEmojiPicker(false);
@@ -709,7 +710,7 @@ export default function Students() {
                 {form.avatar && (
                   <button
                     type="button"
-                    onClick={() => setForm(prev => ({ ...prev, avatar: '' }))}
+                    onClick={() => setForm(prev => ({ ...prev, avatar: '', remove_avatar: true }))}
                     className="px-2 py-1 rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 text-xs font-semibold transition-colors"
                     title="ลบรูปและใช้อิโมจิตามลำดับ"
                   >
@@ -737,7 +738,7 @@ export default function Students() {
                         key={idx}
                         type="button"
                         onClick={() => {
-                          setForm(prev => ({ ...prev, avatar: emoji }));
+                          setForm(prev => ({ ...prev, avatar: emoji, remove_avatar: false }));
                           setShowEmojiPicker(false);
                         }}
                         className="w-7 h-7 flex items-center justify-center text-lg rounded-lg hover:bg-indigo-50 hover:scale-125 transition-transform"

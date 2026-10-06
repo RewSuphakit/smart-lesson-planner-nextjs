@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { UpdateStudentExamScoresSchema, validateRequestBody } from '@/lib/validation';
+import { invalidateCache, userCacheKey } from '@/lib/cache';
 
 export async function PUT(request: NextRequest) {
   try {
@@ -67,6 +68,9 @@ export async function PUT(request: NextRequest) {
     if (updateOperations.length > 0) {
       await prisma.$transaction(updateOperations);
     }
+
+    invalidateCache(userCacheKey(user.id, 'dashboard'));
+    invalidateCache(userCacheKey(user.id, 'classrooms'));
 
     return NextResponse.json({ message: 'Exams updated successfully' });
   } catch (error) {

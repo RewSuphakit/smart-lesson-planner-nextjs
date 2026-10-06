@@ -73,6 +73,8 @@ interface Classroom {
   final_weight?: number;
   midterm_max_score?: number;
   final_max_score?: number;
+  total_weeks?: number;
+  curriculum_type?: 'pvch' | 'pvs' | 'custom' | string;
 }
 
 interface Student {
@@ -282,7 +284,7 @@ export default function Scores() {
   const { data: allClassAttendance = [] } = useQuery<{ id: number; student_id: number; date: string; status: string }[]>({
     queryKey: ['attendance-all-class-for-scores', selectedClass],
     queryFn: async () => {
-      const res = await api.get(`/attendance?classroom_id=${selectedClass}`);
+      const res = await api.get(`/attendance?classroom_id=${selectedClass}&type=records`);
       return res.data.data || [];
     },
     enabled: !!selectedClass,
@@ -405,10 +407,7 @@ export default function Scores() {
     const start = new Date(semesterStartDate);
     if (isNaN(start.getTime())) return {};
 
-    let targetWeeks = 18;
-    if (classroomObj?.name?.includes('ปวส') || classroomObj?.name?.includes('ปวส.')) {
-      targetWeeks = 15;
-    }
+    const targetWeeks = classroomObj?.total_weeks || (classroomObj?.curriculum_type === 'pvs' ? 15 : 18);
 
     const getSchemaDay = (d: Date) => (d.getDay() + 6) % 7;
 
@@ -471,19 +470,7 @@ export default function Scores() {
   useEffect(() => {
     if (matrixData) {
       const fetchedStructs = matrixData.structures || [];
-      const total = classroomObj?.total_classes || 40;
-      let targetWeeks = 18;
-      if (classroomObj?.name?.includes('ปวส') || classroomObj?.name?.includes('ปวส.')) {
-        targetWeeks = 15;
-      } else if (classroomObj?.name?.includes('ปวช') || classroomObj?.name?.includes('ปวช.')) {
-        targetWeeks = 18;
-      } else {
-        if (total % 18 !== 0) {
-          for (let w = 15; w <= 20; w++) {
-            if (total % w === 0) { targetWeeks = w; break; }
-          }
-        }
-      }
+      const targetWeeks = classroomObj?.total_weeks || (classroomObj?.curriculum_type === 'pvs' ? 15 : 18);
 
       let finalStructs: ScoreStructure[];
       let savedInDB = false;

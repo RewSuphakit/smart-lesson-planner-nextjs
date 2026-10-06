@@ -69,6 +69,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ data: records.map(formatAttendanceRecord) });
     }
 
+    // Get all individual attendance records for a classroom (e.g. for Scores matrix week-date mapping)
+    if (classroomId && (searchParams.get('type') === 'records' || searchParams.get('records') === 'true')) {
+      const classroom = await prisma.classroom.findFirst({
+        where: { id: Number(classroomId), userId: user.id },
+      });
+      if (!classroom) return NextResponse.json({ message: 'Classroom not found' }, { status: 404 });
+
+      const records = await prisma.attendance.findMany({
+        where: { classroomId: Number(classroomId) },
+        orderBy: { date: 'asc' },
+      });
+      return NextResponse.json({ data: records.map(formatAttendanceRecord) });
+    }
+
     // Get stats
     if (classroomId) {
       // Verify classroom ownership

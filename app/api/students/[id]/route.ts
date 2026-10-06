@@ -81,7 +81,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
               val = Math.min(maxScore, Math.max(0, num));
             }
           }
-        } else if (['studentCode', 'gradeLevel', 'email', 'avatar'].includes(prismaKey)) {
+        } else if (prismaKey === 'avatar') {
+          if (body.remove_avatar === true) {
+            val = null;
+          } else if (val && String(val).trim()) {
+            val = String(val).trim();
+          } else {
+            // Keep existing avatar if not explicitly set or removed
+            continue;
+          }
+        } else if (['studentCode', 'gradeLevel', 'email'].includes(prismaKey)) {
           val = val ? String(val).trim() : null;
         }
         updateData[prismaKey] = val;

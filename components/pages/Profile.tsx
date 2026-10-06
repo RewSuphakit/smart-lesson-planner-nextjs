@@ -133,7 +133,6 @@ export default function ProfilePage() {
       }
       if (res.data.token) {
         localStorage.setItem('token', res.data.token);
-        document.cookie = `token=${res.data.token}; path=/; max-age=604800; SameSite=Lax`;
       }
       toast.success(res.data.message || 'เปลี่ยนที่อยู่อีเมลสำเร็จเรียบร้อย 🎉');
       setIsEmailModalOpen(false);

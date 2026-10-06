@@ -159,6 +159,7 @@ model Student {
   @@index([userId, classroomId], map: "idx_students_user_classroom")
   @@index([classroomId, name], map: "idx_students_classroom_name")
   @@index([classroomId, studentCode], map: "idx_students_classroom_code")
+  @@index([studentCode], map: "idx_students_code")
   @@map("students")
 }
 

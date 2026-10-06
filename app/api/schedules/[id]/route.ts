@@ -3,6 +3,7 @@ import { ScheduleStatus } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { parseTimeToUtc } from '@/lib/constants';
+import { invalidateCache, userCacheKey } from '@/lib/cache';
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -59,6 +60,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     await prisma.schedule.update({ where: { id: numericId }, data: updateData });
+    invalidateCache(userCacheKey(user.id, 'dashboard'));
     return NextResponse.json({ message: 'Schedule updated' });
   } catch (error) {
     if (error instanceof AuthError) return handleAuthError();
@@ -82,6 +84,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     if (!schedule) return NextResponse.json({ message: 'Schedule not found' }, { status: 404 });
 
     await prisma.schedule.delete({ where: { id: numericId } });
+    invalidateCache(userCacheKey(user.id, 'dashboard'));
     return NextResponse.json({ message: 'Schedule deleted' });
   } catch (error) {
     if (error instanceof AuthError) return handleAuthError();

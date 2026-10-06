@@ -187,20 +187,17 @@ export default function Grades() {
   const { data: gradesData, isLoading: loadingGrades } = useQuery<{ criteria: Criterion[]; report: ReportStudent[]; weights?: Weights }>({
     queryKey: ['grades', selectedClass],
     queryFn: async () => {
-      const [critRes, repRes] = await Promise.all([
-        api.get(`/grades?classroom_id=${selectedClass}&type=criteria`),
-        api.get(`/grades?classroom_id=${selectedClass}`)
-      ]);
-
-      const loadedCriteria = critRes.data.data;
+      const repRes = await api.get(`/grades?classroom_id=${selectedClass}`);
+      const repData = repRes.data;
+      const loadedCriteria = repData.criteria;
       const finalCriteria = (loadedCriteria && loadedCriteria.length > 0)
         ? loadedCriteria
         : DEFAULT_CRITERIA.map(c => ({ ...c }));
 
       return {
         criteria: finalCriteria,
-        report: repRes.data.data || [],
-        weights: repRes.data.weights
+        report: repData.data || [],
+        weights: repData.weights
       };
     },
     enabled: !!selectedClass,

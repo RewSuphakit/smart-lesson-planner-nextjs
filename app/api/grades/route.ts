@@ -235,6 +235,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       data: report,
+      criteria: criteria.map(c => ({ grade: c.grade, min_score: c.minScore })),
       weights: {
         assignment_weight: weightAssign,
         post_test_weight: weightPostTest,
