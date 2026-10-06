@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
+import { invalidateCache, userCacheKey } from '@/lib/cache';
 
 /**
  * POST /api/semester/:id/activate
@@ -59,6 +60,10 @@ export async function POST(
         data: { isActive: true },
       }),
     ]);
+
+    invalidateCache(userCacheKey(userId, 'semester'));
+    invalidateCache(userCacheKey(userId, 'classrooms'));
+    invalidateCache(userCacheKey(userId, 'dashboard'));
 
     return NextResponse.json({
       data: {

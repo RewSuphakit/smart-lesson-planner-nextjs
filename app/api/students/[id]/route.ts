@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
+import { invalidateCache, userCacheKey } from '@/lib/cache';
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -88,6 +89,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     await prisma.student.update({ where: { id: numericId }, data: updateData });
+    invalidateCache(userCacheKey(user.id, 'classrooms'));
+    invalidateCache(userCacheKey(user.id, 'dashboard'));
     return NextResponse.json({ message: 'Student updated' });
   } catch (error) {
     if (error instanceof AuthError) return handleAuthError();
@@ -112,6 +115,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     if (!student) return NextResponse.json({ message: 'Student not found' }, { status: 404 });
 
     await prisma.student.delete({ where: { id: numericId } });
+    invalidateCache(userCacheKey(user.id, 'classrooms'));
+    invalidateCache(userCacheKey(user.id, 'dashboard'));
     return NextResponse.json({ message: 'Student deleted' });
   } catch (error) {
     if (error instanceof AuthError) return handleAuthError();

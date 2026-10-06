@@ -55,22 +55,8 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-
-      // If user is unverified and has no classrooms, clean up collision
-      const classroomCount = await prisma.classroom.count({
-        where: { userId: existingUser.id },
-      });
-
-      if (classroomCount === 0) {
-        await prisma.user.delete({
-          where: { id: existingUser.id },
-        });
-      } else {
-        return NextResponse.json(
-          { message: 'อีเมลนี้ถูกลงทะเบียนไว้แล้ว กรุณาใช้อีเมลอื่น' },
-          { status: 400 }
-        );
-      }
+      // Note: Do not delete unverified accounts here at request time (prevents DoS/takeover).
+      // If the requester truly owns the email, they will prove ownership with the OTP in verify/route.ts.
     }
 
     // Generate 6-digit OTP

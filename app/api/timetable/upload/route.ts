@@ -5,6 +5,8 @@ import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { PERIOD_TIMES, parseTimeToUtc } from '@/lib/constants';
 import { protectRequest, aiLimiter } from '@/lib/arcjet';
+import { getActiveSemesterId } from '@/lib/semester';
+import { invalidateCache, userCacheKey } from '@/lib/cache';
 
 export const maxDuration = 60; // Allow up to 60 seconds on Vercel Serverless Function
 export const dynamic = 'force-dynamic';
@@ -111,7 +113,7 @@ async function callGeminiWithFallback(
   genAI: GoogleGenerativeAI,
   parts: (string | { inlineData: { data: string; mimeType: string } })[]
 ) {
-  const models = ['gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-3.5-flash-lite'];
+  const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
   let lastError: Error | null = null;
 
   for (const modelName of models) {
@@ -481,6 +483,7 @@ export async function POST(request: NextRequest) {
       entryType: EntryType;
       timetableName?: string;
       semester?: string | null;
+      semesterId?: number | null;
     }
 
     let entries: TimetableEntryInput[] = [];
@@ -502,17 +505,24 @@ export async function POST(request: NextRequest) {
 
     const timetableName = (formData.get('timetable_name') as string) || 'ตารางสอน';
     const semester = (formData.get('semester') as string) || null;
+    const semesterIdForm = formData.get('semester_id');
+    const resolvedSemesterId = semesterIdForm ? Number(semesterIdForm) : await getActiveSemesterId(user.id);
     
     entries = entries.map(e => ({
       ...e,
       timetableName,
       semester,
+      semesterId: resolvedSemesterId || null,
     }));
 
     let createdCount = 0;
     if (formData.get('replace') === 'true') {
+      const deleteWhere: { userId: number; semesterId?: number } = { userId: user.id };
+      if (resolvedSemesterId) {
+        deleteWhere.semesterId = resolvedSemesterId;
+      }
       const [, created] = await prisma.$transaction([
-        prisma.weeklySchedule.deleteMany({ where: { userId: user.id } }),
+        prisma.weeklySchedule.deleteMany({ where: deleteWhere }),
         prisma.weeklySchedule.createMany({ data: entries }),
       ]);
       createdCount = created.count;
@@ -520,6 +530,8 @@ export async function POST(request: NextRequest) {
       const created = await prisma.weeklySchedule.createMany({ data: entries });
       createdCount = created.count;
     }
+
+    invalidateCache(userCacheKey(user.id, 'dashboard'));
 
     return NextResponse.json({
       message: `นำเข้าตารางสอนสำเร็จ ${createdCount} รายการ`,

@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getAuthUser } from '@/lib/auth';
+import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
+import { invalidateCache, userCacheKey } from '@/lib/cache';
 
 export async function PUT(request: NextRequest) {
   try {
-    const user = getAuthUser(request);
-    if (!user) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-    }
+    const user = requireAuth(request);
 
     const { studentIds, classroomId } = await request.json();
 
@@ -35,11 +33,15 @@ export async function PUT(request: NextRequest) {
       },
     });
 
+    invalidateCache(userCacheKey(user.id, 'classrooms'));
+    invalidateCache(userCacheKey(user.id, 'dashboard'));
+
     return NextResponse.json({
       message: `ย้ายนักเรียนสำเร็จ ${updateResult.count} คน`,
       count: updateResult.count
     });
   } catch (error) {
+    if (error instanceof AuthError) return handleAuthError();
     console.error('Bulk update classroom error:', error);
     return NextResponse.json({ message: 'Failed to update classrooms' }, { status: 500 });
   }

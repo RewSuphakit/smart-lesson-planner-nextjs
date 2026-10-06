@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { PERIOD_TIMES, parseTimeToUtc } from '@/lib/constants';
 import { getActiveSemesterId } from '@/lib/semester';
+import { invalidateCache, userCacheKey } from '@/lib/cache';
 
 function normalizeEntryType(type?: string | null): 'lecture' | 'lab' | 'activity' | 'homeroom' {
   const lower = String(type || '').toLowerCase().trim();
@@ -185,7 +186,28 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const user = requireAuth(request);
-    await prisma.weeklySchedule.deleteMany({ where: { userId: user.id } });
+    const { searchParams } = new URL(request.url);
+    const semesterIdParam = searchParams.get('semester_id');
+    const allSemesters = searchParams.get('all') === 'true';
+
+    const deleteWhere: { userId: number; semesterId?: number } = { userId: user.id };
+
+    if (!allSemesters) {
+      if (semesterIdParam) {
+        const sid = Number(semesterIdParam);
+        if (!isNaN(sid) && sid > 0) {
+          deleteWhere.semesterId = sid;
+        }
+      } else {
+        const activeSemesterId = await getActiveSemesterId(user.id);
+        if (activeSemesterId) {
+          deleteWhere.semesterId = activeSemesterId;
+        }
+      }
+    }
+
+    await prisma.weeklySchedule.deleteMany({ where: deleteWhere });
+    invalidateCache(userCacheKey(user.id, 'dashboard'));
     return NextResponse.json({ message: 'Timetable cleared' });
   } catch (error) {
     if (error instanceof AuthError) return handleAuthError();

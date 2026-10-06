@@ -14,16 +14,21 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('start_date');
     const endDate = searchParams.get('end_date');
 
-    // Get attendance history for a student
-    if (studentId && classroomId) {
+    // Get attendance history for a student (supports /api/attendance/history/:studentId rewrite or explicit classroom_id)
+    if (studentId) {
       // Validate ownership
       const student = await prisma.student.findFirst({
         where: { id: Number(studentId), userId: user.id },
       });
       if (!student) return NextResponse.json({ message: 'Student not found' }, { status: 404 });
 
+      const whereClause: { studentId: number; classroomId?: number } = { studentId: Number(studentId) };
+      if (classroomId) {
+        whereClause.classroomId = Number(classroomId);
+      }
+
       const records = await prisma.attendance.findMany({
-        where: { studentId: Number(studentId), classroomId: Number(classroomId) },
+        where: whereClause,
         orderBy: { date: 'desc' },
       });
       return NextResponse.json({ data: records.map(formatAttendanceRecord) });
