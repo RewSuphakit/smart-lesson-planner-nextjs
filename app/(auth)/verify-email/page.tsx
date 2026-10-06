@@ -117,7 +117,6 @@ function VerifyEmailContent() {
         document.cookie = `token=${res.data.token}; path=/; max-age=604800; SameSite=Lax`;
       }
       if (res.data.user) {
-        localStorage.setItem('user', JSON.stringify(res.data.user));
         updateUser(res.data.user);
       }
 
@@ -151,7 +150,6 @@ function VerifyEmailContent() {
         document.cookie = `token=${res.data.token}; path=/; max-age=604800; SameSite=Lax`;
       }
       if (res.data.user) {
-        localStorage.setItem('user', JSON.stringify(res.data.user));
         updateUser(res.data.user);
       }
 
