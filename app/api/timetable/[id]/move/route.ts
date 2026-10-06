@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { PERIOD_TIMES, parseTimeToUtc } from '@/lib/constants';
+import { invalidateCache, userCacheKey } from '@/lib/cache';
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -26,8 +27,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const span = entry.endPeriod - entry.startPeriod;
     const endPeriod = startPeriod + span;
 
+    if (dayOfWeek < 0 || dayOfWeek > 6) {
+      return NextResponse.json({ message: 'Invalid day of week (0-6)' }, { status: 400 });
+    }
+    if (startPeriod < 0 || startPeriod > 12) {
+      return NextResponse.json({ message: 'Invalid start period (0-12)' }, { status: 400 });
+    }
     if (endPeriod < startPeriod) {
       return NextResponse.json({ message: 'End period cannot be less than start period' }, { status: 400 });
+    }
+    if (endPeriod > 12) {
+      return NextResponse.json({ message: 'คาบเรียนเกินช่วงเวลาทำการสูงสุด (คาบที่ 12)' }, { status: 400 });
     }
 
     const hours = startPeriod === 0 ? 0 : (endPeriod - startPeriod + 1);
@@ -48,6 +58,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         hours,
       },
     });
+
+    invalidateCache(userCacheKey(user.id, 'dashboard'));
 
     return NextResponse.json({ message: 'Timetable moved successfully' });
   } catch (error) {

@@ -337,6 +337,8 @@ export async function POST(request: NextRequest) {
         }
       });
 
+      invalidateCache(userCacheKey(user.id, 'dashboard'));
+
       return NextResponse.json({ message: 'Scores saved successfully', updatedCount: creates.length + updates.length });
     }
 
@@ -494,6 +496,8 @@ export async function POST(request: NextRequest) {
           }
         );
       }
+
+      invalidateCache(userCacheKey(user.id, 'dashboard'));
 
       return NextResponse.json({
         message: 'Bulk scores saved successfully',

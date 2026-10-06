@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { PERIOD_TIMES, parseTimeToUtc } from '@/lib/constants';
+import { invalidateCache, userCacheKey } from '@/lib/cache';
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -51,9 +52,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
-    const finalStartPeriod = body.start_period !== undefined ? Number(body.start_period) : entry.startPeriod;
-    const finalEndPeriod = body.end_period !== undefined ? Number(body.end_period) : entry.endPeriod;
+    const rawStart = body.start_period !== undefined ? Number(body.start_period) : entry.startPeriod;
+    const rawEnd = body.end_period !== undefined ? Number(body.end_period) : entry.endPeriod;
+    const finalStartPeriod = Math.max(0, Math.min(12, isNaN(rawStart) ? 1 : rawStart));
+    const finalEndPeriod = Math.max(finalStartPeriod, Math.min(12, isNaN(rawEnd) ? finalStartPeriod : rawEnd));
     
+    updateData.startPeriod = finalStartPeriod;
+    updateData.endPeriod = finalEndPeriod;
     updateData.hours = finalStartPeriod === 0 ? 0 : (finalEndPeriod - finalStartPeriod + 1);
 
     if (body.start_time !== undefined) {
@@ -71,6 +76,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     await prisma.weeklySchedule.update({ where: { id: Number(id) }, data: updateData });
+    invalidateCache(userCacheKey(user.id, 'dashboard'));
     return NextResponse.json({ message: 'Entry updated' });
   } catch (error) {
     if (error instanceof AuthError) return handleAuthError();
@@ -90,6 +96,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     if (!entry) return NextResponse.json({ message: 'Entry not found' }, { status: 404 });
 
     await prisma.weeklySchedule.delete({ where: { id: Number(id) } });
+    invalidateCache(userCacheKey(user.id, 'dashboard'));
     return NextResponse.json({ message: 'Entry deleted' });
   } catch (error) {
     if (error instanceof AuthError) return handleAuthError();

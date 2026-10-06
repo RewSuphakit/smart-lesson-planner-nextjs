@@ -78,13 +78,13 @@ export async function GET(request: NextRequest) {
         name: c.name,
         total_classes: c.totalClasses,
         min_attendance_percent: c.minAttendancePercent,
-        assignment_weight: c.assignmentWeight,
-        post_test_weight: c.postTestWeight,
-        affective_weight: c.affectiveWeight,
-        midterm_weight: c.midtermWeight,
-        final_weight: c.finalWeight,
-        midterm_max_score: c.midtermMaxScore,
-        final_max_score: c.finalMaxScore,
+        assignment_weight: c.assignmentWeight !== null && c.assignmentWeight !== undefined ? Number(c.assignmentWeight) : null,
+        post_test_weight: c.postTestWeight !== null && c.postTestWeight !== undefined ? Number(c.postTestWeight) : null,
+        affective_weight: c.affectiveWeight !== null && c.affectiveWeight !== undefined ? Number(c.affectiveWeight) : null,
+        midterm_weight: c.midtermWeight !== null && c.midtermWeight !== undefined ? Number(c.midtermWeight) : null,
+        final_weight: c.finalWeight !== null && c.finalWeight !== undefined ? Number(c.finalWeight) : null,
+        midterm_max_score: c.midtermMaxScore !== null && c.midtermMaxScore !== undefined ? Number(c.midtermMaxScore) : null,
+        final_max_score: c.finalMaxScore !== null && c.finalMaxScore !== undefined ? Number(c.finalMaxScore) : null,
         late_to_absent_ratio: c.lateToAbsentRatio,
         leave_to_absent_ratio: c.leaveToAbsentRatio,
       })),
@@ -97,9 +97,9 @@ export async function GET(request: NextRequest) {
           else if (a.status === 'late') lateCount++;
         }
         const classroom = classrooms.find(c => c.id === cId);
-        const weightAffective = classroom?.affectiveWeight ? Number(classroom.affectiveWeight) : 20;
+        const weightAffective = classroom?.affectiveWeight !== null && classroom?.affectiveWeight !== undefined ? Number(classroom.affectiveWeight) : 20;
         const finalAffectiveScore = calculateAffectiveScore({
-          baseScore: s.affectiveScore ? Number(s.affectiveScore) : null,
+          baseScore: s.affectiveScore !== null && s.affectiveScore !== undefined ? Number(s.affectiveScore) : null,
           maxWeight: weightAffective,
           absentCount,
           lateCount,
@@ -110,8 +110,8 @@ export async function GET(request: NextRequest) {
           student_code: s.studentCode || '',
           name: s.name,
           classroom: s.classroom?.name || '',
-          midterm_score: s.midtermScore,
-          final_score: s.finalScore,
+          midterm_score: s.midtermScore !== null && s.midtermScore !== undefined ? Number(s.midtermScore) : null,
+          final_score: s.finalScore !== null && s.finalScore !== undefined ? Number(s.finalScore) : null,
           affective_score: finalAffectiveScore,
         };
       }),

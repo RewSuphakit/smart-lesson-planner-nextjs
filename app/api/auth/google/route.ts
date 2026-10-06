@@ -66,11 +66,12 @@ export async function POST(request: NextRequest) {
     if (!email) {
       return NextResponse.json({ message: 'Email not provided by Google account' }, { status: 400 });
     }
+    const cleanEmail = email.toLowerCase().trim();
 
     let user = await withDbRetry(() => prisma.user.findUnique({ where: { googleId } }));
 
     if (!user) {
-      const existingByEmail = await withDbRetry(() => prisma.user.findUnique({ where: { email } }));
+      const existingByEmail = await withDbRetry(() => prisma.user.findUnique({ where: { email: cleanEmail } }));
       if (existingByEmail) {
         // Link Google ID to existing user account and ensure email is verified
         user = await withDbRetry(() =>
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
         user = await withDbRetry(() =>
           prisma.user.create({
             data: {
-              email,
+              email: cleanEmail,
               name: name || 'User',
               googleId,
               avatar: picture,

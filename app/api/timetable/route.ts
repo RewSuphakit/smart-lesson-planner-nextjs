@@ -104,8 +104,10 @@ export async function POST(request: NextRequest) {
       }
 
       const data = body.entries.map((e: Record<string, unknown>) => {
-        const startPeriod = Number(e.start_period);
-        const endPeriod = Number(e.end_period);
+        const rawStart = Number(e.start_period);
+        const rawEnd = Number(e.end_period);
+        const startPeriod = Math.max(0, Math.min(12, isNaN(rawStart) ? 1 : rawStart));
+        const endPeriod = Math.max(startPeriod, Math.min(12, isNaN(rawEnd) ? startPeriod : rawEnd));
         const hours = startPeriod === 0 ? 0 : (endPeriod - startPeriod + 1);
         const startTimeStr = (e.start_time as string) || PERIOD_TIMES[startPeriod]?.start;
         const endTimeStr = (e.end_time as string) || PERIOD_TIMES[endPeriod]?.end;
@@ -115,7 +117,7 @@ export async function POST(request: NextRequest) {
           timetableName: (e.timetable_name as string) || 'ตารางสอน',
           semester: (e.semester as string) || null,
           semesterId: e.semester_id ? Number(e.semester_id) : activeSemesterId,
-          dayOfWeek: e.day_of_week as number,
+          dayOfWeek: Math.max(0, Math.min(6, Number(e.day_of_week) || 0)),
           startPeriod,
           endPeriod,
           startTime: parseTimeToUtc(startTimeStr),
@@ -133,6 +135,7 @@ export async function POST(request: NextRequest) {
       });
 
       await prisma.weeklySchedule.createMany({ data });
+      invalidateCache(userCacheKey(user.id, 'dashboard'));
       return NextResponse.json({ message: 'Timetable entries created' }, { status: 201 });
     }
 
@@ -146,8 +149,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const startPeriod = Number(body.start_period);
-    const endPeriod = Number(body.end_period);
+    const rawStart = Number(body.start_period);
+    const rawEnd = Number(body.end_period);
+    const startPeriod = Math.max(0, Math.min(12, isNaN(rawStart) ? 1 : rawStart));
+    const endPeriod = Math.max(startPeriod, Math.min(12, isNaN(rawEnd) ? startPeriod : rawEnd));
     const hours = startPeriod === 0 ? 0 : (endPeriod - startPeriod + 1);
     const startTimeStr = body.start_time || PERIOD_TIMES[startPeriod]?.start;
     const endTimeStr = body.end_time || PERIOD_TIMES[endPeriod]?.end;
@@ -158,7 +163,7 @@ export async function POST(request: NextRequest) {
         timetableName: body.timetable_name || 'ตารางสอน',
         semester: body.semester || null,
         semesterId: body.semester_id ? Number(body.semester_id) : activeSemesterId,
-        dayOfWeek: Number(body.day_of_week),
+        dayOfWeek: Math.max(0, Math.min(6, Number(body.day_of_week) || 0)),
         startPeriod,
         endPeriod,
         startTime: parseTimeToUtc(startTimeStr),
@@ -175,6 +180,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    invalidateCache(userCacheKey(user.id, 'dashboard'));
     return NextResponse.json({ data: entry }, { status: 201 });
   } catch (error) {
     if (error instanceof AuthError) return handleAuthError();

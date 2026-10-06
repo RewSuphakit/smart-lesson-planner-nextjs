@@ -33,7 +33,8 @@ export async function POST(request: NextRequest) {
       return arcjetCheck.response!;
     }
 
-    const user = await withDbRetry(() => prisma.user.findUnique({ where: { email } }));
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await withDbRetry(() => prisma.user.findUnique({ where: { email: normalizedEmail } }));
     if (!user) {
       return NextResponse.json({ message: 'Invalid email or password' }, { status: 401 });
     }

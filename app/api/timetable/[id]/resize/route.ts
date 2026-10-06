@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { PERIOD_TIMES, parseTimeToUtc } from '@/lib/constants';
+import { invalidateCache, userCacheKey } from '@/lib/cache';
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -19,11 +20,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ message: 'Entry not found' }, { status: 404 });
     }
 
-    const endPeriod = body.end_period !== undefined ? body.end_period : entry.endPeriod;
+    const endPeriod = body.end_period !== undefined ? Number(body.end_period) : entry.endPeriod;
     const startPeriod = entry.startPeriod;
 
     if (endPeriod < startPeriod) {
       return NextResponse.json({ message: 'End period cannot be less than start period' }, { status: 400 });
+    }
+    if (endPeriod > 12) {
+      return NextResponse.json({ message: 'คาบเรียนเกินช่วงเวลาทำการสูงสุด (คาบที่ 12)' }, { status: 400 });
     }
 
     const hours = startPeriod === 0 ? 0 : (endPeriod - startPeriod + 1);
@@ -39,6 +43,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         endTime,
       },
     });
+
+    invalidateCache(userCacheKey(user.id, 'dashboard'));
 
     return NextResponse.json({ message: 'Timetable resized successfully' });
   } catch (error) {
