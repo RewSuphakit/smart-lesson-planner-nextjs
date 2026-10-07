@@ -117,6 +117,59 @@ export const UpdateSemesterSchema = z.object({
 });
 
 
+// ==================== Attendance Schemas ====================
+export const AttendanceStatusEnum = z.enum(['present', 'late', 'absent', 'leave']);
+
+export const RecordAttendanceSchema = z.object({
+  student_id: z.coerce.number().int().positive('Student ID must be a positive integer'),
+  classroom_id: z.coerce.number().int().positive('Classroom ID must be a positive integer'),
+  date: z.string().refine((d) => !isNaN(Date.parse(d)), 'Invalid date format'),
+  status: AttendanceStatusEnum,
+});
+
+export const BulkRecordAttendanceSchema = z.object({
+  records: z.array(RecordAttendanceSchema).min(1, 'At least one attendance record is required'),
+});
+
+// ==================== Score Schemas ====================
+export const ScoreStructureItemSchema = z.object({
+  lesson_number: z.coerce.number().int().min(1, 'Lesson number must be at least 1'),
+  lesson_name: z.string().optional().default(''),
+  max_assignment_score: z.union([z.number(), z.string(), z.null()]).optional(),
+  max_post_test_score: z.union([z.number(), z.string(), z.null()]).optional(),
+  hours: z.union([z.number(), z.string()]).optional().default(0),
+});
+
+export const SaveScoreStructureSchema = z.object({
+  classroom_id: z.coerce.number().int().positive().optional(),
+  type: z.literal('structure').optional(),
+  structures: z.array(ScoreStructureItemSchema).min(1, 'At least one structure is required'),
+});
+
+export const LessonScoreItemSchema = z.object({
+  student_id: z.coerce.number().int().positive('Student ID must be a positive integer'),
+  assignment_score: z.union([z.number(), z.string(), z.null()]).optional(),
+  post_test_score: z.union([z.number(), z.string(), z.null()]).optional(),
+});
+
+export const SaveLessonScoresSchema = z.object({
+  classroom_id: z.coerce.number().int().positive().optional(),
+  lesson_number: z.coerce.number().int().min(1, 'Lesson number must be at least 1'),
+  scores: z.array(LessonScoreItemSchema).min(1, 'At least one score entry is required'),
+});
+
+export const BulkScoreItemSchema = z.object({
+  student_id: z.coerce.number().int().positive('Student ID must be a positive integer'),
+  lesson_number: z.coerce.number().int().min(1, 'Lesson number must be at least 1'),
+  assignment_score: z.union([z.number(), z.string(), z.null()]).optional(),
+  post_test_score: z.union([z.number(), z.string(), z.null()]).optional(),
+});
+
+export const SaveBulkScoresSchema = z.object({
+  classroom_id: z.coerce.number().int().positive().optional(),
+  scores: z.array(BulkScoreItemSchema).min(1, 'At least one score entry is required'),
+});
+
 // ==================== Validation Helper ====================
 export function formatZodError(error: z.ZodError): NextResponse {
   const formattedErrors = error.issues.map((err: z.ZodIssue) => ({
@@ -133,17 +186,24 @@ export function formatZodError(error: z.ZodError): NextResponse {
   );
 }
 
+export function validateData<T>(
+  data: unknown,
+  schema: z.ZodSchema<T>
+): { success: true; data: T } | { success: false; response: NextResponse } {
+  const result = schema.safeParse(data);
+  if (!result.success) {
+    return { success: false, response: formatZodError(result.error) };
+  }
+  return { success: true, data: result.data };
+}
+
 export async function validateRequestBody<T>(
   request: Request,
   schema: z.ZodSchema<T>
 ): Promise<{ success: true; data: T } | { success: false; response: NextResponse }> {
   try {
     const body = await request.json();
-    const result = schema.safeParse(body);
-    if (!result.success) {
-      return { success: false, response: formatZodError(result.error) };
-    }
-    return { success: true, data: result.data };
+    return validateData(body, schema);
   } catch {
     return {
       success: false,
@@ -151,3 +211,4 @@ export async function validateRequestBody<T>(
     };
   }
 }
+

@@ -9,9 +9,7 @@ import {
   XCircle,
   Clock,
   Calendar,
-  Award,
   BookOpen,
-  User,
   Sparkles,
   RotateCcw,
   Printer,
@@ -20,17 +18,21 @@ import {
   AlertCircle,
   FileText,
   Check,
-  ArrowLeft,
   Loader2,
   School,
+  Camera,
+  Trash2,
 } from 'lucide-react';
-import Link from 'next/link';
+import toast from 'react-hot-toast';
+import UserAvatar from '@/components/UserAvatar';
+import { compressImageFile } from '@/lib/avatarCompression';
 
 interface StudentInfo {
   id: number;
   name: string;
   student_code: string;
   grade_level: string | null;
+  avatar?: string | null;
 }
 
 interface ClassroomInfo {
@@ -137,6 +139,8 @@ export default function StudentPortal() {
   const [activeTab, setActiveTab] = useState<'assignments' | 'attendance'>('assignments');
   const [selectedClassroomId, setSelectedClassroomId] = useState<number | null>(null);
   const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'missing' | 'submitted'>('all');
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Load recently searched student codes
   useEffect(() => {
@@ -215,14 +219,96 @@ export default function StudentPortal() {
     setSelectedClassroomId(null);
   };
 
-  const getGradeBadgeColor = (grade: string) => {
-    if (grade === '4' || grade === '3.5') return 'bg-emerald-500 text-white';
-    if (grade === '3' || grade === '2.5') return 'bg-blue-500 text-white';
-    if (grade === '2' || grade === '1.5') return 'bg-amber-500 text-white';
-    if (grade === '1') return 'bg-orange-500 text-white';
-    if (grade === '0' || grade === 'ข.ร.' || grade === 'ม.ส.' || grade === 'ข.ส.')
-      return 'bg-rose-500 text-white';
-    return 'bg-slate-500 text-white';
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !data) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('กรุณาเลือกไฟล์รูปภาพ (JPG, PNG, WebP)');
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    const loadingToast = toast.loading('กำลังประมวลผลและอัพโหลดรูปภาพ...');
+    try {
+      // Compress client-side to compact WebP (200x200, ~4-8 KB)
+      const compressed = await compressImageFile(file, 200, 0.8);
+
+      const res = await fetch('/api/portal/student', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          student_code: data.student.student_code,
+          avatar: compressed,
+        }),
+      });
+
+      const resData = await res.json();
+      if (!res.ok) {
+        throw new Error(resData.message || 'ไม่สามารถอัพโหลดรูปภาพได้');
+      }
+
+      setData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          student: {
+            ...prev.student,
+            avatar: compressed,
+          },
+        };
+      });
+
+      toast.success('อัพเดทรูปโปรไฟล์สำเร็จแล้ว', { id: loadingToast });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการอัพโหลดรูปภาพ';
+      toast.error(msg, { id: loadingToast });
+    } finally {
+      setIsUploadingAvatar(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    if (!data || !data.student.avatar) return;
+    if (!window.confirm('คุณต้องการลบรูปโปรไฟล์นี้ใช่หรือไม่?')) return;
+
+    setIsUploadingAvatar(true);
+    const loadingToast = toast.loading('กำลังลบรูปโปรไฟล์...');
+    try {
+      const res = await fetch('/api/portal/student', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          student_code: data.student.student_code,
+          remove_avatar: true,
+          avatar: null,
+        }),
+      });
+
+      const resData = await res.json();
+      if (!res.ok) {
+        throw new Error(resData.message || 'ไม่สามารถลบรูปภาพได้');
+      }
+
+      setData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          student: {
+            ...prev.student,
+            avatar: null,
+          },
+        };
+      });
+
+      toast.success('ลบรูปโปรไฟล์เรียบร้อยแล้ว', { id: loadingToast });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการลบรูปภาพ';
+      toast.error(msg, { id: loadingToast });
+    } finally {
+      setIsUploadingAvatar(false);
+    }
   };
 
   const missingAssignmentsCount =
@@ -283,7 +369,7 @@ export default function StudentPortal() {
               ค้นหาข้อมูลผลการเรียน
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 mt-2 max-w-md mx-auto">
-              กรอกรหัสประจำตัวนักเรียน เพื่อดูสถิติเวลาเรียน เกรดที่คาดว่าจะได้รับ
+              กรอกรหัสประจำตัวนักเรียน เพื่อดูสถิติเวลาเรียน
               และรายการงานที่ค้างส่ง
             </p>
 
@@ -362,9 +448,30 @@ export default function StudentPortal() {
             {/* Top Bar with Student Info & Switch Class/Search */}
             <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-start sm:items-center gap-3.5">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-md shadow-indigo-500/20 shrink-0">
-                  <User className="w-6 h-6" />
+                {/* Profile Avatar with Camera Trigger */}
+                <div className="relative group shrink-0">
+                  <UserAvatar
+                    avatar={data.student.avatar}
+                    name={data.student.name}
+                    userId={data.student.id}
+                    size="lg"
+                    className="rounded-2xl border-2 border-indigo-200/80 shadow-md transition-all duration-200 group-hover:scale-105"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingAvatar}
+                    className="absolute -bottom-1 -right-1 bg-indigo-600 hover:bg-indigo-700 text-white p-1.5 rounded-xl shadow-md border-2 border-white transition-all hover:scale-110 disabled:opacity-50 cursor-pointer"
+                    title="อัพโหลดหรือเปลี่ยนรูปโปรไฟล์"
+                  >
+                    {isUploadingAvatar ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Camera className="w-3.5 h-3.5" />
+                    )}
+                  </button>
                 </div>
+
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <h2 className="text-lg sm:text-xl font-bold text-slate-800">
@@ -389,8 +496,42 @@ export default function StudentPortal() {
                       <span>ครูผู้สอน: {data.classroom.teacher_name}</span>
                     </div>
                   )}
+
+                  {/* Quick Profile Photo Actions */}
+                  <div className="flex items-center gap-2 mt-2">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploadingAvatar}
+                      className="text-[11px] font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition-colors inline-flex items-center gap-1 border border-indigo-200/60 cursor-pointer"
+                    >
+                      <Camera className="w-3 h-3" />
+                      <span>{data.student.avatar ? 'เปลี่ยนรูปภาพ' : 'อัพโหลดรูปโปรไฟล์'}</span>
+                    </button>
+                    {data.student.avatar && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveAvatar}
+                        disabled={isUploadingAvatar}
+                        className="text-[11px] font-medium text-rose-500 hover:text-rose-700 hover:bg-rose-50 px-2 py-1 rounded-lg transition-colors inline-flex items-center gap-1 cursor-pointer"
+                        title="ลบรูปโปรไฟล์และใช้อิโมจิเริ่มต้น"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>ลบรูป</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
+
+              {/* Hidden file input for avatar upload */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/webp"
+                onChange={handleAvatarUpload}
+                className="hidden"
+              />
 
               <div className="flex items-center gap-2 self-end sm:self-center">
                 {/* Classroom Selector if multiple */}
@@ -500,62 +641,8 @@ export default function StudentPortal() {
                   </div>
                 ) : null}
 
-                {/* ─── Key Metrics 3 Cards (Grade / Attendance Meter / Missing Assignments) ─── */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* 1. Grade Card */}
-                  <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-between relative overflow-hidden">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
-                        <Award className="w-4 h-4 text-indigo-500" />
-                        เกรดคาดการณ์
-                      </span>
-                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">
-                        ร้อยละ {data.grades_summary.percentage}%
-                      </span>
-                    </div>
-
-                    <div className="my-4 flex items-baseline gap-3">
-                      <span
-                        className={`text-4xl font-extrabold px-3 py-1 rounded-2xl shadow-sm ${getGradeBadgeColor(
-                          data.grades_summary.grade
-                        )}`}
-                      >
-                        {data.grades_summary.grade}
-                      </span>
-                      <div>
-                        <div className="text-lg font-bold text-slate-800">
-                          {data.grades_summary.total_score} / {data.grades_summary.max_score}
-                        </div>
-                        <p className="text-[11px] text-slate-400">คะแนนรวมทั้งหมด</p>
-                      </div>
-                    </div>
-
-                    {/* Progress Bar */}
-                    <div>
-                      <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                        <div
-                          className={`h-full transition-all duration-500 ${data.attendance_summary.is_f
-                            ? 'bg-rose-500'
-                            : Number(data.grades_summary.percentage) >= 80
-                              ? 'bg-emerald-500'
-                              : Number(data.grades_summary.percentage) >= 60
-                                ? 'bg-blue-500'
-                                : 'bg-amber-500'
-                            }`}
-                          style={{
-                            width: `${Math.min(
-                              100,
-                              Math.max(0, Number(data.grades_summary.percentage))
-                            )}%`,
-                          }}
-                        />
-                      </div>
-                      <div className="flex justify-between items-center text-[10px] text-slate-400 mt-1.5">
-                        <span>0 คะแนน</span>
-                        <span>เกณฑ์เกรด 4 (80 คะแนน)</span>
-                      </div>
-                    </div>
-                  </div>
+                {/* ─── Key Metrics 2 Cards (Attendance Meter / Missing Assignments) ─── */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
                   {/* 2. Attendance Gauge Card */}
                   <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-between">

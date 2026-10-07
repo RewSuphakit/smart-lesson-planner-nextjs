@@ -2,6 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { getOrSetCache, userCacheKey, invalidateCache } from '@/lib/cache';
+import {
+  formatScoreResponse,
+  formatScoreStructureResponse,
+  formatStudentListItem,
+} from '@/lib/formatters';
+import { sanitizeScore } from '@/lib/sanitize';
+import {
+  validateData,
+  SaveScoreStructureSchema,
+  SaveLessonScoresSchema,
+  SaveBulkScoresSchema,
+} from '@/lib/validation';
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,7 +31,7 @@ export async function GET(request: NextRequest) {
 
     // Verify classroom ownership
     const classroom = await prisma.classroom.findFirst({
-      where: { id: numericClassroomId, userId: user.id }
+      where: { id: numericClassroomId, userId: user.id },
     });
     if (!classroom) return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
 
@@ -48,42 +60,13 @@ export async function GET(request: NextRequest) {
         }),
       ]);
 
-      const mappedStudents = students.map(s => ({
-        id: s.id,
-        student_code: s.studentCode,
-        name: s.name,
-        classroom_id: s.classroomId,
-        midterm_score: s.midtermScore ? Number(s.midtermScore) : null,
-        final_score: s.finalScore ? Number(s.finalScore) : null,
-        affective_score: s.affectiveScore ? Number(s.affectiveScore) : null,
-      }));
-
-      const mappedStructures = structures.map(s => ({
-        id: s.id,
-        classroom_id: s.classroomId,
-        lesson_number: s.lessonNumber,
-        lesson_name: s.lessonName,
-        max_assignment_score: s.maxAssignmentScore,
-        max_post_test_score: s.maxPostTestScore,
-        hours: s.hours,
-      }));
-
-      const mappedScores = scores.map(s => ({
-        id: s.id,
-        student_id: s.studentId,
-        classroom_id: s.classroomId,
-        lesson_number: s.lessonNumber,
-        assignment_score: s.assignmentScore !== null ? Number(s.assignmentScore) : null,
-        post_test_score: s.postTestScore !== null ? Number(s.postTestScore) : null,
-      }));
-
       return NextResponse.json({
         data: {
           classroom,
-          students: mappedStudents,
-          structures: mappedStructures,
-          scores: mappedScores,
-        }
+          students: students.map(formatStudentListItem),
+          structures: structures.map(formatScoreStructureResponse),
+          scores: scores.map(formatScoreResponse),
+        },
       });
     }
 
@@ -97,17 +80,7 @@ export async function GET(request: NextRequest) {
             where: { classroomId: numericClassroomId },
             orderBy: { lessonNumber: 'asc' },
           });
-          return structures.map(s => ({
-            id: s.id,
-            classroom_id: s.classroomId,
-            lesson_number: s.lessonNumber,
-            lesson_name: s.lessonName,
-            max_assignment_score: s.maxAssignmentScore,
-            max_post_test_score: s.maxPostTestScore,
-            hours: s.hours,
-            created_at: s.createdAt,
-            updated_at: s.updatedAt
-          }));
+          return structures.map(formatScoreStructureResponse);
         }
       );
       return NextResponse.json({ data: mappedStructures });
@@ -118,34 +91,14 @@ export async function GET(request: NextRequest) {
       const scores = await prisma.studentScore.findMany({
         where: { classroomId: numericClassroomId, lessonNumber: Number(lessonNumber) },
       });
-      const mappedScores = scores.map(s => ({
-        id: s.id,
-        student_id: s.studentId,
-        classroom_id: s.classroomId,
-        lesson_number: s.lessonNumber,
-        assignment_score: s.assignmentScore !== null ? Number(s.assignmentScore) : null,
-        post_test_score: s.postTestScore !== null ? Number(s.postTestScore) : null,
-        created_at: s.createdAt,
-        updated_at: s.updatedAt
-      }));
-      return NextResponse.json({ data: mappedScores });
+      return NextResponse.json({ data: scores.map(formatScoreResponse) });
     }
 
     // Get all student scores for classroom
     const scores = await prisma.studentScore.findMany({
       where: { classroomId: numericClassroomId },
     });
-    const mappedScores = scores.map(s => ({
-      id: s.id,
-      student_id: s.studentId,
-      classroom_id: s.classroomId,
-      lesson_number: s.lessonNumber,
-      assignment_score: s.assignmentScore !== null ? Number(s.assignmentScore) : null,
-      post_test_score: s.postTestScore !== null ? Number(s.postTestScore) : null,
-      created_at: s.createdAt,
-      updated_at: s.updatedAt
-    }));
-    return NextResponse.json({ data: mappedScores });
+    return NextResponse.json({ data: scores.map(formatScoreResponse) });
   } catch (error) {
     if (error instanceof AuthError) return handleAuthError();
     console.error('GET scores error:', error);
@@ -166,33 +119,20 @@ export async function POST(request: NextRequest) {
 
     // Verify classroom ownership
     const classroom = await prisma.classroom.findFirst({
-      where: { id: classroomId, userId: user.id }
+      where: { id: classroomId, userId: user.id },
     });
     if (!classroom) return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
 
-    // Helper to sanitize score values: converts empty/null to null, validates numbers, and clamps between 0 and 999.99
-    const sanitizeScore = (val: unknown): number | null => {
-      if (val === undefined || val === null || val === '') return null;
-      const num = Number(val);
-      if (isNaN(num)) return null;
-      return Math.min(999.99, Math.max(0, num));
-    };
-
     // Save score structure (Batch Transaction)
     if (body.type === 'structure' || searchParams.get('type') === 'structure' || body.structures) {
-      const structures = body.structures || [];
-      if (!Array.isArray(structures) || structures.length === 0) {
-        return NextResponse.json({ message: 'No structures provided' }, { status: 400 });
+      const validation = validateData(body, SaveScoreStructureSchema);
+      if (!validation.success) {
+        return validation.response;
       }
+      const structures = validation.data.structures;
 
       const structOperations = structures
-        .map((struct: {
-          lesson_number: number | string;
-          lesson_name?: string;
-          max_assignment_score?: number | string | null;
-          max_post_test_score?: number | string | null;
-          hours?: number | string;
-        }) => {
+        .map((struct) => {
           const lessonNum = Number(struct.lesson_number);
           if (isNaN(lessonNum) || lessonNum < 1) return null;
 
@@ -230,15 +170,15 @@ export async function POST(request: NextRequest) {
 
         // Delete any leftover structures beyond the highest submitted lesson number (e.g. switching from 18 to 15 weeks)
         const validLessonNums = structures
-          .map((s: { lesson_number: number | string }) => Number(s.lesson_number))
-          .filter(n => !isNaN(n) && n > 0);
+          .map((s) => Number(s.lesson_number))
+          .filter((n) => !isNaN(n) && n > 0);
         const maxLesson = Math.max(...validLessonNums);
         if (maxLesson > 0) {
           await prisma.scoreStructure.deleteMany({
             where: {
               classroomId,
-              lessonNumber: { gt: maxLesson }
-            }
+              lessonNumber: { gt: maxLesson },
+            },
           });
         }
       }
@@ -248,24 +188,18 @@ export async function POST(request: NextRequest) {
 
     // Save student scores for a single lesson (Optimized Batch)
     if (body.scores && body.lesson_number !== undefined) {
-      interface ScoreInput {
-        student_id: number | string;
-        assignment_score?: number | string | null;
-        post_test_score?: number | string | null;
+      const validation = validateData(body, SaveLessonScoresSchema);
+      if (!validation.success) {
+        return validation.response;
       }
-      const scores = body.scores as ScoreInput[];
-      const studentIds = Array.from(new Set(scores.map(s => Number(s.student_id)).filter(id => !isNaN(id))));
+      const { scores, lesson_number: lessonNum } = validation.data;
+      const studentIds = Array.from(new Set(scores.map((s) => Number(s.student_id)).filter((id) => !isNaN(id))));
 
       const ownedStudents = await prisma.student.findMany({
         where: { id: { in: studentIds }, userId: user.id },
         select: { id: true },
       });
-      const ownedStudentIds = new Set(ownedStudents.map(s => s.id));
-
-      const lessonNum = Number(body.lesson_number);
-      if (isNaN(lessonNum) || lessonNum < 1) {
-        return NextResponse.json({ message: 'Invalid lesson number' }, { status: 400 });
-      }
+      const ownedStudentIds = new Set(ownedStudents.map((s) => s.id));
 
       // Deduplicate by studentId
       const sanitizedMap = new Map<number, { assignVal?: number | null; postVal?: number | null }>();
@@ -344,20 +278,18 @@ export async function POST(request: NextRequest) {
 
     // Bulk weekly scores (Full Matrix Save via Optimized Batch)
     if (body.scores && body.lesson_number === undefined) {
-      interface BulkScoreInput {
-        student_id: number | string;
-        lesson_number: number | string;
-        assignment_score?: number | string | null;
-        post_test_score?: number | string | null;
+      const validation = validateData(body, SaveBulkScoresSchema);
+      if (!validation.success) {
+        return validation.response;
       }
-      const bulkScores = body.scores as BulkScoreInput[];
-      const studentIds = Array.from(new Set(bulkScores.map(s => Number(s.student_id)).filter(id => !isNaN(id))));
+      const bulkScores = validation.data.scores;
+      const studentIds = Array.from(new Set(bulkScores.map((s) => Number(s.student_id)).filter((id) => !isNaN(id))));
 
       const ownedStudents = await prisma.student.findMany({
         where: { id: { in: studentIds }, userId: user.id },
         select: { id: true },
       });
-      const ownedStudentIds = new Set(ownedStudents.map(s => s.id));
+      const ownedStudentIds = new Set(ownedStudents.map((s) => s.id));
 
       // 1. Deduplicate by studentId + lessonNumber (keep the latest valid entry)
       const sanitizedMap = new Map<string, {
@@ -512,4 +444,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Failed to save scores' }, { status: 500 });
   }
 }
-

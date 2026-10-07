@@ -110,6 +110,159 @@ export function formatAttendanceRecord(record: Attendance) {
   };
 }
 
+// ==================== Attendance Conversion Helpers ====================
+
+export interface AttendanceConfig {
+  lateToAbsentRatio: number;
+  leaveToAbsentRatio: number;
+  totalClasses: number;
+  minAttendancePercent: number;
+}
+
+export interface AbsentConversionResult {
+  convertedFromLate: number;
+  convertedFromLeave: number;
+  totalConverted: number;
+  maxAllowedAbsences: number;
+  isF: boolean;
+  remaining: number;
+  attendancePercent: number;
+  remainingLate: number;
+  remainingLeave: number;
+}
+
+/**
+ * Extract normalized attendance config from a classroom record.
+ * Provides safe defaults for null/undefined values.
+ */
+export function getAttendanceConfig(classroom: {
+  lateToAbsentRatio?: number | null;
+  leaveToAbsentRatio?: number | null;
+  totalClasses?: number | null;
+  minAttendancePercent?: number | null;
+}): AttendanceConfig {
+  return {
+    lateToAbsentRatio: classroom.lateToAbsentRatio || 3,
+    leaveToAbsentRatio: classroom.leaveToAbsentRatio || 2,
+    totalClasses: classroom.totalClasses || 40,
+    minAttendancePercent: classroom.minAttendancePercent || 80,
+  };
+}
+
+/**
+ * Core logic to convert late/leave counts into equivalent absent counts
+ * and determine if a student has lost exam eligibility.
+ *
+ * Used by: grades report, dashboard at-risk, attendance stats.
+ */
+export function computeAbsentConversion(
+  counts: { absent: number; late: number; leave: number },
+  config: AttendanceConfig
+): AbsentConversionResult {
+  const maxAllowedAbsences = Math.floor(config.totalClasses * ((100 - config.minAttendancePercent) / 100));
+  const convertedFromLate = Math.floor(counts.late / config.lateToAbsentRatio);
+  const convertedFromLeave = Math.floor(counts.leave / config.leaveToAbsentRatio);
+  const totalConverted = counts.absent + convertedFromLate + convertedFromLeave;
+  const isF = totalConverted > maxAllowedAbsences;
+  const remaining = maxAllowedAbsences - totalConverted;
+  const attendancePercent = config.totalClasses > 0
+    ? Math.max(0, Math.min(100, Math.round(((config.totalClasses - totalConverted) / config.totalClasses) * 100)))
+    : 100;
+
+  return {
+    convertedFromLate, convertedFromLeave, totalConverted,
+    maxAllowedAbsences, isF, remaining, attendancePercent,
+    remainingLate: counts.late % config.lateToAbsentRatio,
+    remainingLeave: counts.leave % config.leaveToAbsentRatio,
+  };
+}
+
+// ==================== Response Formatters ====================
+
+/**
+ * Format a Student database record into standard snake_case API response.
+ * Handles optional fields gracefully for both full and partial Prisma selects.
+ */
+export function formatStudentListItem(s: {
+  id: number;
+  name: string;
+  studentCode?: string | null;
+  gradeLevel?: string | null;
+  email?: string | null;
+  classroomId?: number | null;
+  avatar?: string | null;
+  midtermScore?: unknown;
+  finalScore?: unknown;
+  affectiveScore?: unknown;
+}) {
+  return {
+    id: s.id,
+    name: s.name,
+    student_code: s.studentCode ?? null,
+    grade_level: s.gradeLevel ?? null,
+    email: s.email ?? null,
+    classroom_id: s.classroomId ?? null,
+    avatar: s.avatar ?? null,
+    midterm_score: s.midtermScore != null ? Number(s.midtermScore) : null,
+    final_score: s.finalScore != null ? Number(s.finalScore) : null,
+    affective_score: s.affectiveScore != null ? Number(s.affectiveScore) : null,
+  };
+}
+
+/**
+ * Format a StudentScore database record into standard snake_case API response.
+ */
+export function formatScoreResponse(s: {
+  id: number;
+  studentId: number;
+  classroomId: number;
+  lessonNumber: number;
+  assignmentScore?: unknown;
+  postTestScore?: unknown;
+  createdAt?: Date;
+  updatedAt?: Date;
+}) {
+  return {
+    id: s.id,
+    student_id: s.studentId,
+    classroom_id: s.classroomId,
+    lesson_number: s.lessonNumber,
+    assignment_score: s.assignmentScore != null ? Number(s.assignmentScore) : null,
+    post_test_score: s.postTestScore != null ? Number(s.postTestScore) : null,
+    created_at: s.createdAt,
+    updated_at: s.updatedAt,
+  };
+}
+
+/**
+ * Format a ScoreStructure database record into standard snake_case API response.
+ */
+export function formatScoreStructureResponse(s: {
+  id: number;
+  classroomId: number;
+  lessonNumber: number;
+  lessonName?: string | null;
+  maxAssignmentScore?: unknown;
+  maxPostTestScore?: unknown;
+  hours?: number | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+}) {
+  return {
+    id: s.id,
+    classroom_id: s.classroomId,
+    lesson_number: s.lessonNumber,
+    lesson_name: s.lessonName ?? null,
+    max_assignment_score: s.maxAssignmentScore ?? null,
+    max_post_test_score: s.maxPostTestScore ?? null,
+    hours: s.hours ?? null,
+    created_at: s.createdAt,
+    updated_at: s.updatedAt,
+  };
+}
+
+// ==================== Attendance Stats ====================
+
 export interface AttendanceStudentStats {
   student_id: number;
   present_count: number;
@@ -138,12 +291,7 @@ export function calculateAttendanceStats(
     minAttendancePercent?: number | null;
   }
 ): AttendanceStudentStats[] {
-  const ratioLate = classroom.lateToAbsentRatio || 3;
-  const ratioLeave = classroom.leaveToAbsentRatio || 2;
-  const totalClasses = classroom.totalClasses || 40;
-  const minAttPercent = classroom.minAttendancePercent || 80;
-  const maxAllowedAbsences = Math.floor(totalClasses * ((100 - minAttPercent) / 100));
-
+  const config = getAttendanceConfig(classroom);
   const studentMap = new Map<number, { present: number; late: number; absent: number; leave: number }>();
   for (const r of records) {
     if (!studentMap.has(r.studentId)) {
@@ -157,29 +305,25 @@ export function calculateAttendanceStats(
   }
 
   return Array.from(studentMap.entries()).map(([studentId, s]) => {
-    const convertedFromLate = Math.floor(s.late / ratioLate);
-    const convertedFromLeave = Math.floor(s.leave / ratioLeave);
-    const totalConverted = s.absent + convertedFromLate + convertedFromLeave;
+    const conv = computeAbsentConversion(s, config);
     return {
       student_id: studentId,
-      present_count: s.present,
-      late_count: s.late,
-      absent_count: s.absent,
-      leave_count: s.leave,
-      converted_absent_count: totalConverted,
-      remaining_late_count: s.late % ratioLate,
-      remaining_leave_count: s.leave % ratioLeave,
-      is_f: totalConverted > maxAllowedAbsences,
-      max_allowed_absences: maxAllowedAbsences,
-      total_classes: totalClasses,
-      converted_from_late: convertedFromLate,
-      converted_from_leave: convertedFromLeave,
+      present_count: s.present, late_count: s.late,
+      absent_count: s.absent, leave_count: s.leave,
+      converted_absent_count: conv.totalConverted,
+      remaining_late_count: conv.remainingLate,
+      remaining_leave_count: conv.remainingLeave,
+      is_f: conv.isF,
+      max_allowed_absences: conv.maxAllowedAbsences,
+      total_classes: config.totalClasses,
+      converted_from_late: conv.convertedFromLate,
+      converted_from_leave: conv.convertedFromLeave,
     };
   });
 }
 
 /**
- * Calculate attendance statistics grouped by student for a given classroom (optimized for DB groupBy).
+ * Calculate attendance statistics grouped by student (optimized for DB groupBy).
  */
 export function calculateAttendanceStatsFromGrouped(
   grouped: Array<{ studentId: number; status: string; _count: number }>,
@@ -190,12 +334,7 @@ export function calculateAttendanceStatsFromGrouped(
     minAttendancePercent?: number | null;
   }
 ): AttendanceStudentStats[] {
-  const ratioLate = classroom.lateToAbsentRatio || 3;
-  const ratioLeave = classroom.leaveToAbsentRatio || 2;
-  const totalClasses = classroom.totalClasses || 40;
-  const minAttPercent = classroom.minAttendancePercent || 80;
-  const maxAllowedAbsences = Math.floor(totalClasses * ((100 - minAttPercent) / 100));
-
+  const config = getAttendanceConfig(classroom);
   const studentMap = new Map<number, { present: number; late: number; absent: number; leave: number }>();
   for (const r of grouped) {
     if (!studentMap.has(r.studentId)) {
@@ -209,24 +348,19 @@ export function calculateAttendanceStatsFromGrouped(
   }
 
   return Array.from(studentMap.entries()).map(([studentId, s]) => {
-    const convertedFromLate = Math.floor(s.late / ratioLate);
-    const convertedFromLeave = Math.floor(s.leave / ratioLeave);
-    const totalConverted = s.absent + convertedFromLate + convertedFromLeave;
+    const conv = computeAbsentConversion(s, config);
     return {
       student_id: studentId,
-      present_count: s.present,
-      late_count: s.late,
-      absent_count: s.absent,
-      leave_count: s.leave,
-      converted_absent_count: totalConverted,
-      remaining_late_count: s.late % ratioLate,
-      remaining_leave_count: s.leave % ratioLeave,
-      is_f: totalConverted > maxAllowedAbsences,
-      max_allowed_absences: maxAllowedAbsences,
-      total_classes: totalClasses,
-      converted_from_late: convertedFromLate,
-      converted_from_leave: convertedFromLeave,
+      present_count: s.present, late_count: s.late,
+      absent_count: s.absent, leave_count: s.leave,
+      converted_absent_count: conv.totalConverted,
+      remaining_late_count: conv.remainingLate,
+      remaining_leave_count: conv.remainingLeave,
+      is_f: conv.isF,
+      max_allowed_absences: conv.maxAllowedAbsences,
+      total_classes: config.totalClasses,
+      converted_from_late: conv.convertedFromLate,
+      converted_from_leave: conv.convertedFromLeave,
     };
   });
 }
-

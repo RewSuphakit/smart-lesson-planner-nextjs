@@ -10,6 +10,7 @@ import {
   getActiveSemester,
 } from '@/lib/semester';
 import { getOrSetCache, userCacheKey } from '@/lib/cache';
+import { getAttendanceConfig, computeAbsentConversion } from '@/lib/formatters';
 
 function isFlagpoleOrHomeroom(ws: { startPeriod?: number; entryType?: string; subjectName?: string | null; subjectCode?: string | null }) {
   if (ws.startPeriod === 0) return true;
@@ -195,19 +196,11 @@ export async function GET(request: NextRequest) {
           const classroom = classroomMap.get(student.classroomId);
           if (!classroom) continue;
 
-          const ratioLate = classroom.lateToAbsentRatio || 3;
-          const ratioLeave = classroom.leaveToAbsentRatio || 2;
-          const totalClasses = classroom.totalClasses || 40;
-          const minAttPercent = classroom.minAttendancePercent || 80;
-          const maxAllowedAbsences = Math.floor(totalClasses * ((100 - minAttPercent) / 100));
-
+          const attConfig = getAttendanceConfig(classroom);
           const stats = attStatsMap.get(`${student.id}_${student.classroomId}`) || { absent: 0, late: 0, leave: 0 };
-          const convertedFromLate = Math.floor(stats.late / ratioLate);
-          const convertedFromLeave = Math.floor(stats.leave / ratioLeave);
-          const totalConverted = stats.absent + convertedFromLate + convertedFromLeave;
-          const remaining = maxAllowedAbsences - totalConverted;
+          const attConv = computeAbsentConversion(stats, attConfig);
 
-          if (totalConverted > maxAllowedAbsences) {
+          if (attConv.isF) {
             atRiskStudents.push({
               student_id: student.id,
               student_name: student.name,
@@ -215,22 +208,22 @@ export async function GET(request: NextRequest) {
               classroom_name: classroom.name,
               reason: 'หมดสิทธิ์สอบแล้ว (เวลาเรียนไม่ถึงเกณฑ์)',
               type: 'attendance_f',
-              absent_count: totalConverted,
-              max_allowed: maxAllowedAbsences,
+              absent_count: attConv.totalConverted,
+              max_allowed: attConv.maxAllowedAbsences,
               remaining: 0,
               avatar: null,
             });
-          } else if (remaining <= 2 && remaining >= 0) {
+          } else if (attConv.remaining <= 2 && attConv.remaining >= 0) {
             atRiskStudents.push({
               student_id: student.id,
               student_name: student.name,
               student_code: student.studentCode,
               classroom_name: classroom.name,
-              reason: `เสี่ยงหมดสิทธิ์สอบ (ขาดได้อีก ${remaining} ครั้ง)`,
+              reason: `เสี่ยงหมดสิทธิ์สอบ (ขาดได้อีก ${attConv.remaining} ครั้ง)`,
               type: 'attendance_warning',
-              absent_count: totalConverted,
-              max_allowed: maxAllowedAbsences,
-              remaining: remaining,
+              absent_count: attConv.totalConverted,
+              max_allowed: attConv.maxAllowedAbsences,
+              remaining: attConv.remaining,
               avatar: null,
             });
           }

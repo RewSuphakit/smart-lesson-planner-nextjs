@@ -4,6 +4,7 @@ import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { calculateAffectiveScore } from '@/lib/affective';
 import { resolveTargetWeeks } from '@/lib/semester';
 import { getOrSetCache, userCacheKey, invalidateCache } from '@/lib/cache';
+import { getAttendanceConfig, computeAbsentConversion } from '@/lib/formatters';
 
 export async function GET(request: NextRequest) {
   try {
@@ -127,11 +128,7 @@ export async function GET(request: NextRequest) {
     ];
 
     // Get attendance config
-    const ratioLate = classroom.lateToAbsentRatio || 3;
-    const ratioLeave = classroom.leaveToAbsentRatio || 2;
-    const totalClasses = classroom.totalClasses || 40;
-    const minAttPercent = classroom.minAttendancePercent || 80;
-    const maxAllowedAbsences = Math.floor(totalClasses * ((100 - minAttPercent) / 100));
+    const attConfig = getAttendanceConfig(classroom);
 
     const totalWeightSum = weightAssign + weightPostTest + weightAffective + weightMidterm + weightFinal;
 
@@ -143,13 +140,9 @@ export async function GET(request: NextRequest) {
         else if (a.status === 'absent') absentCount++;
         else if (a.status === 'leave') leaveCount++;
       }
-      const convertedFromLate = Math.floor(lateCount / ratioLate);
-      const convertedFromLeave = Math.floor(leaveCount / ratioLeave);
-      const totalConverted = absentCount + convertedFromLate + convertedFromLeave;
-      const isF = totalConverted > maxAllowedAbsences;
-      const attendancePercent = totalClasses > 0
-        ? Math.max(0, Math.min(100, Math.round(((totalClasses - totalConverted) / totalClasses) * 100)))
-        : 100;
+      const attConv = computeAbsentConversion({ absent: absentCount, late: lateCount, leave: leaveCount }, attConfig);
+      const isF = attConv.isF;
+      const attendancePercent = attConv.attendancePercent;
 
       // Score calculation up to targetWeeks
       const sumAssignRaw = s.studentScores
@@ -228,8 +221,8 @@ export async function GET(request: NextRequest) {
         is_f: isF,
         absent_count: absentCount,
         late_count: lateCount,
-        max_allowed_absences: maxAllowedAbsences,
-        remaining_absences: maxAllowedAbsences - totalConverted,
+        max_allowed_absences: attConv.maxAllowedAbsences,
+        remaining_absences: attConv.remaining,
       };
     });
 

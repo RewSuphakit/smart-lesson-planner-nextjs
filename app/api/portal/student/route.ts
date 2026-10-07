@@ -3,6 +3,8 @@ import prisma from '@/lib/prisma';
 import { calculateAffectiveScore } from '@/lib/affective';
 import { resolveTargetWeeks } from '@/lib/semester';
 import { protectRequest, portalLimiter } from '@/lib/arcjet';
+import { invalidateCache, userCacheKey } from '@/lib/cache';
+
 
 export async function GET(request: NextRequest) {
   try {
@@ -64,8 +66,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         status: 'multiple_classrooms',
         student: {
+          id: matchingStudents[0].id,
           name: matchingStudents[0].name,
           student_code: matchingStudents[0].studentCode,
+          avatar: matchingStudents[0].avatar,
         },
         classrooms: validClassrooms.map((s) => ({
           student_id: s.id,
@@ -275,6 +279,7 @@ export async function GET(request: NextRequest) {
         name: targetStudent.name,
         student_code: targetStudent.studentCode,
         grade_level: targetStudent.gradeLevel,
+        avatar: targetStudent.avatar,
       },
       classroom: {
         id: classroom.id,
@@ -351,3 +356,88 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+export async function PATCH(request: NextRequest) {
+  return handleAvatarUpdate(request);
+}
+
+export async function POST(request: NextRequest) {
+  return handleAvatarUpdate(request);
+}
+
+async function handleAvatarUpdate(request: NextRequest) {
+  try {
+    const arcjetCheck = await protectRequest(request, portalLimiter);
+    if (!arcjetCheck.allowed) {
+      return arcjetCheck.response!;
+    }
+
+    const body = await request.json();
+    const studentCode = typeof body.student_code === 'string' ? body.student_code.trim() : '';
+    if (!studentCode) {
+      return NextResponse.json(
+        { message: 'กรุณาระบุรหัสประจำตัวนักเรียน (student_code)' },
+        { status: 400 }
+      );
+    }
+
+    const students = await prisma.student.findMany({
+      where: { studentCode },
+      select: { id: true, userId: true },
+    });
+
+    if (students.length === 0) {
+      return NextResponse.json(
+        { message: 'ไม่พบข้อมูลนักเรียนด้วยรหัสประจำตัวนี้' },
+        { status: 404 }
+      );
+    }
+
+    let avatar: string | null = null;
+    if (body.remove_avatar !== true && body.avatar) {
+      const rawAvatar = String(body.avatar).trim();
+      if (
+        !rawAvatar.startsWith('data:image/') &&
+        !rawAvatar.startsWith('http://') &&
+        !rawAvatar.startsWith('https://')
+      ) {
+        return NextResponse.json(
+          { message: 'รูปแบบรูปภาพไม่ถูกต้อง (ต้องเป็น base64 data URL หรือ image URL)' },
+          { status: 400 }
+        );
+      }
+      if (rawAvatar.length > 1024 * 1024) {
+        return NextResponse.json(
+          { message: 'ขนาดรูปภาพใหญ่เกินไป (สูงสุด 1MB)' },
+          { status: 400 }
+        );
+      }
+      avatar = rawAvatar;
+    }
+
+    // Update all student records with this studentCode
+    await prisma.student.updateMany({
+      where: { studentCode },
+      data: { avatar },
+    });
+
+    // Invalidate caches for all affected teachers
+    const distinctUserIds = Array.from(new Set(students.map((s) => s.userId)));
+    for (const uId of distinctUserIds) {
+      invalidateCache(userCacheKey(uId, 'classrooms'));
+      invalidateCache(userCacheKey(uId, 'dashboard'));
+    }
+
+    return NextResponse.json({
+      message: avatar ? 'อัพเดทรูปโปรไฟล์สำเร็จ' : 'ลบรูปโปรไฟล์สำเร็จ',
+      avatar,
+    });
+  } catch (error) {
+    console.error('Portal student avatar update error:', error);
+    return NextResponse.json(
+      { message: 'เกิดข้อผิดพลาดในการอัพเดทรูปโปรไฟล์' },
+      { status: 500 }
+    );
+  }
+}
+

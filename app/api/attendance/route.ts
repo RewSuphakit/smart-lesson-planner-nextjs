@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { formatAttendanceRecord, calculateAttendanceStatsFromGrouped } from '@/lib/formatters';
 import { invalidateCache, userCacheKey } from '@/lib/cache';
+import { validateData, BulkRecordAttendanceSchema, RecordAttendanceSchema } from '@/lib/validation';
 
 export async function GET(request: NextRequest) {
   try {
@@ -115,15 +116,14 @@ export async function POST(request: NextRequest) {
 
     // Bulk mark attendance
     if (Array.isArray(body.records)) {
-      interface RecordInput {
-        student_id: number;
-        classroom_id: number;
-        date: string;
-        status: 'present' | 'late' | 'absent' | 'leave';
+      const validation = validateData(body, BulkRecordAttendanceSchema);
+      if (!validation.success) {
+        return validation.response;
       }
-      const records = body.records as RecordInput[];
+      const records = validation.data.records;
+
       // Find unique classroom IDs and verify ownership in a single query
-      const classroomIds = Array.from(new Set(records.map(r => Number(r.classroom_id)))) as number[];
+      const classroomIds = Array.from(new Set(records.map(r => r.classroom_id)));
       if (classroomIds.length > 0) {
         const ownedClassrooms = await prisma.classroom.findMany({
           where: { id: { in: classroomIds }, userId: user.id },
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Verify student ownership for all students in the request
-      const studentIds = Array.from(new Set(records.map(r => Number(r.student_id)))) as number[];
+      const studentIds = Array.from(new Set(records.map(r => r.student_id)));
       const ownedStudents = await prisma.student.findMany({
         where: { id: { in: studentIds }, userId: user.id },
         select: { id: true },
@@ -175,33 +175,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Single mark
-    if (!body.student_id || !body.classroom_id || !body.date || !body.status) {
-      return NextResponse.json(
-        { message: 'Missing required fields (student_id, classroom_id, date, status)' },
-        { status: 400 }
-      );
+    const singleValidation = validateData(body, RecordAttendanceSchema);
+    if (!singleValidation.success) {
+      return singleValidation.response;
     }
-
-    const validStatuses = ['present', 'late', 'absent', 'leave'];
-    if (!validStatuses.includes(body.status)) {
-      return NextResponse.json(
-        { message: 'Invalid attendance status. Must be present, late, absent, or leave' },
-        { status: 400 }
-      );
-    }
-
-    const parsedDate = new Date(body.date);
-    if (isNaN(parsedDate.getTime())) {
-      return NextResponse.json({ message: 'Invalid date format' }, { status: 400 });
-    }
+    const record = singleValidation.data;
+    const parsedDate = new Date(record.date);
 
     // Verify classroom and student ownership
     const [classroom, student] = await Promise.all([
       prisma.classroom.findFirst({
-        where: { id: Number(body.classroom_id), userId: user.id },
+        where: { id: record.classroom_id, userId: user.id },
       }),
       prisma.student.findFirst({
-        where: { id: Number(body.student_id), userId: user.id },
+        where: { id: record.student_id, userId: user.id },
       }),
     ]);
     if (!classroom) return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
@@ -210,17 +197,17 @@ export async function POST(request: NextRequest) {
     await prisma.attendance.upsert({
       where: {
         studentId_classroomId_date: {
-          studentId: Number(body.student_id),
-          classroomId: Number(body.classroom_id),
+          studentId: record.student_id,
+          classroomId: record.classroom_id,
           date: parsedDate,
         },
       },
-      update: { status: body.status },
+      update: { status: record.status },
       create: {
-        studentId: Number(body.student_id),
-        classroomId: Number(body.classroom_id),
+        studentId: record.student_id,
+        classroomId: record.classroom_id,
         date: parsedDate,
-        status: body.status,
+        status: record.status,
       },
     });
 

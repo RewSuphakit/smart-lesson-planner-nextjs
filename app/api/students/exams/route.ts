@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { UpdateStudentExamScoresSchema, validateRequestBody } from '@/lib/validation';
 import { invalidateCache, userCacheKey } from '@/lib/cache';
+import { sanitizeExamScore } from '@/lib/sanitize';
 
 export async function PUT(request: NextRequest) {
   try {
@@ -25,18 +26,6 @@ export async function PUT(request: NextRequest) {
     const ownedSet = new Set(ownedStudents.map(s => s.id));
 
     const updateOperations = [];
-
-    // Helper to sanitize score values: converts empty/null to null, validates numbers, and clamps between 0 and 999.99
-    const sanitizeExamScore = (val: unknown, allowSpecialCodes = false): number | null => {
-      if (val === undefined || val === null || val === '') return null;
-      const num = Number(val);
-      if (isNaN(num)) return null;
-      // Allow special vocational education status codes: -1 = ข.ส. (ขาดสอบ), -2 = ม.ส. (ไม่สมบูรณ์)
-      if (allowSpecialCodes && (num === -1 || num === -2)) {
-        return num;
-      }
-      return Math.min(999.99, Math.max(0, num));
-    };
 
     for (const score of body.scores) {
       const studentId = Number(score.student_id);

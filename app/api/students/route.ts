@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
-import { CreateStudentSchema, BulkCreateStudentSchema, validateRequestBody } from '@/lib/validation';
+import { CreateStudentSchema, BulkCreateStudentSchema, UpdateStudentExamScoresSchema, validateRequestBody, validateData } from '@/lib/validation';
 import { invalidateCache, userCacheKey } from '@/lib/cache';
+import { formatStudentListItem } from '@/lib/formatters';
+import { sanitizeExamScore } from '@/lib/sanitize';
 
 export async function GET(request: NextRequest) {
   try {
@@ -58,18 +60,7 @@ export async function GET(request: NextRequest) {
         }),
       ]);
 
-      const mappedStudents = students.map(s => ({
-        id: s.id,
-        name: s.name,
-        student_code: s.studentCode,
-        grade_level: s.gradeLevel,
-        email: s.email,
-        classroom_id: s.classroomId,
-        avatar: 'avatar' in s ? (s.avatar as string | null) : null,
-        midterm_score: s.midtermScore ? Number(s.midtermScore) : null,
-        final_score: s.finalScore ? Number(s.finalScore) : null,
-        affective_score: s.affectiveScore ? Number(s.affectiveScore) : null,
-      }));
+      const mappedStudents = students.map(formatStudentListItem);
 
       return NextResponse.json({
         data: mappedStudents,
@@ -88,18 +79,7 @@ export async function GET(request: NextRequest) {
       orderBy: { name: 'asc' },
     });
 
-    const mappedStudents = students.map(s => ({
-      id: s.id,
-      name: s.name,
-      student_code: s.studentCode,
-      grade_level: s.gradeLevel,
-      email: s.email,
-      classroom_id: s.classroomId,
-      avatar: 'avatar' in s ? (s.avatar as string | null) : null,
-      midterm_score: s.midtermScore ? Number(s.midtermScore) : null,
-      final_score: s.finalScore ? Number(s.finalScore) : null,
-      affective_score: s.affectiveScore ? Number(s.affectiveScore) : null,
-    }));
+    const mappedStudents = students.map(formatStudentListItem);
 
     return NextResponse.json({ data: mappedStudents });
   } catch (error) {
@@ -218,8 +198,14 @@ export async function PATCH(request: NextRequest) {
 
     // Bulk update exams — verify ownership + only update provided fields in a single transaction
     if (Array.isArray(body.scores)) {
+      const examValidation = validateData(body, UpdateStudentExamScoresSchema);
+      if (!examValidation.success) {
+        return examValidation.response;
+      }
+
+      const validScores = examValidation.data.scores;
       const studentIds: number[] = Array.from(
-        new Set<number>(body.scores.map((s: { student_id: string | number }) => Number(s.student_id)).filter((id: number) => !isNaN(id)))
+        new Set<number>(validScores.map(s => Number(s.student_id)).filter((id: number) => !isNaN(id)))
       );
 
       const ownedStudents = await prisma.student.findMany({
@@ -229,19 +215,19 @@ export async function PATCH(request: NextRequest) {
       const ownedSet = new Set(ownedStudents.map(s => s.id));
 
       const updateOperations = [];
-      for (const score of body.scores) {
+      for (const score of validScores) {
         const studentId = Number(score.student_id);
         if (!ownedSet.has(studentId)) continue;
 
         const dataToUpdate: Record<string, unknown> = {};
         if (score.midterm_score !== undefined) {
-          dataToUpdate.midtermScore = score.midterm_score === '' || score.midterm_score === null ? null : Number(score.midterm_score);
+          dataToUpdate.midtermScore = sanitizeExamScore(score.midterm_score, false);
         }
         if (score.final_score !== undefined) {
-          dataToUpdate.finalScore = score.final_score === '' || score.final_score === null ? null : Number(score.final_score);
+          dataToUpdate.finalScore = sanitizeExamScore(score.final_score, true);
         }
         if (score.affective_score !== undefined) {
-          dataToUpdate.affectiveScore = score.affective_score === '' || score.affective_score === null ? null : Math.max(0, Number(score.affective_score));
+          dataToUpdate.affectiveScore = sanitizeExamScore(score.affective_score, false);
         }
         if (Object.keys(dataToUpdate).length > 0) {
           updateOperations.push(
@@ -256,6 +242,8 @@ export async function PATCH(request: NextRequest) {
       if (updateOperations.length > 0) {
         await prisma.$transaction(updateOperations);
       }
+      invalidateCache(userCacheKey(user.id, 'dashboard'));
+      invalidateCache(userCacheKey(user.id, 'classrooms'));
       return NextResponse.json({ message: 'Scores updated' });
     }
 
