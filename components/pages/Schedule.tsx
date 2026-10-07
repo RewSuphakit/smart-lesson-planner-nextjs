@@ -5,18 +5,26 @@ import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
 import {
-  format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
-  addDays, addMonths, subMonths, isSameDay, isSameMonth, parseISO
-} from 'date-fns';
-import { th } from 'date-fns/locale';
-import {
-  ChevronLeft, ChevronRight, Plus, X, Loader2,
-  Trash2, Calendar, Edit2, AlertCircle,
+  X, Loader2, Trash2, AlertCircle,
   UploadCloud, FileText, Table
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import {
+  format as _format,
+  startOfMonth as _startOfMonth,
+  endOfMonth as _endOfMonth,
+  startOfWeek as _startOfWeek,
+  endOfWeek as _endOfWeek,
+  addDays as _addDays,
+  addMonths as _addMonths,
+  subMonths as _subMonths,
+  isSameDay as _isSameDay,
+  isSameMonth as _isSameMonth,
+  parseISO as _parseISO
+} from 'date-fns';
+import { th as _th } from 'date-fns/locale';
+void [_format, _startOfMonth, _endOfMonth, _startOfWeek, _endOfWeek, _addDays, _addMonths, _subMonths, _isSameDay, _isSameMonth, _parseISO, _th];
 
-const DAY_NAMES = ['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา'];
 const TIMETABLE_DAYS = ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์', 'อาทิตย์'];
 
 interface ApiError {
@@ -25,21 +33,6 @@ interface ApiError {
       message?: string;
     };
   };
-}
-
-interface ScheduleItem {
-  id: string | number;
-  lesson_title: string;
-  subject: string;
-  scheduled_date: string;
-  start_time: string;
-  end_time: string;
-  notes?: string;
-  status: 'scheduled' | 'completed' | 'cancelled';
-  week_number?: number | null;
-  is_final_week?: boolean;
-  total_weeks?: number;
-  classroom_name?: string | null;
 }
 
 interface TimetableEntry {
@@ -71,34 +64,6 @@ interface HoverTooltip {
   rect: DOMRect;
 }
 
-function getMonthGrid(date: Date) {
-  const start = startOfWeek(startOfMonth(date), { weekStartsOn: 1 });
-  const end   = endOfWeek(endOfMonth(date),     { weekStartsOn: 1 });
-  const days  = [];
-  let cur     = start;
-  while (cur <= end) { days.push(cur); cur = addDays(cur, 1); }
-  return days;
-}
-
-const STATUS_STYLE = {
-  scheduled:  'bg-indigo-500/10 text-indigo-400 border-indigo-500/20 shadow-indigo-500/10',
-  completed:  'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-emerald-500/10',
-  cancelled:  'bg-red-500/10 text-red-400 border-red-500/20 shadow-red-500/10',
-};
-const STATUS_LABEL = { scheduled: 'กำหนดสอน', completed: 'สอนแล้ว', cancelled: 'ยกเลิก' };
-
-function defaultForm(date: Date) {
-  return {
-    title: '',
-    subject: '',
-    scheduled_date: date ? format(date, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
-    start_time: '09:00',
-    end_time:   '10:00',
-    notes:       '',
-    status:      'scheduled' as 'scheduled' | 'completed' | 'cancelled',
-  };
-}
-
 export default function Schedule() {
   const queryClient = useQueryClient();
 
@@ -107,17 +72,7 @@ export default function Schedule() {
     queryClient.invalidateQueries({ queryKey: ['timetable'] });
     queryClient.invalidateQueries({ queryKey: ['timetable-classroom-options'] });
     queryClient.invalidateQueries({ queryKey: ['timetable-all'] });
-    queryClient.invalidateQueries({ queryKey: ['schedules'] });
   };
-
-  const [activeTab, setActiveTab] = useState('calendar');
-
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDay,  setSelectedDay]  = useState(new Date());
-  
-  const [showForm,     setShowForm]     = useState(false);
-  const [editTarget,   setEditTarget]   = useState<ScheduleItem | null>(null);
-  const [form,         setForm]         = useState(() => defaultForm(new Date()));
 
   // Weekly timetable modal states
   const [showTimetableModal, setShowTimetableModal] = useState(false);
@@ -147,9 +102,6 @@ export default function Schedule() {
   const [dragOverCell, setDragOverCell] = useState<string | null>(null);
   const [hoverTooltip, setHoverTooltip] = useState<HoverTooltip | null>(null);
 
-  const [showAutoGenerate, setShowAutoGenerate] = useState(false);
-  const [autoGenerateStartDate, setAutoGenerateStartDate] = useState(() => '2026-05-18');
-
   // ─── Query: ดึงข้อมูลห้องเรียน ───
   const { data: classroomsList = [] } = useQuery<Array<{
     id: string | number;
@@ -161,26 +113,6 @@ export default function Schedule() {
     queryKey: ['classrooms'],
     queryFn: async () => {
       const res = await api.get('/classrooms');
-      return res.data.data || [];
-    }
-  });
-
-  const openAutoGenerateModal = () => {
-    const earliest = classroomsList.find(c => c.semester_start_date)?.semester_start_date?.slice(0, 10);
-    if (earliest) {
-      setAutoGenerateStartDate(earliest);
-    }
-    setShowAutoGenerate(true);
-  };
-
-  // ─── Query: ดึงข้อมูลตารางสอน (Calendar) ───
-  const startStr = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
-  const endStr   = format(endOfMonth(currentMonth),   'yyyy-MM-dd');
-  
-  const { data: schedules = [], isLoading: loadingSchedules } = useQuery<ScheduleItem[]>({
-    queryKey: ['schedules', startStr, endStr],
-    queryFn: async () => {
-      const res = await api.get("/schedules?start=" + startStr + "&end=" + endStr);
       return res.data.data || [];
     }
   });
@@ -201,19 +133,19 @@ export default function Schedule() {
     }
   });
 
-  const rawEntries = (timetableData as any)?.entries;
+  const rawEntries = (timetableData as { entries?: TimetableEntry[] })?.entries;
   const timetableEntries: TimetableEntry[] = Array.isArray(rawEntries)
     ? rawEntries
     : Array.isArray(timetableData)
       ? (timetableData as unknown as TimetableEntry[])
       : [];
 
-  const rawSummary = (timetableData as any)?.summary;
+  const rawSummary = (timetableData as { summary?: TimetableSummaryItem[] })?.summary;
   const timetableSummary: TimetableSummaryItem[] = Array.isArray(rawSummary)
     ? rawSummary
     : [];
 
-  const loading = activeTab === 'calendar' ? loadingSchedules : loadingTimetable;
+  const loading = loadingTimetable;
 
   const PERIOD_TIMES: Record<number, { start: string; end: string }> = {
     0:  { start: '07:30', end: '08:00' },
@@ -370,123 +302,6 @@ export default function Schedule() {
     deleteTimetableMutation.mutate(editTimetableTarget.id);
   };
 
-  const openCreate = (day?: Date) => {
-    setEditTarget(null);
-    setForm(defaultForm(day || selectedDay));
-    setShowForm(true);
-  };
-
-  const openEdit = (sch: ScheduleItem) => {
-    setEditTarget(sch);
-    setForm({
-      title:          sch.lesson_title ?? '',
-      subject:        sch.subject ?? '',
-      scheduled_date: sch.scheduled_date?.slice(0, 10) ?? '',
-      start_time:     sch.start_time?.slice(0, 5)      ?? '09:00',
-      end_time:       sch.end_time?.slice(0, 5)        ?? '10:00',
-      notes:          sch.notes  ?? '',
-      status:         sch.status ?? 'scheduled',
-    });
-    setShowForm(true);
-  };
-
-  const closeForm = () => { setShowForm(false); setEditTarget(null); };
-
-  // ─── Mutation: จัดการตารางสอน (Calendar Schedule) ───
-  const scheduleMutation = useMutation({
-    mutationFn: async (payload: typeof form) => {
-      if (editTarget) {
-        if (typeof editTarget.id === 'string' && editTarget.id.startsWith('virtual_')) {
-          return api.post('/schedules', payload);
-        } else {
-          return api.put("/schedules/" + editTarget.id, payload);
-        }
-      } else {
-        return api.post('/schedules', payload);
-      }
-    },
-    onSuccess: () => {
-      toast.success(editTarget ? (typeof editTarget.id === 'string' && editTarget.id.startsWith('virtual_') ? 'บันทึกคาบสอนจากตารางเรียนประจำสัปดาห์แล้ว' : 'อัปเดตตารางสอนเรียบร้อย') : 'เพิ่มตารางสอนเรียบร้อย');
-      closeForm();
-      queryClient.invalidateQueries({ queryKey: ['schedules'] });
-    },
-    onError: (err: ApiError) => {
-      toast.error(err.response?.data?.message || 'บันทึกไม่สำเร็จ');
-    }
-  });
-
-  const handleScheduleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.title.trim()) return toast.error('กรุณากรอกหัวข้อที่สอน');
-    if (!form.subject.trim()) return toast.error('กรุณากรอกวิชาที่สอน');
-    if (!form.scheduled_date) return toast.error('กรุณาเลือกวันที่');
-    if (form.start_time >= form.end_time) return toast.error('เวลาสิ้นสุดต้องมากกว่าเวลาเริ่มต้น');
-    scheduleMutation.mutate(form);
-  };
-
-  // ─── Mutation: ลบตารางสอน ───
-  const deleteScheduleMutation = useMutation({
-    mutationFn: async ({ id, isVirtual, item }: { id: string | number; isVirtual: boolean; item?: ScheduleItem }) => {
-      if (isVirtual) {
-        if (!item) throw new Error('ไม่พบข้อมูลคาบเรียนจำลอง');
-        return api.post('/schedules', {
-          title: item.lesson_title,
-          subject: item.subject,
-          scheduled_date: item.scheduled_date.slice(0, 10),
-          start_time: item.start_time.slice(0, 5),
-          end_time: item.end_time.slice(0, 5),
-          notes: item.notes || '',
-          status: 'cancelled',
-        });
-      } else {
-        return api.delete("/schedules/" + id);
-      }
-    },
-    onSuccess: (_, variables) => {
-      toast.success(variables.isVirtual ? 'ยกเลิกคาบสอนแล้ว' : 'ลบตารางสอนแล้ว');
-      queryClient.invalidateQueries({ queryKey: ['schedules'] });
-    },
-    onError: (err: ApiError) => {
-      toast.error(err.response?.data?.message || 'ทำรายการไม่สำเร็จ');
-    }
-  });
-
-  const handleDeleteSchedule = (id: string | number) => {
-    const isVirtual = typeof id === 'string' && id.startsWith('virtual_');
-    const confirmMsg = isVirtual 
-      ? 'ต้องการยกเลิกการเรียนการสอนสำหรับคาบเรียนจำลองนี้ใช่หรือไม่? (จะบันทึกสถานะ "ยกเลิก" ลงในปฏิทิน)' 
-      : 'ต้องการลบตารางสอนนี้หรือไม่?';
-      
-    if (!window.confirm(confirmMsg)) return;
-
-    const item = isVirtual ? schedules.find(s => s.id === id) : undefined;
-    deleteScheduleMutation.mutate({ id, isVirtual, item });
-  };
-
-  // ─── Mutation: สร้างแผนตารางสอนอัตโนมัติ ───
-  const autoGenerateMutation = useMutation({
-    mutationFn: async (startDate: string) => {
-      return api.post('/schedules', {
-        action: 'generate',
-        start_date: startDate
-      });
-    },
-    onSuccess: (res) => {
-      toast.success(res.data.message || 'สร้างตารางสอนล่วงหน้าสำเร็จ');
-      setShowAutoGenerate(false);
-      queryClient.invalidateQueries({ queryKey: ['schedules'] });
-    },
-    onError: (err: ApiError) => {
-      toast.error(err.response?.data?.message || 'สร้างตารางสอนล่วงหน้าไม่สำเร็จ');
-    }
-  });
-
-  const handleAutoGenerateSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!autoGenerateStartDate) return toast.error('กรุณาระบุวันเริ่มต้นภาคเรียน');
-    autoGenerateMutation.mutate(autoGenerateStartDate);
-  };
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) setUploadFile(file);
@@ -621,223 +436,8 @@ export default function Schedule() {
     setDragType(null);
   };
 
-  const days = getMonthGrid(currentMonth);
-  const safeSchedules = Array.isArray(schedules) ? schedules : [];
-  const schedulesForDay = (day: Date) => safeSchedules.filter(s => s && s.scheduled_date && isSameDay(parseISO(s.scheduled_date.slice(0, 10)), day));
-  const selectedDaySchedules = schedulesForDay(selectedDay);
-
-  const saving = scheduleMutation.isPending;
   const savingTimetable = timetableMutation.isPending || deleteTimetableMutation.isPending;
   const uploading = timetableUploadMutation.isPending;
-  const autoGenerating = autoGenerateMutation.isPending;
-
-
-  const goToFinalWeek = () => {
-    // 1. Check if safeSchedules has a final week schedule
-    const finalSch = safeSchedules.find(s => s.is_final_week);
-    if (finalSch) {
-      const d = parseISO(finalSch.scheduled_date.slice(0, 10));
-      setCurrentMonth(d);
-      setSelectedDay(d);
-      toast('ไปยังสัปดาห์สุดท้ายของภาคเรียน (สัปดาห์ที่ 18)', { icon: '🏁' });
-      return;
-    }
-
-    // 2. Or check classroomsList for the latest semester_end_date
-    let latestEnd: Date | null = null;
-    for (const c of classroomsList) {
-      if (c.semester_end_date) {
-        const d = new Date(c.semester_end_date);
-        if (!latestEnd || d > latestEnd) latestEnd = d;
-      }
-    }
-
-    const targetDate = latestEnd || new Date('2026-09-16');
-    setCurrentMonth(targetDate);
-    setSelectedDay(targetDate);
-    toast('ไปยังสัปดาห์สุดท้ายของภาคเรียน', { icon: '🏁' });
-  };
-
-  const renderCalendar = () => (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6 animate-fade-in-up">
-      <div className="glass p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-          <div className="flex items-center gap-2">
-            <button onClick={() => setCurrentMonth(m => subMonths(m, 1))} className="p-2 rounded-xl hover:bg-indigo-50 transition-colors">
-              <ChevronLeft className="w-5 h-5 text-slate-600" />
-            </button>
-            <h2 className="text-base font-bold text-slate-800">
-              {format(currentMonth, 'MMMM yyyy', { locale: th })}
-            </h2>
-            <button onClick={() => setCurrentMonth(m => addMonths(m, 1))} className="p-2 rounded-xl hover:bg-indigo-50 transition-colors">
-              <ChevronRight className="w-5 h-5 text-slate-600" />
-            </button>
-          </div>
-
-          <button
-            onClick={goToFinalWeek}
-            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/10 via-purple-500/10 to-indigo-500/10 hover:from-amber-500/20 hover:to-indigo-500/20 border border-amber-300/60 text-amber-900 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
-            title="เลื่อนปฏิทินไปยังสัปดาห์สุดท้ายของภาคเรียน"
-          >
-            <span>🏁</span>
-            <span>ไปยังสัปดาห์สุดท้าย (สัปดาห์ที่ 18)</span>
-          </button>
-        </div>
-
-        <div className="grid grid-cols-7 mb-2">
-          {DAY_NAMES.map(d => (
-            <div key={d} className="text-center text-[0.68rem] font-semibold text-slate-500 py-1">{d}</div>
-          ))}
-        </div>
-
-        {loading ? (
-          <div className="skeleton h-64 rounded-xl" />
-        ) : (
-          <div className="grid grid-cols-7 gap-1">
-            {days.map((day, i) => {
-              const daySchs  = schedulesForDay(day);
-              const isToday  = isSameDay(day, new Date());
-              const isCurMon = isSameMonth(day, currentMonth);
-              const isSelected = isSameDay(day, selectedDay);
-              const hasFinalWeek = daySchs.some(s => s.is_final_week);
-              
-              let btnClass = "relative rounded-2xl p-2 min-h-[64px] text-left transition-all duration-300 border ";
-              if (!isCurMon) {
-                btnClass += "opacity-30 border-transparent";
-              } else if (hasFinalWeek) {
-                btnClass += "border-amber-200/90 bg-amber-50/40";
-              } else {
-                btnClass += "border-indigo-100 bg-indigo-50";
-              }
-              
-              if (isSelected) {
-                btnClass += " bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border-indigo-500/50 shadow-lg shadow-indigo-500/20 scale-105 z-10";
-              } else {
-                btnClass += " hover:bg-white/[0.06] hover:border-indigo-200 hover:-translate-y-0.5 hover:shadow-lg";
-              }
-              
-              let numClass = "text-[0.72rem] font-bold w-7 h-7 flex items-center justify-center rounded-xl mb-1.5 ";
-              if (isToday) {
-                numClass += "bg-indigo-500 text-white shadow-lg shadow-indigo-500/30";
-              } else if (isSelected) {
-                numClass += "text-indigo-700";
-              } else {
-                numClass += "text-slate-600";
-              }
-
-              return (
-                <button
-                  key={i}
-                  onClick={() => setSelectedDay(day)}
-                  className={btnClass}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className={numClass}>
-                      {format(day, 'd')}
-                    </span>
-                    {hasFinalWeek && (
-                      <span className="text-[0.52rem] font-extrabold px-1 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300/80 leading-none">
-                        สัปดาห์สุดท้าย
-                      </span>
-                    )}
-                  </div>
-                  {daySchs.length > 0 && (
-                    <div className="mt-1 space-y-0.5">
-                      {daySchs.slice(0, 2).map((s, j) => {
-                        const isAct = s.lesson_title?.includes('เสาธง') || s.lesson_title?.includes('โฮมรูม') || s.subject?.includes('เสาธง') || s.lesson_title?.includes('เข้าแถว');
-                        return (
-                          <div key={j} className={"text-[0.55rem] font-medium leading-tight rounded-[4px] px-1.5 py-0.5 truncate border backdrop-blur-md " + (isAct ? "bg-rose-50 text-rose-600 border-rose-200" : (STATUS_STYLE[s.status] || STATUS_STYLE.scheduled))}>
-                            {s.start_time?.slice(0, 5)} {s.lesson_title} {isAct ? '' : `(${s.subject})`}
-                          </div>
-                        );
-                      })}
-                      {daySchs.length > 2 && <div className="text-[0.55rem] text-slate-500 pl-1">+{daySchs.length - 2}</div>}
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      <div className="glass p-5 flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">{format(selectedDay, 'EEEE', { locale: th })}</p>
-              {selectedDaySchedules.some(s => s.is_final_week) ? (
-                <span className="text-[0.62rem] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
-                  🏁 สัปดาห์สุดท้าย
-                </span>
-              ) : selectedDaySchedules[0]?.week_number ? (
-                <span className="text-[0.62rem] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-                  สัปดาห์ที่ {selectedDaySchedules[0].week_number}
-                </span>
-              ) : null}
-            </div>
-            <h3 className="text-xl font-bold text-slate-800">{format(selectedDay, 'd MMMM yyyy', { locale: th })}</h3>
-          </div>
-          <button onClick={() => openCreate(selectedDay)} className="p-2.5 rounded-xl bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-700 transition-all">
-            <Plus className="w-4 h-4" />
-          </button>
-        </div>
-
-        {selectedDaySchedules.some(s => s.is_final_week) && (
-          <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/80 rounded-xl p-3 flex items-start gap-2.5">
-            <span className="text-lg leading-none">🏁</span>
-            <div>
-              <p className="text-xs font-bold text-amber-950">สัปดาห์สุดท้ายของภาคเรียน (สัปดาห์ที่ {selectedDaySchedules[0]?.week_number || 18})</p>
-              <p className="text-[0.68rem] text-amber-800 mt-0.5 leading-relaxed">
-                สัปดาห์ประเมินผลและสอบปลายภาค สิ้นสุดแผนการสอนประจำภาคเรียน
-              </p>
-            </div>
-          </div>
-        )}
-
-        <div className="divider" />
-        {loading ? (
-          <div className="space-y-3">{[1,2].map(i => <div key={i} className="skeleton h-20 rounded-xl" />)}</div>
-        ) : selectedDaySchedules.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center py-10 text-center">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center mb-3"><Calendar className="w-6 h-6 text-slate-700" /></div>
-            <p className="text-slate-500 text-sm font-medium">ไม่มีตารางสอนในวันนี้</p>
-          </div>
-        ) : (
-          <div className="space-y-3 overflow-y-auto flex-1">
-            {[...selectedDaySchedules].sort((a, b) => (a.start_time || '').localeCompare(b.start_time || '')).map((sch) => (
-              <div key={sch.id} className="glass p-5 rounded-2xl group relative overflow-hidden border border-indigo-100 transition-all hover:shadow-lg">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2 flex-wrap">
-                      <span className="text-xs font-bold bg-indigo-50 px-2 py-1 rounded-md">{sch.start_time?.slice(0, 5)} - {sch.end_time?.slice(0, 5)}</span>
-                      {sch.is_final_week && (
-                        <span className="text-[0.62rem] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300">สัปดาห์สุดท้าย</span>
-                      )}
-                      {sch.lesson_title?.includes('เสาธง') || sch.lesson_title?.includes('โฮมรูม') || sch.subject?.includes('เสาธง') || sch.lesson_title?.includes('เข้าแถว') ? (
-                        <span className="text-[0.65rem] font-bold px-2 py-1 rounded-md bg-rose-50 text-rose-600 border border-rose-200">กิจกรรม/เข้าแถว</span>
-                      ) : (
-                        <span className={"text-[0.65rem] font-bold px-2 py-1 rounded-md " + STATUS_STYLE[sch.status]}>{STATUS_LABEL[sch.status]}</span>
-                      )}
-                    </div>
-                    <p className="text-sm font-bold text-slate-800">{sch.lesson_title}</p>
-                    <p className="text-xs text-slate-500 mt-1">วิชา: {sch.subject}</p>
-                    {sch.notes && (
-                      <p className="text-[0.68rem] text-slate-400 mt-1 truncate">{sch.notes}</p>
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => openEdit(sch)} className="p-1.5 rounded-md hover:bg-indigo-100 text-slate-600"><Edit2 className="w-3.5 h-3.5" /></button>
-                    <button onClick={() => handleDeleteSchedule(sch.id)} className="p-1.5 rounded-md hover:bg-red-100 text-slate-600 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
 
   const renderTimetable = () => {
     const entriesByDay: Record<number, TimetableEntry[]> = {};
@@ -879,20 +479,6 @@ export default function Schedule() {
 
     return (
       <div className="animate-fade-in-up">
-        <div className="flex justify-between items-center mb-6">
-          <p className="text-sm text-slate-500">ตารางสอนรายสัปดาห์</p>
-          <div className="flex gap-3">
-            <button onClick={() => setShowUpload(true)} className="btn btn-primary">
-              <UploadCloud className="w-4 h-4" /> อัพโหลดไฟล์ตาราง (รูปภาพ/CSV/PDF)
-            </button>
-            {timetableEntries.length > 0 && (
-              <button onClick={clearTimetable} className="btn btn-ghost text-red-500 hover:bg-red-50 hover:border-red-200">
-                ล้างข้อมูล
-              </button>
-            )}
-          </div>
-        </div>
-
         {loading ? (
            <div className="skeleton h-[500px] rounded-2xl w-full" />
         ) : timetableEntries.length === 0 ? (
@@ -1096,93 +682,38 @@ export default function Schedule() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 mb-1">ตารางสอน</h1>
+          <h1 className="text-2xl font-bold text-slate-800 mb-1">ตารางสอนประจำสัปดาห์</h1>
           <p className="text-slate-500 text-sm">จัดการเวลาเรียนและการสอนของคุณ</p>
         </div>
-        <button 
-          onClick={openAutoGenerateModal} 
-          className="btn btn-primary bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold flex items-center gap-2 border-0 shadow-lg shadow-indigo-200/50"
-        >
-          <Table className="w-4 h-4" /> สร้างแผนสอนล่วงหน้าอัตโนมัติ
-        </button>
+        <div className="flex items-center gap-3">
+          <button onClick={() => setShowUpload(true)} className="btn btn-primary flex items-center gap-2">
+            <UploadCloud className="w-4 h-4" /> อัพโหลดไฟล์ตาราง (รูปภาพ/CSV/PDF)
+          </button>
+          {timetableEntries.length > 0 && (
+            <button onClick={clearTimetable} className="btn btn-ghost text-red-500 hover:bg-red-50 hover:border-red-200">
+              ล้างข้อมูล
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="flex p-1 bg-indigo-500/5 backdrop-blur-sm rounded-xl w-fit border border-indigo-500/10">
-        <button
-          onClick={() => setActiveTab('calendar')}
-          className={"px-5 py-2 rounded-lg text-sm font-semibold transition-all " + (activeTab === 'calendar' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700')}
-        >
-          ปฏิทินแผนการสอน
-        </button>
-        <button
-          onClick={() => setActiveTab('timetable')}
-          className={"px-5 py-2 rounded-lg text-sm font-semibold transition-all " + (activeTab === 'timetable' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700')}
-        >
-          ตารางเรียนประจำสัปดาห์
-        </button>
-      </div>
+      {renderTimetable()}
 
-      {activeTab === 'calendar' ? renderCalendar() : renderTimetable()}
-
-      {showForm && createPortal(
-        <div className="modal-overlay" onClick={closeForm}>
-          <div className="glass w-full max-w-md p-7 animate-fade-in-up" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-                  <Calendar className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-slate-800">{editTarget ? 'แก้ไขตารางสอน' : 'เพิ่มตารางสอน'}</h2>
-                </div>
-              </div>
-              <button onClick={closeForm} className="p-2 hover:bg-indigo-50 rounded-xl"><X className="w-5 h-5 text-slate-500" /></button>
-            </div>
-            <form onSubmit={handleScheduleSubmit} className="space-y-4">
-              <div>
-                <label className="form-label">วิชาที่สอน *</label>
-                <input 
-                  type="text" 
-                  value={form.subject} 
-                  onChange={e => setForm(f => ({ ...f, subject: e.target.value }))} 
-                  className="form-input" 
-                  placeholder="เช่น คณิตศาสตร์, ภาษาอังกฤษ" 
-                  required 
-                />
-              </div>
-              <div>
-                <label className="form-label">หัวข้อที่สอน *</label>
-                <input 
-                  type="text" 
-                  value={form.title} 
-                  onChange={e => setForm(f => ({ ...f, title: e.target.value }))} 
-                  className="form-input" 
-                  placeholder="เช่น การบวกเลข, Present Simple Tense" 
-                  required 
-                />
-              </div>
-              <div>
-                <label className="form-label">วันที่ *</label>
-                <input type="date" value={form.scheduled_date} onChange={e => setForm(f => ({ ...f, scheduled_date: e.target.value }))} className="form-input" required />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="form-label">เริ่ม *</label>
-                  <input type="time" value={form.start_time} onChange={e => setForm(f => ({ ...f, start_time: e.target.value }))} className="form-input" required />
-                </div>
-                <div>
-                  <label className="form-label">สิ้นสุด *</label>
-                  <input type="time" value={form.end_time} onChange={e => setForm(f => ({ ...f, end_time: e.target.value }))} className="form-input" required />
-                </div>
-              </div>
-              <div className="flex gap-3 pt-4">
-                <button type="submit" disabled={saving} className="btn btn-primary flex-1">
-                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : editTarget ? 'บันทึก' : 'เพิ่ม'}
-                </button>
-                <button type="button" onClick={closeForm} className="btn btn-ghost px-5">ยกเลิก</button>
-              </div>
-            </form>
-          </div>
+      {hoverTooltip && !draggedEntry && !showTimetableModal && createPortal(
+        <div 
+          className="fixed z-[9999] w-48 bg-white shadow-xl rounded-lg p-3 border border-slate-100 text-left pointer-events-none"
+          style={{
+            top: hoverTooltip.rect.top - 8,
+            left: hoverTooltip.rect.left + hoverTooltip.rect.width / 2,
+            transform: 'translate(-50%, -100%)'
+          }}
+        >
+          <p className="text-xs font-bold text-slate-800">{hoverTooltip.entry.subject_name}</p>
+          <p className="text-[0.65rem] text-slate-500 mt-1">{hoverTooltip.entry.subject_code}</p>
+          <p className="text-[0.65rem] text-slate-500">ห้อง: {hoverTooltip.entry.room || '-'}</p>
+          <p className="text-[0.65rem] text-slate-500">กลุ่ม: {hoverTooltip.entry.group_name || '-'}</p>
+          <p className="text-[0.65rem] text-slate-500">คาบ: {hoverTooltip.entry.start_period} - {hoverTooltip.entry.end_period} ({hoverTooltip.entry.hours || (hoverTooltip.entry.end_period - hoverTooltip.entry.start_period + 1)} ชม.)</p>
+          <p className="text-[0.6rem] text-indigo-500 mt-1">คลิกเพื่อแก้ไข/ลบคาบเรียน</p>
         </div>,
         document.body
       )}
@@ -1233,91 +764,6 @@ export default function Schedule() {
               </div>
             </form>
           </div>
-        </div>,
-        document.body
-      )}
-
-      {showAutoGenerate && createPortal(
-        <div className="modal-overlay" onClick={() => setShowAutoGenerate(false)}>
-          <div className="glass w-full max-w-lg p-7 animate-fade-in-up" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-200">
-                  <Table className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-slate-800">สร้างแผนการสอนล่วงหน้าอัตโนมัติ</h2>
-                  <p className="text-xs text-slate-400">ตามตารางเรียนประจำสัปดาห์และห้องเรียน</p>
-                </div>
-              </div>
-              <button onClick={() => setShowAutoGenerate(false)} className="p-2 hover:bg-slate-100 rounded-xl"><X className="w-5 h-5 text-slate-500" /></button>
-            </div>
-
-            <form onSubmit={handleAutoGenerateSubmit} className="space-y-5">
-              <div className="bg-gradient-to-r from-indigo-50/70 to-purple-50/70 rounded-2xl p-4 border border-indigo-100/50">
-                <p className="text-xs text-indigo-900 leading-relaxed font-semibold mb-2">
-                  💡 ระบบจะสร้างแผนการสอนลงปฏิทินตลอดภาคเรียนอัตโนมัติ:
-                </p>
-                <ul className="list-disc list-inside text-[0.7rem] text-slate-600 space-y-1">
-                  <li>ใช้คาบเรียนวิชาการที่ <strong>เชื่อมกับห้องเรียน</strong> แล้วเท่านั้น</li>
-                  <li>ไม่รวมคาบกิจกรรมหน้าเสาธงหรือโฮมรูม (ไม่นับเป็นคาบสอน)</li>
-                  <li>คำนวณวันและเวลาสอนแต่ละสัปดาห์ตามตารางเรียน</li>
-                  <li>สร้างตารางสอนครอบคลุมทุกสัปดาห์จนถึง <strong>สัปดาห์สุดท้าย</strong> ของภาคเรียน (สัปดาห์ที่ 18 หรือ 15)</li>
-                </ul>
-                <div className="mt-3 space-y-1">
-                  <p className="text-xs text-emerald-700 font-semibold">✅ คาบที่เชื่อมแล้ว: {(Array.isArray(timetableEntries) ? timetableEntries : []).filter(e => e && e.classroom_id).length} รายการ</p>
-                  {(Array.isArray(timetableEntries) ? timetableEntries : []).filter(e => e && !e.classroom_id).length > 0 && (
-                    <p className="text-xs text-amber-600 font-semibold">⚠️ ยังไม่เชื่อม: {(Array.isArray(timetableEntries) ? timetableEntries : []).filter(e => e && !e.classroom_id).length} รายการ — คลิกที่คาบในตารางเพื่อเชื่อม</p>
-                  )}
-                  {(Array.isArray(timetableEntries) ? timetableEntries : []).filter(e => e && e.classroom_id).length === 0 && (
-                    <p className="text-xs text-red-600 font-bold mt-1">❌ ยังไม่มีคาบที่เชื่อมกับห้องเรียน — ต้องเชื่อมก่อนจึงจะสร้างได้</p>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <label className="form-label text-slate-700 font-bold mb-1.5 block">วันเริ่มต้นภาคเรียน *</label>
-                <input 
-                  type="date" 
-                  value={autoGenerateStartDate} 
-                  onChange={e => setAutoGenerateStartDate(e.target.value)} 
-                  className="form-input text-lg py-2.5" 
-                  required 
-                />
-              </div>
-
-              <div className="flex gap-3 pt-3">
-                <button type="submit" disabled={autoGenerating} className="btn btn-primary flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 border-0 py-2.5 text-sm font-bold shadow-lg shadow-indigo-100">
-                  {autoGenerating ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                      กำลังสร้างตารางสอนล่วงหน้า...
-                    </>
-                  ) : 'เริ่มต้นสร้างแผนการสอนล่วงหน้า'}
-                </button>
-                <button type="button" onClick={() => setShowAutoGenerate(false)} className="btn btn-ghost px-5 text-slate-600">ยกเลิก</button>
-              </div>
-            </form>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {hoverTooltip && !draggedEntry && !showTimetableModal && createPortal(
-        <div 
-          className="fixed z-[9999] w-48 bg-white shadow-xl rounded-lg p-3 border border-slate-100 text-left pointer-events-none"
-          style={{
-            top: hoverTooltip.rect.top - 8,
-            left: hoverTooltip.rect.left + hoverTooltip.rect.width / 2,
-            transform: 'translate(-50%, -100%)'
-          }}
-        >
-          <p className="text-xs font-bold text-slate-800">{hoverTooltip.entry.subject_name}</p>
-          <p className="text-[0.65rem] text-slate-500 mt-1">{hoverTooltip.entry.subject_code}</p>
-          <p className="text-[0.65rem] text-slate-500">ห้อง: {hoverTooltip.entry.room || '-'}</p>
-          <p className="text-[0.65rem] text-slate-500">กลุ่ม: {hoverTooltip.entry.group_name || '-'}</p>
-          <p className="text-[0.65rem] text-slate-500">คาบ: {hoverTooltip.entry.start_period} - {hoverTooltip.entry.end_period} ({hoverTooltip.entry.hours || (hoverTooltip.entry.end_period - hoverTooltip.entry.start_period + 1)} ชม.)</p>
-          <p className="text-[0.6rem] text-indigo-500 mt-1">คลิกเพื่อแก้ไข/ลบคาบเรียน</p>
         </div>,
         document.body
       )}

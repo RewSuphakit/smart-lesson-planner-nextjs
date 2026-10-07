@@ -61,15 +61,15 @@ export const portalLimiter = arcjetKey
   ? arcjet({
       key: arcjetKey,
       rules: [
-        shield({ mode: 'LIVE' }),
+        shield({ mode: process.env.NODE_ENV !== 'production' ? 'DRY_RUN' : 'LIVE' }),
         detectBot({
-          mode: 'LIVE',
+          mode: process.env.NODE_ENV !== 'production' ? 'DRY_RUN' : 'LIVE',
           allow: [],
         }),
         slidingWindow({
-          mode: 'LIVE',
+          mode: process.env.NODE_ENV !== 'production' ? 'DRY_RUN' : 'LIVE',
           interval: '5m',
-          max: 25,
+          max: 120,
         }),
       ],
     })
@@ -202,17 +202,18 @@ export async function protectRequest(
   const ip = getClientIp(request);
   const identifier = options?.userId ? `user:${options.userId}` : `ip:${ip}`;
 
-  let maxRequests = 120;
+  const isDev = process.env.NODE_ENV !== 'production';
+  let maxRequests = isDev ? 1000 : 120;
   let windowMs = 60 * 1000; // 1 min
 
   if (limiterInstance === aiLimiter) {
-    maxRequests = 20;
+    maxRequests = isDev ? 100 : 20;
     windowMs = 60 * 60 * 1000; // 1 hr
   } else if (limiterInstance === portalLimiter) {
-    maxRequests = 30;
+    maxRequests = isDev ? 1000 : 120;
     windowMs = 5 * 60 * 1000; // 5 mins
   } else if (limiterInstance === authLimiter) {
-    maxRequests = 30;
+    maxRequests = isDev ? 300 : 40;
     windowMs = 60 * 1000; // 1 min
   }
 

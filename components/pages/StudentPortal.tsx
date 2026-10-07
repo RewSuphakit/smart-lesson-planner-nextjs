@@ -141,6 +141,7 @@ export default function StudentPortal() {
   const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'missing' | 'submitted'>('all');
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const classroomCacheRef = React.useRef<Map<number, PortalData>>(new Map());
 
   // Load recently searched student codes
   useEffect(() => {
@@ -185,18 +186,27 @@ export default function StudentPortal() {
       const json = await res.json();
 
       if (!res.ok) {
-        setError(json.message || 'ไม่พบข้อมูลนักเรียน');
-        setData(null);
+        if (classroomId && data) {
+          toast.error(json.message || 'ไม่สามารถโหลดข้อมูลห้องเรียนนี้ได้');
+        } else {
+          setError(json.message || 'ไม่พบข้อมูลนักเรียน');
+          setData(null);
+        }
       } else {
         setData(json);
         saveRecentCode(trimmed);
         if (json.classroom?.id) {
           setSelectedClassroomId(json.classroom.id);
+          classroomCacheRef.current.set(json.classroom.id, json);
         }
       }
     } catch {
-      setError('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์ กรุณาลองใหม่อีกครั้ง');
-      setData(null);
+      if (classroomId && data) {
+        toast.error('เกิดข้อผิดพลาดในการโหลดข้อมูล กรุณาลองใหม่อีกครั้ง');
+      } else {
+        setError('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์ กรุณาลองใหม่อีกครั้ง');
+        setData(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -204,16 +214,26 @@ export default function StudentPortal() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    classroomCacheRef.current.clear();
     setSelectedClassroomId(null);
     fetchStudentData(studentCodeInput);
   };
 
   const handleSelectClassroom = (classroomId: number) => {
     setSelectedClassroomId(classroomId);
+
+    // Instant switch from in-memory cache if already fetched
+    const cached = classroomCacheRef.current.get(classroomId);
+    if (cached) {
+      setData(cached);
+      return;
+    }
+
     fetchStudentData(studentCodeInput, classroomId);
   };
 
   const handleReset = () => {
+    classroomCacheRef.current.clear();
     setData(null);
     setError(null);
     setSelectedClassroomId(null);
@@ -421,6 +441,8 @@ export default function StudentPortal() {
                     <button
                       key={code}
                       onClick={() => {
+                        classroomCacheRef.current.clear();
+                        setSelectedClassroomId(null);
                         setStudentCodeInput(code);
                         fetchStudentData(code);
                       }}
