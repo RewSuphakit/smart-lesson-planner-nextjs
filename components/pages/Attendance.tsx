@@ -11,8 +11,10 @@ import {
   FileSpreadsheet, Upload, BookOpen, GraduationCap, ArrowRight
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import AttendanceCsvModal from '@/components/AttendanceCsvModal';
-import AttendanceImportModal from '@/components/AttendanceImportModal';
+import dynamic from 'next/dynamic';
+
+const AttendanceCsvModal = dynamic(() => import('@/components/AttendanceCsvModal'), { ssr: false });
+const AttendanceImportModal = dynamic(() => import('@/components/AttendanceImportModal'), { ssr: false });
 
 import { getThaiHolidays, checkThaiHoliday, HolidayInfo } from '@/lib/thaiHolidays';
 

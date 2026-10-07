@@ -3,6 +3,12 @@ import { PrismaClient } from '@prisma/client';
 function getDatasourceUrl(): string | undefined {
   const url = process.env.DATABASE_URL;
   if (!url) return undefined;
+
+  // In serverless environments (Vercel/AWS Lambda), keep per-container connection limit low (2)
+  // to prevent concurrent serverless functions from exhausting MySQL's max_connections pool.
+  const isServerless = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+  const defaultLimit = isServerless ? '2' : '10';
+
   try {
     const parsed = new URL(url);
     if (!parsed.searchParams.has('connect_timeout')) {
@@ -12,7 +18,7 @@ function getDatasourceUrl(): string | undefined {
       parsed.searchParams.set('pool_timeout', '20');
     }
     if (!parsed.searchParams.has('connection_limit')) {
-      parsed.searchParams.set('connection_limit', '10');
+      parsed.searchParams.set('connection_limit', defaultLimit);
     }
     return parsed.toString();
   } catch {
@@ -24,7 +30,7 @@ function getDatasourceUrl(): string | undefined {
       result += (result.includes('?') ? '&' : '?') + 'pool_timeout=20';
     }
     if (!result.includes('connection_limit')) {
-      result += (result.includes('?') ? '&' : '?') + 'connection_limit=10';
+      result += (result.includes('?') ? '&' : '?') + `connection_limit=${defaultLimit}`;
     }
     return result;
   }
@@ -43,9 +49,8 @@ export const prisma =
     log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
   });
 
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma;
-}
+// Always cache client on globalThis to ensure warm serverless containers on Vercel reuse connection pools
+globalForPrisma.prisma = prisma;
 
 /**
  * Retries a database operation if it hits a transient connection timeout (P1001 / P1002)

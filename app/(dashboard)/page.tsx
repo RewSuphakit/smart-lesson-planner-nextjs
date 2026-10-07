@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/services/api';
@@ -156,39 +157,19 @@ function LiveClock() {
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Fetch Dashboard Data with TanStack Query (Instant navigation caching)
+  const { data = null, isLoading: loading } = useQuery<DashboardData | null>({
+    queryKey: ['dashboard'],
+    queryFn: async () => {
+      const res = await api.get('/dashboard');
+      return res.data.data;
+    },
+    staleTime: 1000 * 60, // 1 minute fresh cache
+  });
+
   const [exporting, setExporting] = useState(false);
   const [riskFilter, setRiskFilter] = useState<'all' | 'attendance_f' | 'attendance_warning'>('all');
   const [searchRisk, setSearchRisk] = useState('');
-
-  // Fetch Dashboard Data
-  useEffect(() => {
-    let active = true;
-    const controller = new AbortController();
-
-    api.get('/dashboard', { signal: controller.signal })
-      .then(res => {
-        if (active) {
-          setData(res.data.data);
-        }
-      })
-      .catch((err) => {
-        if (err.name !== 'CanceledError') {
-          console.error(err);
-        }
-      })
-      .finally(() => {
-        if (active) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      active = false;
-      controller.abort();
-    };
-  }, []);
 
   // Greeting based on Thai time of day
   const greeting = useMemo(() => {

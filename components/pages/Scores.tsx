@@ -9,9 +9,11 @@ import {
   Award, Eye, EyeOff
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import dynamic from 'next/dynamic';
 import { checkThaiHoliday } from '@/lib/thaiHolidays';
-import ScoreExcelModal from '@/components/ScoreExcelModal';
-import ScoreImportModal from '@/components/ScoreImportModal';
+
+const ScoreExcelModal = dynamic(() => import('@/components/ScoreExcelModal'), { ssr: false });
+const ScoreImportModal = dynamic(() => import('@/components/ScoreImportModal'), { ssr: false });
 import ClassroomCardPicker from '@/components/ClassroomCardPicker';
 import { parseClassroomName } from '@/lib/classroom';
 
