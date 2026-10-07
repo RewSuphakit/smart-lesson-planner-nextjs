@@ -45,11 +45,15 @@ export function getAuthUser(request: NextRequest): JwtPayload | null {
   try {
     let token: string | undefined;
 
-    const authHeader = request.headers.get('authorization');
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      token = authHeader.split(' ')[1];
-    } else {
-      token = request.cookies.get('token')?.value;
+    // 1. Primary & Secure: httpOnly cookie
+    token = request.cookies.get('token')?.value;
+
+    // 2. Fallback: Authorization Bearer header (for external API clients / tests)
+    if (!token) {
+      const authHeader = request.headers.get('authorization');
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.split(' ')[1];
+      }
     }
 
     if (!token) {
@@ -111,6 +115,7 @@ export function clearAuthCookie(response: NextResponse): void {
     sameSite: 'lax',
     path: '/',
     maxAge: 0,
+    expires: new Date(0),
   });
 }
 

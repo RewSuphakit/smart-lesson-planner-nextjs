@@ -4,12 +4,14 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
 import { createPortal } from 'react-dom';
-import { 
+import {
   Loader2, Search, RotateCcw, Zap, Plus, Minus,
-  ThumbsUp, ThumbsDown, AlertCircle, HeartHandshake, CheckCircle2, AlertTriangle, Users, Award, X
+  ThumbsUp, ThumbsDown, AlertCircle, HeartHandshake, CheckCircle2, AlertTriangle, Users, Award, X, Grid
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import UserAvatar from '@/components/UserAvatar';
+import ClassroomCardPicker from '@/components/ClassroomCardPicker';
+import { parseClassroomName } from '@/lib/classroom';
 
 const animalAvatars = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐧', '🐥', '🦉', '🦄', '🐙', '🐢', '🦖', '🦕', '🦦', '🦥'];
 
@@ -17,6 +19,9 @@ interface Classroom {
   id: string | number;
   name: string;
   affective_weight?: number;
+  student_count?: number;
+  total_classes?: number;
+  total_weeks?: number;
 }
 
 interface Student {
@@ -43,10 +48,10 @@ export default function Affective() {
   const queryClient = useQueryClient();
 
   const [selectedClass, setSelectedClass] = useState<string>('');
-  
+
   // Tracking which student ID is currently updating to show individual loaders
   const [updatingStudentIds, setUpdatingStudentIds] = useState<Record<string | number, boolean>>({});
-  
+
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'score-desc' | 'score-asc'>('name');
 
@@ -92,8 +97,8 @@ export default function Affective() {
           student_code: s.student_code,
           classroom_id: s.classroom_id,
           avatar: s.avatar,
-          affective_score: s.affective_score !== null && s.affective_score !== undefined 
-            ? Number(s.affective_score) 
+          affective_score: s.affective_score !== null && s.affective_score !== undefined
+            ? Number(s.affective_score)
             : Math.max(0, maxAffectiveWeight - ((gradeInfo?.absent_count || 0) * 2 + (gradeInfo?.late_count || 0) * 1)),
           absent_count: gradeInfo?.absent_count || 0,
           late_count: gradeInfo?.late_count || 0
@@ -133,9 +138,9 @@ export default function Affective() {
     },
     onMutate: async ({ studentId, score }) => {
       await queryClient.cancelQueries({ queryKey: ['affective-students', selectedClass, maxAffectiveWeight] });
-      
+
       const previousStudents = queryClient.getQueryData<Student[]>(['affective-students', selectedClass, maxAffectiveWeight]);
-      
+
       queryClient.setQueryData<Student[]>(
         ['affective-students', selectedClass, maxAffectiveWeight],
         old => old?.map(s => s.id === studentId ? { ...s, affective_score: score } : s) ?? []
@@ -207,7 +212,7 @@ export default function Affective() {
   const handleResetAllToMax = () => {
     if (students.length === 0) return;
     if (!window.confirm(`ยืนยันการตั้งค่าเริ่มต้นคะแนนจิตพิสัยของนักเรียนทุกคนในห้องนี้เป็นคะแนนเต็ม (${maxAffectiveWeight} คะแนน) หรือไม่?`)) return;
-    
+
     const batchScores = students.map(s => ({
       student_id: s.id,
       affective_score: maxAffectiveWeight
@@ -233,7 +238,7 @@ export default function Affective() {
       const absent = s.absent_count || 0;
       const late = s.late_count || 0;
       const penalty = (absent * 2) + (late * 1);
-      
+
       let autoScore: number;
       if (calcMode === 'deductFromCurrent') {
         autoScore = Math.max(0, s.affective_score - penalty);
@@ -266,8 +271,8 @@ export default function Affective() {
 
     if (search.trim()) {
       const q = search.toLowerCase();
-      result = result.filter(s => 
-        s.name.toLowerCase().includes(q) || 
+      result = result.filter(s =>
+        s.name.toLowerCase().includes(q) ||
         (s.student_code && s.student_code.toLowerCase().includes(q))
       );
     }
@@ -310,6 +315,14 @@ export default function Affective() {
     { label: 'ก่อกวน', value: -3, icon: '⚠️' },
   ];
 
+  const selectedClassData = useMemo(() => {
+    return classrooms.find(c => String(c.id) === String(selectedClass)) || null;
+  }, [classrooms, selectedClass]);
+
+  const activeParsed = useMemo(() => {
+    return selectedClassData ? parseClassroomName(selectedClassData.name) : null;
+  }, [selectedClassData]);
+
   if (loadingClassrooms) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -320,38 +333,76 @@ export default function Affective() {
 
   return (
     <div className="space-y-6 animate-fade-in-up">
-      {/* Header Title */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 mb-1 flex items-center gap-2">
-            <HeartHandshake className="w-6 h-6 text-pink-600" />
-            ห้องเรียนคุณธรรม & จิตพิสัย (Affective)
-          </h1>
-          <p className="text-slate-500 text-sm">การบวกหรือหักคะแนนพฤติกรรมในชั้นเรียนแบบเรียลไทม์ เชื่อมต่อกับระบบตัดเกรดโดยตรง</p>
-        </div>
-      </div>
 
-      {/* Classroom Selection Bar */}
-      <div className="glass p-5 rounded-2xl flex flex-col md:flex-row gap-4 items-end justify-between border border-indigo-100 bg-white">
-        <div className="flex-1 w-full max-w-md">
-          <label className="form-label font-bold text-slate-700" htmlFor="affective-class-select">เลือกห้องเรียนที่กำลังสอน</label>
-          <select 
-            id="affective-class-select"
-            value={selectedClass} 
-            onChange={e => setSelectedClass(e.target.value)} 
-            className="form-input text-base font-medium border-indigo-200 focus:border-indigo-500 bg-white"
-          >
-            <option value="">-- เลือกห้องเรียนเพื่อเริ่มให้คะแนน --</option>
-            {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        </div>
-        
-        {selectedClass && (
-          <div className="flex flex-wrap gap-2.5 w-full md:w-auto">
+
+      {/* Active Classroom Bar (เมื่อเลือกห้องแล้ว) */}
+      {selectedClass && selectedClassData && activeParsed && (
+        <div className="glass p-4 sm:p-5 rounded-2xl flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between border border-pink-100 bg-white shadow-xl shadow-pink-100/20">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3.5">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-pink-500 via-rose-500 to-purple-600 text-white flex items-center justify-center shadow-lg shadow-pink-500/25 shrink-0">
+              <HeartHandshake className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {activeParsed.code && (
+                  <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200/70">
+                    {activeParsed.code}
+                  </span>
+                )}
+                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${activeParsed.curriculumType === 'pvs'
+                    ? 'bg-purple-50 text-purple-700 border-purple-200'
+                    : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                  }`}>
+                  {activeParsed.curriculumType === 'pvs' ? 'ปวส.' : 'ปวช.'}
+                </span>
+                {activeParsed.groupName && (
+                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200/70">
+                    {activeParsed.groupName}
+                  </span>
+                )}
+                <span className="text-xs font-medium text-slate-500 ml-1">
+                  (👥 {selectedClassData.student_count || students.length || 0} คน)
+                </span>
+              </div>
+              <h2 className="text-base sm:text-lg font-extrabold text-slate-800 leading-tight mt-1">
+                {activeParsed.subjectTitle}
+              </h2>
+            </div>
+
+            {/* Quick Switch / เปลี่ยนห้อง */}
+            <div className="flex items-center gap-1.5 sm:ml-2">
+              <div className="relative">
+                <select
+                  value={selectedClass}
+                  onChange={e => setSelectedClass(e.target.value)}
+                  className="form-input text-xs font-bold py-1.5 pl-2.5 pr-7 bg-white hover:bg-slate-50 border-slate-200 rounded-xl focus:border-pink-400 focus:ring focus:ring-pink-200/50 transition-all text-slate-700 cursor-pointer shadow-xs"
+                  title="สลับห้องเรียนเร็ว"
+                >
+                  {classrooms.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedClass('')}
+                className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200/60 transition-all shadow-xs cursor-pointer"
+                title="ย้อนกลับไปดูการ์ดห้องเรียนทั้งหมด"
+              >
+                <Grid className="w-3.5 h-3.5 text-pink-600" />
+                <span>การ์ดทั้งหมด</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex flex-wrap gap-2.5 items-center">
             <button
               onClick={handleAutoCalculateFromAttendance}
               disabled={loadingStudents || updateBatchScoresMutation.isPending || students.length === 0}
-              className="btn bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 flex-1 md:flex-none flex items-center justify-center gap-1.5 py-2 text-xs font-bold"
+              className="btn bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 flex-1 md:flex-none flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-xl shadow-xs"
               title="คำนวณหักคะแนนจิตพิสัยตามสถิติ ขาด (หัก 2) / สาย (หัก 1) แล้วบันทึกลงฐานข้อมูล"
             >
               {updateBatchScoresMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4 text-amber-600" />}
@@ -361,24 +412,33 @@ export default function Affective() {
             <button
               onClick={handleResetAllToMax}
               disabled={loadingStudents || updateBatchScoresMutation.isPending || students.length === 0}
-              className="btn bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 flex-1 md:flex-none flex items-center justify-center gap-1.5 py-2 text-xs font-bold"
+              className="btn bg-pink-50 hover:bg-pink-100 text-pink-800 border border-pink-200 flex-1 md:flex-none flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-xl shadow-xs"
               title="รีเซ็ตคะแนนจิตพิสัยทุกคนเป็นคะแนนเต็มห้อง"
             >
-              {updateBatchScoresMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4 text-indigo-600" />}
+              {updateBatchScoresMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4 text-pink-600" />}
               <span>ให้คะแนนเต็มทุกคน ({maxAffectiveWeight})</span>
             </button>
           </div>
-        )}
-      </div>
-
-      {!selectedClass ? (
-        <div className="glass p-16 text-center rounded-2xl border border-indigo-100 bg-white">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-indigo-50 flex items-center justify-center mb-3 text-3xl shadow-sm border border-indigo-100">
-            ✨
-          </div>
-          <h3 className="text-lg font-bold text-slate-800">เริ่มต้นจัดการชั้นเรียนคุณธรรม</h3>
-          <p className="text-slate-500 text-sm mt-1 max-w-sm mx-auto">เลือกห้องเรียนด้านบน เพื่อบวกหรือหักคะแนนจิตพิสัยของนักเรียนในชั้นเรียนได้ทันที</p>
         </div>
+      )}
+
+      {/* Classroom Card Picker (เมื่อยังไม่ได้เลือกห้องเรียน) */}
+      {!selectedClass ? (
+        <ClassroomCardPicker
+          classrooms={classrooms}
+          onSelect={setSelectedClass}
+          title="เลือกห้องเรียนเพื่อจัดการจิตพิสัย"
+          subtitle="เลือกห้องเรียนที่กำลังสอน เพื่อบวกหรือหักคะแนนพฤติกรรมในชั้นเรียนแบบเรียลไทม์"
+          icon={<HeartHandshake className="w-6 h-6" />}
+          themeColor="pink"
+          actionText="เริ่มให้คะแนนจิตพิสัย"
+          customCardStat={(c) => (
+            <div className="pt-1.5 border-t border-slate-200/50 flex items-center justify-between text-[11px] text-pink-700 font-semibold">
+              <span>คะแนนจิตพิสัยเต็ม</span>
+              <span>{c.affective_weight || 20} คะแนน</span>
+            </div>
+          )}
+        />
       ) : loadingStudents ? (
         <div className="space-y-4">
           {[1, 2, 3].map(i => <div key={i} className="skeleton h-32 rounded-2xl" />)}
@@ -428,23 +488,23 @@ export default function Affective() {
           <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
             <div className="relative w-full sm:w-80">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input 
-                value={search} 
-                onChange={e => setSearch(e.target.value)} 
-                className="form-input pl-10 text-xs bg-white border-indigo-100 rounded-xl focus:border-indigo-500" 
-                placeholder="ค้นหารหัสนักเรียน หรือ ชื่อ..." 
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="form-input pl-10 text-xs bg-white border-indigo-100 rounded-xl focus:border-indigo-500"
+                placeholder="ค้นหารหัสนักเรียน หรือ ชื่อ..."
                 id="affective-search"
                 aria-label="ค้นหารหัสนักเรียน หรือชื่อ"
               />
             </div>
-            
+
             <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end shrink-0">
               <div className="text-xs text-slate-600 bg-indigo-50/80 border border-indigo-100 px-3 py-1.5 rounded-xl font-medium">
                 คะแนนเต็มจิตพิสัยห้องนี้: <span className="font-bold text-indigo-700">{maxAffectiveWeight} คะแนน</span>
               </div>
-              <select 
-                value={sortBy} 
-                onChange={e => setSortBy(e.target.value as 'name' | 'score-desc' | 'score-asc')} 
+              <select
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value as 'name' | 'score-desc' | 'score-asc')}
                 className="form-input text-xs w-44 py-1.5 bg-white border-indigo-100 rounded-xl"
                 aria-label="เรียงลำดับรายการ"
               >
@@ -469,13 +529,12 @@ export default function Affective() {
               const isUpdating = updatingStudentIds[s.id];
 
               return (
-                <div 
-                  key={s.id} 
-                  className={`glass overflow-hidden rounded-2xl transition-all duration-300 p-5 border flex flex-col md:flex-row gap-4 bg-white ${
-                    s.affective_score < (maxAffectiveWeight * 0.5)
-                      ? 'border-rose-200 bg-rose-50/30' 
+                <div
+                  key={s.id}
+                  className={`glass overflow-hidden rounded-2xl transition-all duration-300 p-5 border flex flex-col md:flex-row gap-4 bg-white ${s.affective_score < (maxAffectiveWeight * 0.5)
+                      ? 'border-rose-200 bg-rose-50/30'
                       : 'border-indigo-100 hover:border-indigo-300'
-                  }`}
+                    }`}
                 >
                   {/* Left Side: Avatar, Name and Attendance Stats */}
                   <div className="flex flex-row md:flex-col items-center gap-3 shrink-0 md:w-36 text-center md:border-r border-indigo-100/70 md:pr-3">
@@ -487,11 +546,11 @@ export default function Affective() {
                       size="lg"
                       className="rounded-2xl border border-indigo-100 shadow-sm shrink-0"
                     />
-                    
+
                     <div className="flex-1 md:flex-none text-left md:text-center min-w-0">
                       <p className="font-bold text-slate-800 text-sm truncate">{s.name}</p>
                       {s.student_code && <p className="text-[10px] text-slate-500 mt-0.5">รหัส: {s.student_code}</p>}
-                      
+
                       {/* Attendance Badges */}
                       <div className="flex items-center gap-1.5 md:justify-center mt-1 text-[10px]">
                         <span className={`px-1.5 py-0.5 rounded ${absent > 0 ? 'bg-rose-100 text-rose-700 font-bold' : 'bg-slate-100 text-slate-500'}`}>
@@ -522,7 +581,7 @@ export default function Affective() {
                         >
                           <Minus className="w-3.5 h-3.5" />
                         </button>
-                        
+
                         {/* Score Input Display */}
                         <div className="flex items-center gap-1 text-center">
                           {isUpdating ? (
@@ -564,10 +623,9 @@ export default function Affective() {
 
                     {/* Progress Bar */}
                     <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden shadow-inner">
-                      <div 
-                        className={`h-full transition-all duration-500 rounded-full ${
-                          scorePercent >= 80 ? 'bg-emerald-500' : scorePercent >= 50 ? 'bg-amber-500' : 'bg-rose-500'
-                        }`}
+                      <div
+                        className={`h-full transition-all duration-500 rounded-full ${scorePercent >= 80 ? 'bg-emerald-500' : scorePercent >= 50 ? 'bg-amber-500' : 'bg-rose-500'
+                          }`}
                         style={{ width: `${Math.min(100, Math.max(0, scorePercent))}%` }}
                       />
                     </div>
@@ -643,11 +701,10 @@ export default function Affective() {
               {/* Option 1: Deduct from current (Default) */}
               <label
                 onClick={() => setCalcMode('deductFromCurrent')}
-                className={`flex items-start gap-3.5 p-4 rounded-2xl border-2 transition-all cursor-pointer select-none ${
-                  calcMode === 'deductFromCurrent'
+                className={`flex items-start gap-3.5 p-4 rounded-2xl border-2 transition-all cursor-pointer select-none ${calcMode === 'deductFromCurrent'
                     ? 'bg-amber-50/80 border-amber-500/80 shadow-md shadow-amber-500/10'
                     : 'bg-white border-slate-200 hover:border-slate-300'
-                }`}
+                  }`}
               >
                 <input
                   type="radio"
@@ -673,11 +730,10 @@ export default function Affective() {
               {/* Option 2: Reset from max */}
               <label
                 onClick={() => setCalcMode('resetFromMax')}
-                className={`flex items-start gap-3.5 p-4 rounded-2xl border-2 transition-all cursor-pointer select-none ${
-                  calcMode === 'resetFromMax'
+                className={`flex items-start gap-3.5 p-4 rounded-2xl border-2 transition-all cursor-pointer select-none ${calcMode === 'resetFromMax'
                     ? 'bg-indigo-50/80 border-indigo-500/80 shadow-md shadow-indigo-500/10'
                     : 'bg-white border-slate-200 hover:border-slate-300'
-                }`}
+                  }`}
               >
                 <input
                   type="radio"

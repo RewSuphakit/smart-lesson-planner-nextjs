@@ -160,12 +160,13 @@ export async function GET(request: NextRequest) {
 
 ### Auth Flow
 
-1. JWT token stored in `localStorage` (client-side)
-2. Sent via `Authorization: Bearer <token>` header
-3. `requireAuth()` extracts & verifies token from request
-4. Token payload: `{ id, email, role }`
-5. Google OAuth: credential → verify → upsert user → JWT
-6. Global 401 handler dispatches `auth:unauthorized` event
+1. JWT token stored securely in `httpOnly` cookie (`SameSite=Lax`, `Secure` in production) — protected against XSS
+2. Automatically attached to all requests by browser (SSR, Route Handlers, Proxy middleware)
+3. Fallback `Authorization: Bearer <token>` header supported for external clients / tests
+4. `requireAuth()` extracts & verifies token from cookie or header
+5. Token payload: `{ id, email, role }`
+6. Google OAuth: credential → verify → upsert user → JWT in httpOnly cookie
+7. Global 401 handler dispatches `auth:unauthorized` event & `BroadcastChannel` synchronizes auth state across tabs
 
 ### URL Rewrites (next.config.ts)
 

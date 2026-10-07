@@ -131,9 +131,6 @@ export default function ProfilePage() {
       if (res.data.user) {
         updateUser(res.data.user);
       }
-      if (res.data.token) {
-        localStorage.setItem('token', res.data.token);
-      }
       toast.success(res.data.message || 'เปลี่ยนที่อยู่อีเมลสำเร็จเรียบร้อย 🎉');
       setIsEmailModalOpen(false);
     } catch (err: unknown) {

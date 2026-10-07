@@ -3,15 +3,17 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
-import { 
-  Loader2, BookOpen, Save, Settings, AlertCircle, TrendingUp, Plus, Trash2, 
+import {
+  Loader2, BookOpen, Save, Settings, AlertCircle, TrendingUp, Plus, Trash2,
   FileSpreadsheet, Printer, Zap, AlertTriangle, Search, Filter, Award, CheckCircle2, XCircle, Download,
-  SlidersHorizontal, LayoutGrid, Table as TableIcon, ChevronRight, ChevronDown, Sparkles, Check, RefreshCw
+  SlidersHorizontal, LayoutGrid, Table as TableIcon, ChevronRight, ChevronDown, Sparkles, Check, RefreshCw, Grid
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Pagination from '@/components/Pagination';
 import dynamic from 'next/dynamic';
 import { calculateAffectiveScore } from '@/lib/affective';
+import ClassroomCardPicker from '@/components/ClassroomCardPicker';
+import { parseClassroomName } from '@/lib/classroom';
 const GradePdfModal = dynamic(() => import('@/components/GradePdfModal'), { ssr: false });
 const GradeCsvModal = dynamic(() => import('@/components/GradeCsvModal'), { ssr: false });
 import { useAuth } from '@/context/AuthContext';
@@ -20,6 +22,10 @@ import UserAvatar from '@/components/UserAvatar';
 export interface Classroom {
   id: string;
   name: string;
+  student_count?: number;
+  total_classes?: number;
+  total_weeks?: number;
+  curriculum_type?: string;
   assignment_weight?: number;
   post_test_weight?: number;
   affective_weight?: number;
@@ -154,8 +160,8 @@ export default function Grades() {
   const calculatedAutoWidth = useMemo(() => {
     if (!report || report.length === 0) return 260;
     const maxNameLen = Math.max(14, ...report.map(s => (s.name || '').length));
-    const hasBadges = report.some(s => 
-      s.is_f || s.grade === 'ข.ร.' || s.grade === 'ขร' || s.is_absent_final || s.is_incomplete || 
+    const hasBadges = report.some(s =>
+      s.is_f || s.grade === 'ข.ร.' || s.grade === 'ขร' || s.is_absent_final || s.is_incomplete ||
       (s.remaining_absences !== undefined && s.remaining_absences <= 2 && s.remaining_absences >= 0)
     );
     const base = maxNameLen * 9.5 + (hasBadges ? 130 : 45);
@@ -182,6 +188,10 @@ export default function Grades() {
   const classroomObj = useMemo(() => {
     return classrooms.find(c => String(c.id) === String(selectedClass)) || null;
   }, [classrooms, selectedClass]);
+
+  const activeParsed = useMemo(() => {
+    return classroomObj ? parseClassroomName(classroomObj.name) : null;
+  }, [classroomObj]);
 
   // ─── Query: ดึงข้อมูลเกรดและเกณฑ์ ───
   const { data: gradesData, isLoading: loadingGrades } = useQuery<{ criteria: Criterion[]; report: ReportStudent[]; weights?: Weights }>({
@@ -258,11 +268,11 @@ export default function Grades() {
 
   // Total weight sum helper
   const totalWeightSum = useMemo(() => {
-    return Number(weights.assignment_weight || 0) + 
-           Number(weights.post_test_weight || 0) + 
-           Number(weights.affective_weight || 0) + 
-           Number(weights.midterm_weight || 0) + 
-           Number(weights.final_weight || 0);
+    return Number(weights.assignment_weight || 0) +
+      Number(weights.post_test_weight || 0) +
+      Number(weights.affective_weight || 0) +
+      Number(weights.midterm_weight || 0) +
+      Number(weights.final_weight || 0);
   }, [weights]);
 
   // Grade Distribution & Analytics Calculation
@@ -318,10 +328,10 @@ export default function Grades() {
   // Filtered student list
   const filteredReport = useMemo(() => {
     return report.filter(student => {
-      const matchesSearch = !searchQuery.trim() || 
-        student.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      const matchesSearch = !searchQuery.trim() ||
+        student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (student.student_code && student.student_code.includes(searchQuery));
-      
+
       if (!matchesSearch) return false;
 
       if (gradeFilter === 'ALL') return true;
@@ -367,35 +377,35 @@ export default function Grades() {
           valNum = 0;
         }
 
-        const updatedStudent = { 
-          ...student, 
+        const updatedStudent = {
+          ...student,
           [field]: valNum,
           ...(field === 'final_score' ? { is_absent_final: isAbsentFinal, is_incomplete: isIncomplete } : {})
         };
-        
+
         const mScore = Math.max(0, parseFloat(String(updatedStudent.midterm_score)) || 0);
         const rawF = parseFloat(String(updatedStudent.final_score));
         const fScore = (isNaN(rawF) || rawF < 0) ? 0 : rawF;
         const preciseAssign = Number(updatedStudent.precise_scaled_assign ?? 0);
         const precisePost = Number(updatedStudent.precise_scaled_post_test ?? 0);
-        
+
         const preciseMidterm = weights.midterm_max_score > 0 ? (mScore / weights.midterm_max_score) * weights.midterm_weight : 0;
         const preciseFinal = weights.final_max_score > 0 ? (fScore / weights.final_max_score) * weights.final_weight : 0;
-        
+
         updatedStudent.precise_scaled_midterm = preciseMidterm;
         updatedStudent.scaled_midterm = Math.round(preciseMidterm);
         updatedStudent.precise_scaled_final = preciseFinal;
         updatedStudent.scaled_final = Math.round(preciseFinal);
 
         const affective = Math.max(0, parseFloat(String(updatedStudent.affective_score ?? 0)) || 0);
-        
+
         const totalPrecise = preciseAssign + precisePost + affective + preciseMidterm + preciseFinal;
         updatedStudent.total_score_precise = totalPrecise;
         updatedStudent.total_score = Math.round(totalPrecise);
-        
+
         const percentage = totalWeightSum > 0 ? (totalPrecise / totalWeightSum) * 100 : 0;
         updatedStudent.percentage = percentage.toFixed(2);
-        
+
         let finalGrade = null;
         if (updatedStudent.is_f) {
           finalGrade = 'ข.ร.';
@@ -425,8 +435,8 @@ export default function Grades() {
       const scores = report.map(s => ({
         student_id: s.student_id,
         midterm_score: s.midterm_score === '' || s.midterm_score === undefined || s.midterm_score === null ? 0 : Number(s.midterm_score),
-        final_score: s.final_score === '' || s.final_score === undefined || s.final_score === null 
-          ? 0 
+        final_score: s.final_score === '' || s.final_score === undefined || s.final_score === null
+          ? 0
           : Number(s.final_score),
         affective_score: s.affective_score === undefined || s.affective_score === null ? null : Number(s.affective_score)
       }));
@@ -516,7 +526,7 @@ export default function Grades() {
       const isKr = student.is_f || student.grade === 'ข.ร.' || student.grade === 'ขร';
       const isKs = student.grade === 'ข.ส.' || student.is_absent_final;
       const isMs = student.grade === 'ม.ส.' || student.is_incomplete;
-      
+
       let remark = '';
       if (isKr) remark = 'หมดสิทธิ์สอบ (ข.ร.)';
       else if (isKs) remark = 'ขาดสอบปลายภาค (ข.ส.)';
@@ -546,7 +556,7 @@ export default function Grades() {
         const XLSX = await import('xlsx');
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-        
+
         ws['!cols'] = [
           { wch: 6 },
           { wch: 16 },
@@ -638,85 +648,112 @@ export default function Grades() {
 
   if (loadingClassrooms) return (
     <div className="flex flex-col items-center justify-center h-64 gap-3">
-      <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+      <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
       <p className="text-xs text-slate-500">กำลังโหลดข้อมูลห้องเรียน...</p>
     </div>
   );
 
   return (
     <div className="space-y-6 animate-fade-in-up pb-24">
-      {/* ==================== PAGE HEADER & RESPONSIVE SELECTOR ==================== */}
-      <div className="glass p-5 sm:p-6 rounded-3xl border border-indigo-100/80 bg-white shadow-sm">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/15 shrink-0">
-                <Award className="w-5 h-5" />
-              </div>
-              <div>
-                <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">
-                  ตัดเกรด & ประเมินผลการเรียน
-                </h1>
-                <p className="text-xs sm:text-sm text-slate-500">
-                  คำนวณคะแนนตามสัดส่วน 100% ตัดเกรดอัตโนมัติ และตรวจสิทธิ์สอบ (ศธ.02 ออนไลน์)
-                </p>
-              </div>
-            </div>
-          </div>
+      {/* ==================== PAGE HEADER ==================== */}
 
-          {/* Classroom Selector & Settings Button */}
-          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5">
-            <div className="relative flex-1 sm:flex-initial min-w-[200px]">
-              <select
-                value={selectedClass}
-                onChange={e => setSelectedClass(e.target.value)}
-                className="form-input text-xs sm:text-sm py-2.5 pl-3 pr-8 font-semibold text-slate-800 bg-slate-50 border border-indigo-200/80 rounded-2xl focus:bg-white focus:border-indigo-500 shadow-xs w-full"
-              >
-                <option value="">-- เลือกห้องเรียน --</option>
-                {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </div>
 
-            {selectedClass && (
-              <>
-                <span className={`hidden sm:inline-flex px-3 py-2 rounded-2xl text-xs font-bold border items-center gap-1.5 shrink-0 ${
-                  weights.is_pws || classrooms.find(c => String(c.id) === String(selectedClass))?.name?.includes('ปวส')
-                    ? 'bg-amber-50 text-amber-800 border-amber-300'
-                    : 'bg-indigo-50 text-indigo-800 border-indigo-200'
-                }`}>
-                  🎓 {weights.is_pws || classrooms.find(c => String(c.id) === String(selectedClass))?.name?.includes('ปวส')
+      {/* Active Classroom Bar (เมื่อเลือกห้องเรียนแล้ว) */}
+      {selectedClass && activeParsed && (
+        <div className="glass p-4 sm:p-5 rounded-3xl border border-purple-100/80 bg-white shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-purple-600 text-white shadow-xs">
+                  <Award className="w-3.5 h-3.5" />
+                  <span>ห้องเรียนปัจจุบัน</span>
+                </span>
+                {activeParsed.code && (
+                  <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200/70">
+                    {activeParsed.code}
+                  </span>
+                )}
+                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${activeParsed.curriculumType === 'pvs' || weights.is_pws || classroomObj?.name?.includes('ปวส')
+                  ? 'bg-purple-50 text-purple-700 border-purple-200'
+                  : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                  }`}>
+                  {activeParsed.curriculumType === 'pvs' || weights.is_pws || classroomObj?.name?.includes('ปวส')
                     ? `ปวส. (${weights.target_weeks || 15} สัปดาห์)`
                     : `ปวช. (${weights.target_weeks || 18} สัปดาห์)`}
                 </span>
+                {activeParsed.groupName && (
+                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200/70">
+                    {activeParsed.groupName}
+                  </span>
+                )}
+                <span className="text-xs font-medium text-slate-500 ml-1">
+                  (👥 {classroomObj?.student_count || report.length || 0} คน)
+                </span>
+              </div>
+              <h2 className="text-base sm:text-lg font-extrabold text-slate-800 leading-tight mt-1">
+                {activeParsed.subjectTitle}
+              </h2>
+            </div>
 
-                <button
-                  onClick={() => setShowSettings(!showSettings)}
-                  className={`btn px-3.5 py-2 rounded-2xl text-xs font-bold flex items-center gap-1.5 shrink-0 transition-all ${
-                    showSettings 
-                      ? 'btn-primary shadow-md shadow-indigo-500/20' 
-                      : 'bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50'
+            {/* Quick Switch / เปลี่ยนห้อง & Settings button */}
+            <div className="flex items-center gap-1.5 sm:ml-2 flex-wrap">
+              <button
+                onClick={() => setShowSettings(!showSettings)}
+                className={`btn px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shrink-0 transition-all ${showSettings
+                  ? 'btn-primary shadow-md shadow-purple-500/20'
+                  : 'bg-white border border-purple-200 text-purple-700 hover:bg-purple-50'
                   }`}
-                >
-                  <Settings className="w-4 h-4" />
-                  <span className="hidden sm:inline">ตั้งค่าเกณฑ์ & น้ำหนัก</span>
-                  <span className="sm:hidden">ตั้งค่า</span>
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
+              >
+                <Settings className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">ตั้งค่าเกณฑ์ & น้ำหนัก</span>
+                <span className="sm:hidden">ตั้งค่า</span>
+              </button>
 
-      {!selectedClass ? (
-        <div className="glass p-12 sm:p-16 text-center rounded-3xl border border-indigo-100 bg-white">
-          <div className="w-16 h-16 mx-auto rounded-3xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mb-4 text-indigo-600 shadow-sm">
-            <BookOpen className="w-8 h-8" />
+              <div className="relative">
+                <select
+                  value={selectedClass}
+                  onChange={e => setSelectedClass(e.target.value)}
+                  className="form-input text-xs font-bold py-1.5 pl-2.5 pr-7 bg-white hover:bg-slate-50 border-slate-200 rounded-xl focus:border-purple-400 focus:ring focus:ring-purple-200/50 transition-all text-slate-700 cursor-pointer shadow-xs"
+                  title="สลับห้องเรียนเร็ว"
+                >
+                  {classrooms.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedClass('')}
+                className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200/60 transition-all shadow-xs cursor-pointer"
+                title="ย้อนกลับไปดูการ์ดห้องเรียนทั้งหมด"
+              >
+                <Grid className="w-3.5 h-3.5 text-purple-600" />
+                <span>การ์ดทั้งหมด</span>
+              </button>
+            </div>
           </div>
-          <h3 className="text-lg font-bold text-slate-800 mb-1.5">กรุณาเลือกห้องเรียนเพื่อดูผลการเรียน</h3>
-          <p className="text-slate-500 text-xs sm:text-sm max-w-md mx-auto">
-            เลือกห้องเรียนจากเมนูด้านบนเพื่อเริ่มต้นดูสถิติ บันทึกคะแนนสอบกลางภาค/ปลายภาค และประมวลผลการตัดเกรด
-          </p>
         </div>
+      )}
+
+      {/* Classroom Card Picker (เมื่อยังไม่ได้เลือกห้องเรียน) */}
+      {!selectedClass ? (
+        <ClassroomCardPicker
+          classrooms={classrooms}
+          onSelect={setSelectedClass}
+          title="เลือกห้องเรียนเพื่อดูผลการเรียนและตัดเกรด"
+          subtitle="เลือกรายวิชาและห้องเรียนเพื่อประมวลผลการตัดเกรด บันทึกคะแนนกลางภาค/ปลายภาค และออกรายงาน ศธ.02"
+          icon={<Award className="w-6 h-6" />}
+          themeColor="purple"
+          actionText="ดูผลการเรียน & ตัดเกรด"
+          customCardStat={(c) => (
+            <div className="pt-1.5 border-t border-slate-200/50 flex items-center justify-between text-[11px] text-purple-700 font-semibold">
+              <span>เกณฑ์ประเมิน</span>
+              <span>สัดส่วน 100% · 8 ระดับ</span>
+            </div>
+          )}
+        />
       ) : loadingGrades ? (
         <div className="flex flex-col items-center justify-center h-64 gap-3">
           <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
@@ -753,11 +790,10 @@ export default function Grades() {
 
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold text-slate-600">ผลรวม:</span>
-                <span className={`px-3 py-1 rounded-full text-xs font-extrabold flex items-center gap-1.5 ${
-                  totalWeightSum === 100 
-                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
-                    : 'bg-rose-100 text-rose-800 border border-rose-300'
-                }`}>
+                <span className={`px-3 py-1 rounded-full text-xs font-extrabold flex items-center gap-1.5 ${totalWeightSum === 100
+                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                  : 'bg-rose-100 text-rose-800 border border-rose-300'
+                  }`}>
                   {totalWeightSum === 100 ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <XCircle className="w-3.5 h-3.5 text-rose-600" />}
                   {totalWeightSum}% / 100%
                 </span>
@@ -777,78 +813,78 @@ export default function Grades() {
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2">
               <div className="bg-white p-3 rounded-2xl border border-pink-100 shadow-xs">
                 <label className="block text-[11px] font-bold text-pink-700 uppercase mb-1">จิตพิสัย (%)</label>
-                <input 
+                <input
                   type="number" min="0" max="100"
-                  value={weights.affective_weight} 
-                  onChange={e => setWeights({...weights, affective_weight: parseFloat(e.target.value) || 0})}
-                  className="form-input text-center font-bold text-pink-800 text-sm py-1.5" 
-                  placeholder="10" 
+                  value={weights.affective_weight}
+                  onChange={e => setWeights({ ...weights, affective_weight: parseFloat(e.target.value) || 0 })}
+                  className="form-input text-center font-bold text-pink-800 text-sm py-1.5"
+                  placeholder="10"
                 />
               </div>
               <div className="bg-white p-3 rounded-2xl border border-amber-100 shadow-xs">
                 <label className="block text-[11px] font-bold text-amber-700 uppercase mb-1">สอบย่อย (%)</label>
-                <input 
+                <input
                   type="number" min="0" max="100"
-                  value={weights.post_test_weight} 
-                  onChange={e => setWeights({...weights, post_test_weight: parseFloat(e.target.value) || 0})}
-                  className="form-input text-center font-bold text-amber-800 text-sm py-1.5" 
-                  placeholder="30" 
+                  value={weights.post_test_weight}
+                  onChange={e => setWeights({ ...weights, post_test_weight: parseFloat(e.target.value) || 0 })}
+                  className="form-input text-center font-bold text-amber-800 text-sm py-1.5"
+                  placeholder="30"
                 />
               </div>
               <div className="bg-white p-3 rounded-2xl border border-emerald-100 shadow-xs">
                 <label className="block text-[11px] font-bold text-emerald-700 uppercase mb-1">งานเก็บ (%)</label>
-                <input 
+                <input
                   type="number" min="0" max="100"
-                  value={weights.assignment_weight} 
-                  onChange={e => setWeights({...weights, assignment_weight: parseFloat(e.target.value) || 0})}
-                  className="form-input text-center font-bold text-emerald-800 text-sm py-1.5" 
-                  placeholder="20" 
+                  value={weights.assignment_weight}
+                  onChange={e => setWeights({ ...weights, assignment_weight: parseFloat(e.target.value) || 0 })}
+                  className="form-input text-center font-bold text-emerald-800 text-sm py-1.5"
+                  placeholder="20"
                 />
               </div>
               <div className="bg-white p-3 rounded-2xl border border-cyan-100 shadow-xs">
                 <label className="block text-[11px] font-bold text-cyan-700 uppercase mb-1">กลางภาค (%)</label>
-                <input 
+                <input
                   type="number" min="0" max="100"
-                  value={weights.midterm_weight} 
-                  onChange={e => setWeights({...weights, midterm_weight: parseFloat(e.target.value) || 0})}
-                  className="form-input text-center font-bold text-cyan-800 text-sm py-1.5" 
-                  placeholder="20" 
+                  value={weights.midterm_weight}
+                  onChange={e => setWeights({ ...weights, midterm_weight: parseFloat(e.target.value) || 0 })}
+                  className="form-input text-center font-bold text-cyan-800 text-sm py-1.5"
+                  placeholder="20"
                 />
               </div>
               <div className="bg-white p-3 rounded-2xl border border-blue-100 shadow-xs">
                 <label className="block text-[11px] font-bold text-blue-700 uppercase mb-1">ปลายภาค (%)</label>
-                <input 
+                <input
                   type="number" min="0" max="100"
-                  value={weights.final_weight} 
-                  onChange={e => setWeights({...weights, final_weight: parseFloat(e.target.value) || 0})}
-                  className="form-input text-center font-bold text-blue-800 text-sm py-1.5" 
-                  placeholder="20" 
+                  value={weights.final_weight}
+                  onChange={e => setWeights({ ...weights, final_weight: parseFloat(e.target.value) || 0 })}
+                  className="form-input text-center font-bold text-blue-800 text-sm py-1.5"
+                  placeholder="20"
                 />
               </div>
             </div>
-            
+
             {/* Max Scores for Exams */}
             <div className="pt-3 border-t border-indigo-100/60">
               <h5 className="font-bold text-slate-700 mb-2 text-xs">กำหนดคะแนนเต็มสำหรับข้อสอบ (เพื่อใช้แปลงอัตราส่วน)</h5>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg">
                 <div className="flex items-center gap-3 bg-white p-2.5 rounded-2xl border border-indigo-100">
                   <label className="text-xs font-semibold text-cyan-800 w-28 shrink-0">เต็ม กลางภาค:</label>
-                  <input 
+                  <input
                     type="number" min="1"
-                    value={weights.midterm_max_score} 
-                    onChange={e => setWeights({...weights, midterm_max_score: parseFloat(e.target.value) || 0})}
-                    className="form-input text-center font-bold text-slate-800 flex-1 py-1 text-xs" 
-                    placeholder="100" 
+                    value={weights.midterm_max_score}
+                    onChange={e => setWeights({ ...weights, midterm_max_score: parseFloat(e.target.value) || 0 })}
+                    className="form-input text-center font-bold text-slate-800 flex-1 py-1 text-xs"
+                    placeholder="100"
                   />
                 </div>
                 <div className="flex items-center gap-3 bg-white p-2.5 rounded-2xl border border-indigo-100">
                   <label className="text-xs font-semibold text-blue-800 w-28 shrink-0">เต็ม ปลายภาค:</label>
-                  <input 
+                  <input
                     type="number" min="1"
-                    value={weights.final_max_score} 
-                    onChange={e => setWeights({...weights, final_max_score: parseFloat(e.target.value) || 0})}
-                    className="form-input text-center font-bold text-slate-800 flex-1 py-1 text-xs" 
-                    placeholder="100" 
+                    value={weights.final_max_score}
+                    onChange={e => setWeights({ ...weights, final_max_score: parseFloat(e.target.value) || 0 })}
+                    className="form-input text-center font-bold text-slate-800 flex-1 py-1 text-xs"
+                    placeholder="100"
                   />
                 </div>
               </div>
@@ -863,7 +899,7 @@ export default function Grades() {
                 <p className="text-xs text-slate-500">เรียงจากคะแนนสูงลงมาต่ำ</p>
               </div>
               <div className="flex gap-2">
-                <button 
+                <button
                   onClick={() => setCriteria([
                     { grade: 'A', min_score: 80 },
                     { grade: 'B+', min_score: 75 },
@@ -878,7 +914,7 @@ export default function Grades() {
                 >
                   ใช้เกรดอักษร (A-F)
                 </button>
-                <button 
+                <button
                   onClick={() => setCriteria([...DEFAULT_CRITERIA])}
                   className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors border border-emerald-200"
                 >
@@ -1014,11 +1050,10 @@ export default function Grades() {
                       else if (gKey === 'ม.ส.') setGradeFilter(isSelected ? 'ALL' : 'MS');
                       else setGradeFilter(isSelected ? 'ALL' : gKey);
                     }}
-                    className={`px-3 py-1.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-1.5 border shrink-0 ${
-                      isSelected 
-                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-500/20 scale-105' 
-                        : 'bg-slate-50 text-slate-700 border-slate-200/80 hover:bg-indigo-50 hover:text-indigo-700'
-                    }`}
+                    className={`px-3 py-1.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-1.5 border shrink-0 ${isSelected
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-500/20 scale-105'
+                      : 'bg-slate-50 text-slate-700 border-slate-200/80 hover:bg-indigo-50 hover:text-indigo-700'
+                      }`}
                   >
                     <span>{gKey}:</span>
                     <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${isSelected ? 'bg-white text-indigo-700' : 'bg-white text-slate-800 font-extrabold shadow-xs'}`}>
@@ -1137,47 +1172,46 @@ export default function Grades() {
               {/* Action Buttons Row */}
               <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-indigo-100/60">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <button 
-                    onClick={() => exportStd02('xlsx')} 
+                  <button
+                    onClick={() => exportStd02('xlsx')}
                     className="btn bg-white hover:bg-indigo-50 text-slate-700 border border-indigo-200 text-xs px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 shadow-xs"
                   >
-                    <Download className="w-3.5 h-3.5 text-indigo-600" /> 
+                    <Download className="w-3.5 h-3.5 text-indigo-600" />
                     <span>Export ศธ.02 (Excel)</span>
                   </button>
 
-                  <button 
-                    onClick={() => setShowCsvPreviewModal(true)} 
+                  <button
+                    onClick={() => setShowCsvPreviewModal(true)}
                     className="btn bg-white hover:bg-emerald-50 text-slate-700 border border-emerald-200 text-xs px-3 py-1.5 rounded-xl font-semibold flex items-center gap-1.5 shadow-xs"
                   >
-                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" /> 
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
                     <span>พรีวิว CSV</span>
                   </button>
 
-                  <button 
-                    onClick={() => setShowPdfPreviewModal(true)} 
+                  <button
+                    onClick={() => setShowPdfPreviewModal(true)}
                     className="btn bg-white hover:bg-violet-50 text-slate-700 border border-violet-200 text-xs px-3 py-1.5 rounded-xl font-semibold flex items-center gap-1.5 shadow-xs"
                   >
-                    <Printer className="w-3.5 h-3.5 text-violet-600" /> 
+                    <Printer className="w-3.5 h-3.5 text-violet-600" />
                     <span>พิมพ์ PDF</span>
                   </button>
 
-                  <button 
-                    onClick={autoCalculateAffective} 
+                  <button
+                    onClick={autoCalculateAffective}
                     className="btn bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs px-3 py-1.5 rounded-xl font-semibold flex items-center gap-1.5"
                   >
-                    <Zap className="w-3.5 h-3.5 text-amber-600" /> 
+                    <Zap className="w-3.5 h-3.5 text-amber-600" />
                     <span>คำนวณจิตพิสัยออโต้</span>
                   </button>
                 </div>
 
-                <button 
-                  onClick={() => saveExamsMutation.mutate()} 
-                  disabled={saveExamsMutation.isPending} 
-                  className={`btn text-xs px-4 py-2 rounded-2xl flex items-center gap-1.5 font-bold shadow-md transition-all ${
-                    hasUnsavedChanges
-                      ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-emerald-500/25 animate-pulse'
-                      : 'btn-primary shadow-indigo-500/20'
-                  }`}
+                <button
+                  onClick={() => saveExamsMutation.mutate()}
+                  disabled={saveExamsMutation.isPending}
+                  className={`btn text-xs px-4 py-2 rounded-2xl flex items-center gap-1.5 font-bold shadow-md transition-all ${hasUnsavedChanges
+                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-emerald-500/25 animate-pulse'
+                    : 'btn-primary shadow-indigo-500/20'
+                    }`}
                 >
                   {saveExamsMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   <span>{hasUnsavedChanges ? 'บันทึกการแก้ไข' : 'บันทึกคะแนน'}</span>
@@ -1192,7 +1226,7 @@ export default function Grades() {
                   <thead>
                     <tr className="bg-slate-100/90 border-b border-indigo-100 text-slate-700 font-bold sticky top-0 z-10 backdrop-blur-md">
                       <th className="p-3 w-16 text-center">รหัส</th>
-                      <th 
+                      <th
                         className="p-3 border-r border-indigo-200/60 sticky left-0 bg-slate-100/95 z-20 shadow-xs"
                         style={{ minWidth: `${activeNameWidth}px`, width: `${activeNameWidth}px` }}
                       >
@@ -1234,14 +1268,13 @@ export default function Grades() {
                       const isAtRisk = !isKr && !isKs && !isMs && (totalScore < 50 || (student.remaining_absences !== undefined && student.remaining_absences <= 2 && student.remaining_absences >= 0));
 
                       return (
-                        <tr 
-                          key={student.student_id} 
-                          className={`hover:bg-indigo-50/60 transition-colors ${
-                            isKr ? 'bg-rose-50/70' : isKs ? 'bg-amber-50/70' : isMs ? 'bg-purple-50/70' : isAtRisk ? 'bg-amber-50/30' : idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'
-                          }`}
+                        <tr
+                          key={student.student_id}
+                          className={`hover:bg-indigo-50/60 transition-colors ${isKr ? 'bg-rose-50/70' : isKs ? 'bg-amber-50/70' : isMs ? 'bg-purple-50/70' : isAtRisk ? 'bg-amber-50/30' : idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'
+                            }`}
                         >
                           <td className="p-2.5 text-slate-500 font-medium text-center font-mono">{student.student_code || '-'}</td>
-                          <td 
+                          <td
                             className="p-2.5 font-semibold text-slate-800 border-r border-indigo-100/80 sticky left-0 z-10 bg-inherit shadow-xs"
                             style={{ minWidth: `${activeNameWidth}px`, width: `${activeNameWidth}px` }}
                           >
@@ -1274,11 +1307,11 @@ export default function Grades() {
 
                           {/* Affective Editable Score */}
                           <td className="p-2 text-center bg-pink-50/20 border-r border-pink-100/40">
-                            <input 
+                            <input
                               type="number" step="0.5" min="0" max={weights.affective_weight}
                               value={student.affective_score ?? ''}
                               onChange={e => handleExamScoreChange(student.student_id, 'affective_score', e.target.value)}
-                              className="form-input text-center py-1 px-1.5 w-16 mx-auto text-pink-800 font-bold border-pink-200 focus:border-pink-500 text-xs rounded-xl bg-white shadow-2xs" 
+                              className="form-input text-center py-1 px-1.5 w-16 mx-auto text-pink-800 font-bold border-pink-200 focus:border-pink-500 text-xs rounded-xl bg-white shadow-2xs"
                               placeholder="0"
                             />
                           </td>
@@ -1297,11 +1330,11 @@ export default function Grades() {
 
                           {/* Midterm Editable Score */}
                           <td className="p-2 text-center bg-cyan-50/20 border-r border-cyan-100/40">
-                            <input 
+                            <input
                               type="number" step="0.5" min="0" max={weights.midterm_max_score}
                               value={student.midterm_score ?? ''}
                               onChange={e => handleExamScoreChange(student.student_id, 'midterm_score', e.target.value)}
-                              className="form-input text-center py-1 px-1.5 w-16 mx-auto text-cyan-800 font-bold border-cyan-200 focus:border-cyan-500 text-xs rounded-xl bg-white shadow-2xs" 
+                              className="form-input text-center py-1 px-1.5 w-16 mx-auto text-cyan-800 font-bold border-cyan-200 focus:border-cyan-500 text-xs rounded-xl bg-white shadow-2xs"
                               placeholder="0"
                             />
                             <div className="text-[10px] text-cyan-700 font-semibold mt-0.5 font-mono">ได้: {Number(student.precise_scaled_midterm || student.scaled_midterm || 0).toFixed(1)}</div>
@@ -1337,11 +1370,11 @@ export default function Grades() {
                               </div>
                             ) : (
                               <>
-                                <input 
+                                <input
                                   type="number" step="0.5" min="0" max={weights.final_max_score}
                                   value={student.final_score ?? ''}
                                   onChange={e => handleExamScoreChange(student.student_id, 'final_score', e.target.value)}
-                                  className="form-input text-center py-1 px-1.5 w-16 mx-auto text-blue-800 font-bold border-blue-200 focus:border-blue-500 text-xs rounded-xl bg-white shadow-2xs" 
+                                  className="form-input text-center py-1 px-1.5 w-16 mx-auto text-blue-800 font-bold border-blue-200 focus:border-blue-500 text-xs rounded-xl bg-white shadow-2xs"
                                   placeholder="0"
                                 />
                                 <div className="text-[10px] text-blue-700 font-semibold mt-0.5 font-mono">ได้: {Number(student.precise_scaled_final || student.scaled_final || 0).toFixed(1)}</div>
@@ -1396,9 +1429,8 @@ export default function Grades() {
                   return (
                     <div
                       key={student.student_id}
-                      className={`p-4 rounded-3xl border transition-all space-y-3 ${
-                        isKr ? 'bg-rose-50/70 border-rose-200' : isKs ? 'bg-amber-50/70 border-amber-200' : isMs ? 'bg-purple-50/70 border-purple-200' : 'bg-white border-indigo-100/80 hover:border-indigo-300 shadow-xs'
-                      }`}
+                      className={`p-4 rounded-3xl border transition-all space-y-3 ${isKr ? 'bg-rose-50/70 border-rose-200' : isKs ? 'bg-amber-50/70 border-amber-200' : isMs ? 'bg-purple-50/70 border-purple-200' : 'bg-white border-indigo-100/80 hover:border-indigo-300 shadow-xs'
+                        }`}
                     >
                       {/* Card Header: Avatar, Name, Student Code, Grade Badge */}
                       <div className="flex items-start justify-between gap-2.5">
@@ -1451,13 +1483,13 @@ export default function Grades() {
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1 text-xs">
                         <div className="p-2.5 rounded-2xl bg-pink-50/50 border border-pink-100">
                           <span className="text-[10px] font-bold text-pink-700 uppercase">จิตพิสัย ({weights.affective_weight}%)</span>
-                          <input 
+                          <input
                             type="number"
                             inputMode="decimal"
                             step="0.5" min="0" max={weights.affective_weight}
                             value={student.affective_score ?? ''}
                             onChange={e => handleExamScoreChange(student.student_id, 'affective_score', e.target.value)}
-                            className="form-input text-center py-1.5 px-1 w-full text-pink-900 font-bold border-pink-200 focus:border-pink-500 text-base md:text-xs rounded-xl bg-white mt-1" 
+                            className="form-input text-center py-1.5 px-1 w-full text-pink-900 font-bold border-pink-200 focus:border-pink-500 text-base md:text-xs rounded-xl bg-white mt-1"
                             placeholder="0"
                           />
                         </div>
@@ -1480,13 +1512,13 @@ export default function Grades() {
 
                         <div className="p-2.5 rounded-2xl bg-cyan-50/50 border border-cyan-100">
                           <span className="text-[10px] font-bold text-cyan-700 uppercase">กลางภาค ({weights.midterm_weight}%)</span>
-                          <input 
+                          <input
                             type="number"
                             inputMode="decimal"
                             step="0.5" min="0" max={weights.midterm_max_score}
                             value={student.midterm_score ?? ''}
                             onChange={e => handleExamScoreChange(student.student_id, 'midterm_score', e.target.value)}
-                            className="form-input text-center py-1.5 px-1 w-full text-cyan-900 font-bold border-cyan-200 focus:border-cyan-500 text-base md:text-xs rounded-xl bg-white mt-1" 
+                            className="form-input text-center py-1.5 px-1 w-full text-cyan-900 font-bold border-cyan-200 focus:border-cyan-500 text-base md:text-xs rounded-xl bg-white mt-1"
                             placeholder="0"
                           />
                         </div>
@@ -1524,13 +1556,13 @@ export default function Grades() {
                               <button type="button" onClick={() => handleExamScoreChange(student.student_id, 'final_score', '0')} className="text-[11px] text-blue-600 hover:underline font-bold">แก้คะแนน</button>
                             </div>
                           ) : (
-                            <input 
+                            <input
                               type="number"
                               inputMode="decimal"
                               step="0.5" min="0" max={weights.final_max_score}
                               value={student.final_score ?? ''}
                               onChange={e => handleExamScoreChange(student.student_id, 'final_score', e.target.value)}
-                              className="form-input text-center py-1.5 px-1 w-full text-blue-900 font-bold border-blue-200 focus:border-blue-500 text-base md:text-xs rounded-xl bg-white mt-1" 
+                              className="form-input text-center py-1.5 px-1 w-full text-blue-900 font-bold border-blue-200 focus:border-blue-500 text-base md:text-xs rounded-xl bg-white mt-1"
                               placeholder="0"
                             />
                           )}

@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import api from '@/services/api';
 
 interface User {
@@ -27,91 +27,106 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+// BroadcastChannel for cross-tab auth state synchronization without localStorage
+const AUTH_CHANNEL_NAME = 'smart_lesson_auth_sync';
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const fetchProfile = useCallback(async () => {
+    try {
+      const { data } = await api.get('/auth/profile');
+      setUser(data.user);
+      return data.user;
+    } catch {
+      setUser(null);
+      return null;
+    }
+  }, []);
+
   useEffect(() => {
-    const initAuth = async () => {
-      // Clear legacy/cached user object from localStorage for privacy & security
-      try {
-        localStorage.removeItem('user');
-      } catch {
-        // Ignore storage errors in restricted environments
-      }
-
-      const token = localStorage.getItem('token');
-      if (token) {
-        try {
-          const { data } = await api.get('/auth/profile');
-          setUser(data.user);
-        } catch {
-          localStorage.removeItem('token');
-          document.cookie = 'token=; Max-Age=0; path=/;';
-          setUser(null);
-        }
-      } else {
-        document.cookie = 'token=; Max-Age=0; path=/;';
-        setUser(null);
-      }
-      setLoading(false);
-    };
-    initAuth();
-
-    const handleUnauthorized = () => {
+    // Purge any legacy token/user remnants from localStorage for privacy & security
+    try {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      document.cookie = 'token=; Max-Age=0; path=/;';
+    } catch {
+      // Ignore in restricted environments
+    }
+
+    const initAuth = async () => {
+      await fetchProfile();
+      setLoading(false);
+    };
+
+    initAuth();
+
+    // Listen for global 401 Unauthorized event
+    const handleUnauthorized = () => {
       setUser(null);
     };
 
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'token') {
-        if (!e.newValue) {
-          // Token was removed in another tab (logout)
-          setUser(null);
-          localStorage.removeItem('user');
-          document.cookie = 'token=; Max-Age=0; path=/;';
-        } else if (e.newValue !== e.oldValue) {
-          // Token was updated / switched user in another tab
-          initAuth();
-        }
+    // Cross-tab synchronization via BroadcastChannel
+    let authChannel: BroadcastChannel | null = null;
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        authChannel = new BroadcastChannel(AUTH_CHANNEL_NAME);
+        authChannel.onmessage = (event) => {
+          if (event.data?.type === 'LOGOUT') {
+            setUser(null);
+          } else if (event.data?.type === 'LOGIN') {
+            fetchProfile();
+          }
+        };
+      } catch {
+        // Fallback gracefully if BroadcastChannel fails
       }
-    };
+    }
 
     window.addEventListener('auth:unauthorized', handleUnauthorized);
-    window.addEventListener('storage', handleStorage);
+
     return () => {
       window.removeEventListener('auth:unauthorized', handleUnauthorized);
-      window.removeEventListener('storage', handleStorage);
+      if (authChannel) {
+        authChannel.close();
+      }
     };
-  }, []);
+  }, [fetchProfile]);
+
+  const notifyTabs = (type: 'LOGIN' | 'LOGOUT') => {
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        const channel = new BroadcastChannel(AUTH_CHANNEL_NAME);
+        channel.postMessage({ type });
+        channel.close();
+      } catch {
+        // Ignore
+      }
+    }
+  };
 
   const login = async (email: string, password: string, rememberMe?: boolean, turnstileToken?: string) => {
     const { data } = await api.post('/auth/login', { email, password, rememberMe, turnstileToken });
-    localStorage.setItem('token', data.token);
-    const maxAge = rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60;
-    document.cookie = `token=${data.token}; path=/; max-age=${maxAge}; SameSite=Lax`;
+    // Cookie is set securely by server via Set-Cookie header (httpOnly, Secure, SameSite)
     setUser(data.user);
+    notifyTabs('LOGIN');
     return data;
   };
 
   const register = async (name: string, email: string, password: string, role?: string) => {
     const { data } = await api.post('/auth/register', { name, email, password, role });
-    if (data.token && data.user) {
-      localStorage.setItem('token', data.token);
-      document.cookie = `token=${data.token}; path=/; max-age=604800; SameSite=Lax`;
+    if (data.user) {
       setUser(data.user);
+      notifyTabs('LOGIN');
     }
     return data;
   };
 
   const verifyEmail = async (email: string, code: string) => {
     const { data } = await api.post('/auth/verify-email', { email, code });
-    if (data.token && data.user) {
-      localStorage.setItem('token', data.token);
-      document.cookie = `token=${data.token}; path=/; max-age=604800; SameSite=Lax`;
+    if (data.user) {
       setUser(data.user);
+      notifyTabs('LOGIN');
     }
     return data;
   };
@@ -123,9 +138,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const googleLogin = async (credential: string) => {
     const { data } = await api.post('/auth/google', { credential });
-    localStorage.setItem('token', data.token);
-    document.cookie = `token=${data.token}; path=/; max-age=604800; SameSite=Lax`;
     setUser(data.user);
+    notifyTabs('LOGIN');
     return data;
   };
 
@@ -135,10 +149,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // Ignore network errors during logout
     } finally {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      document.cookie = 'token=; Max-Age=0; path=/;';
+      try {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      } catch {
+        // Ignore
+      }
       setUser(null);
+      notifyTabs('LOGOUT');
     }
   };
 

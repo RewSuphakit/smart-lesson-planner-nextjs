@@ -3,16 +3,11 @@ import axios from 'axios';
 const api = axios.create({
   baseURL: '/api',
   headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
 });
 
-// Attach token and prevent stale browser HTTP cache on every request
+// Prevent stale browser HTTP cache on every request
 api.interceptors.request.use((config) => {
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-  }
   // Ensure browser never serves stale cached GET responses
   config.headers['Cache-Control'] = 'no-cache';
   config.headers['Pragma'] = 'no-cache';

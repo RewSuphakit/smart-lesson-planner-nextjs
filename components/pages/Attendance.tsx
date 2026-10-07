@@ -4,11 +4,11 @@ import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
 import { createPortal } from 'react-dom';
-import { 
-  Loader2, Users, Save, Calendar as CalendarIcon, CheckCircle, Clock, XCircle, 
-  FileText, AlertCircle, X, History, Trash2, ChevronLeft, ChevronRight, 
+import {
+  Loader2, Users, Save, Calendar as CalendarIcon, CheckCircle, Clock, XCircle,
+  FileText, AlertCircle, X, History, Trash2, ChevronLeft, ChevronRight,
   Search, Check, Grid, List, RefreshCw, Sparkles, RotateCcw,
-  FileSpreadsheet, Upload
+  FileSpreadsheet, Upload, BookOpen, GraduationCap, ArrowRight
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import AttendanceCsvModal from '@/components/AttendanceCsvModal';
@@ -41,19 +41,17 @@ const MemoizedAttendanceCell = memo(({ status, isEditing, onEditClick, onStatusS
   const isWeekend = holiday?.type === 'weekend';
 
   return (
-    <td className={`p-2 border-r border-indigo-100/40 text-center relative h-14 min-w-[80px] transition-colors ${
-      isGovHoliday ? 'bg-amber-50/40' : isWeekend ? 'bg-slate-50/50' : ''
-    }`}>
+    <td className={`p-2 border-r border-indigo-100/40 text-center relative h-14 min-w-[80px] transition-colors ${isGovHoliday ? 'bg-amber-50/40' : isWeekend ? 'bg-slate-50/50' : ''
+      }`}>
       {!status ? (
-        <button 
+        <button
           onClick={onEditClick}
-          className={`w-8 h-8 rounded-full border flex items-center justify-center mx-auto transition-all text-xs font-semibold touch-manipulation ${
-            isGovHoliday
-              ? 'border-amber-300 bg-amber-100/80 text-amber-800 hover:bg-amber-200 hover:border-amber-400 shadow-sm'
-              : isWeekend
+          className={`w-8 h-8 rounded-full border flex items-center justify-center mx-auto transition-all text-xs font-semibold touch-manipulation ${isGovHoliday
+            ? 'border-amber-300 bg-amber-100/80 text-amber-800 hover:bg-amber-200 hover:border-amber-400 shadow-sm'
+            : isWeekend
               ? 'border-slate-200 bg-slate-100/80 text-slate-400 hover:bg-slate-200'
               : 'border-dashed border-slate-300 hover:border-indigo-400 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600'
-          }`}
+            }`}
           title={holiday ? `วันหยุด: ${holiday.name} (คลิกเพื่อลงชื่อย้อนหลัง)` : 'คลิกเพื่อลงชื่อย้อนหลัง'}
         >
           {isGovHoliday ? '🏖️' : '+'}
@@ -61,44 +59,43 @@ const MemoizedAttendanceCell = memo(({ status, isEditing, onEditClick, onStatusS
       ) : (
         <button
           onClick={onEditClick}
-          className={`w-14 py-1.5 rounded-xl text-[10px] font-bold mx-auto flex items-center justify-center border transition-all hover:scale-105 touch-manipulation ${
-            status === 'present' ? 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100' :
+          className={`w-14 py-1.5 rounded-xl text-[10px] font-bold mx-auto flex items-center justify-center border transition-all hover:scale-105 touch-manipulation ${status === 'present' ? 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100' :
             status === 'late' ? 'bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100' :
-            status === 'absent' ? 'bg-red-50 border-red-200 text-red-500 hover:bg-red-100' :
-            'bg-blue-50 border-blue-200 text-blue-500 hover:bg-blue-100'
-          }`}
+              status === 'absent' ? 'bg-red-50 border-red-200 text-red-500 hover:bg-red-100' :
+                'bg-blue-50 border-blue-200 text-blue-500 hover:bg-blue-100'
+            }`}
         >
           {status === 'present' ? 'มา' : status === 'late' ? 'สาย' : status === 'absent' ? 'ขาด' : 'ลา'}
         </button>
       )}
 
       {isEditing && (
-        <div 
+        <div
           ref={popoverRef}
           className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-1 bg-white p-2 rounded-xl border border-indigo-100 shadow-xl flex items-center gap-1.5 animate-scale-up"
         >
-          <button 
+          <button
             onClick={() => onStatusSelect('present')}
             className="w-7 h-7 rounded-lg bg-emerald-500 text-white font-bold text-xs flex items-center justify-center hover:bg-emerald-600 shadow-sm touch-manipulation"
             title="มาเรียน"
           >
             มา
           </button>
-          <button 
+          <button
             onClick={() => onStatusSelect('late')}
             className="w-7 h-7 rounded-lg bg-amber-500 text-white font-bold text-xs flex items-center justify-center hover:bg-amber-600 shadow-sm touch-manipulation"
             title="สาย"
           >
             สาย
           </button>
-          <button 
+          <button
             onClick={() => onStatusSelect('absent')}
             className="w-7 h-7 rounded-lg bg-red-500 text-white font-bold text-xs flex items-center justify-center hover:bg-red-600 shadow-sm touch-manipulation"
             title="ขาด"
           >
             ขาด
           </button>
-          <button 
+          <button
             onClick={() => onStatusSelect('leave')}
             className="w-7 h-7 rounded-lg bg-blue-500 text-white font-bold text-xs flex items-center justify-center hover:bg-blue-600 shadow-sm touch-manipulation"
             title="ลา"
@@ -106,7 +103,7 @@ const MemoizedAttendanceCell = memo(({ status, isEditing, onEditClick, onStatusS
             ลา
           </button>
           {status && onDeleteClick && (
-            <button 
+            <button
               onClick={onDeleteClick}
               className="w-7 h-7 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 font-bold text-xs flex items-center justify-center border border-red-200 shadow-sm touch-manipulation"
               title="ลบ/ยกเลิกการเช็คชื่อช่องนี้"
@@ -177,7 +174,7 @@ const ThaiDateRangePicker = memo(({ startDate, endDate, onChange }: ThaiDateRang
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (
-        popoverRef.current && 
+        popoverRef.current &&
         !popoverRef.current.contains(e.target as Node) &&
         buttonRef.current &&
         !buttonRef.current.contains(e.target as Node)
@@ -357,11 +354,10 @@ const ThaiDateRangePicker = memo(({ startDate, endDate, onChange }: ThaiDateRang
                 key={days}
                 type="button"
                 onClick={() => handlePresetSelect(days)}
-                className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all ${
-                  isPresetActive(days)
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'bg-indigo-50/70 text-indigo-700 hover:bg-indigo-100'
-                }`}
+                className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all ${isPresetActive(days)
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'bg-indigo-50/70 text-indigo-700 hover:bg-indigo-100'
+                  }`}
               >
                 {days} วัน
               </button>
@@ -501,6 +497,45 @@ interface Classroom {
   semester_start_date?: string | null;
   semester_end_date?: string | null;
   current_week?: number | null;
+  student_count?: number;
+}
+
+export interface ParsedClassroomName {
+  code: string | null;
+  subjectTitle: string;
+  groupName: string | null;
+  curriculumType: 'pvs' | 'pvch' | 'other';
+}
+
+export function parseClassroomName(fullName: string): ParsedClassroomName {
+  if (!fullName) {
+    return { code: null, subjectTitle: '', groupName: null, curriculumType: 'other' };
+  }
+
+  const trimmed = fullName.trim();
+  const codeMatch = trimmed.match(/^([0-9]{4,5}-[0-9]{4}|[A-Za-z0-9-]{5,12})\s+/);
+  const code = codeMatch ? codeMatch[1] : null;
+  const afterCode = codeMatch ? trimmed.slice(codeMatch[0].length).trim() : trimmed;
+
+  const groupMatch = afterCode.match(/\s+((?:\([^\)]+\)\s*)?(?:ชก|ชย|ชค|ชอ|ชส|บช|กต|คธ|ทธ|อส)?\s*(?:ปวช\.|ปวส\.|ม\.)\s*[0-9]+(?:\/[0-9]+)?|[0-9]+\/[0-9]+)$/);
+
+  let groupName: string | null = null;
+  let subjectTitle = afterCode;
+
+  if (groupMatch && groupMatch.index !== undefined) {
+    groupName = groupMatch[1].trim();
+    subjectTitle = afterCode.slice(0, groupMatch.index).trim();
+  }
+
+  const isPvs = fullName.includes('ปวส') || (groupName?.includes('ปวส') ?? false);
+  const isPvch = fullName.includes('ปวช') || (groupName?.includes('ปวช') ?? false);
+
+  return {
+    code,
+    subjectTitle: subjectTitle || fullName,
+    groupName,
+    curriculumType: isPvs ? 'pvs' : isPvch ? 'pvch' : 'other',
+  };
 }
 
 interface SemesterWeek {
@@ -598,13 +633,12 @@ const MobileStudentAttendanceCard = memo(({
               หมดสิทธิ์เรียน
             </span>
           ) : (
-            <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg border ${
-              isCloseToFRisk 
-                ? 'bg-red-50 text-red-700 border-red-200 animate-pulse' 
-                : stats.converted_absent_count > 0 
-                ? 'bg-amber-50 text-amber-800 border-amber-200' 
+            <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg border ${isCloseToFRisk
+              ? 'bg-red-50 text-red-700 border-red-200 animate-pulse'
+              : stats.converted_absent_count > 0
+                ? 'bg-amber-50 text-amber-800 border-amber-200'
                 : 'bg-slate-50 text-slate-600 border-slate-200'
-            }`}>
+              }`}>
               ขาด {stats.converted_absent_count}/{maxAllowedAbsences}
             </span>
           )}
@@ -616,11 +650,10 @@ const MobileStudentAttendanceCard = memo(({
         <button
           type="button"
           onClick={() => onStatusSelect(student.id, 'present')}
-          className={`min-h-[44px] py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 touch-manipulation active:scale-95 ${
-            status === 'present'
-              ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20 ring-2 ring-emerald-400 font-black'
-              : 'bg-slate-50 hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 border border-slate-200/80'
-          }`}
+          className={`min-h-[44px] py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 touch-manipulation active:scale-95 ${status === 'present'
+            ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20 ring-2 ring-emerald-400 font-black'
+            : 'bg-slate-50 hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 border border-slate-200/80'
+            }`}
         >
           <CheckCircle className={`w-4 h-4 ${status === 'present' ? 'text-white' : 'text-emerald-600'}`} />
           <span>มา</span>
@@ -629,11 +662,10 @@ const MobileStudentAttendanceCard = memo(({
         <button
           type="button"
           onClick={() => onStatusSelect(student.id, 'late')}
-          className={`min-h-[44px] py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 touch-manipulation active:scale-95 ${
-            status === 'late'
-              ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20 ring-2 ring-amber-400 font-black'
-              : 'bg-slate-50 hover:bg-amber-50 text-slate-700 hover:text-amber-700 border border-slate-200/80'
-          }`}
+          className={`min-h-[44px] py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 touch-manipulation active:scale-95 ${status === 'late'
+            ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20 ring-2 ring-amber-400 font-black'
+            : 'bg-slate-50 hover:bg-amber-50 text-slate-700 hover:text-amber-700 border border-slate-200/80'
+            }`}
         >
           <Clock className={`w-4 h-4 ${status === 'late' ? 'text-white' : 'text-amber-600'}`} />
           <span>สาย</span>
@@ -642,11 +674,10 @@ const MobileStudentAttendanceCard = memo(({
         <button
           type="button"
           onClick={() => onStatusSelect(student.id, 'absent')}
-          className={`min-h-[44px] py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 touch-manipulation active:scale-95 ${
-            status === 'absent'
-              ? 'bg-rose-500 text-white shadow-md shadow-rose-500/20 ring-2 ring-rose-400 font-black'
-              : 'bg-slate-50 hover:bg-rose-50 text-slate-700 hover:text-rose-700 border border-slate-200/80'
-          }`}
+          className={`min-h-[44px] py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 touch-manipulation active:scale-95 ${status === 'absent'
+            ? 'bg-rose-500 text-white shadow-md shadow-rose-500/20 ring-2 ring-rose-400 font-black'
+            : 'bg-slate-50 hover:bg-rose-50 text-slate-700 hover:text-rose-700 border border-slate-200/80'
+            }`}
         >
           <XCircle className={`w-4 h-4 ${status === 'absent' ? 'text-white' : 'text-rose-500'}`} />
           <span>ขาด</span>
@@ -655,11 +686,10 @@ const MobileStudentAttendanceCard = memo(({
         <button
           type="button"
           onClick={() => onStatusSelect(student.id, 'leave')}
-          className={`min-h-[44px] py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 touch-manipulation active:scale-95 ${
-            status === 'leave'
-              ? 'bg-blue-500 text-white shadow-md shadow-blue-500/20 ring-2 ring-blue-400 font-black'
-              : 'bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200/80'
-          }`}
+          className={`min-h-[44px] py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 touch-manipulation active:scale-95 ${status === 'leave'
+            ? 'bg-blue-500 text-white shadow-md shadow-blue-500/20 ring-2 ring-blue-400 font-black'
+            : 'bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200/80'
+            }`}
         >
           <FileText className={`w-4 h-4 ${status === 'leave' ? 'text-white' : 'text-blue-500'}`} />
           <span>ลา</span>
@@ -687,7 +717,7 @@ export default function Attendance() {
   const [attendance, setAttendance] = useState<Record<string, string>>({});
   const [stats, setStats] = useState<StudentStats[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   // Auto-Save state
   const [autoSave, setAutoSave] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
@@ -739,7 +769,7 @@ export default function Attendance() {
 
   // Tabs state
   const [activeTab, setActiveTab] = useState<'daily' | 'matrix'>('daily');
-  
+
   // Matrix history grid state
   const [matrixStartDate, setMatrixStartDate] = useState<string>(() => {
     const d = new Date();
@@ -748,10 +778,10 @@ export default function Attendance() {
   });
   const [matrixEndDate, setMatrixEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [matrixEditingCell, setMatrixEditingCell] = useState<{ studentId: string; date: string } | null>(null);
-  
+
   // History Modal state
   const [historyStudent, setHistoryStudent] = useState<Student | null>(null);
-  
+
   // Export Modal state
   const [showExportModal, setShowExportModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -818,10 +848,10 @@ export default function Attendance() {
     if (!selectedClass) return;
     const classEntries = allTimetableEntries.filter(
       e => String(e.classroom_id) === String(selectedClass) &&
-           e.start_period !== 0 &&
-           e.entry_type !== 'homeroom' &&
-           !e.subject_name?.includes('เสาธง') &&
-           !e.subject_name?.includes('เข้าแถว')
+        e.start_period !== 0 &&
+        e.entry_type !== 'homeroom' &&
+        !e.subject_name?.includes('เสาธง') &&
+        !e.subject_name?.includes('เข้าแถว')
     );
     const timetableDays = Array.from(new Set(classEntries.map(e => e.day_of_week)));
 
@@ -841,10 +871,10 @@ export default function Attendance() {
         api.get(`/attendance?classroom_id=${selectedClass}&date=${date}`),
         api.get(`/attendance?classroom_id=${selectedClass}`)
       ]);
-      
+
       const classStudents = stuRes.data.data || [];
       const existing = attRes.data.data || [];
-      
+
       const newAtt: Record<string, string> = {};
       classStudents.forEach((s: Student) => {
         const found = existing.find((e: { student_id: string | number }) => String(e.student_id) === String(s.id));
@@ -1040,8 +1070,8 @@ export default function Attendance() {
 
   const handleMatrixCellDelete = (studentId: string, dateStr: string) => {
     setMatrixEditingCell(null);
-    const record = matrixRecords.find(r => 
-      (String(r.student_id) === String(studentId)) && 
+    const record = matrixRecords.find(r =>
+      (String(r.student_id) === String(studentId)) &&
       (r.date ? r.date.split('T')[0] === dateStr : false)
     );
     if (!record) return;
@@ -1061,11 +1091,10 @@ export default function Attendance() {
     return (
       <button
         onClick={() => handleStatusChange(id, status)}
-        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
-          isActive 
-            ? `${activeClass} shadow-md scale-[1.03]` 
-            : 'bg-white/50 border border-indigo-50/50 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-100'
-        }`}
+        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${isActive
+          ? `${activeClass} shadow-md scale-[1.03]`
+          : 'bg-white/50 border border-indigo-50/50 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-100'
+          }`}
       >
         {icon} {label}
       </button>
@@ -1110,10 +1139,10 @@ export default function Attendance() {
 
   const handleClearData = () => {
     if (!selectedClass || students.length === 0) return;
-    
+
     const dateObj = new Date(date);
     const formattedDateForConfirm = dateObj.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
-    
+
     if (!confirm(`⚠️ ยืนยันการลบข้อมูลเช็คชื่อ?\n\nคุณต้องการลบข้อมูลการเช็คชื่อของทุกคนในห้องนี้\nสำหรับวันที่ "${formattedDateForConfirm}" ใช่หรือไม่?\n\n(เหมาะสำหรับกรณีลงชื่อผิดวัน หรือต้องการเริ่มลงใหม่ของวันนี้)`)) {
       return;
     }
@@ -1192,7 +1221,7 @@ export default function Attendance() {
   };
 
   // Filters students by search query
-  const filteredStudents = students.filter(student => 
+  const filteredStudents = students.filter(student =>
     student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (student.student_code && student.student_code.toLowerCase().includes(searchQuery.toLowerCase()))
   );
@@ -1240,7 +1269,7 @@ export default function Attendance() {
 
   const getUniqueDates = () => {
     const dates = new Set<string>();
-    
+
     // Add dates that have records
     matrixRecords.forEach(r => {
       if (r.date) {
@@ -1269,6 +1298,53 @@ export default function Attendance() {
   const matrixDates = getUniqueDates();
   const selectedClassData = classrooms.find(c => String(c.id) === String(selectedClass));
   const maxAllowedAbsences = selectedClassData ? Math.floor((Number(selectedClassData.total_classes) || 40) * (100 - (Number(selectedClassData.min_attendance_percent) || 80)) / 100) : 0;
+
+  const activeParsed = useMemo(() => {
+    return selectedClassData ? parseClassroomName(selectedClassData.name) : null;
+  }, [selectedClassData]);
+
+  const [classFilter, setClassFilter] = useState<'all' | 'today' | 'pvch' | 'pvs'>('all');
+  const [classSearch, setClassSearch] = useState('');
+
+  const todayClassroomIds = useMemo(() => {
+    return new Set(
+      todayEntries
+        .filter(e => e.classroom_id)
+        .map(e => String(e.classroom_id))
+    );
+  }, [todayEntries]);
+
+  const todayCount = useMemo(() => {
+    return classrooms.filter(c => todayClassroomIds.has(String(c.id))).length;
+  }, [classrooms, todayClassroomIds]);
+
+  const pvchCount = useMemo(() => {
+    return classrooms.filter(c => (c.curriculum_type || (c.name?.includes('ปวส') ? 'pvs' : 'pvch')) === 'pvch').length;
+  }, [classrooms]);
+
+  const pvsCount = useMemo(() => {
+    return classrooms.filter(c => (c.curriculum_type || (c.name?.includes('ปวส') ? 'pvs' : 'pvch')) === 'pvs').length;
+  }, [classrooms]);
+
+  const filteredClassrooms = useMemo(() => {
+    let list = classrooms;
+    if (classFilter === 'today') {
+      list = list.filter(c => todayClassroomIds.has(String(c.id)));
+    } else if (classFilter === 'pvch') {
+      list = list.filter(c => (c.curriculum_type || (c.name?.includes('ปวส') ? 'pvs' : 'pvch')) === 'pvch');
+    } else if (classFilter === 'pvs') {
+      list = list.filter(c => (c.curriculum_type || (c.name?.includes('ปวส') ? 'pvs' : 'pvch')) === 'pvs');
+    }
+    if (classSearch.trim()) {
+      const q = classSearch.toLowerCase().trim();
+      list = list.filter(c => c.name?.toLowerCase().includes(q));
+    }
+    return [...list].sort((a, b) => {
+      const aToday = todayClassroomIds.has(String(a.id)) ? 1 : 0;
+      const bToday = todayClassroomIds.has(String(b.id)) ? 1 : 0;
+      return bToday - aToday;
+    });
+  }, [classrooms, classFilter, classSearch, todayClassroomIds]);
 
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
   const isPastDate = date < todayStr;
@@ -1305,15 +1381,10 @@ export default function Attendance() {
   );
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
+    <div className="animate-fade-in-up">
       {/* Page Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight bg-gradient-to-r from-slate-800 to-indigo-900 bg-clip-text text-transparent mb-1">
-            เช็คชื่อเข้าเรียน
-          </h1>
-          <p className="text-slate-500 text-sm">บันทึก ติดตาม และประเมินผลสถิติการมาเรียนของนักเรียนย้อนหลัง</p>
-        </div>
+
 
         {/* Global Action Tools */}
         {selectedClass && students.length > 0 && (
@@ -1335,7 +1406,7 @@ export default function Attendance() {
               <Upload className="w-4 h-4 text-indigo-600" />
               <span>นำเข้าจาก Excel & ตัวอย่างไฟล์</span>
             </button>
-            
+
             <button
               onClick={handleClearData}
               disabled={saving}
@@ -1349,116 +1420,328 @@ export default function Attendance() {
         )}
       </div>
 
-      {/* Today's Classes from Timetable */}
-      {todayEntries.length > 0 && (
-        <div className="glass p-5 rounded-2xl border border-white/40 shadow-xl shadow-indigo-100/20">
-          <div className="flex items-center gap-2 mb-3">
-            <CalendarIcon className="w-5 h-5 text-emerald-500" />
-            <h3 className="text-sm font-bold text-slate-700">📅 คาบเรียนวันนี้ ({new Date().toLocaleDateString('th-TH', { weekday: 'long' })})</h3>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {todayEntries.map((entry) => {
-              const matchedClassroom = entry.classroom_id ? classrooms.find(c => String(c.id) === String(entry.classroom_id)) : null;
-              const isActive = matchedClassroom && String(matchedClassroom.id) === selectedClass;
-              const periodLabel = entry.start_period === entry.end_period ? `คาบ ${entry.start_period}` : `คาบ ${entry.start_period}-${entry.end_period}`;
-              return (
-                <button
-                  key={entry.id}
-                  onClick={() => {
-                    if (matchedClassroom) {
-                      setSelectedClass(String(matchedClassroom.id));
-                      setDate(new Date().toISOString().split('T')[0]);
-                      setActiveTab('daily');
-                    }
-                  }}
-                  disabled={!matchedClassroom}
-                  className={`px-4 py-2.5 rounded-xl border text-left transition-all duration-200 ${
-                    isActive
-                      ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg shadow-emerald-200'
-                      : matchedClassroom
-                        ? 'bg-white hover:bg-emerald-50 border-emerald-200 text-slate-700 hover:border-emerald-400 hover:shadow-md cursor-pointer'
-                        : 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
-                  }`}
+
+      {/* Active Classroom Bar (เมื่อเลือกห้องแล้ว) */}
+      {selectedClass && selectedClassData && activeParsed && (
+        <div className="glass p-4 sm:p-5 rounded-2xl flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between border border-white/40 shadow-xl shadow-indigo-100/20">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3.5">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/25 shrink-0">
+              <GraduationCap className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {activeParsed.code && (
+                  <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200/70">
+                    {activeParsed.code}
+                  </span>
+                )}
+                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${activeParsed.curriculumType === 'pvs'
+                  ? 'bg-purple-50 text-purple-700 border-purple-200'
+                  : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                  }`}>
+                  {activeParsed.curriculumType === 'pvs' ? 'ปวส.' : 'ปวช.'}
+                </span>
+                {activeParsed.groupName && (
+                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200/70">
+                    {activeParsed.groupName}
+                  </span>
+                )}
+                <span className="text-xs font-medium text-slate-500 ml-1">
+                  (👥 {selectedClassData.student_count || students.length || 0} คน)
+                </span>
+              </div>
+              <h2 className="text-base sm:text-lg font-extrabold text-slate-800 leading-tight mt-1">
+                {activeParsed.subjectTitle}
+              </h2>
+            </div>
+
+            {/* Quick Switch / เปลี่ยนห้อง */}
+            <div className="flex items-center gap-1.5 sm:ml-2">
+              <div className="relative">
+                <select
+                  value={selectedClass}
+                  onChange={e => setSelectedClass(e.target.value)}
+                  className="form-input text-xs font-bold py-1.5 pl-2.5 pr-7 bg-white hover:bg-slate-50 border-slate-200 rounded-xl focus:border-indigo-400 focus:ring focus:ring-indigo-200/50 transition-all text-slate-700 cursor-pointer shadow-xs"
+                  title="สลับห้องเรียนเร็ว"
                 >
-                  <div className="font-bold text-sm">{entry.subject_name || 'ไม่ระบุวิชา'}</div>
-                  <div className={`text-xs mt-0.5 ${isActive ? 'text-emerald-100' : 'text-slate-500'}`}>
-                    {periodLabel} · {entry.room || '-'}
-                    {matchedClassroom && <span className="ml-1">· {matchedClassroom.name}</span>}
-                    {!matchedClassroom && <span className="ml-1 text-amber-500">· ยังไม่เชื่อมห้องเรียน</span>}
-                  </div>
-                </button>
-              );
-            })}
+                  {classrooms.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedClass('')}
+                className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/60 transition-all shadow-xs cursor-pointer"
+                title="ย้อนกลับไปดูการ์ดห้องเรียนทั้งหมด"
+              >
+                <Grid className="w-3.5 h-3.5 text-indigo-600" />
+                <span>การ์ดทั้งหมด</span>
+              </button>
+            </div>
           </div>
-          {todayEntries.some(e => !e.classroom_id) && (
-            <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
-              <AlertCircle className="w-3 h-3" />
-              บางคาบยังไม่ได้เชื่อมกับห้องเรียน — ไปตั้งค่าที่เมนู &quot;ตารางเรียน&quot;
-            </p>
-          )}
+
+          {/* Right side: Attendance threshold info + Tab switchers */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-gradient-to-r from-indigo-50/80 to-purple-50/60 border border-indigo-100/80 text-indigo-900 text-xs font-semibold">
+              <AlertCircle className="w-4 h-4 text-indigo-600 shrink-0" />
+              <div className="leading-tight">
+                <div>เวลาเรียนขั้นต่ำ: <strong className="font-black text-indigo-950">{selectedClassData.min_attendance_percent || 80}%</strong></div>
+                <div className="text-[11px] text-slate-600 font-medium">ขาดได้ไม่เกิน: <strong className="font-black text-rose-600">{maxAllowedAbsences} คาบ</strong> / {selectedClassData.total_classes || 40} คาบ</div>
+              </div>
+            </div>
+
+            <div className="flex bg-slate-100/80 p-1.5 rounded-xl border border-slate-200/50 shrink-0">
+              <button
+                onClick={() => setActiveTab('daily')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all duration-200 ${activeTab === 'daily'
+                  ? 'bg-white text-indigo-600 shadow-md'
+                  : 'text-slate-600 hover:text-indigo-600'
+                  }`}
+              >
+                <List className="w-4 h-4" />
+                เช็คชื่อประจำวัน
+              </button>
+              <button
+                onClick={() => setActiveTab('matrix')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all duration-200 ${activeTab === 'matrix'
+                  ? 'bg-white text-indigo-600 shadow-md'
+                  : 'text-slate-600 hover:text-indigo-600'
+                  }`}
+              >
+                <Grid className="w-4 h-4" />
+                ตารางประวัติย้อนหลัง
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Classroom selector card */}
-      <div className="glass p-5 rounded-2xl flex flex-col md:flex-row gap-5 items-center justify-between border border-white/40 shadow-xl shadow-indigo-100/20">
-        <div className="w-full md:w-2/3">
-          <label className="form-label text-slate-700 font-semibold mb-1.5 block">ห้องเรียน</label>
-          <div className="flex flex-col md:flex-row md:items-center gap-4">
-            <select 
-              value={selectedClass} 
-              onChange={e => setSelectedClass(e.target.value)} 
-              className="form-input text-lg py-2.5 bg-white/70 border-indigo-100/80 rounded-xl focus:border-indigo-400 focus:ring focus:ring-indigo-200/50 transition-all font-medium text-slate-800 max-w-md w-full"
-            >
-              <option value="">-- เลือกห้องเรียน --</option>
-              {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-            
-            {selectedClassData && (
-              <div className="flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-50 to-indigo-100/50 border border-indigo-100 text-indigo-800 shadow-sm shrink-0">
-                <AlertCircle className="w-5 h-5 text-indigo-500 shrink-0" />
-                <div className="text-xs font-semibold leading-relaxed">
-                  <span className="block sm:inline">เวลาเรียนขั้นต่ำ: <strong className="text-indigo-900 font-black">{selectedClassData.min_attendance_percent || 80}%</strong></span>
-                  <span className="hidden sm:inline mx-2 text-slate-300">|</span>
-                  <span className="block sm:inline">สิทธิ์เรียน/สอบ: ขาดได้ไม่เกิน <strong className="text-red-600 font-black">{maxAllowedAbsences} คาบ</strong> <span className="text-slate-500 font-medium">(จากทั้งหมด {selectedClassData.total_classes || 40} คาบ)</span></span>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {selectedClass && (
-          <div className="flex bg-slate-100/80 p-1.5 rounded-xl border border-slate-200/50 w-full md:w-auto">
-            <button
-              onClick={() => setActiveTab('daily')}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                activeTab === 'daily'
-                  ? 'bg-white text-indigo-600 shadow-md'
-                  : 'text-slate-600 hover:text-indigo-600'
-              }`}
-            >
-              <List className="w-4 h-4" />
-              เช็คชื่อประจำวัน
-            </button>
-            <button
-              onClick={() => setActiveTab('matrix')}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                activeTab === 'matrix'
-                  ? 'bg-white text-indigo-600 shadow-md'
-                  : 'text-slate-600 hover:text-indigo-600'
-              }`}
-            >
-              <Grid className="w-4 h-4" />
-              ตารางประวัติย้อนหลัง
-            </button>
-          </div>
-        )}
-      </div>
-
+      {/* Classroom Card Grid Selector (เมื่อยังไม่ได้เลือกห้องเรียน) */}
       {!selectedClass ? (
-        <div className="glass p-20 text-center rounded-2xl border border-white/30">
-          <Users className="w-16 h-16 text-indigo-300 mx-auto mb-4 stroke-1" />
-          <h3 className="text-xl font-bold text-slate-700 mb-1">ยังไม่ได้เลือกห้องเรียน</h3>
-          <p className="text-slate-600 text-sm max-w-sm mx-auto">กรุณาเลือกห้องเรียนด้านบนเพื่อเริ่มเช็คชื่อรายวัน หรือจัดการประวัติเช็คชื่อย้อนหลัง</p>
+        <div className="space-y-5 animate-fade-in">
+          {/* Header & Filters */}
+          <div className="glass p-5 rounded-2xl border border-white/40 shadow-xl shadow-indigo-100/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500 via-indigo-600 to-purple-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/25 shrink-0">
+                <BookOpen className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                  <span>เลือกห้องเรียนเพื่อบันทึกเวลาเรียน</span>
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
+                    {classrooms.length} ห้อง
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  เลือกรายวิชาและห้องเรียนที่ต้องการเช็คชื่อรายวัน หรือจัดการประวัติการเข้าเรียน
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+              {/* Category Filter Pills */}
+              <div className="flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 flex-wrap gap-1">
+                <button
+                  type="button"
+                  onClick={() => setClassFilter('all')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${classFilter === 'all'
+                    ? 'bg-white text-indigo-600 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                >
+                  ทั้งหมด ({classrooms.length})
+                </button>
+                {todayCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setClassFilter('today')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${classFilter === 'today'
+                      ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-400'
+                      : 'text-emerald-700 bg-emerald-50/80 hover:bg-emerald-100/90'
+                      }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    มีสอนวันนี้ ({todayCount})
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setClassFilter('pvch')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${classFilter === 'pvch'
+                    ? 'bg-white text-indigo-600 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                >
+                  ปวช. ({pvchCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setClassFilter('pvs')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${classFilter === 'pvs'
+                    ? 'bg-white text-indigo-600 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                >
+                  ปวส. ({pvsCount})
+                </button>
+              </div>
+
+              {/* Search Box */}
+              <div className="relative min-w-[200px]">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={classSearch}
+                  onChange={e => setClassSearch(e.target.value)}
+                  placeholder="ค้นหารหัสวิชา, ชื่อวิชา..."
+                  className="w-full pl-9 pr-3 py-2 text-xs font-medium rounded-xl border border-slate-200 bg-white/90 focus:outline-none focus:ring-2 focus:ring-indigo-400/50 focus:border-indigo-500 shadow-xs"
+                />
+                {classSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setClassSearch('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Classroom Cards Grid */}
+          {filteredClassrooms.length === 0 ? (
+            <div className="glass p-12 text-center rounded-2xl border border-white/40 shadow-sm">
+              <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+              <h4 className="text-base font-bold text-slate-700">ไม่พบห้องเรียนที่ตรงกับเงื่อนไข</h4>
+              <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                {classSearch ? `ไม่มีห้องเรียนที่ตรงกับคำค้นหา "${classSearch}"` : 'ยังไม่มีห้องเรียนในกลุ่มนี้'}
+              </p>
+              {(classSearch || classFilter !== 'all') && (
+                <button
+                  type="button"
+                  onClick={() => { setClassSearch(''); setClassFilter('all'); }}
+                  className="mt-3.5 px-4 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold border border-indigo-200 transition-colors"
+                >
+                  ล้างตัวกรองทั้งหมด
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4.5">
+              {filteredClassrooms.map(c => {
+                const parsed = parseClassroomName(c.name);
+                const hasToday = todayEntries.some(e => String(e.classroom_id) === String(c.id));
+                const todayEntry = todayEntries.find(e => String(e.classroom_id) === String(c.id));
+                const classMaxAbs = Math.floor((Number(c.total_classes) || 40) * (100 - (Number(c.min_attendance_percent) || 80)) / 100);
+
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedClass(String(c.id));
+                      setActiveTab('daily');
+                    }}
+                    className={`group relative bg-white/85 hover:bg-white backdrop-blur-xl rounded-2xl p-5 border text-left flex flex-col justify-between transition-all duration-200 hover:-translate-y-1 hover:shadow-xl hover:shadow-indigo-500/10 cursor-pointer overflow-hidden ${hasToday
+                      ? 'border-emerald-300 shadow-md shadow-emerald-500/5 ring-1 ring-emerald-400/40'
+                      : 'border-indigo-100/80 hover:border-indigo-300 shadow-sm'
+                      }`}
+                  >
+                    {/* Top Accent Gradient Bar */}
+                    <div className={`absolute top-0 left-0 right-0 h-1.5 transition-all ${hasToday
+                      ? 'bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500'
+                      : parsed.curriculumType === 'pvs'
+                        ? 'bg-gradient-to-r from-purple-500 via-fuchsia-500 to-indigo-500'
+                        : 'bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-500'
+                      }`} />
+
+                    <div>
+                      {/* Badge Header Row */}
+                      <div className="flex items-center justify-between gap-2 mb-3">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {parsed.code && (
+                            <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-lg bg-slate-100/90 text-slate-700 border border-slate-200 shadow-2xs">
+                              {parsed.code}
+                            </span>
+                          )}
+                          <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border shadow-2xs ${parsed.curriculumType === 'pvs'
+                            ? 'bg-purple-50 text-purple-700 border-purple-200'
+                            : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                            }`}>
+                            {parsed.curriculumType === 'pvs' ? 'ปวส.' : 'ปวช.'}
+                          </span>
+                          {parsed.groupName && (
+                            <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-800 border border-amber-200/90 shadow-2xs">
+                              {parsed.groupName}
+                            </span>
+                          )}
+                        </div>
+
+                        {hasToday && (
+                          <span className="flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-xs animate-pulse shrink-0">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            มีสอนวันนี้
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Course Title */}
+                      <h4 className="font-black text-base text-slate-800 group-hover:text-indigo-600 transition-colors line-clamp-2 leading-snug mb-3.5">
+                        {parsed.subjectTitle}
+                      </h4>
+
+                      {/* Info & Criteria Box */}
+                      <div className="space-y-2 bg-slate-50/80 group-hover:bg-indigo-50/40 p-3 rounded-xl border border-slate-100 group-hover:border-indigo-100/60 transition-colors mb-4">
+                        <div className="flex items-center justify-between text-xs text-slate-600">
+                          <span className="flex items-center gap-1.5">
+                            <Users className="w-3.5 h-3.5 text-indigo-500" />
+                            <span>นักเรียน</span>
+                          </span>
+                          <strong className="text-slate-800 font-bold">{c.student_count || 0} คน</strong>
+                        </div>
+
+                        <div className="flex items-center justify-between text-xs text-slate-600">
+                          <span className="flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-indigo-500" />
+                            <span>แผนการสอน</span>
+                          </span>
+                          <span className="text-slate-700 font-medium">
+                            {c.total_weeks || (parsed.curriculumType === 'pvs' ? 15 : 18)} สัปดาห์ · {c.total_classes || 40} คาบ
+                          </span>
+                        </div>
+
+                        {todayEntry && (
+                          <div className="pt-1.5 border-t border-emerald-200/60 flex items-center justify-between text-[11px] text-emerald-800 font-semibold">
+                            <span>คาบสอนวันนี้</span>
+                            <span>คาบ {todayEntry.start_period}{todayEntry.start_period !== todayEntry.end_period ? `-${todayEntry.end_period}` : ''} ({todayEntry.room || 'ห้องปกติ'})</span>
+                          </div>
+                        )}
+
+                        <div className="pt-1.5 border-t border-slate-200/50 flex items-center justify-between text-[11px] text-slate-500">
+                          <span>เกณฑ์เข้าเรียน</span>
+                          <span>
+                            ขั้นต่ำ <strong className="text-indigo-900 font-bold">{c.min_attendance_percent || 80}%</strong> (ขาดได้ {classMaxAbs} คาบ)
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Footer Prompt */}
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-indigo-600 group-hover:text-indigo-700">
+                      <span>เริ่มเช็คชื่อห้องนี้</span>
+                      <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white flex items-center justify-center transition-all group-hover:translate-x-1 shadow-xs">
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       ) : students.length === 0 ? (
         <div className="glass p-20 text-center rounded-2xl border border-white/30">
@@ -1474,32 +1757,32 @@ export default function Attendance() {
           {activeTab === 'daily' ? (
             /* ================= DAILY ROLL CALL TAB ================= */
             <div className="space-y-6">
-              
+
               {/* Date Control Panel */}
               <div className="glass p-5 rounded-2xl border border-white/50 shadow-md">
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                   <div className="flex items-center gap-2 bg-indigo-50/50 p-1.5 rounded-xl border border-indigo-100/50">
-                    <button 
-                      onClick={() => adjustDate(-1)} 
+                    <button
+                      onClick={() => adjustDate(-1)}
                       className="p-2 text-indigo-600 hover:bg-white rounded-lg transition-colors"
                       title="วันก่อนหน้า"
                     >
                       <ChevronLeft className="w-5 h-5" />
                     </button>
-                    
+
                     <div className="relative flex items-center gap-2 px-3 font-semibold text-slate-800 cursor-pointer group">
                       <CalendarIcon className="w-4 h-4 text-indigo-500" />
                       <span>{formattedSelectedDate}</span>
-                      <input 
-                        type="date" 
-                        value={date} 
-                        onChange={e => setDate(e.target.value)} 
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                      <input
+                        type="date"
+                        value={date}
+                        onChange={e => setDate(e.target.value)}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                       />
                     </div>
 
-                    <button 
-                      onClick={() => adjustDate(1)} 
+                    <button
+                      onClick={() => adjustDate(1)}
                       className="p-2 text-indigo-600 hover:bg-white rounded-lg transition-colors"
                       title="วันถัดไป"
                     >
@@ -1508,27 +1791,26 @@ export default function Attendance() {
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-end">
-                    <button 
-                      onClick={setToday} 
-                      className={`px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-xl border transition-all ${
-                        isToday
-                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                      }`}
+                    <button
+                      onClick={setToday}
+                      className={`px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-xl border transition-all ${isToday
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                        }`}
                     >
                       วันนี้
                     </button>
-                    <button 
-                      onClick={setYesterday} 
+                    <button
+                      onClick={setYesterday}
                       className="px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-xl bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition-all"
                     >
                       เมื่อวาน
                     </button>
 
                     {/* ปุ่มเช็คชื่อย้อนหลัง */}
-                    <button 
+                    <button
                       type="button"
-                      onClick={() => setShowRetroactiveModal(true)} 
+                      onClick={() => setShowRetroactiveModal(true)}
                       className="px-4 py-2 text-xs sm:text-sm font-bold rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/30 transition-all flex items-center gap-1.5 hover:scale-[1.02] active:scale-[0.98]"
                       title="เปิดหน้าต่างเลือกสัปดาห์หรือวันย้อนหลังเพื่อเช็คชื่อ"
                     >
@@ -1564,8 +1846,8 @@ export default function Attendance() {
                         {dailyStats.marked === dailyStats.total && dailyStats.total > 0
                           ? `บันทึกครบแล้ว (${dailyStats.marked}/${dailyStats.total} คน)`
                           : dailyStats.marked > 0
-                          ? `เช็คแล้ว ${dailyStats.marked} คน (ยังค้างอีก ${dailyStats.total - dailyStats.marked} คน)`
-                          : 'ยังไม่มีประวัติการเช็คชื่อของวันนี้ — สามารถเช็คสถานะและบันทึกได้ทันที'}
+                            ? `เช็คแล้ว ${dailyStats.marked} คน (ยังค้างอีก ${dailyStats.total - dailyStats.marked} คน)`
+                            : 'ยังไม่มีประวัติการเช็คชื่อของวันนี้ — สามารถเช็คสถานะและบันทึกได้ทันที'}
                       </p>
                     </div>
                   </div>
@@ -1664,19 +1946,19 @@ export default function Attendance() {
 
                   <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
                     <span className="text-xs text-slate-600 font-semibold mr-1">กำหนดเร็ว:</span>
-                    <button 
+                    <button
                       onClick={() => handleMarkAll('present')}
                       className="px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-600 text-xs font-semibold border border-emerald-200/40 transition-colors"
                     >
                       มาเรียนทุกคน
                     </button>
-                    <button 
+                    <button
                       onClick={() => handleMarkAll('absent')}
                       className="px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 text-xs font-semibold border border-red-200/40 transition-colors"
                     >
                       ขาดทุกคน
                     </button>
-                    <button 
+                    <button
                       onClick={handleResetDraft}
                       className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold border border-slate-300/40 transition-colors flex items-center gap-1.5"
                     >
@@ -1716,11 +1998,10 @@ export default function Attendance() {
                         const sStats = getStudentStats(student.id);
                         const isCloseToFRisk = sStats.converted_absent_count >= maxAllowedAbsences * 0.75;
                         return (
-                          <tr 
-                            key={student.id} 
-                            className={`border-b border-indigo-50/50 transition-colors duration-150 hover:bg-indigo-50/30 ${
-                              idx % 2 === 0 ? 'bg-white/20' : 'bg-transparent'
-                            }`}
+                          <tr
+                            key={student.id}
+                            className={`border-b border-indigo-50/50 transition-colors duration-150 hover:bg-indigo-50/30 ${idx % 2 === 0 ? 'bg-white/20' : 'bg-transparent'
+                              }`}
                           >
                             <td className="p-4 text-slate-600 text-sm font-semibold">{student.student_code || '-'}</td>
                             <td className="p-4">
@@ -1729,9 +2010,9 @@ export default function Attendance() {
                                   {student.name.charAt(0)}
                                 </div>
                                 <span className="font-semibold text-slate-800">{student.name}</span>
-                                <button 
-                                  onClick={() => setHistoryStudent(student)} 
-                                  className="p-1 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-100/50 transition-all" 
+                                <button
+                                  onClick={() => setHistoryStudent(student)}
+                                  className="p-1 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-100/50 transition-all"
                                   title="ดูประวัติการมาเรียนอย่างละเอียด"
                                 >
                                   <History className="w-4 h-4" />
@@ -1761,16 +2042,15 @@ export default function Attendance() {
                                       <span className="text-slate-600">/ {maxAllowedAbsences}</span>
                                     </div>
                                     <div className="w-full max-w-[90px] bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                                      <div 
-                                        className={`h-full rounded-full ${
-                                          isCloseToFRisk ? 'bg-red-500 animate-pulse' : 'bg-indigo-500'
-                                        }`} 
+                                      <div
+                                        className={`h-full rounded-full ${isCloseToFRisk ? 'bg-red-500 animate-pulse' : 'bg-indigo-500'
+                                          }`}
                                         style={{ width: `${Math.min((sStats.converted_absent_count / (maxAllowedAbsences || 1)) * 100, 100)}%` }}
                                       ></div>
                                     </div>
                                   </div>
                                 )}
-                                
+
                                 {(sStats.remaining_late_count > 0 || sStats.remaining_leave_count > 0) && (
                                   <div className="flex gap-1 text-[9px] mt-1 font-semibold opacity-70">
                                     {sStats.remaining_late_count > 0 && <span className="text-amber-600 bg-amber-50 px-1 py-0.5 rounded border border-amber-100">สายสะสม {sStats.remaining_late_count}</span>}
@@ -1791,21 +2071,21 @@ export default function Attendance() {
                   {/* Left: Auto Save Toggle */}
                   <div className="flex items-center gap-4">
                     <label className="relative inline-flex items-center cursor-pointer select-none">
-                      <input 
-                        type="checkbox" 
-                        checked={autoSave} 
+                      <input
+                        type="checkbox"
+                        checked={autoSave}
                         onChange={(e) => {
                           setAutoSave(e.target.checked);
                           if (e.target.checked) {
                             setAutoSaveStatus('idle');
                           }
-                        }} 
-                        className="sr-only peer" 
+                        }}
+                        className="sr-only peer"
                       />
                       <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
                       <span className="ml-2.5 text-sm font-bold text-slate-700">บันทึกอัตโนมัติ</span>
                     </label>
-                    
+
                     {autoSave && renderAutoSaveStatus()}
                   </div>
 
@@ -1875,7 +2155,7 @@ export default function Attendance() {
           ) : (
             /* ================= ATTENDANCE HISTORY MATRIX GRID ================= */
             <div className="space-y-6">
-              
+
               {/* Modern Thai Date range filter card */}
               <div className="bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-blue-500/10 p-4 sm:p-5 rounded-3xl border border-indigo-100/80 shadow-lg shadow-indigo-500/5 backdrop-blur-xl">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1913,8 +2193,8 @@ export default function Attendance() {
                         <span>{matrixDates.length > 0 ? `${matrixDates.length} คาบเรียน/วันในตาราง` : '0 คาบ'}</span>
                       </div>
                       {teachingDayGovHolidays.length > 0 && (
-                        <div 
-                          className="text-xs text-amber-900 font-bold bg-amber-50 px-3 py-2 rounded-2xl border border-amber-200/80 shadow-sm flex items-center gap-1.5 shrink-0" 
+                        <div
+                          className="text-xs text-amber-900 font-bold bg-amber-50 px-3 py-2 rounded-2xl border border-amber-200/80 shadow-sm flex items-center gap-1.5 shrink-0"
                           title={`วันหยุดตรงกับวันที่มีสอน: ${teachingDayGovHolidays.map(h => `${h.date} (${h.name})`).join(', ')}`}
                         >
                           <span>🏖️</span>
@@ -1955,11 +2235,10 @@ export default function Attendance() {
                               setTeachingDays(prev => [...prev, day.id].sort((a, b) => a - b));
                             }
                           }}
-                          className={`px-3 py-1 text-xs font-bold rounded-xl transition-all ${
-                            isSelected
-                              ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-500/20'
-                              : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                          }`}
+                          className={`px-3 py-1 text-xs font-bold rounded-xl transition-all ${isSelected
+                            ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-500/20'
+                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                            }`}
                         >
                           {day.label}
                         </button>
@@ -1976,7 +2255,7 @@ export default function Attendance() {
                     <Grid className="w-5 h-5 text-indigo-500" />
                     <span className="font-bold text-slate-800">ตารางการเช็คชื่อสะสม ({matrixDates.length} คาบเรียน/วัน)</span>
                   </div>
-                  
+
                   <div className="relative w-64">
                     <Search className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
                     <input
@@ -2004,119 +2283,117 @@ export default function Attendance() {
                   <div className="overflow-x-auto max-h-[60vh] custom-scrollbar">
                     <div style={{ minWidth: `${Math.max(1000, 176 + (matrixDates.length * 96))}px` }}>
                       <table className="w-full text-left border-collapse table-fixed">
-                      <thead>
-                        <tr className="bg-indigo-50/70 border-b border-indigo-100/80 sticky top-0 z-20 backdrop-blur-md">
-                          <th className="p-4 font-bold text-slate-700 w-44 sticky left-0 bg-indigo-50 z-30 shadow-[2px_0_5px_rgba(0,0,0,0.05)] border-r border-indigo-100">
-                            นักเรียน ({filteredStudents.length} คน)
-                          </th>
-                          {matrixDates.map(dateStr => {
-                            const dateObj = new Date(dateStr);
-                            const day = dateObj.getDate();
-                            const month = dateObj.toLocaleDateString('th-TH', { month: 'short' });
-                            const holiday = holidayMap[dateStr] || checkThaiHoliday(dateStr);
+                        <thead>
+                          <tr className="bg-indigo-50/70 border-b border-indigo-100/80 sticky top-0 z-20 backdrop-blur-md">
+                            <th className="p-4 font-bold text-slate-700 w-44 sticky left-0 bg-indigo-50 z-30 shadow-[2px_0_5px_rgba(0,0,0,0.05)] border-r border-indigo-100">
+                              นักเรียน ({filteredStudents.length} คน)
+                            </th>
+                            {matrixDates.map(dateStr => {
+                              const dateObj = new Date(dateStr);
+                              const day = dateObj.getDate();
+                              const month = dateObj.toLocaleDateString('th-TH', { month: 'short' });
+                              const holiday = holidayMap[dateStr] || checkThaiHoliday(dateStr);
 
-                            const isGovHoliday = holiday?.type === 'government';
-                            const isWeekend = holiday?.type === 'weekend';
+                              const isGovHoliday = holiday?.type === 'government';
+                              const isWeekend = holiday?.type === 'weekend';
 
-                            return (
-                              <th 
-                                key={dateStr} 
-                                className={`p-3 font-bold text-center w-24 text-xs border-r transition-colors ${
-                                  isGovHoliday 
-                                    ? 'bg-amber-100/90 border-amber-200/90 text-amber-900' 
+                              return (
+                                <th
+                                  key={dateStr}
+                                  className={`p-3 font-bold text-center w-24 text-xs border-r transition-colors ${isGovHoliday
+                                    ? 'bg-amber-100/90 border-amber-200/90 text-amber-900'
                                     : isWeekend
-                                    ? 'bg-slate-150/80 bg-slate-200/60 border-slate-200/80 text-slate-600'
-                                    : 'bg-indigo-50/70 border-indigo-100/50 text-slate-700'
-                                }`}
-                                title={holiday ? holiday.name : undefined}
+                                      ? 'bg-slate-150/80 bg-slate-200/60 border-slate-200/80 text-slate-600'
+                                      : 'bg-indigo-50/70 border-indigo-100/50 text-slate-700'
+                                    }`}
+                                  title={holiday ? holiday.name : undefined}
+                                >
+                                  <div className="flex flex-col items-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setDate(dateStr);
+                                        setActiveTab('daily');
+                                        toast.success(`เปิดหน้าเช็คชื่อวันที่ ${day} ${month}`);
+                                      }}
+                                      className="group/btn flex flex-col items-center hover:opacity-85 transition-all cursor-pointer"
+                                      title={`คลิกเพื่อเปิดหน้าเช็คชื่อทั้งห้องของวันที่ ${day} ${month}`}
+                                    >
+                                      <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
+                                        {dateObj.toLocaleDateString('th-TH', { weekday: 'short' })}
+                                        {isGovHoliday && <span>🏖️</span>}
+                                      </span>
+                                      <span className={`text-sm font-black ${isGovHoliday ? 'text-amber-950' : 'text-indigo-800'} group-hover/btn:underline`}>
+                                        {day} {month}
+                                      </span>
+                                      <span className="text-[9px] text-indigo-600 font-bold bg-white/90 hover:bg-white px-1.5 py-0.5 rounded-md border border-indigo-200/80 mt-0.5 opacity-80 group-hover/btn:opacity-100 shadow-xs">
+                                        เช็คทั้งห้อง
+                                      </span>
+                                    </button>
+                                    {isGovHoliday && (
+                                      <span className="text-[9px] font-bold text-amber-800 truncate max-w-[84px] leading-tight mt-0.5" title={holiday.name}>
+                                        {holiday.name}
+                                      </span>
+                                    )}
+                                  </div>
+                                </th>
+                              );
+                            })}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredStudents.map((student, idx) => {
+                            return (
+                              <tr
+                                key={student.id}
+                                className={`border-b border-indigo-50/50 hover:bg-indigo-50/20 transition-colors ${idx % 2 === 0 ? 'bg-white/20' : 'bg-transparent'
+                                  }`}
                               >
-                                <div className="flex flex-col items-center">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setDate(dateStr);
-                                      setActiveTab('daily');
-                                      toast.success(`เปิดหน้าเช็คชื่อวันที่ ${day} ${month}`);
-                                    }}
-                                    className="group/btn flex flex-col items-center hover:opacity-85 transition-all cursor-pointer"
-                                    title={`คลิกเพื่อเปิดหน้าเช็คชื่อทั้งห้องของวันที่ ${day} ${month}`}
-                                  >
-                                    <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
-                                      {dateObj.toLocaleDateString('th-TH', { weekday: 'short' })}
-                                      {isGovHoliday && <span>🏖️</span>}
-                                    </span>
-                                    <span className={`text-sm font-black ${isGovHoliday ? 'text-amber-950' : 'text-indigo-800'} group-hover/btn:underline`}>
-                                      {day} {month}
-                                    </span>
-                                    <span className="text-[9px] text-indigo-600 font-bold bg-white/90 hover:bg-white px-1.5 py-0.5 rounded-md border border-indigo-200/80 mt-0.5 opacity-80 group-hover/btn:opacity-100 shadow-xs">
-                                      เช็คทั้งห้อง
-                                    </span>
-                                  </button>
-                                  {isGovHoliday && (
-                                    <span className="text-[9px] font-bold text-amber-800 truncate max-w-[84px] leading-tight mt-0.5" title={holiday.name}>
-                                      {holiday.name}
-                                    </span>
-                                  )}
-                                </div>
-                              </th>
+                                <td className="p-4 font-semibold text-slate-800 text-sm sticky left-0 bg-white/95 backdrop-blur-md z-20 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)] border-r border-indigo-100 flex items-center gap-2 h-14 overflow-hidden text-ellipsis whitespace-nowrap">
+                                  <div className="w-6 h-6 rounded-full bg-indigo-50 text-indigo-600 font-bold text-[10px] flex items-center justify-center flex-shrink-0">
+                                    {student.name.charAt(0)}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="font-semibold text-slate-800 text-xs truncate leading-snug">{student.name}</p>
+                                    {student.student_code && (
+                                      <p className="text-[10px] text-slate-500 leading-none mt-0.5">{student.student_code}</p>
+                                    )}
+                                  </div>
+                                </td>
+
+                                {matrixDates.map(dateStr => {
+                                  // Find matching record
+                                  const record = matrixRecords.find(r =>
+                                    (String(r.student_id) === String(student.id)) &&
+                                    (r.date ? r.date.split('T')[0] === dateStr : false)
+                                  );
+
+                                  const status = record ? record.status : null;
+                                  const isEditing = matrixEditingCell?.studentId === student.id && matrixEditingCell?.date === dateStr;
+                                  const holiday = holidayMap[dateStr] || checkThaiHoliday(dateStr);
+
+                                  return (
+                                    <MemoizedAttendanceCell
+                                      key={dateStr}
+                                      status={status}
+                                      isEditing={isEditing}
+                                      onEditClick={() => setMatrixEditingCell({ studentId: student.id, date: dateStr })}
+                                      onStatusSelect={statusVal => handleMatrixCellUpdate(student.id, dateStr, statusVal)}
+                                      onDeleteClick={status ? () => handleMatrixCellDelete(student.id, dateStr) : undefined}
+                                      popoverRef={isEditing ? cellPopoverRef : undefined}
+                                      holiday={holiday}
+                                    />
+                                  );
+                                })}
+                              </tr>
                             );
                           })}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredStudents.map((student, idx) => {
-                          return (
-                            <tr 
-                              key={student.id} 
-                              className={`border-b border-indigo-50/50 hover:bg-indigo-50/20 transition-colors ${
-                                idx % 2 === 0 ? 'bg-white/20' : 'bg-transparent'
-                              }`}
-                            >
-                              <td className="p-4 font-semibold text-slate-800 text-sm sticky left-0 bg-white/95 backdrop-blur-md z-20 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)] border-r border-indigo-100 flex items-center gap-2 h-14 overflow-hidden text-ellipsis whitespace-nowrap">
-                                <div className="w-6 h-6 rounded-full bg-indigo-50 text-indigo-600 font-bold text-[10px] flex items-center justify-center flex-shrink-0">
-                                  {student.name.charAt(0)}
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="font-semibold text-slate-800 text-xs truncate leading-snug">{student.name}</p>
-                                  {student.student_code && (
-                                    <p className="text-[10px] text-slate-500 leading-none mt-0.5">{student.student_code}</p>
-                                  )}
-                                </div>
-                              </td>
-                              
-                              {matrixDates.map(dateStr => {
-                                // Find matching record
-                                const record = matrixRecords.find(r => 
-                                  (String(r.student_id) === String(student.id)) && 
-                                  (r.date ? r.date.split('T')[0] === dateStr : false)
-                                );
-                                
-                                const status = record ? record.status : null;
-                                const isEditing = matrixEditingCell?.studentId === student.id && matrixEditingCell?.date === dateStr;
-                                const holiday = holidayMap[dateStr] || checkThaiHoliday(dateStr);
-
-                                return (
-                                  <MemoizedAttendanceCell
-                                    key={dateStr}
-                                    status={status}
-                                    isEditing={isEditing}
-                                    onEditClick={() => setMatrixEditingCell({ studentId: student.id, date: dateStr })}
-                                    onStatusSelect={statusVal => handleMatrixCellUpdate(student.id, dateStr, statusVal)}
-                                    onDeleteClick={status ? () => handleMatrixCellDelete(student.id, dateStr) : undefined}
-                                    popoverRef={isEditing ? cellPopoverRef : undefined}
-                                    holiday={holiday}
-                                  />
-                                );
-                              })}
-                            </tr>
-                          );
-                        })}
-                      </tbody>
+                        </tbody>
                       </table>
                     </div>
                   </div>
                 )}
-                
+
                 <div className="p-4 border-t border-indigo-50/50 bg-indigo-50/30">
                   <p className="text-xs text-slate-600 font-medium">💡 คลิกที่ชื่อย่อสถานะเพื่อเปิดเมนูสำหรับแก้ไขสถิติการมาเรียนย้อนหลังของนักเรียนได้โดยตรง</p>
                 </div>
@@ -2144,7 +2421,7 @@ export default function Attendance() {
                 <X className="w-5 h-5 text-slate-500" />
               </button>
             </div>
-            
+
             {historyLoading ? (
               <div className="flex justify-center py-8">
                 <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
@@ -2157,9 +2434,9 @@ export default function Attendance() {
               <div className="space-y-2 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
                 {historyData.map(record => {
                   const dateObj = new Date(record.date);
-                  const formattedDate = dateObj.toLocaleDateString('th-TH', { 
-                    year: 'numeric', 
-                    month: 'long', 
+                  const formattedDate = dateObj.toLocaleDateString('th-TH', {
+                    year: 'numeric',
+                    month: 'long',
                     day: 'numeric',
                     weekday: 'short'
                   });
@@ -2171,7 +2448,7 @@ export default function Attendance() {
                       </div>
                       <div className="flex items-center gap-3">
                         {getStatusDisplay(record.status)}
-                        <button 
+                        <button
                           onClick={() => handleDeleteHistory(record.id)}
                           className="p-1.5 rounded-lg text-slate-500 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all duration-150"
                           title="ลบสถิตินี้ออก"
@@ -2184,10 +2461,10 @@ export default function Attendance() {
                 })}
               </div>
             )}
-            
+
             <div className="mt-5 pt-4 border-t border-indigo-50/50 flex justify-end">
-              <button 
-                onClick={() => setHistoryStudent(null)} 
+              <button
+                onClick={() => setHistoryStudent(null)}
                 className="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm transition-colors"
               >
                 ปิดหน้าต่าง
@@ -2233,8 +2510,8 @@ export default function Attendance() {
       {/* ================= RETROACTIVE ATTENDANCE MODAL ================= */}
       {showRetroactiveModal && createPortal(
         <div className="modal-overlay" onClick={() => setShowRetroactiveModal(false)}>
-          <div 
-            className="glass w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto animate-scale-up" 
+          <div
+            className="glass w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto animate-scale-up"
             onClick={e => e.stopPropagation()}
           >
             {/* Header */}
@@ -2255,9 +2532,9 @@ export default function Attendance() {
                   </p>
                 </div>
               </div>
-              <button 
-                onClick={() => setShowRetroactiveModal(false)} 
-                className="p-2 hover:bg-indigo-50 rounded-xl transition-colors" 
+              <button
+                onClick={() => setShowRetroactiveModal(false)}
+                className="p-2 hover:bg-indigo-50 rounded-xl transition-colors"
                 aria-label="ปิดหน้าต่าง"
               >
                 <X className="w-5 h-5 text-slate-500" />
@@ -2269,11 +2546,10 @@ export default function Attendance() {
               <button
                 type="button"
                 onClick={() => setRetroactiveTab('weeks')}
-                className={`flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 ${
-                  retroactiveTab === 'weeks'
-                    ? 'bg-white text-indigo-700 shadow-sm'
-                    : 'text-slate-600 hover:text-indigo-600'
-                }`}
+                className={`flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 ${retroactiveTab === 'weeks'
+                  ? 'bg-white text-indigo-700 shadow-sm'
+                  : 'text-slate-600 hover:text-indigo-600'
+                  }`}
               >
                 <CalendarIcon className="w-4 h-4 text-indigo-600" />
                 <span>เลือกตามสัปดาห์ภาคเรียน ({semesterInfo?.totalWeeks || selectedClassData?.total_weeks || 18} สัปดาห์)</span>
@@ -2281,11 +2557,10 @@ export default function Attendance() {
               <button
                 type="button"
                 onClick={() => setRetroactiveTab('calendar')}
-                className={`flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 ${
-                  retroactiveTab === 'calendar'
-                    ? 'bg-white text-indigo-700 shadow-sm'
-                    : 'text-slate-600 hover:text-indigo-600'
-                }`}
+                className={`flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 ${retroactiveTab === 'calendar'
+                  ? 'bg-white text-indigo-700 shadow-sm'
+                  : 'text-slate-600 hover:text-indigo-600'
+                  }`}
               >
                 <Clock className="w-4 h-4 text-violet-600" />
                 <span>ปฏิทินเลือกวันที่ด่วน</span>
@@ -2322,13 +2597,12 @@ export default function Attendance() {
                         const thaiDayNames = ['จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.', 'อา.'];
 
                         return (
-                          <div 
-                            key={w.week} 
-                            className={`p-3.5 rounded-2xl border transition-all ${
-                              w.isCurrent
-                                ? 'bg-indigo-50/90 border-indigo-300 ring-2 ring-indigo-200 shadow-sm'
-                                : 'bg-white border-slate-200/80 hover:border-indigo-200 shadow-xs'
-                            }`}
+                          <div
+                            key={w.week}
+                            className={`p-3.5 rounded-2xl border transition-all ${w.isCurrent
+                              ? 'bg-indigo-50/90 border-indigo-300 ring-2 ring-indigo-200 shadow-sm'
+                              : 'bg-white border-slate-200/80 hover:border-indigo-200 shadow-xs'
+                              }`}
                           >
                             <div className="flex items-center justify-between mb-2">
                               <span className="font-extrabold text-sm text-slate-800 flex items-center gap-1.5">
@@ -2360,15 +2634,14 @@ export default function Attendance() {
                                       setActiveTab('daily');
                                       toast.success(`เลือกเช็คชื่อวันที่ ${d.dateObj.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })} (สัปดาห์ที่ ${w.week})`);
                                     }}
-                                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex flex-col items-center min-w-[50px] ${
-                                      d.isSelected
-                                        ? 'bg-indigo-600 text-white shadow-sm'
-                                        : d.isFuture
+                                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex flex-col items-center min-w-[50px] ${d.isSelected
+                                      ? 'bg-indigo-600 text-white shadow-sm'
+                                      : d.isFuture
                                         ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
                                         : d.isTeachingDay
-                                        ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200/70 hover:scale-105'
-                                        : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200'
-                                    }`}
+                                          ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200/70 hover:scale-105'
+                                          : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200'
+                                      }`}
                                     title={d.isFuture ? 'ยังไม่ถึงวันที่นี้' : `เช็คชื่อวันที่ ${d.dateStr}`}
                                   >
                                     <span className="text-[10px] opacity-75">{thaiDayNames[d.dayOfWeek]}</span>
@@ -2430,11 +2703,10 @@ export default function Attendance() {
                             setActiveTab('daily');
                             toast.success(`เลือกเช็คชื่อวันที่ ${d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}`);
                           }}
-                          className={`p-3 rounded-2xl border text-center transition-all ${
-                            isSel
-                              ? 'bg-indigo-600 text-white font-bold border-indigo-600 shadow-sm'
-                              : 'bg-white hover:bg-indigo-50 border-slate-200 text-slate-700 font-semibold'
-                          }`}
+                          className={`p-3 rounded-2xl border text-center transition-all ${isSel
+                            ? 'bg-indigo-600 text-white font-bold border-indigo-600 shadow-sm'
+                            : 'bg-white hover:bg-indigo-50 border-slate-200 text-slate-700 font-semibold'
+                            }`}
                         >
                           <div className="text-xs">{p.label}</div>
                           <div className={`text-[10px] mt-0.5 ${isSel ? 'text-indigo-100' : 'text-slate-400'}`}>
