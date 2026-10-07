@@ -104,6 +104,17 @@ export function setAuthCookie(
     path: '/',
     maxAge,
   });
+
+  // Client indicator cookie (accessible to JavaScript)
+  response.cookies.set({
+    name: 'logged_in',
+    value: 'true',
+    httpOnly: false,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge,
+  });
 }
 
 export function clearAuthCookie(response: NextResponse): void {
@@ -111,6 +122,17 @@ export function clearAuthCookie(response: NextResponse): void {
     name: 'token',
     value: '',
     httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 0,
+    expires: new Date(0),
+  });
+
+  response.cookies.set({
+    name: 'logged_in',
+    value: '',
+    httpOnly: false,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',

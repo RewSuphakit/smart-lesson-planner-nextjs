@@ -19,7 +19,10 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401 && typeof window !== 'undefined') {
-      window.dispatchEvent(new Event('auth:unauthorized'));
+      const requestUrl = error.config?.url || '';
+      if (!requestUrl.includes('/auth/profile')) {
+        window.dispatchEvent(new Event('auth:unauthorized'));
+      }
     }
     return Promise.reject(error);
   }

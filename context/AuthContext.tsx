@@ -37,10 +37,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchProfile = useCallback(async () => {
     try {
       const { data } = await api.get('/auth/profile');
-      setUser(data.user);
-      return data.user;
+      if (data?.user) {
+        setUser(data.user);
+        return data.user;
+      } else {
+        setUser(null);
+        if (typeof document !== 'undefined') {
+          document.cookie = 'logged_in=; Max-Age=0; path=/;';
+        }
+        return null;
+      }
     } catch {
       setUser(null);
+      if (typeof document !== 'undefined') {
+        document.cookie = 'logged_in=; Max-Age=0; path=/;';
+      }
       return null;
     }
   }, []);
@@ -152,6 +163,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        if (typeof document !== 'undefined') {
+          document.cookie = 'logged_in=; Max-Age=0; path=/;';
+        }
       } catch {
         // Ignore
       }

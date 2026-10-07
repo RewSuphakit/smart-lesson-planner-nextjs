@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma, { withDbRetry } from '@/lib/prisma';
-import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
+import { requireAuth, getAuthUser, clearAuthCookie, AuthError, handleAuthError } from '@/lib/auth';
 
 import bcrypt from 'bcryptjs';
 
 export async function GET(request: NextRequest) {
   try {
-    const authUser = requireAuth(request);
+    const authUser = getAuthUser(request);
+    if (!authUser) {
+      const response = NextResponse.json({ user: null }, { status: 200 });
+      clearAuthCookie(response);
+      return response;
+    }
 
     const user = await withDbRetry(() =>
       prisma.user.findUnique({
@@ -26,17 +31,32 @@ export async function GET(request: NextRequest) {
     );
 
     if (!user) {
-      return NextResponse.json({ message: 'User not found' }, { status: 404 });
+      const response = NextResponse.json({ user: null }, { status: 200 });
+      clearAuthCookie(response);
+      return response;
     }
 
     const { password, googleId, ...safeUser } = user;
-    return NextResponse.json({ 
+    const response = NextResponse.json({ 
       user: {
         ...safeUser,
         hasPassword: !!password,
         isGoogleUser: !!googleId
       } 
     });
+
+    // Ensure client indicator cookie is present when user session is active
+    response.cookies.set({
+      name: 'logged_in',
+      value: 'true',
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 30 * 24 * 60 * 60,
+    });
+
+    return response;
   } catch (error) {
     if (error instanceof AuthError) return handleAuthError();
     return NextResponse.json({ message: 'Failed to get profile' }, { status: 500 });
