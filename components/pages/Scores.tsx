@@ -66,6 +66,7 @@ MemoizedScoreInput.displayName = 'MemoizedScoreInput';
 interface Classroom {
   id: string | number;
   name: string;
+  student_count?: number;
   description?: string;
   total_classes?: number;
   assignment_weight?: number;

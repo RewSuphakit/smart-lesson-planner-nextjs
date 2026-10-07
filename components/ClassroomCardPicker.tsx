@@ -13,6 +13,14 @@ export interface ClassroomPickerItem {
   min_attendance_percent?: number;
   curriculum_type?: string;
   description?: string | null;
+  affective_weight?: number;
+  assignment_weight?: number;
+  post_test_weight?: number;
+  midterm_weight?: number;
+  final_weight?: number;
+  midterm_max_score?: number;
+  final_max_score?: number;
+  [key: string]: any;
 }
 
 interface ClassroomCardPickerProps {
