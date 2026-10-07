@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { OAuth2Client } from 'google-auth-library';
 import prisma, { withDbRetry } from '@/lib/prisma';
 import { generateToken, setAuthCookie } from '@/lib/auth';
+import { protectRequest, authLimiter } from '@/lib/arcjet';
 
 function cleanString(str?: string | null): string {
   if (!str) return '';
@@ -15,6 +16,11 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const arcjetCheck = await protectRequest(request, authLimiter);
+    if (!arcjetCheck.allowed) {
+      return arcjetCheck.response!;
+    }
+
     const cleanClientId = cleanString(process.env.GOOGLE_CLIENT_ID);
     const cleanPublicClientId = cleanString(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID);
 
@@ -62,9 +68,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Invalid Google token' }, { status: 400 });
     }
 
-    const { sub: googleId, email, name, picture } = payload;
+    const { sub: googleId, email, name, picture, email_verified } = payload;
     if (!email) {
       return NextResponse.json({ message: 'Email not provided by Google account' }, { status: 400 });
+    }
+    if (!email_verified) {
+      return NextResponse.json(
+        { message: 'อีเมลบัญชี Google ของคุณยังไม่ได้รับการยืนยันตัวตน กรุณายืนยันกับ Google ก่อนเข้าสู่ระบบ' },
+        { status: 400 }
+      );
     }
     const cleanEmail = email.toLowerCase().trim();
 

@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError, generateToken, setAuthCookie } from '@/lib/auth';
+import { protectRequest, authLimiter } from '@/lib/arcjet';
 
 export async function POST(request: NextRequest) {
   try {
     const authUser = requireAuth(request);
+
+    const arcjetCheck = await protectRequest(request, authLimiter, { userId: String(authUser.id) });
+    if (!arcjetCheck.allowed) {
+      return arcjetCheck.response!;
+    }
+
     const body = await request.json();
 
     const cleanCode = body.code ? String(body.code).trim() : '';
@@ -45,9 +52,49 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (user.verificationCode !== cleanCode) {
+    const currentAttempts = (user as { verificationAttempts?: number }).verificationAttempts ?? 0;
+    const MAX_VERIFY_ATTEMPTS = 5;
+
+    if (currentAttempts >= MAX_VERIFY_ATTEMPTS) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          verificationCode: null,
+          verificationCodeExpiry: null,
+          verificationAttempts: 0,
+        },
+      });
       return NextResponse.json(
-        { message: 'รหัสยืนยัน OTP ไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง' },
+        { message: 'คุณกรอกรหัสยืนยันผิดเกินจำนวนครั้งที่กำหนด รหัสถูกยกเลิกแล้ว กรุณากดขอรหัสใหม่' },
+        { status: 400 }
+      );
+    }
+
+    if (user.verificationCode !== cleanCode) {
+      const newAttempts = currentAttempts + 1;
+      if (newAttempts >= MAX_VERIFY_ATTEMPTS) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            verificationCode: null,
+            verificationCodeExpiry: null,
+            verificationAttempts: 0,
+          },
+        });
+        return NextResponse.json(
+          { message: 'คุณกรอกรหัสยืนยันผิดเกินจำนวนครั้งที่กำหนด (5 ครั้ง) รหัสถูกยกเลิกแล้ว กรุณากดขอรหัสใหม่' },
+          { status: 400 }
+        );
+      }
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { verificationAttempts: newAttempts },
+      });
+
+      const remaining = MAX_VERIFY_ATTEMPTS - newAttempts;
+      return NextResponse.json(
+        { message: `รหัสยืนยัน OTP ไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง (เหลือโอกาสอีก ${remaining} ครั้ง)` },
         { status: 400 }
       );
     }

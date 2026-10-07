@@ -2,10 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { generateOtpCode, sendEmailChangeOtpEmail } from '@/lib/email';
+import { protectRequest, authLimiter } from '@/lib/arcjet';
 
 export async function POST(request: NextRequest) {
   try {
     const authUser = requireAuth(request);
+
+    const arcjetCheck = await protectRequest(request, authLimiter, { userId: String(authUser.id) });
+    if (!arcjetCheck.allowed) {
+      return arcjetCheck.response!;
+    }
+
     const body = await request.json();
 
     const rawEmail = body.newEmail ? String(body.newEmail).trim().toLowerCase() : '';
@@ -28,11 +35,23 @@ export async function POST(request: NextRequest) {
     // Check against current user
     const currentUser = await prisma.user.findUnique({
       where: { id: authUser.id },
-      select: { id: true, email: true, name: true },
+      select: { id: true, email: true, name: true, verificationCodeExpiry: true },
     });
 
     if (!currentUser) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 });
+    }
+
+    // Rate limiting: 60s cooldown between OTP requests
+    if (currentUser.verificationCodeExpiry) {
+      const remainingMs = currentUser.verificationCodeExpiry.getTime() - Date.now();
+      if (remainingMs > 14 * 60 * 1000) {
+        const waitSec = Math.ceil((remainingMs - 14 * 60 * 1000) / 1000);
+        return NextResponse.json(
+          { message: `กรุณารออีก ${waitSec} วินาทีก่อนกดขอรหัสใหม่` },
+          { status: 429 }
+        );
+      }
     }
 
     if (currentUser.email.toLowerCase() === rawEmail) {
@@ -69,6 +88,7 @@ export async function POST(request: NextRequest) {
         pendingEmail: rawEmail,
         verificationCode: otp,
         verificationCodeExpiry: expiry,
+        verificationAttempts: 0,
       },
     });
 

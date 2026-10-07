@@ -25,10 +25,10 @@ export async function POST(request: NextRequest) {
     });
 
     if (!user) {
-      return NextResponse.json(
-        { message: 'ไม่พบบัญชีผู้ใช้งานที่ใช้อีเมลนี้ในระบบ กรุณาตรวจสอบอีเมลอีกครั้ง' },
-        { status: 404 }
-      );
+      return NextResponse.json({
+        message: 'หากอีเมลนี้ลงทะเบียนไว้ในระบบ เราได้ส่งรหัส OTP สำหรับรีเซ็ตรหัสผ่านไปยังอีเมลของคุณแล้ว (หากไม่พบ กรุณาตรวจสอบในโฟลเดอร์อีเมลขยะ/Spam)',
+        email: lowerEmail,
+      });
     }
 
     if (!user.password && user.googleId) {
@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
       data: {
         resetPasswordToken: otpCode,
         resetPasswordExpiry: expiry,
+        resetPasswordAttempts: 0,
       },
     });
 

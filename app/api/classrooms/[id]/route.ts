@@ -77,6 +77,18 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       semester_id: 'semesterId',
     };
 
+    if (body.semester_id !== undefined && body.semester_id !== null) {
+      const targetSemId = Number(body.semester_id);
+      if (targetSemId > 0) {
+        const ownedSemester = await prisma.semester.findFirst({
+          where: { id: targetSemId, userId: user.id },
+        });
+        if (!ownedSemester) {
+          return NextResponse.json({ message: 'Target semester not found or unauthorized' }, { status: 403 });
+        }
+      }
+    }
+
     for (const [key, prismaKey] of Object.entries(fieldMap)) {
       const val = body[key as keyof typeof body];
       if (val !== undefined) {

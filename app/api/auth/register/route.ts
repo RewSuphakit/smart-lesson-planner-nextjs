@@ -4,21 +4,35 @@ import prisma from '@/lib/prisma';
 import { RegisterSchema, validateRequestBody } from '@/lib/validation';
 import { generateOtpCode, sendVerificationEmail } from '@/lib/email';
 import { protectRequest, authLimiter } from '@/lib/arcjet';
+import { verifyTurnstileToken } from '@/lib/turnstile';
 
 export async function POST(request: NextRequest) {
   try {
-    // Arcjet Rate Limiting & Abuse Protection (5 attempts / 15 mins)
-    const arcjetCheck = await protectRequest(request, authLimiter);
-    if (!arcjetCheck.allowed) {
-      return arcjetCheck.response!;
-    }
-
     const validation = await validateRequestBody(request, RegisterSchema);
     if (!validation.success) {
       return validation.response;
     }
 
-    const { email, password, name } = validation.data;
+    const { email, password, name, turnstileToken } = validation.data;
+
+    // 1. Verify Cloudflare Turnstile token
+    const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
+                     request.headers.get('x-real-ip') ||
+                     undefined;
+    const turnstileCheck = await verifyTurnstileToken(turnstileToken, clientIp, 'register');
+    if (!turnstileCheck.success) {
+      return NextResponse.json(
+        { message: turnstileCheck.error || 'การตรวจสอบความปลอดภัยไม่ผ่าน' },
+        { status: 400 }
+      );
+    }
+
+    // 2. Arcjet Rate Limiting & Abuse Protection
+    const arcjetCheck = await protectRequest(request, authLimiter);
+    if (!arcjetCheck.allowed) {
+      return arcjetCheck.response!;
+    }
+
     const lowerEmail = email.toLowerCase().trim();
 
     const existing = await prisma.user.findUnique({ where: { email: lowerEmail } });
@@ -39,6 +53,7 @@ export async function POST(request: NextRequest) {
           password: hashedPassword,
           verificationCode: otpCode,
           verificationCodeExpiry: expiry,
+          verificationAttempts: 0,
         },
       });
     } else {
@@ -52,6 +67,7 @@ export async function POST(request: NextRequest) {
           emailVerified: false,
           verificationCode: otpCode,
           verificationCodeExpiry: expiry,
+          verificationAttempts: 0,
         },
       });
     }

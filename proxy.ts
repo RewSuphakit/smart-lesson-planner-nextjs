@@ -21,17 +21,37 @@ const PUBLIC_PATHS = [
   '/api/health',
 ];
 
-// Helper to check if JWT token is expired without external dependencies
-function isTokenExpired(token: string): boolean {
+import crypto from 'crypto';
+
+// Helper to cryptographically verify JWT token signature and expiration
+function isValidJwt(token: string): boolean {
   try {
     const parts = token.split('.');
-    if (parts.length !== 3) return true;
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf-8'));
-    if (!payload || typeof payload !== 'object') return true;
-    if (!payload.exp) return false;
-    return Date.now() >= payload.exp * 1000;
-  } catch {
+    if (parts.length !== 3) return false;
+    const [headerB64, payloadB64, signatureB64] = parts;
+
+    // 1. Verify expiration
+    const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf-8'));
+    if (!payload || typeof payload !== 'object') return false;
+    if (payload.exp && Date.now() >= payload.exp * 1000) return false;
+
+    // 2. Cryptographically verify signature if secret is present
+    const secret = process.env.JWT_SECRET;
+    if (secret) {
+      const expectedSignature = crypto
+        .createHmac('sha256', secret)
+        .update(`${headerB64}.${payloadB64}`)
+        .digest('base64url');
+
+      const sigBuffer = Buffer.from(signatureB64);
+      const expectedBuffer = Buffer.from(expectedSignature);
+      if (sigBuffer.length !== expectedBuffer.length) return false;
+      if (!crypto.timingSafeEqual(sigBuffer, expectedBuffer)) return false;
+    }
+
     return true;
+  } catch {
+    return false;
   }
 }
 
@@ -49,7 +69,7 @@ export function proxy(request: NextRequest) {
 
   const isPublicPath = PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(path));
   const rawToken = request.cookies.get('token')?.value;
-  const isValidToken = Boolean(rawToken && !isTokenExpired(rawToken));
+  const isValidToken = Boolean(rawToken && isValidJwt(rawToken));
 
   // If token is present but expired, clear the cookie and redirect to login
   if (rawToken && !isValidToken) {

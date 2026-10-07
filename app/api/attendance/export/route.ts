@@ -379,9 +379,17 @@ export async function GET(request: NextRequest) {
         ];
       });
 
-      const formattedHeaders = csvHeaders.map(h => `"${h.replace(/"/g, '""')}"`).join(',');
+      const sanitizeCsvCell = (value: unknown): string => {
+        let str = String(value ?? '');
+        if (/^[=+\-@\t\r]/.test(str)) {
+          str = `'${str}`;
+        }
+        return `"${str.replace(/"/g, '""')}"`;
+      };
+
+      const formattedHeaders = csvHeaders.map(sanitizeCsvCell).join(',');
       const formattedRows = csvRows.map(row => 
-        row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+        row.map(sanitizeCsvCell).join(',')
       ).join('\n');
 
       return new NextResponse(BOM + formattedHeaders + '\n' + formattedRows, {

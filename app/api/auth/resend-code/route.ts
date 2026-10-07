@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { generateOtpCode, sendVerificationEmail } from '@/lib/email';
+import { protectRequest, authLimiter } from '@/lib/arcjet';
 
 export async function POST(request: NextRequest) {
   try {
+    const arcjetCheck = await protectRequest(request, authLimiter);
+    if (!arcjetCheck.allowed) {
+      return arcjetCheck.response!;
+    }
+
     const body = await request.json();
     const { email } = body;
 
@@ -15,7 +21,9 @@ export async function POST(request: NextRequest) {
 
     const user = await prisma.user.findUnique({ where: { email: lowerEmail } });
     if (!user) {
-      return NextResponse.json({ message: 'ไม่พบบัญชีผู้ใช้งานนี้' }, { status: 404 });
+      return NextResponse.json({
+        message: 'หากอีเมลนี้มีอยู่ในระบบ เราได้ส่งรหัสยืนยันใหม่ไปยังอีเมลของคุณเรียบร้อยแล้ว',
+      });
     }
 
     if (user.emailVerified) {
@@ -43,6 +51,7 @@ export async function POST(request: NextRequest) {
       data: {
         verificationCode: newCode,
         verificationCodeExpiry: expiry,
+        verificationAttempts: 0,
       },
     });
 

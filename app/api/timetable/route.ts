@@ -103,6 +103,21 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      const semesterIds: number[] = Array.from(
+        new Set(body.entries.map((e: Record<string, unknown>) => Number(e.semester_id)).filter((id: number) => !isNaN(id) && id > 0))
+      );
+      if (semesterIds.length > 0) {
+        const ownedSemesters = await prisma.semester.findMany({
+          where: { id: { in: semesterIds }, userId: user.id },
+          select: { id: true },
+        });
+        const ownedSemSet = new Set(ownedSemesters.map(s => s.id));
+        const hasUnauthorizedSem = semesterIds.some(id => !ownedSemSet.has(id));
+        if (hasUnauthorizedSem) {
+          return NextResponse.json({ message: 'One or more semesters not found or unauthorized' }, { status: 403 });
+        }
+      }
+
       const data = body.entries.map((e: Record<string, unknown>) => {
         const rawStart = Number(e.start_period);
         const rawEnd = Number(e.end_period);
@@ -146,6 +161,15 @@ export async function POST(request: NextRequest) {
       });
       if (!ownedClassroom) {
         return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 403 });
+      }
+    }
+
+    if (body.semester_id) {
+      const ownedSem = await prisma.semester.findFirst({
+        where: { id: Number(body.semester_id), userId: user.id },
+      });
+      if (!ownedSem) {
+        return NextResponse.json({ message: 'Semester not found or unauthorized' }, { status: 403 });
       }
     }
 

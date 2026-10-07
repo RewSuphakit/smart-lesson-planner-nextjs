@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { generateOtpCode, sendEmailChangeOtpEmail } from '@/lib/email';
+import { protectRequest, authLimiter } from '@/lib/arcjet';
 
 export async function POST(request: NextRequest) {
   try {
+    const arcjetCheck = await protectRequest(request, authLimiter);
+    if (!arcjetCheck.allowed) {
+      return arcjetCheck.response!;
+    }
+
     const body = await request.json();
     const { currentEmail, newEmail } = body;
 
@@ -34,7 +40,7 @@ export async function POST(request: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { email: cleanCurrent },
-      select: { id: true, email: true, name: true, emailVerified: true },
+      select: { id: true, email: true, name: true, emailVerified: true, verificationCodeExpiry: true },
     });
 
     if (!user) {
@@ -42,6 +48,18 @@ export async function POST(request: NextRequest) {
         { message: 'ไม่พบบัญชีผู้ใช้งานนี้ในระบบ' },
         { status: 404 }
       );
+    }
+
+    // Rate limiting: 60s cooldown between OTP requests
+    if (user.verificationCodeExpiry) {
+      const remainingMs = user.verificationCodeExpiry.getTime() - Date.now();
+      if (remainingMs > 14 * 60 * 1000) {
+        const waitSec = Math.ceil((remainingMs - 14 * 60 * 1000) / 1000);
+        return NextResponse.json(
+          { message: `กรุณารออีก ${waitSec} วินาทีก่อนกดขอรหัสใหม่` },
+          { status: 429 }
+        );
+      }
     }
 
     if (user.emailVerified) {
@@ -78,6 +96,7 @@ export async function POST(request: NextRequest) {
         pendingEmail: cleanNew,
         verificationCode: otp,
         verificationCodeExpiry: expiry,
+        verificationAttempts: 0,
       },
     });
 

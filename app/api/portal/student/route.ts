@@ -37,7 +37,6 @@ export async function GET(request: NextRequest) {
               select: {
                 id: true,
                 name: true,
-                email: true,
               },
             },
           },
@@ -396,19 +395,17 @@ async function handleAvatarUpdate(request: NextRequest) {
     let avatar: string | null = null;
     if (body.remove_avatar !== true && body.avatar) {
       const rawAvatar = String(body.avatar).trim();
-      if (
-        !rawAvatar.startsWith('data:image/') &&
-        !rawAvatar.startsWith('http://') &&
-        !rawAvatar.startsWith('https://')
-      ) {
+      const validBase64ImageRegex = /^data:image\/(webp|jpeg|png);base64,[A-Za-z0-9+/=]+$/;
+      if (!validBase64ImageRegex.test(rawAvatar)) {
         return NextResponse.json(
-          { message: 'รูปแบบรูปภาพไม่ถูกต้อง (ต้องเป็น base64 data URL หรือ image URL)' },
+          { message: 'รูปแบบรูปภาพไม่ถูกต้อง (รองรับเฉพาะไฟล์รูปภาพ WebP, JPG, PNG แบบ base64 เท่านั้น)' },
           { status: 400 }
         );
       }
-      if (rawAvatar.length > 1024 * 1024) {
+      // Limit to 256KB
+      if (rawAvatar.length > 256 * 1024) {
         return NextResponse.json(
-          { message: 'ขนาดรูปภาพใหญ่เกินไป (สูงสุด 1MB)' },
+          { message: 'ขนาดรูปภาพใหญ่เกินไป (สูงสุด 250KB)' },
           { status: 400 }
         );
       }

@@ -506,7 +506,22 @@ export async function POST(request: NextRequest) {
     const timetableName = (formData.get('timetable_name') as string) || 'ตารางสอน';
     const semester = (formData.get('semester') as string) || null;
     const semesterIdForm = formData.get('semester_id');
-    const resolvedSemesterId = semesterIdForm ? Number(semesterIdForm) : await getActiveSemesterId(user.id);
+    let resolvedSemesterId: number | null = null;
+
+    if (semesterIdForm) {
+      const parsed = Number(semesterIdForm);
+      if (!isNaN(parsed) && parsed > 0) {
+        const ownedSemester = await prisma.semester.findFirst({
+          where: { id: parsed, userId: user.id },
+        });
+        if (!ownedSemester) {
+          return NextResponse.json({ message: 'Target semester not found or unauthorized' }, { status: 403 });
+        }
+        resolvedSemesterId = parsed;
+      }
+    } else {
+      resolvedSemesterId = await getActiveSemesterId(user.id);
+    }
     
     entries = entries.map(e => ({
       ...e,

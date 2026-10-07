@@ -11,13 +11,12 @@ export async function GET() {
     });
   } catch (error) {
     const err = error as { message?: string; code?: string };
-    console.error('Health check database failure:', error);
+    const isProd = process.env.NODE_ENV === 'production';
     return NextResponse.json(
       {
         status: 'unhealthy',
         database: 'disconnected',
-        error: err?.message || String(error),
-        code: err?.code,
+        error: isProd ? 'Database connection error' : (err?.message || String(error)),
         timestamp: new Date().toISOString(),
       },
       { status: 503 }

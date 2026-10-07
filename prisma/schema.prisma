@@ -57,8 +57,10 @@ model User {
   pendingEmail            String?   @map("pending_email") @db.VarChar(255)
   verificationCode        String?   @map("verification_code") @db.VarChar(10)
   verificationCodeExpiry  DateTime? @map("verification_code_expiry")
+  verificationAttempts    Int       @default(0) @map("verification_attempts")
   resetPasswordToken      String?   @map("reset_password_token") @db.VarChar(10)
   resetPasswordExpiry     DateTime? @map("reset_password_expiry")
+  resetPasswordAttempts   Int       @default(0) @map("reset_password_attempts")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

@@ -2,10 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
+import { protectRequest, authLimiter } from '@/lib/arcjet';
 
 export async function POST(request: NextRequest) {
   try {
     const authUser = requireAuth(request);
+
+    const arcjetCheck = await protectRequest(request, authLimiter, { userId: String(authUser.id) });
+    if (!arcjetCheck.allowed) {
+      return arcjetCheck.response!;
+    }
+
     const body = await request.json();
 
     const { current_password, new_password } = body;

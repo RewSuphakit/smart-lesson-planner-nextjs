@@ -57,7 +57,23 @@ export async function PUT(request: NextRequest) {
       updateData.name = name;
     }
     if (body.avatar !== undefined) {
-      updateData.avatar = body.avatar ? String(body.avatar).trim() : null;
+      if (body.avatar) {
+        const rawAvatar = String(body.avatar).trim();
+        const isGoogleAvatar = rawAvatar.startsWith('https://lh3.googleusercontent.com/');
+        const isBase64Image = /^data:image\/(webp|jpeg|png);base64,[A-Za-z0-9+/=]+$/.test(rawAvatar);
+        if (!isGoogleAvatar && !isBase64Image) {
+          return NextResponse.json(
+            { message: 'รูปแบบรูปภาพไม่ถูกต้อง (รองรับเฉพาะ base64 WebP, JPG, PNG หรือ Google Avatar)' },
+            { status: 400 }
+          );
+        }
+        if (rawAvatar.length > 512 * 1024) {
+          return NextResponse.json({ message: 'ขนาดรูปภาพใหญ่เกินไป (สูงสุด 500KB)' }, { status: 400 });
+        }
+        updateData.avatar = rawAvatar;
+      } else {
+        updateData.avatar = null;
+      }
     }
 
     const updatedUser = await prisma.user.update({

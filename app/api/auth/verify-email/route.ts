@@ -33,8 +33,51 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'อีเมลนี้ได้รับการยืนยันเรียบร้อยแล้ว สามารถเข้าสู่ระบบได้ทันที' }, { status: 400 });
     }
 
+    const currentAttempts = (user as { verificationAttempts?: number }).verificationAttempts ?? 0;
+    const MAX_VERIFY_ATTEMPTS = 5;
+
+    if (currentAttempts >= MAX_VERIFY_ATTEMPTS) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          verificationCode: null,
+          verificationCodeExpiry: null,
+          verificationAttempts: 0,
+        },
+      });
+      return NextResponse.json(
+        { message: 'คุณกรอกรหัสยืนยันผิดเกินจำนวนครั้งที่กำหนด รหัสถูกยกเลิกแล้ว กรุณากดขอรหัสใหม่' },
+        { status: 400 }
+      );
+    }
+
     if (!user.verificationCode || user.verificationCode !== cleanCode) {
-      return NextResponse.json({ message: 'รหัสยืนยันไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง' }, { status: 400 });
+      const newAttempts = currentAttempts + 1;
+      if (newAttempts >= MAX_VERIFY_ATTEMPTS) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            verificationCode: null,
+            verificationCodeExpiry: null,
+            verificationAttempts: 0,
+          },
+        });
+        return NextResponse.json(
+          { message: 'คุณกรอกรหัสยืนยันผิดเกินจำนวนครั้งที่กำหนด (5 ครั้ง) รหัสถูกยกเลิกแล้ว กรุณากดขอรหัสใหม่' },
+          { status: 400 }
+        );
+      }
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { verificationAttempts: newAttempts },
+      });
+
+      const remaining = MAX_VERIFY_ATTEMPTS - newAttempts;
+      return NextResponse.json(
+        { message: `รหัสยืนยันไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง (เหลือโอกาสอีก ${remaining} ครั้ง)` },
+        { status: 400 }
+      );
     }
 
     if (!user.verificationCodeExpiry || user.verificationCodeExpiry < new Date()) {
@@ -48,6 +91,7 @@ export async function POST(request: NextRequest) {
         emailVerified: true,
         verificationCode: null,
         verificationCodeExpiry: null,
+        verificationAttempts: 0,
       },
       select: {
         id: true,

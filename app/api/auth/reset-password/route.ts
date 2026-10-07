@@ -45,15 +45,55 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (user.resetPasswordToken !== code.trim()) {
+    const currentAttempts = (user as { resetPasswordAttempts?: number }).resetPasswordAttempts ?? 0;
+    const MAX_OTP_ATTEMPTS = 5;
+
+    if (currentAttempts >= MAX_OTP_ATTEMPTS) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          resetPasswordToken: null,
+          resetPasswordExpiry: null,
+          resetPasswordAttempts: 0,
+        },
+      });
       return NextResponse.json(
-        { message: 'รหัส OTP ไม่ถูกต้อง กรุณาตรวจสอบใหม่อีกครั้ง' },
+        { message: 'คุณกรอกรหัส OTP ไม่ถูกต้องเกินจำนวนครั้งที่กำหนด รหัสนี้ถูกยกเลิกแล้ว กรุณากดขอรหัสใหม่' },
+        { status: 400 }
+      );
+    }
+
+    if (user.resetPasswordToken !== code.trim()) {
+      const newAttempts = currentAttempts + 1;
+      if (newAttempts >= MAX_OTP_ATTEMPTS) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            resetPasswordToken: null,
+            resetPasswordExpiry: null,
+            resetPasswordAttempts: 0,
+          },
+        });
+        return NextResponse.json(
+          { message: 'คุณกรอกรหัส OTP ไม่ถูกต้องเกินจำนวนครั้งที่กำหนด (5 ครั้ง) รหัสนี้ถูกยกเลิกแล้ว กรุณากดขอรหัสใหม่' },
+          { status: 400 }
+        );
+      }
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { resetPasswordAttempts: newAttempts },
+      });
+
+      const remaining = MAX_OTP_ATTEMPTS - newAttempts;
+      return NextResponse.json(
+        { message: `รหัส OTP ไม่ถูกต้อง กรุณาตรวจสอบใหม่อีกครั้ง (เหลือโอกาสอีก ${remaining} ครั้ง)` },
         { status: 400 }
       );
     }
 
     // Hash the new password securely
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
 
     await prisma.user.update({
       where: { id: user.id },
@@ -61,6 +101,7 @@ export async function POST(request: NextRequest) {
         password: hashedPassword,
         resetPasswordToken: null,
         resetPasswordExpiry: null,
+        resetPasswordAttempts: 0,
       },
     });
 

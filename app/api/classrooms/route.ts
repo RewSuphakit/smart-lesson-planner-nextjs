@@ -89,7 +89,14 @@ export async function POST(request: NextRequest) {
 
     // Resolve semester: explicit > active > null
     let resolvedSemesterId = semester_id || null;
-    if (!resolvedSemesterId) {
+    if (resolvedSemesterId) {
+      const ownedSemester = await prisma.semester.findFirst({
+        where: { id: resolvedSemesterId, userId: user.id },
+      });
+      if (!ownedSemester) {
+        return NextResponse.json({ message: 'Target semester not found or unauthorized' }, { status: 403 });
+      }
+    } else {
       resolvedSemesterId = await getActiveSemesterId(user.id);
     }
 
