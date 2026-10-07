@@ -85,7 +85,12 @@ export function proxy(request: NextRequest) {
   }
 
   const response = NextResponse.next();
-  response.headers.set('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  // Allow Google OAuth / GSI popup postMessage communication on auth pages
+  if (pathname === '/login' || pathname === '/register' || pathname.startsWith('/api/auth/')) {
+    response.headers.set('Cross-Origin-Opener-Policy', 'unsafe-none');
+  } else {
+    response.headers.set('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  }
   return response;
 }
 
