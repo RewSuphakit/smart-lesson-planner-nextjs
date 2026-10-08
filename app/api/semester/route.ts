@@ -136,8 +136,14 @@ export async function POST(request: NextRequest) {
 
     const resolvedWeeks = total_weeks || getDefaultWeeks(curriculum_type as CurriculumType);
 
+    // Count existing semesters for this user: auto-activate first semester if none exist yet
+    const existingCount = await prisma.semester.count({
+      where: { userId: user.id },
+    });
+    const shouldBeActive = is_active || existingCount === 0;
+
     // If this semester should be active, deactivate others first
-    if (is_active) {
+    if (shouldBeActive) {
       await prisma.semester.updateMany({
         where: { userId: user.id, isActive: true },
         data: { isActive: false },
@@ -152,7 +158,7 @@ export async function POST(request: NextRequest) {
         academicYear: academic_year,
         startDate: start_date ? new Date(start_date) : null,
         endDate: end_date ? new Date(end_date) : null,
-        isActive: is_active,
+        isActive: shouldBeActive,
         curriculumType: (curriculum_type as CurriculumType) || CurriculumType.pvch,
         totalWeeks: resolvedWeeks,
       },

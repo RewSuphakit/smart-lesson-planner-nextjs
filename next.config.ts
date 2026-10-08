@@ -72,7 +72,6 @@ const nextConfig: NextConfig = {
       { source: '/api/scores/bulk-import', destination: '/api/scores' },
       { source: '/api/attendance/stats/:classroomId', destination: '/api/attendance?classroom_id=:classroomId' },
       { source: '/api/attendance/history/:studentId', destination: '/api/attendance?student_id=:studentId' },
-      { source: '/api/files/upload', destination: '/api/files' },
       { source: '/api/timetable/clear', destination: '/api/timetable' },
     ];
   },

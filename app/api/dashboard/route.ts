@@ -264,7 +264,6 @@ export async function GET(request: NextRequest) {
             } else {
               // Slots without classroom bound (e.g. general assembly / flagpole)
               if (isFlagpoleOrHomeroom(slot)) return false;
-              if (classroomsWithDates.length > 0 && allClassroomsEnded) return false;
             }
             return true;
           });

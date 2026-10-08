@@ -150,16 +150,16 @@ export default function Schedule() {
   const loading = loadingTimetable;
 
   const PERIOD_TIMES: Record<number, { start: string; end: string }> = {
-    0:  { start: '07:30', end: '08:00' },
-    1:  { start: '08:00', end: '09:00' },
-    2:  { start: '09:00', end: '10:00' },
-    3:  { start: '10:00', end: '11:00' },
-    4:  { start: '11:00', end: '12:00' },
-    5:  { start: '13:00', end: '14:00' },
-    6:  { start: '14:00', end: '15:00' },
-    7:  { start: '15:00', end: '16:00' },
-    8:  { start: '16:00', end: '17:00' },
-    9:  { start: '17:00', end: '18:00' },
+    0: { start: '07:30', end: '08:00' },
+    1: { start: '08:00', end: '09:00' },
+    2: { start: '09:00', end: '10:00' },
+    3: { start: '10:00', end: '11:00' },
+    4: { start: '11:00', end: '12:00' },
+    5: { start: '13:00', end: '14:00' },
+    6: { start: '14:00', end: '15:00' },
+    7: { start: '15:00', end: '16:00' },
+    8: { start: '16:00', end: '17:00' },
+    9: { start: '17:00', end: '18:00' },
     10: { start: '18:00', end: '19:00' },
     11: { start: '19:00', end: '20:00' },
     12: { start: '20:00', end: '21:00' },
@@ -168,7 +168,7 @@ export default function Schedule() {
   const openCreateTimetable = (dayIdx: number, periodId: number | string) => {
     const period = typeof periodId === 'number' ? periodId : 1;
     const defaultTime = PERIOD_TIMES[period] || { start: '08:00', end: '09:00' };
-    
+
     setEditTimetableTarget(null);
     setTimetableForm({
       day_of_week: dayIdx,
@@ -211,21 +211,21 @@ export default function Schedule() {
   const handlePeriodChange = (field: 'start_period' | 'end_period', val: number) => {
     setTimetableForm(prev => {
       const nextForm = { ...prev, [field]: val };
-      
+
       // Keep start <= end
       if (field === 'start_period' && nextForm.start_period > nextForm.end_period) {
         nextForm.end_period = nextForm.start_period;
       } else if (field === 'end_period' && nextForm.end_period < nextForm.start_period) {
         nextForm.start_period = nextForm.end_period;
       }
-      
+
       // Auto set times based on start/end periods
       const startT = PERIOD_TIMES[nextForm.start_period]?.start;
       const endT = PERIOD_TIMES[nextForm.end_period]?.end;
-      
+
       if (startT) nextForm.start_time = startT;
       if (endT) nextForm.end_time = endT;
-      
+
       return nextForm;
     });
   };
@@ -256,11 +256,11 @@ export default function Schedule() {
     if (Number(timetableForm.start_period) > Number(timetableForm.end_period)) return toast.error('คาบเรียนสิ้นสุดต้องไม่น้อยกว่าคาบเรียนเริ่มต้น');
     if (timetableForm.start_time >= timetableForm.end_time) return toast.error('เวลาสิ้นสุดต้องมากกว่าเวลาเริ่มต้น');
 
-    const isHomeroomOrFlagpole = 
-      timetableForm.entry_type === 'homeroom' || 
-      Number(timetableForm.start_period) === 0 || 
-      timetableForm.subject_name?.includes('เสาธง') || 
-      timetableForm.subject_name?.includes('โฮมรูม') || 
+    const isHomeroomOrFlagpole =
+      timetableForm.entry_type === 'homeroom' ||
+      Number(timetableForm.start_period) === 0 ||
+      timetableForm.subject_name?.includes('เสาธง') ||
+      timetableForm.subject_name?.includes('โฮมรูม') ||
       timetableForm.subject_name?.includes('เข้าแถว');
 
     const payload = {
@@ -331,13 +331,13 @@ export default function Schedule() {
     const csvContent = '\uFEFF' + [
       'วัน,คาบเริ่ม,คาบสิ้นสุด,รหัสวิชา,ชื่อวิชา,ห้อง,กลุ่ม,ประเภท,อาจารย์',
       'จันทร์,1,1,20000-1101,กิจกรรมหน้าเสาธงและโฮมรูม,หน้าเสาธง,ปวช.1/1,โฮมรูม,ครูที่ปรึกษา',
-      'จันทร์,2,4,20001-1005,การใช้คอมพิวเตอร์และสารสนเทศเพื่องานอาชีพ,734,ปวช.1/1,ปฏิบัติ,อ.ชญารัตน์',
+      'จันทร์,2,4,20001-1005,การใช้คอมพิวเตอร์และสารสนเทศเพื่องานอาชีพ,734,ปวช.1/1,ปฏิบัติ,อ.xxxx',
       'จันทร์,5,8,21909-2011,การเขียนโปรแกรมเชิงวัตถุ,735,ปวช.2/1,ปฏิบัติ,อ.ณัฐนันท์',
-      'อังคาร,2,4,30001-1003,การประยุกต์ใช้เทคโนโลยีดิจิทัลในอาชีพ,745,ปวส.1/6,ทฤษฎี,อ.ศิริยา',
-      'พุธ,2,4,30901-1001,การพัฒนาเว็บแอปพลิเคชัน,ห้องคอมฯ ต้นแบบ 2,ปวส.2/2,ปฏิบัติ,อ.จริญยา',
+      'อังคาร,2,4,30001-1003,การประยุกต์ใช้เทคโนโลยีดิจิทัลในอาชีพ,745,ปวส.1/6,ทฤษฎี,อ.xxxx',
+      'พุธ,2,4,30901-1001,การพัฒนาเว็บแอปพลิเคชัน,ห้องคอมฯ ต้นแบบ 2,ปวส.2/2,ปฏิบัติ,อ.xxxx',
       'พุธ,5,6,20000-2001,กิจกรรมลูกเสือวิสามัญ 1,โดม,ชค.1/1,กิจกรรม,อ.สมชาย',
-      'พฤหัสบดี,1,4,20901-2002,ระบบเครือข่ายคอมพิวเตอร์เบื้องต้น,LAB-1,ชค.2/1,ปฏิบัติ,อ.วิโรจน์',
-      'ศุกร์,2,4,20000-1201,ภาษาอังกฤษเพื่อการสื่อสารในงานอาชีพ,421,ชฟ.2/1,ทฤษฎี,Teacher John',
+      'พฤหัสบดี,1,4,20901-2002,ระบบเครือข่ายคอมพิวเตอร์เบื้องต้น,LAB-1,ชค.2/1,ปฏิบัติ,อ.xxxx',
+      'ศุกร์,2,4,20000-1201,ภาษาอังกฤษเพื่อการสื่อสารในงานอาชีพ,421,ชฟ.2/1,ทฤษฎี,Teacher xxx',
     ].join('\r\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -358,13 +358,13 @@ export default function Schedule() {
       const headers = ['วัน', 'คาบเริ่ม', 'คาบสิ้นสุด', 'รหัสวิชา', 'ชื่อวิชา', 'ห้อง', 'กลุ่ม', 'ประเภท', 'อาจารย์'];
       const rows = [
         ['จันทร์', 1, 1, '20000-1101', 'กิจกรรมหน้าเสาธงและโฮมรูม', 'หน้าเสาธง', 'ปวช.1/1', 'โฮมรูม', 'ครูที่ปรึกษา'],
-        ['จันทร์', 2, 4, '20001-1005', 'การใช้คอมพิวเตอร์และสารสนเทศเพื่องานอาชีพ', '734', 'ปวช.1/1', 'ปฏิบัติ', 'อ.ชญารัตน์'],
+        ['จันทร์', 2, 4, '20001-1005', 'การใช้คอมพิวเตอร์และสารสนเทศเพื่องานอาชีพ', '734', 'ปวช.1/1', 'ปฏิบัติ', 'อ.xxxx'],
         ['จันทร์', 5, 8, '21909-2011', 'การเขียนโปรแกรมเชิงวัตถุ', '735', 'ปวช.2/1', 'ปฏิบัติ', 'อ.ณัฐนันท์'],
-        ['อังคาร', 2, 4, '30001-1003', 'การประยุกต์ใช้เทคโนโลยีดิจิทัลในอาชีพ', '745', 'ปวส.1/6', 'ทฤษฎี', 'อ.ศิริยา'],
-        ['พุธ', 2, 4, '30901-1001', 'การพัฒนาเว็บแอปพลิเคชัน', 'ห้องคอมฯ ต้นแบบ 2', 'ปวส.2/2', 'ปฏิบัติ', 'อ.จริญยา'],
+        ['อังคาร', 2, 4, '30001-1003', 'การประยุกต์ใช้เทคโนโลยีดิจิทัลในอาชีพ', '745', 'ปวส.1/6', 'ทฤษฎี', 'อ.xxxx'],
+        ['พุธ', 2, 4, '30901-1001', 'การพัฒนาเว็บแอปพลิเคชัน', 'ห้องคอมฯ ต้นแบบ 2', 'ปวส.2/2', 'ปฏิบัติ', 'อ.xxxx'],
         ['พุธ', 5, 6, '20000-2001', 'กิจกรรมลูกเสือวิสามัญ 1', 'โดม', 'ชค.1/1', 'กิจกรรม', 'อ.สมชาย'],
-        ['พฤหัสบดี', 1, 4, '20901-2002', 'ระบบเครือข่ายคอมพิวเตอร์เบื้องต้น', 'LAB-1', 'ชค.2/1', 'ปฏิบัติ', 'อ.วิโรจน์'],
-        ['ศุกร์', 2, 4, '20000-1201', 'ภาษาอังกฤษเพื่อการสื่อสารในงานอาชีพ', '421', 'ชฟ.2/1', 'ทฤษฎี', 'Teacher John'],
+        ['พฤหัสบดี', 1, 4, '20901-2002', 'ระบบเครือข่ายคอมพิวเตอร์เบื้องต้น', 'LAB-1', 'ชค.2/1', 'ปฏิบัติ', 'อ.xxxx'],
+        ['ศุกร์', 2, 4, '20000-1201', 'ภาษาอังกฤษเพื่อการสื่อสารในงานอาชีพ', '421', 'ชฟ.2/1', 'ทฤษฎี', 'Teacher xxx'],
       ];
 
       const wb = XLSX.utils.book_new();
@@ -392,7 +392,7 @@ export default function Schedule() {
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!uploadFile) return toast.error('กรุณาเลือกไฟล์');
-    
+
     const formData = new FormData();
 
     // Auto-convert .xlsx/.xls to CSV if selected
@@ -413,7 +413,7 @@ export default function Schedule() {
     } else {
       formData.append('file', uploadFile);
     }
-    
+
     formData.append('replace', 'true');
     timetableUploadMutation.mutate(formData);
   };
@@ -524,7 +524,7 @@ export default function Schedule() {
   const renderTimetable = () => {
     const entriesByDay: Record<number, TimetableEntry[]> = {};
     for (let i = 0; i < 7; i++) entriesByDay[i] = [];
-    
+
     const safeEntries = Array.isArray(timetableEntries) ? timetableEntries : [];
     safeEntries.forEach(entry => {
       if (entry && typeof entry.day_of_week === 'number' && entriesByDay[entry.day_of_week]) {
@@ -562,7 +562,7 @@ export default function Schedule() {
     return (
       <div className="animate-fade-in-up">
         {loading ? (
-           <div className="skeleton h-[500px] rounded-2xl w-full" />
+          <div className="skeleton h-[500px] rounded-2xl w-full" />
         ) : timetableEntries.length === 0 ? (
           <div className="glass p-12 flex flex-col items-center justify-center text-center">
             <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mb-4">
@@ -595,13 +595,13 @@ export default function Schedule() {
                   if (dayEntries.length === 0 && dayIdx > 4) return null;
 
                   return (
-                    <div 
-                      key={dayIdx} 
+                    <div
+                      key={dayIdx}
                       className="grid relative"
                       style={{ gridTemplateColumns: gridCols }}
                     >
                       {/* Day name label — explicit column 1 */}
-                      <div 
+                      <div
                         className="border border-slate-200 bg-slate-50 p-2 text-sm font-bold text-slate-700 text-center flex items-center justify-center"
                         style={{ gridRow: 1, gridColumn: 1 }}
                       >
@@ -615,8 +615,8 @@ export default function Schedule() {
 
                         if (slot.isBreak) {
                           return (
-                            <div 
-                              key={`bg-${slot.id}`} 
+                            <div
+                              key={`bg-${slot.id}`}
                               className="border border-slate-200 bg-slate-50/50 p-1 text-center flex items-center justify-center min-h-[60px]"
                               style={{ gridRow: 1, gridColumn: colPos }}
                             >
@@ -692,21 +692,21 @@ export default function Schedule() {
                               setHoverTooltip(null);
                             }}
                           >
-                            <div 
+                            <div
                               className="w-full h-full p-2 text-center cursor-grab active:cursor-grabbing flex flex-col justify-center min-h-[56px]"
                               draggable={true}
                               onDragStart={(e) => handleDragStart(e, entry, 'move')}
                               onDragEnd={handleDragEnd}
                             >
-                              <div 
-                                className="text-[0.7rem] font-bold truncate" 
+                              <div
+                                className="text-[0.7rem] font-bold truncate"
                                 title={entry.subject_code}
                                 style={{ color: entry.color ? entry.color : undefined }}
                               >
                                 {entry.subject_code}
                               </div>
                               {entry.room && (
-                                <div 
+                                <div
                                   className="text-[0.6rem] opacity-80 truncate"
                                   style={{ color: entry.color ? entry.color : undefined }}
                                 >
@@ -714,9 +714,9 @@ export default function Schedule() {
                                 </div>
                               )}
                             </div>
-                            
+
                             {/* Resize Handle */}
-                            <div 
+                            <div
                               className="absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-slate-900/20 flex flex-col justify-center items-center opacity-0 group-hover:opacity-100 transition-opacity z-30"
                               draggable={true}
                               onDragStart={(e) => {
@@ -782,7 +782,7 @@ export default function Schedule() {
       {renderTimetable()}
 
       {hoverTooltip && !draggedEntry && !showTimetableModal && createPortal(
-        <div 
+        <div
           className="fixed z-[9999] w-48 bg-white shadow-xl rounded-lg p-3 border border-slate-100 text-left pointer-events-none"
           style={{
             top: hoverTooltip.rect.top - 8,
@@ -927,7 +927,7 @@ export default function Schedule() {
                           <td className="p-2 border-r border-slate-100">734</td>
                           <td className="p-2 border-r border-slate-100">ปวช.1/1</td>
                           <td className="p-2 border-r border-slate-100"><span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 text-[10px] font-bold">ปฏิบัติ</span></td>
-                          <td className="p-2 text-slate-500">อ.ชญารัตน์</td>
+                          <td className="p-2 text-slate-500">อ.xxxx</td>
                         </tr>
                         <tr className="hover:bg-slate-50">
                           <td className="p-2 border-r border-slate-100 font-bold text-indigo-700">อังคาร</td>
@@ -938,7 +938,7 @@ export default function Schedule() {
                           <td className="p-2 border-r border-slate-100">745</td>
                           <td className="p-2 border-r border-slate-100">ปวส.1/6</td>
                           <td className="p-2 border-r border-slate-100"><span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-bold">ทฤษฎี</span></td>
-                          <td className="p-2 text-slate-500">อ.ศิริยา</td>
+                          <td className="p-2 text-slate-500">อ.xxxx</td>
                         </tr>
                         <tr className="hover:bg-slate-50">
                           <td className="p-2 border-r border-slate-100 font-bold text-indigo-700">พุธ</td>
@@ -1000,11 +1000,10 @@ export default function Schedule() {
             {/* Upload Form */}
             <form onSubmit={handleUploadSubmit} className="space-y-4 pt-1">
               <div
-                className={`border-2 border-dashed rounded-2xl p-6 sm:p-7 text-center transition-all cursor-pointer ${
-                  uploadFile
+                className={`border-2 border-dashed rounded-2xl p-6 sm:p-7 text-center transition-all cursor-pointer ${uploadFile
                     ? 'border-indigo-400 bg-indigo-50/40 ring-2 ring-indigo-200/50'
                     : 'border-indigo-200 hover:border-indigo-400 bg-indigo-50/20 hover:bg-indigo-50/40'
-                }`}
+                  }`}
                 onClick={() => fileInputRef.current?.click()}
               >
                 <div className="w-12 h-12 rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center mx-auto mb-3 shadow-2xs">

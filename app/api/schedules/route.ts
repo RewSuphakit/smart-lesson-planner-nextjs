@@ -88,8 +88,11 @@ export async function GET(request: NextRequest) {
       orderBy: [{ scheduledDate: 'asc' }, { startTime: 'asc' }],
     });
 
+    // Sort classrooms by name length descending so longer/more specific names match first (prevents "ปวช.1" matching before "ปวช.1/2")
+    const sortedClassrooms = [...classrooms].sort((a, b) => b.name.length - a.name.length);
+
     const mappedConcrete = concreteSchedules.map(s => {
-      const matchedRoom = classrooms.find(c => s.notes?.includes(c.name) || s.title?.includes(c.name));
+      const matchedRoom = sortedClassrooms.find(c => s.notes?.includes(c.name) || s.title?.includes(c.name));
       const roomStart = matchedRoom?.semesterStartDate ? new Date(matchedRoom.semesterStartDate) : minSemesterStart;
       const roomWeeks = matchedRoom ? resolveTargetWeeks(matchedRoom) : maxTotalWeeks;
 

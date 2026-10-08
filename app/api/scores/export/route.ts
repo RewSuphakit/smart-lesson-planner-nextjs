@@ -287,16 +287,23 @@ export async function GET(request: NextRequest) {
       const filename = `${filenameBase}.csv`;
       const BOM = '\uFEFF';
       
-      // Format rows for CSV (handling wrapping and quoting strings)
-      const csvHeaders = headers.map(h => `"${h.replace(/"/g, '""')}"`).join(',');
-      const csvRows = rows.map(row => 
-        row.map(cell => {
-          if (typeof cell === 'string') {
-            return `"${cell.replace(/"/g, '""')}"`;
-          }
-          return cell;
-        }).join(',')
-      );
+      // Sanitize cells for CSV (handling formula injection, objects, and quote escaping)
+      const sanitizeCsvCell = (value: unknown): string => {
+        let str = '';
+        if (typeof value === 'object' && value !== null) {
+          const obj = value as { v?: unknown; f?: unknown };
+          str = String(obj.v ?? obj.f ?? '');
+        } else {
+          str = String(value ?? '');
+        }
+        if (/^[=+\-@\t\r]/.test(str)) {
+          str = `'${str}`;
+        }
+        return `"${str.replace(/"/g, '""')}"`;
+      };
+
+      const csvHeaders = headers.map(sanitizeCsvCell).join(',');
+      const csvRows = rows.map(row => row.map(sanitizeCsvCell).join(','));
 
       const csvContent = BOM + [csvHeaders, ...csvRows].join('\n');
 

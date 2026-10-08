@@ -49,27 +49,31 @@ export async function POST(
       return NextResponse.json({ message: 'ภาคเรียนปลายทางไม่พบ' }, { status: 404 });
     }
 
-    // Get source classrooms with students
+    // Get source classrooms with students, score structures, and grade criteria
     const sourceClassrooms = await prisma.classroom.findMany({
       where: { semesterId: sourceSemesterId, userId: user.id },
-      include: includeStudents ? {
-        students: {
-          select: {
-            name: true,
-            studentCode: true,
-            gradeLevel: true,
-            email: true,
-            avatar: true,
+      include: {
+        scoreStructures: true,
+        gradeCriteria: true,
+        ...(includeStudents ? {
+          students: {
+            select: {
+              name: true,
+              studentCode: true,
+              gradeLevel: true,
+              email: true,
+              avatar: true,
+            },
           },
-        },
-      } : undefined,
+        } : {}),
+      },
     });
 
     if (sourceClassrooms.length === 0) {
       return NextResponse.json({ message: 'ไม่มีห้องเรียนในภาคเรียนต้นทาง' }, { status: 400 });
     }
 
-    // Clone classrooms (and optionally students) in a transaction
+    // Clone classrooms (along with students, score structures, and grade criteria) in a transaction
     const clonedClassrooms = await prisma.$transaction(async (tx) => {
       const results = [];
 
@@ -98,6 +102,31 @@ export async function POST(
             // Note: semesterStartDate intentionally NOT copied — use target semester dates
           },
         });
+
+        // Clone score structures (lesson names, max scores, hours)
+        if (sourceClassroom.scoreStructures && sourceClassroom.scoreStructures.length > 0) {
+          await tx.scoreStructure.createMany({
+            data: sourceClassroom.scoreStructures.map(s => ({
+              classroomId: newClassroom.id,
+              lessonNumber: s.lessonNumber,
+              lessonName: s.lessonName,
+              maxAssignmentScore: s.maxAssignmentScore,
+              maxPostTestScore: s.maxPostTestScore,
+              hours: s.hours,
+            })),
+          });
+        }
+
+        // Clone grade criteria (letter grades and cut-offs)
+        if (sourceClassroom.gradeCriteria && sourceClassroom.gradeCriteria.length > 0) {
+          await tx.gradeCriteria.createMany({
+            data: sourceClassroom.gradeCriteria.map(g => ({
+              classroomId: newClassroom.id,
+              grade: g.grade,
+              minScore: g.minScore,
+            })),
+          });
+        }
 
         let studentCount = 0;
 

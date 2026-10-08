@@ -6,7 +6,8 @@ import api from '@/services/api';
 import { createPortal } from 'react-dom';
 import {
   Loader2, Search, RotateCcw, Zap, Plus, Minus,
-  ThumbsUp, ThumbsDown, AlertCircle, HeartHandshake, CheckCircle2, AlertTriangle, Users, Award, X, Grid
+  ThumbsUp, ThumbsDown, AlertCircle, HeartHandshake, CheckCircle2, AlertTriangle, Users, Award, X, Grid,
+  Sliders, Pencil
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import UserAvatar from '@/components/UserAvatar';
@@ -58,6 +59,11 @@ export default function Affective() {
   // Modal for calculating from attendance stats
   const [showCalcModal, setShowCalcModal] = useState(false);
   const [calcMode, setCalcMode] = useState<'deductFromCurrent' | 'resetFromMax'>('deductFromCurrent');
+
+  // Modal for customizing max affective score
+  const [showWeightModal, setShowWeightModal] = useState(false);
+  const [customWeightInput, setCustomWeightInput] = useState<number>(20);
+  const [resetStudentsToNew, setResetStudentsToNew] = useState(false);
 
   // ─── Query: ดึงข้อมูลห้องเรียน ───
   const { data: classrooms = [], isLoading: loadingClassrooms } = useQuery<Classroom[]>({
@@ -174,6 +180,37 @@ export default function Affective() {
     },
     onError: () => {
       toast.error('บันทึกคะแนนกลุ่มไม่สำเร็จ');
+    },
+  });
+
+  // ─── Mutation: อัปเดตคะแนนเต็มจิตพิสัยของห้องเรียน ───
+  const updateClassroomWeightMutation = useMutation({
+    mutationFn: async ({ weight, resetAll }: { weight: number; resetAll: boolean }) => {
+      await api.put(`/classrooms/${selectedClass}`, {
+        affective_weight: weight,
+      });
+
+      if (resetAll && students.length > 0) {
+        const batchScores = students.map(s => ({
+          student_id: s.id,
+          affective_score: weight,
+        }));
+        await api.put('/students/exams?type=behavior', {
+          scores: batchScores,
+        });
+      }
+    },
+    onSuccess: async (_, variables) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['classrooms'] }),
+        queryClient.invalidateQueries({ queryKey: ['affective-students'] }),
+        queryClient.invalidateQueries({ queryKey: ['grades'] }),
+      ]);
+      setShowWeightModal(false);
+      toast.success(`กำหนดคะแนนเต็มจิตพิสัยเป็น ${variables.weight} คะแนนเรียบร้อยแล้ว`, { icon: '🎯' });
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || 'ไม่สามารถอัปเดตคะแนนเต็มได้');
     },
   });
 
@@ -400,6 +437,20 @@ export default function Affective() {
           {/* Action buttons */}
           <div className="flex flex-wrap gap-2.5 items-center">
             <button
+              onClick={() => {
+                setCustomWeightInput(maxAffectiveWeight);
+                setResetStudentsToNew(false);
+                setShowWeightModal(true);
+              }}
+              disabled={loadingStudents || updateClassroomWeightMutation.isPending}
+              className="btn bg-white hover:bg-pink-50/50 text-slate-700 hover:text-pink-700 border border-slate-200 hover:border-pink-200 flex-1 md:flex-none flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-xl shadow-xs transition-all"
+              title="ตั้งค่าคะแนนเต็มจิตพิสัยของห้องเรียนนี้"
+            >
+              <Sliders className="w-4 h-4 text-pink-600" />
+              <span>กำหนดคะแนนเต็ม</span>
+            </button>
+
+            <button
               onClick={handleAutoCalculateFromAttendance}
               disabled={loadingStudents || updateBatchScoresMutation.isPending || students.length === 0}
               className="btn bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 flex-1 md:flex-none flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-xl shadow-xs"
@@ -498,9 +549,22 @@ export default function Affective() {
               />
             </div>
 
-            <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end shrink-0">
-              <div className="text-xs text-slate-600 bg-indigo-50/80 border border-indigo-100 px-3 py-1.5 rounded-xl font-medium">
-                คะแนนเต็มจิตพิสัยห้องนี้: <span className="font-bold text-indigo-700">{maxAffectiveWeight} คะแนน</span>
+            <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-between sm:justify-end shrink-0">
+              <div className="flex items-center gap-1.5 text-xs text-slate-600 bg-indigo-50/80 border border-indigo-100 px-3 py-1.5 rounded-xl font-medium">
+                <span>คะแนนเต็มจิตพิสัยห้องนี้: <span className="font-bold text-indigo-700">{maxAffectiveWeight} คะแนน</span></span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomWeightInput(maxAffectiveWeight);
+                    setResetStudentsToNew(false);
+                    setShowWeightModal(true);
+                  }}
+                  className="p-1 hover:bg-indigo-100 rounded-lg text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer"
+                  title="แก้ไขคะแนนเต็มจิตพิสัย"
+                  aria-label="แก้ไขคะแนนเต็มจิตพิสัย"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
               </div>
               <select
                 value={sortBy}
@@ -766,6 +830,126 @@ export default function Affective() {
               >
                 {updateBatchScoresMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
                 <span>ยืนยันการคำนวณ</span>
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ================= MAX SCORE MODAL ================= */}
+      {showWeightModal && createPortal(
+        <div className="modal-overlay" onClick={() => setShowWeightModal(false)}>
+          <div className="glass w-full max-w-md p-6 animate-scale-up" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-indigo-50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-pink-500/10 text-pink-600 flex items-center justify-center font-bold shrink-0">
+                  <Sliders className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-800 text-base">กำหนดคะแนนเต็มจิตพิสัย</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    ห้อง: {activeParsed?.subjectTitle || selectedClassData?.name}
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setShowWeightModal(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+
+            {/* Input & Presets */}
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  คะแนนเต็มจิตพิสัย (1 - 100 คะแนน)
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    step="1"
+                    value={customWeightInput}
+                    onChange={e => {
+                      const val = Number(e.target.value);
+                      setCustomWeightInput(isNaN(val) ? 0 : val);
+                    }}
+                    className="form-input text-lg font-black text-pink-700 py-2 px-3.5 rounded-xl border-slate-200 focus:border-pink-500 focus:ring-pink-200 w-full"
+                    autoFocus
+                  />
+                  <span className="text-xs font-bold text-slate-500 shrink-0">คะแนน</span>
+                </div>
+              </div>
+
+              {/* Quick Presets */}
+              <div>
+                <div className="text-[11px] font-semibold text-slate-500 mb-1.5">คะแนนยอดนิยม:</div>
+                <div className="flex flex-wrap gap-2">
+                  {[10, 15, 20, 25, 30].map(val => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setCustomWeightInput(val)}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                        customWeightInput === val
+                          ? 'bg-pink-600 text-white border-pink-600 shadow-sm'
+                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      {val} คะแนน
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Reset students option */}
+              <label className="flex items-start gap-2.5 p-3 rounded-xl bg-pink-50/50 border border-pink-100 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={resetStudentsToNew}
+                  onChange={e => setResetStudentsToNew(e.target.checked)}
+                  className="mt-0.5 text-pink-600 rounded focus:ring-pink-500"
+                />
+                <div className="text-xs">
+                  <span className="font-bold text-slate-800">ปรับคะแนนนักเรียนทุกคนเป็นคะแนนเต็มใหม่ ({customWeightInput || 0}) ทันที</span>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    (หากไม่เลือก ระบบจะคงคะแนนปัจจุบันของนักเรียนไว้)
+                  </p>
+                </div>
+              </label>
+
+              {/* Note */}
+              <div className="text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded-xl border border-slate-200/60 leading-relaxed">
+                💡 <span className="font-bold text-slate-700">หมายเหตุ:</span> คะแนนเต็มจิตพิสัยนี้จะเชื่อมโยงกับน้ำหนักคะแนนจิตพิสัยในหน้า <span className="font-bold text-pink-700">ตัดเกรด</span> ของห้องนี้ด้วย
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+              <button
+                onClick={() => setShowWeightModal(false)}
+                className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-xs hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={() => {
+                  if (!customWeightInput || customWeightInput < 1 || customWeightInput > 100) {
+                    toast.error('กรุณาระบุคะแนนระหว่าง 1 ถึง 100');
+                    return;
+                  }
+                  updateClassroomWeightMutation.mutate({
+                    weight: customWeightInput,
+                    resetAll: resetStudentsToNew,
+                  });
+                }}
+                disabled={updateClassroomWeightMutation.isPending}
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white font-bold text-xs shadow-lg shadow-pink-500/25 flex items-center gap-2 transition-all cursor-pointer"
+              >
+                {updateClassroomWeightMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                <span>บันทึกคะแนนเต็ม</span>
               </button>
             </div>
           </div>
