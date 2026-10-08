@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { generateToken, setAuthCookie } from '@/lib/auth';
 import { protectRequest, authLimiter } from '@/lib/arcjet';
+import { verifyOtp } from '@/lib/email';
 
 export async function POST(request: NextRequest) {
   try {
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!user.verificationCode || user.verificationCode !== cleanCode) {
+    if (!user.verificationCode || !verifyOtp(cleanCode, user.verificationCode)) {
       const newAttempts = currentAttempts + 1;
       if (newAttempts >= MAX_VERIFY_ATTEMPTS) {
         await prisma.user.update({

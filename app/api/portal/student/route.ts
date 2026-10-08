@@ -4,6 +4,7 @@ import { calculateAffectiveScore } from '@/lib/affective';
 import { resolveTargetWeeks } from '@/lib/semester';
 import { protectRequest, portalLimiter } from '@/lib/arcjet';
 import { invalidateCache, userCacheKey } from '@/lib/cache';
+import { generatePortalSession, verifyPortalSession, getAuthUser } from '@/lib/auth';
 
 
 export async function GET(request: NextRequest) {
@@ -62,7 +63,7 @@ export async function GET(request: NextRequest) {
 
     // If multiple classrooms found and no classroom_id requested, return list for selection
     if (validClassrooms.length > 1 && !classroomIdParam) {
-      return NextResponse.json({
+      const resp = NextResponse.json({
         status: 'multiple_classrooms',
         student: {
           id: matchingStudents[0].id,
@@ -79,6 +80,18 @@ export async function GET(request: NextRequest) {
           grade_level: s.gradeLevel,
         })),
       });
+
+      resp.cookies.set({
+        name: 'portal_session',
+        value: generatePortalSession(code),
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 3600,
+      });
+
+      return resp;
     }
 
     // Select target student
@@ -271,7 +284,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       status: 'success',
       student: {
         id: targetStudent.id,
@@ -347,6 +360,18 @@ export async function GET(request: NextRequest) {
         teacher_name: s.classroom!.user.name,
       })),
     });
+
+    response.cookies.set({
+      name: 'portal_session',
+      value: generatePortalSession(code!),
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 3600,
+    });
+
+    return response;
   } catch (error) {
     console.error('Portal student error:', error);
     return NextResponse.json(
@@ -389,6 +414,28 @@ async function handleAvatarUpdate(request: NextRequest) {
       return NextResponse.json(
         { message: 'ไม่พบข้อมูลนักเรียนด้วยรหัสประจำตัวนี้' },
         { status: 404 }
+      );
+    }
+
+    // Security Verification: Require valid signed portal session or teacher auth
+    const portalSessionCookie = request.cookies.get('portal_session')?.value;
+    const verifiedSession = portalSessionCookie ? verifyPortalSession(portalSessionCookie) : null;
+    const authUser = getAuthUser(request);
+
+    let isAuthorized = false;
+    if (verifiedSession && verifiedSession.studentCode.trim().toLowerCase() === studentCode.toLowerCase()) {
+      isAuthorized = true;
+    } else if (authUser) {
+      const teacherOwnsStudent = students.some((s) => s.userId === authUser.id);
+      if (teacherOwnsStudent) {
+        isAuthorized = true;
+      }
+    }
+
+    if (!isAuthorized) {
+      return NextResponse.json(
+        { message: 'ไม่ได้รับอนุญาตให้แก้ไขข้อมูลนักเรียน กรุณาเปิดดูข้อมูลผ่านพอร์ทัลก่อนทำรายการ' },
+        { status: 403 }
       );
     }
 

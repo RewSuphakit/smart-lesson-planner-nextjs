@@ -66,17 +66,6 @@ export async function GET(request: NextRequest) {
         })
       );
 
-      const upcomingSchedulesRaw = await withDbRetry(() =>
-        prisma.schedule.findMany({
-          where: {
-            userId: user.id,
-            scheduledDate: { gte: todayDate },
-            status: 'scheduled',
-          },
-          orderBy: [{ scheduledDate: 'asc' }, { startTime: 'asc' }],
-          take: 10,
-        })
-      );
 
       const weeklyHoursAgg = await withDbRetry(() =>
         prisma.weeklySchedule.aggregate({
@@ -115,25 +104,15 @@ export async function GET(request: NextRequest) {
       // If there are classrooms with dates and all have completed teaching / passed semester end
       const isSemesterEnded = classroomsWithDates.length > 0 && allClassroomsEnded;
 
-      // Filter upcoming schedules:
-      // If the semester has ended, no upcoming schedules for this term.
-      // Also filter out any schedule exceeding maxSemesterEndDate.
-      const upcomingSchedules = (isSemesterEnded ? [] : upcomingSchedulesRaw)
-        .filter(s => {
-          if (maxSemesterEndDate && s.scheduledDate > maxSemesterEndDate) {
-            return false;
-          }
-          return true;
-        })
-        .slice(0, 5)
-        .map(s => ({
-          scheduled_date: s.scheduledDate.toISOString(),
-          start_time: s.startTime.toISOString().split('T')[1] || '',
-          end_time: s.endTime.toISOString().split('T')[1] || '',
-          status: s.status,
-          lesson_title: s.title,
-          subject: s.subject,
-        }));
+      // Upcoming schedules no longer displayed on dashboard
+      const upcomingSchedules: Array<{
+        scheduled_date: string;
+        start_time: string;
+        end_time: string;
+        status: string;
+        lesson_title: string;
+        subject: string;
+      }> = [];
 
       // --- At-Risk Students (Optimized via Aggregation) ---
       const classroomIds = classrooms.map(c => c.id);

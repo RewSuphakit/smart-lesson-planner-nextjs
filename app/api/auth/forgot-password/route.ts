@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { generateOtpCode, sendPasswordResetOtpEmail } from '@/lib/email';
+import { generateOtpCode, sendPasswordResetOtpEmail, hashOtp } from '@/lib/email';
 import { ForgotPasswordSchema, validateRequestBody } from '@/lib/validation';
 import { protectRequest, authLimiter } from '@/lib/arcjet';
 
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     await prisma.user.update({
       where: { id: user.id },
       data: {
-        resetPasswordToken: otpCode,
+        resetPasswordToken: hashOtp(otpCode),
         resetPasswordExpiry: expiry,
         resetPasswordAttempts: 0,
       },

@@ -41,6 +41,26 @@ export function verifyToken(token: string): JwtPayload {
   return jwt.verify(token, getJwtSecret()) as JwtPayload;
 }
 
+export function generatePortalSession(studentCode: string): string {
+  return jwt.sign(
+    { studentCode, type: 'portal_session' },
+    getJwtSecret(),
+    { expiresIn: '1h' }
+  );
+}
+
+export function verifyPortalSession(token: string): { studentCode: string } | null {
+  try {
+    const payload = jwt.verify(token, getJwtSecret()) as { studentCode?: string; type?: string };
+    if (payload?.type === 'portal_session' && payload.studentCode) {
+      return { studentCode: payload.studentCode };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export function getAuthUser(request: NextRequest): JwtPayload | null {
   try {
     let token: string | undefined;

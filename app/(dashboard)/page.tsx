@@ -18,7 +18,6 @@ import {
   CheckCircle2,
   Download,
   Search,
-  BookOpen,
   ArrowRight,
   GraduationCap,
   BellRing,
@@ -999,209 +998,105 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* ==================== UPCOMING TEACHING SCHEDULE & QUICK ACTIONS ==================== */}
+      {/* ==================== QUICK ACTIONS ==================== */}
       <section
-        aria-label="กำหนดการสอนที่จะมาถึงและทางลัดระบบ"
-        className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+        aria-label="ทางลัดระบบงาน"
+        className="glass p-6 sm:p-7 rounded-3xl border border-indigo-100/60 shadow-xs hover:shadow-md transition-all duration-300"
       >
-        {/* Upcoming Teaching Plans (2 Cols) */}
-        <div className="lg:col-span-2 glass p-6 sm:p-7 rounded-3xl border border-indigo-100/60 shadow-xs hover:shadow-md transition-all duration-300">
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100/80 flex items-center justify-center text-indigo-600 shadow-xs">
-                <BookOpen className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-slate-800">
-                  กำหนดการสอนที่จะมาถึง
-                </h2>
-                <p className="text-xs text-slate-600">แผนและหัวข้อการสอนที่นัดหมายไว้ล่วงหน้า</p>
-              </div>
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100/80 flex items-center justify-center text-indigo-600 shadow-xs">
+              <Compass className="w-5 h-5" />
             </div>
-
-            <Link
-              href="/schedule"
-              className="text-xs font-bold text-indigo-600 hover:text-indigo-700 hover:underline inline-flex items-center gap-1"
-            >
-              <span>เพิ่มกำหนดการ</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </Link>
+            <div>
+              <h2 className="text-base font-bold text-slate-800">
+                ทางลัดระบบงาน
+              </h2>
+              <p className="text-xs text-slate-600">เข้าถึงเครื่องมือหลักได้อย่างรวดเร็ว</p>
+            </div>
           </div>
-
-          {data?.upcomingSchedules && data.upcomingSchedules.length > 0 ? (
-            <div className="space-y-3">
-              {data.upcomingSchedules.map((s, i) => (
-                <div
-                  key={i}
-                  className="p-3.5 sm:p-4 rounded-2xl bg-white/85 border border-indigo-100/70 hover:border-indigo-300 flex items-center gap-4 transition-all duration-200 hover:shadow-sm"
-                >
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex flex-col items-center justify-center shadow-md shadow-indigo-500/10 shrink-0">
-                    <span className="text-[0.55rem] uppercase font-bold tracking-wider text-indigo-200">
-                      {format(new Date(s.scheduled_date), 'MMM', { locale: th })}
-                    </span>
-                    <span className="text-lg sm:text-xl font-extrabold leading-none font-mono tabular-nums">
-                      {format(new Date(s.scheduled_date), 'd')}
-                    </span>
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-800 truncate">
-                        {s.lesson_title || 'ไม่มีชื่อหัวข้อ'}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-600 mt-0.5 truncate">
-                      {s.subject} • {s.start_time?.slice(0, 5)} - {s.end_time?.slice(0, 5)} น.
-                    </p>
-                  </div>
-
-                  <span className={`text-[0.65rem] font-bold px-2.5 py-1 rounded-full shrink-0 ${s.status === 'scheduled'
-                      ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                      : s.status === 'completed'
-                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                        : 'bg-slate-100 text-slate-700'
-                    }`}>
-                    {s.status === 'scheduled' ? 'รอสอน' : s.status === 'completed' ? 'สอนแล้ว' : 'ยกเลิก'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : isSemesterEnded ? (
-            <div className="text-center py-10 px-4 bg-emerald-50/40 rounded-2xl border border-emerald-100/80 min-h-[200px] flex flex-col items-center justify-center">
-              <div className="w-12 h-12 mx-auto rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mb-2 shadow-xs">
-                <CheckCircle2 className="w-6 h-6" />
-              </div>
-              <p className="text-xs font-bold text-slate-800">ไม่มีกำหนดการสอนค้างอยู่ (สิ้นสุดภาคเรียนแล้ว)</p>
-              <p className="text-[0.72rem] text-slate-600 mt-0.5 max-w-sm">
-                คุณครูจัดการเรียนการสอนครบถ้วนตามแผนของภาคเรียนนี้เรียบร้อยแล้วครับ
-              </p>
-              <Link
-                href="/schedule"
-                className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-50 text-xs font-bold transition-all shadow-xs"
-              >
-                <Calendar className="w-3.5 h-3.5" />
-                <span>ดูปฏิทินและแผนการสอน</span>
-              </Link>
-            </div>
-          ) : (
-            <div className="text-center py-10 px-4 bg-slate-50/70 rounded-2xl border border-slate-100 min-h-[200px] flex flex-col items-center justify-center">
-              <div className="w-12 h-12 mx-auto rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center mb-2 shadow-xs">
-                <Calendar className="w-6 h-6" />
-              </div>
-              <p className="text-xs font-bold text-slate-700">ยังไม่มีกำหนดการสอนที่นัดหมายไว้</p>
-              <p className="text-[0.72rem] text-slate-500 mt-0.5">คุณครูสามารถเพิ่มแผนและกำหนดการสอนลงในปฏิทินได้เลย</p>
-              <Link
-                href="/schedule"
-                className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-all shadow-xs"
-              >
-                <span>เพิ่มกำหนดการสอน</span>
-              </Link>
-            </div>
-          )}
         </div>
 
-        {/* Quick Menu Access Hub (1 Col) */}
-        <div className="glass p-6 sm:p-7 rounded-3xl border border-indigo-100/60 shadow-xs flex flex-col justify-between hover:shadow-md transition-all duration-300">
-          <div>
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100/80 flex items-center justify-center text-indigo-600 shadow-xs">
-                <Compass className="w-5 h-5" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+          <Link
+            href="/semesters"
+            className="flex items-center justify-between p-3.5 rounded-2xl bg-white/75 border border-indigo-100/60 hover:border-indigo-300 hover:bg-indigo-50/30 transition-all duration-200 group shadow-xs"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-50 to-purple-50 text-indigo-600 flex items-center justify-center border border-indigo-100 shrink-0">
+                <Layers className="w-4 h-4" />
               </div>
-              <div>
-                <h2 className="text-base font-bold text-slate-800">
-                  ทางลัดระบบงาน
-                </h2>
-                <p className="text-xs text-slate-600">เข้าถึงเครื่องมือหลักได้อย่างรวดเร็ว</p>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-slate-800 group-hover:text-indigo-700 transition-colors truncate">ภาคเรียน & ปีการศึกษา</p>
+                <p className="text-[0.68rem] text-slate-500 truncate">จัดการเทอมและปีการศึกษา</p>
               </div>
             </div>
+            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
+          </Link>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2.5">
-              <Link
-                href="/semesters"
-                className="flex items-center justify-between p-3 rounded-2xl bg-white/75 border border-indigo-100/60 hover:border-indigo-300 hover:bg-indigo-50/30 transition-all duration-200 group shadow-xs"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-50 to-purple-50 text-indigo-600 flex items-center justify-center border border-indigo-100">
-                    <Layers className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-800 group-hover:text-indigo-700 transition-colors">ภาคเรียน & ปีการศึกษา</p>
-                    <p className="text-[0.68rem] text-slate-500">จัดการเทอม 1 / เทอม 2 และคัดลอกข้อมูล</p>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all" />
-              </Link>
-
-              <Link
-                href="/attendance"
-                className="flex items-center justify-between p-3 rounded-2xl bg-white/75 border border-indigo-100/60 hover:border-emerald-300 hover:bg-emerald-50/30 transition-all duration-200 group shadow-xs"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm font-bold border border-emerald-100">
-                    <CheckCircle2 className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-800 group-hover:text-emerald-700 transition-colors">ระบบเช็คชื่อ</p>
-                    <p className="text-[0.68rem] text-slate-500">บันทึกเวลาเรียน ขาด ลา มา สาย</p>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all" />
-              </Link>
-
-              <Link
-                href="/scores"
-                className="flex items-center justify-between p-3 rounded-2xl bg-white/75 border border-indigo-100/60 hover:border-indigo-300 hover:bg-indigo-50/30 transition-all duration-200 group shadow-xs"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100">
-                    <CheckSquare className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-800 group-hover:text-indigo-700 transition-colors">คะแนนเก็บรายสัปดาห์</p>
-                    <p className="text-[0.68rem] text-slate-500">บันทึกคะแนนเก็บและแบบทดสอบ</p>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all" />
-              </Link>
-
-              <Link
-                href="/affective"
-                className="flex items-center justify-between p-3 rounded-2xl bg-white/75 border border-indigo-100/60 hover:border-amber-300 hover:bg-amber-50/30 transition-all duration-200 group shadow-xs"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-100">
-                    <Smile className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-800 group-hover:text-amber-700 transition-colors">คะแนนจิตพิสัย</p>
-                    <p className="text-[0.68rem] text-slate-500">ประเมินพฤติกรรมและการมีส่วนร่วม</p>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-amber-600 group-hover:translate-x-1 transition-all" />
-              </Link>
-
-              <Link
-                href="/grades"
-                className="flex items-center justify-between p-3 rounded-2xl bg-white/75 border border-indigo-100/60 hover:border-purple-300 hover:bg-purple-50/30 transition-all duration-200 group shadow-xs"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-100">
-                    <Award className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-800 group-hover:text-purple-700 transition-colors">ตัดเกรด & ประเมินผล</p>
-                    <p className="text-[0.68rem] text-slate-500">คำนวณเกรดเฉลี่ยและส่งออกรายงาน</p>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-purple-600 group-hover:translate-x-1 transition-all" />
-              </Link>
+          <Link
+            href="/attendance"
+            className="flex items-center justify-between p-3.5 rounded-2xl bg-white/75 border border-indigo-100/60 hover:border-emerald-300 hover:bg-emerald-50/30 transition-all duration-200 group shadow-xs"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm font-bold border border-emerald-100 shrink-0">
+                <CheckCircle2 className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-slate-800 group-hover:text-emerald-700 transition-colors truncate">ระบบเช็คชื่อ</p>
+                <p className="text-[0.68rem] text-slate-500 truncate">บันทึกเวลาเรียน ขาด ลา มา สาย</p>
+              </div>
             </div>
-          </div>
+            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
+          </Link>
 
-          <div className="mt-5 p-3.5 rounded-2xl bg-gradient-to-r from-indigo-50/80 to-purple-50/80 border border-indigo-100/70 text-center">
-            <p className="text-[0.72rem] text-slate-600 font-medium">ต้องการความช่วยเหลือหรือคำแนะนำ?</p>
-            <p className="text-[0.68rem] text-indigo-600 font-bold mt-0.5">ระบบบันทึกและซิงค์ข้อมูลให้โดยอัตโนมัติ</p>
-          </div>
+          <Link
+            href="/scores"
+            className="flex items-center justify-between p-3.5 rounded-2xl bg-white/75 border border-indigo-100/60 hover:border-indigo-300 hover:bg-indigo-50/30 transition-all duration-200 group shadow-xs"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100 shrink-0">
+                <CheckSquare className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-slate-800 group-hover:text-indigo-700 transition-colors truncate">คะแนนเก็บรายสัปดาห์</p>
+                <p className="text-[0.68rem] text-slate-500 truncate">บันทึกคะแนนเก็บและแบบทดสอบ</p>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
+          </Link>
+
+          <Link
+            href="/affective"
+            className="flex items-center justify-between p-3.5 rounded-2xl bg-white/75 border border-indigo-100/60 hover:border-amber-300 hover:bg-amber-50/30 transition-all duration-200 group shadow-xs"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-100 shrink-0">
+                <Smile className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-slate-800 group-hover:text-amber-700 transition-colors truncate">คะแนนจิตพิสัย</p>
+                <p className="text-[0.68rem] text-slate-500 truncate">ประเมินพฤติกรรมและการมีส่วนร่วม</p>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-amber-600 group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
+          </Link>
+
+          <Link
+            href="/grades"
+            className="flex items-center justify-between p-3.5 rounded-2xl bg-white/75 border border-indigo-100/60 hover:border-purple-300 hover:bg-purple-50/30 transition-all duration-200 group shadow-xs"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-100 shrink-0">
+                <Award className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-slate-800 group-hover:text-purple-700 transition-colors truncate">ตัดเกรด & ประเมินผล</p>
+                <p className="text-[0.68rem] text-slate-500 truncate">คำนวณเกรดเฉลี่ยและส่งออกรายงาน</p>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-purple-600 group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
+          </Link>
         </div>
       </section>
     </div>
@@ -1328,40 +1223,19 @@ function DashboardSkeleton() {
         </div>
       </div>
 
-      {/* 5. Upcoming Schedules & Quick Actions Skeleton (3 Columns) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Col 1-2: Upcoming */}
-        <div className="lg:col-span-2 glass p-6 sm:p-7 rounded-3xl min-h-[260px]">
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-3">
-              <div className="skeleton w-10 h-10 rounded-2xl" />
-              <div className="space-y-1.5">
-                <div className="skeleton h-5 w-40 rounded-lg" />
-                <div className="skeleton h-3 w-48 rounded" />
-              </div>
-            </div>
-            <div className="skeleton h-4 w-20 rounded" />
-          </div>
-          <div className="space-y-3">
-            <div className="skeleton h-16 w-full rounded-2xl" />
-            <div className="skeleton h-16 w-full rounded-2xl" />
+      {/* 5. Quick Actions Skeleton */}
+      <div className="glass p-6 sm:p-7 rounded-3xl min-h-[140px]">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="skeleton w-10 h-10 rounded-2xl" />
+          <div className="space-y-1.5">
+            <div className="skeleton h-5 w-28 rounded-lg" />
+            <div className="skeleton h-3 w-36 rounded" />
           </div>
         </div>
-
-        {/* Col 3: Quick shortcuts */}
-        <div className="glass p-6 sm:p-7 rounded-3xl min-h-[260px] flex flex-col justify-between">
-          <div className="flex items-center gap-3 mb-5">
-            <div className="skeleton w-10 h-10 rounded-2xl" />
-            <div className="space-y-1.5">
-              <div className="skeleton h-5 w-28 rounded-lg" />
-              <div className="skeleton h-3 w-36 rounded" />
-            </div>
-          </div>
-          <div className="space-y-2.5">
-            <div className="skeleton h-12 w-full rounded-2xl" />
-            <div className="skeleton h-12 w-full rounded-2xl" />
-            <div className="skeleton h-12 w-full rounded-2xl" />
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="skeleton h-16 w-full rounded-2xl" />
+          ))}
         </div>
       </div>
     </div>

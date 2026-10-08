@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import prisma from '@/lib/prisma';
 import { ResetPasswordSchema, validateRequestBody } from '@/lib/validation';
 import { protectRequest, authLimiter } from '@/lib/arcjet';
+import { verifyOtp } from '@/lib/email';
 
 export async function POST(request: NextRequest) {
   try {
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (user.resetPasswordToken !== code.trim()) {
+    if (!verifyOtp(code, user.resetPasswordToken)) {
       const newAttempts = currentAttempts + 1;
       if (newAttempts >= MAX_OTP_ATTEMPTS) {
         await prisma.user.update({

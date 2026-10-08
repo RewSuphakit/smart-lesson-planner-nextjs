@@ -30,24 +30,33 @@ function isValidJwt(token: string): boolean {
     if (parts.length !== 3) return false;
     const [headerB64, payloadB64, signatureB64] = parts;
 
-    // 1. Verify expiration
+    // 1. Fail-closed: Secret must be set
+    const secret = process.env.JWT_SECRET;
+    if (!secret || typeof secret !== 'string' || !secret.trim()) {
+      return false;
+    }
+
+    // 2. Verify algorithm (only HS256 allowed)
+    const header = JSON.parse(Buffer.from(headerB64, 'base64url').toString('utf-8'));
+    if (!header || typeof header !== 'object' || header.alg !== 'HS256') {
+      return false;
+    }
+
+    // 3. Verify expiration
     const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf-8'));
     if (!payload || typeof payload !== 'object') return false;
     if (payload.exp && Date.now() >= payload.exp * 1000) return false;
 
-    // 2. Cryptographically verify signature if secret is present
-    const secret = process.env.JWT_SECRET;
-    if (secret) {
-      const expectedSignature = crypto
-        .createHmac('sha256', secret)
-        .update(`${headerB64}.${payloadB64}`)
-        .digest('base64url');
+    // 4. Cryptographically verify signature
+    const expectedSignature = crypto
+      .createHmac('sha256', secret)
+      .update(`${headerB64}.${payloadB64}`)
+      .digest('base64url');
 
-      const sigBuffer = Buffer.from(signatureB64);
-      const expectedBuffer = Buffer.from(expectedSignature);
-      if (sigBuffer.length !== expectedBuffer.length) return false;
-      if (!crypto.timingSafeEqual(sigBuffer, expectedBuffer)) return false;
-    }
+    const sigBuffer = Buffer.from(signatureB64);
+    const expectedBuffer = Buffer.from(expectedSignature);
+    if (sigBuffer.length !== expectedBuffer.length) return false;
+    if (!crypto.timingSafeEqual(sigBuffer, expectedBuffer)) return false;
 
     return true;
   } catch {

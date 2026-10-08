@@ -11,6 +11,32 @@ export function generateOtpCode(): string {
 }
 
 /**
+ * Hash OTP or reset code using SHA-256 for secure storage at rest.
+ */
+export function hashOtp(code: string): string {
+  return crypto.createHash('sha256').update(code.trim()).digest('hex');
+}
+
+/**
+ * Verify input OTP against stored hash (or legacy plaintext) using timing-safe comparison.
+ */
+export function verifyOtp(inputCode: string, storedHashOrPlain: string | null | undefined): boolean {
+  if (!storedHashOrPlain || !inputCode) return false;
+  const cleanInput = inputCode.trim();
+
+  // Backward compatibility: If stored value is short (<= 10 chars), it's legacy plain text
+  if (storedHashOrPlain.length <= 10) {
+    return cleanInput === storedHashOrPlain;
+  }
+
+  const inputHash = hashOtp(cleanInput);
+  const inputBuffer = Buffer.from(inputHash, 'hex');
+  const storedBuffer = Buffer.from(storedHashOrPlain, 'hex');
+  if (inputBuffer.length !== storedBuffer.length) return false;
+  return crypto.timingSafeEqual(inputBuffer, storedBuffer);
+}
+
+/**
  * Create Nodemailer transporter based on environment variables.
  */
 function getTransporter() {

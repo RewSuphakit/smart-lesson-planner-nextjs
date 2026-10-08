@@ -71,6 +71,18 @@ export async function GET(request: NextRequest) {
       post_test_score: score.postTestScore !== null ? Number(score.postTestScore) : null,
     }));
 
+    // Build O(1) lookup maps to eliminate O(N*M) nested iterations
+    const classroomMap = new Map(classrooms.map((c) => [c.id, c]));
+    const attendanceByStudent = new Map<number, typeof attendance>();
+    for (const a of attendance) {
+      let list = attendanceByStudent.get(a.studentId);
+      if (!list) {
+        list = [];
+        attendanceByStudent.set(a.studentId, list);
+      }
+      list.push(a);
+    }
+
     // Format data for export
     const exportData = {
       classrooms: classrooms.map(c => ({
@@ -90,13 +102,14 @@ export async function GET(request: NextRequest) {
       })),
       students: students.map(s => {
         const cId = s.classroomId || s.classroom?.id;
-        const studentAttendance = attendance.filter(a => a.studentId === s.id && (cId ? a.classroomId === cId : true));
+        const studentAttendance = attendanceByStudent.get(s.id) || [];
         let absentCount = 0, lateCount = 0;
         for (const a of studentAttendance) {
+          if (cId && a.classroomId !== cId) continue;
           if (a.status === 'absent') absentCount++;
           else if (a.status === 'late') lateCount++;
         }
-        const classroom = classrooms.find(c => c.id === cId);
+        const classroom = cId ? classroomMap.get(cId) : undefined;
         const weightAffective = classroom?.affectiveWeight !== null && classroom?.affectiveWeight !== undefined ? Number(classroom.affectiveWeight) : 20;
         const finalAffectiveScore = calculateAffectiveScore({
           baseScore: s.affectiveScore !== null && s.affectiveScore !== undefined ? Number(s.affectiveScore) : null,

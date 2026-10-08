@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import prisma from '@/lib/prisma';
 import { RegisterSchema, validateRequestBody } from '@/lib/validation';
-import { generateOtpCode, sendVerificationEmail } from '@/lib/email';
+import { generateOtpCode, sendVerificationEmail, hashOtp } from '@/lib/email';
 import { protectRequest, authLimiter } from '@/lib/arcjet';
 import { verifyTurnstileToken } from '@/lib/turnstile';
 
@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
 
     const hashedPassword = await bcrypt.hash(password, 12);
     const otpCode = generateOtpCode();
+    const hashedOtp = hashOtp(otpCode);
     const expiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes validity
 
     if (existing && !existing.emailVerified) {
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
         data: {
           name,
           password: hashedPassword,
-          verificationCode: otpCode,
+          verificationCode: hashedOtp,
           verificationCodeExpiry: expiry,
           verificationAttempts: 0,
         },
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
           name,
           role: 'teacher',
           emailVerified: false,
-          verificationCode: otpCode,
+          verificationCode: hashedOtp,
           verificationCodeExpiry: expiry,
           verificationAttempts: 0,
         },

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { generateOtpCode, sendVerificationEmail } from '@/lib/email';
+import { generateOtpCode, sendVerificationEmail, hashOtp } from '@/lib/email';
 import { protectRequest, authLimiter } from '@/lib/arcjet';
 
 export async function POST(request: NextRequest) {
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     await prisma.user.update({
       where: { id: user.id },
       data: {
-        verificationCode: newCode,
+        verificationCode: hashOtp(newCode),
         verificationCodeExpiry: expiry,
         verificationAttempts: 0,
       },

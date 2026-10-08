@@ -148,28 +148,82 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ message: 'Some students not found or unauthorized' }, { status: 403 });
       }
 
-      const attendanceOperations = records.map(record =>
-        prisma.attendance.upsert({
-          where: {
-            studentId_classroomId_date: {
-              studentId: record.student_id,
-              classroomId: record.classroom_id,
-              date: new Date(record.date),
-            },
-          },
-          update: { status: record.status },
-          create: {
-            studentId: record.student_id,
-            classroomId: record.classroom_id,
-            date: new Date(record.date),
-            status: record.status,
-          },
-        })
-      );
-
-      if (attendanceOperations.length > 0) {
-        await prisma.$transaction(attendanceOperations);
+      // Deduplicate incoming records by (student_id, classroom_id, date)
+      const dedupedMap = new Map<string, { studentId: number; classroomId: number; date: Date; status: (typeof records)[0]['status'] }>();
+      for (const r of records) {
+        const parsedDate = new Date(r.date);
+        const dateIso = parsedDate.toISOString().split('T')[0];
+        const key = `${r.student_id}_${r.classroom_id}_${dateIso}`;
+        dedupedMap.set(key, {
+          studentId: r.student_id,
+          classroomId: r.classroom_id,
+          date: parsedDate,
+          status: r.status,
+        });
       }
+      const dedupedList = Array.from(dedupedMap.values());
+
+      // Query existing records in a single batch query
+      const existingAttendance = await prisma.attendance.findMany({
+        where: {
+          classroomId: { in: classroomIds },
+          studentId: { in: studentIds },
+          date: { in: Array.from(new Set(dedupedList.map(r => r.date))) },
+        },
+        select: { id: true, studentId: true, classroomId: true, date: true, status: true },
+      });
+
+      const existingMap = new Map<string, { id: number; status: string }>();
+      for (const ea of existingAttendance) {
+        const key = `${ea.studentId}_${ea.classroomId}_${ea.date.toISOString().split('T')[0]}`;
+        existingMap.set(key, { id: ea.id, status: ea.status });
+      }
+
+      const creates: Array<{ studentId: number; classroomId: number; date: Date; status: (typeof records)[0]['status'] }> = [];
+      const updates: Array<{ id: number; status: (typeof records)[0]['status'] }> = [];
+
+      for (const item of dedupedList) {
+        const key = `${item.studentId}_${item.classroomId}_${item.date.toISOString().split('T')[0]}`;
+        const existing = existingMap.get(key);
+        if (existing) {
+          // Only update if status has actually changed to save DB writes
+          if (existing.status !== item.status) {
+            updates.push({ id: existing.id, status: item.status });
+          }
+        } else {
+          creates.push({
+            studentId: item.studentId,
+            classroomId: item.classroomId,
+            date: item.date,
+            status: item.status,
+          });
+        }
+      }
+
+      if (creates.length > 0 || updates.length > 0) {
+        await prisma.$transaction(async (tx) => {
+          if (creates.length > 0) {
+            await tx.attendance.createMany({
+              data: creates,
+              skipDuplicates: true,
+            });
+          }
+
+          const BATCH_SIZE = 25;
+          for (let i = 0; i < updates.length; i += BATCH_SIZE) {
+            const batch = updates.slice(i, i + BATCH_SIZE);
+            await Promise.all(
+              batch.map((upd) =>
+                tx.attendance.update({
+                  where: { id: upd.id },
+                  data: { status: upd.status },
+                })
+              )
+            );
+          }
+        });
+      }
+
       invalidateCache(userCacheKey(user.id, 'dashboard'));
       return NextResponse.json({ message: 'Attendance marked' });
     }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { generateOtpCode, sendEmailChangeOtpEmail } from '@/lib/email';
+import { generateOtpCode, sendEmailChangeOtpEmail, hashOtp } from '@/lib/email';
 import { protectRequest, authLimiter } from '@/lib/arcjet';
 
 export async function POST(request: NextRequest) {
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
       where: { id: user.id },
       data: {
         pendingEmail: cleanNew,
-        verificationCode: otp,
+        verificationCode: hashOtp(otp),
         verificationCodeExpiry: expiry,
         verificationAttempts: 0,
       },

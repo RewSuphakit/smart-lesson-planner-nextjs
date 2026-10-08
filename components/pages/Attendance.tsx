@@ -8,7 +8,7 @@ import {
   Loader2, Users, Save, Calendar as CalendarIcon, CheckCircle, Clock, XCircle,
   FileText, AlertCircle, X, History, Trash2, ChevronLeft, ChevronRight,
   Search, Check, Grid, List, RefreshCw, Sparkles, RotateCcw,
-  FileSpreadsheet, Upload, BookOpen, GraduationCap, ArrowRight
+  FileSpreadsheet, Upload, BookOpen, GraduationCap, ArrowRight, ClipboardCheck
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import dynamic from 'next/dynamic';
@@ -1383,17 +1383,27 @@ export default function Attendance() {
   );
 
   return (
-    <div className="animate-fade-in-up">
+    <div className="space-y-6 animate-fade-in-up">
       {/* Page Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2.5">
+            <span className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100/80 text-indigo-600 flex items-center justify-center shadow-xs">
+              <ClipboardCheck className="w-5 h-5 text-indigo-600" />
+            </span>
+            <span>เช็คชื่อเข้าเรียน</span>
+          </h1>
+          <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
+            บันทึกเวลาเรียนรายวัน ติดตามสถิติการมาเรียน และสรุปรายงานประวัติการเข้าชั้นเรียน
+          </p>
+        </div>
 
         {/* Global Action Tools */}
         {selectedClass && students.length > 0 && (
-          <div className="flex items-center gap-2 w-full md:w-auto">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => { setExportStartDate(''); setExportEndDate(''); setShowExportModal(true); }}
-              className="flex-1 md:flex-none px-4 py-2.5 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700 border border-emerald-200/50 font-semibold transition-all duration-200 flex items-center justify-center gap-2"
+              className="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/70 font-bold text-xs transition-all flex items-center gap-1.5 shadow-2xs hover:shadow-xs cursor-pointer"
               title="พรีวิวและส่งออกข้อมูลการเช็คชื่อเป็น CSV / Excel"
             >
               <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
@@ -1402,68 +1412,60 @@ export default function Attendance() {
 
             <button
               onClick={() => setShowImportModal(true)}
-              className="flex-1 md:flex-none px-4 py-2.5 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200/60 font-bold transition-all duration-200 flex items-center justify-center gap-2 shadow-xs"
+              className="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/70 font-bold text-xs transition-all flex items-center gap-1.5 shadow-2xs hover:shadow-xs cursor-pointer"
               title="นำเข้าข้อมูลการเช็คชื่อจากไฟล์ Excel พร้อมดูตัวอย่างรูปแบบและดาวน์โหลดเทมเพลต"
             >
               <Upload className="w-4 h-4 text-indigo-600" />
               <span>นำเข้าจาก Excel & ตัวอย่างไฟล์</span>
             </button>
-
-            <button
-              onClick={handleClearData}
-              disabled={saving}
-              className="flex-1 md:flex-none px-4 py-2.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 border border-red-200/60 font-bold transition-all duration-200 flex items-center justify-center gap-2 shadow-sm"
-              title="ลบข้อมูลการเช็คชื่อทั้งห้องสำหรับวันที่เลือกอยู่"
-            >
-              <Trash2 className="w-4 h-4 text-red-500" />
-              <span>ลบข้อมูลวันที่เลือก ({new Date(date).getDate()} {THAI_MONTHS_SHORT[new Date(date).getMonth()]})</span>
-            </button>
           </div>
         )}
       </div>
 
-
       {/* Active Classroom Bar (เมื่อเลือกห้องแล้ว) */}
       {selectedClass && selectedClassData && activeParsed && (
-        <div className="glass p-4 sm:p-5 rounded-2xl flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between border border-white/40 shadow-xl shadow-indigo-100/20">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/25 shrink-0">
-              <GraduationCap className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {activeParsed.code && (
-                  <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200/70">
-                    {activeParsed.code}
-                  </span>
-                )}
-                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${activeParsed.curriculumType === 'pvs'
-                  ? 'bg-purple-50 text-purple-700 border-purple-200'
-                  : 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                  }`}>
-                  {activeParsed.curriculumType === 'pvs' ? 'ปวส.' : 'ปวช.'}
-                </span>
-                {activeParsed.groupName && (
-                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200/70">
-                    {activeParsed.groupName}
-                  </span>
-                )}
-                <span className="text-xs font-medium text-slate-500 ml-1">
-                  (👥 {selectedClassData.student_count || students.length || 0} คน)
-                </span>
+        <div className="glass p-5 sm:p-6 rounded-3xl border border-white/60 shadow-xl shadow-indigo-100/30 space-y-4 backdrop-blur-xl">
+          {/* Top Row: Course Info & Quick Switcher */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/25 shrink-0">
+                <GraduationCap className="w-6 h-6" />
               </div>
-              <h2 className="text-base sm:text-lg font-extrabold text-slate-800 leading-tight mt-1">
-                {activeParsed.subjectTitle}
-              </h2>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {activeParsed.code && (
+                    <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-lg bg-slate-100/90 text-slate-700 border border-slate-200/80 shadow-2xs">
+                      {activeParsed.code}
+                    </span>
+                  )}
+                  <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border shadow-2xs ${activeParsed.curriculumType === 'pvs'
+                    ? 'bg-purple-50 text-purple-700 border-purple-200'
+                    : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                    }`}>
+                    {activeParsed.curriculumType === 'pvs' ? 'ปวส.' : 'ปวช.'}
+                  </span>
+                  {activeParsed.groupName && (
+                    <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-800 border border-amber-200/80 shadow-2xs">
+                      {activeParsed.groupName}
+                    </span>
+                  )}
+                  <span className="text-xs font-semibold text-slate-500 ml-1">
+                    (👥 {selectedClassData.student_count || students.length || 0} คน)
+                  </span>
+                </div>
+                <h2 className="text-base sm:text-xl font-black text-slate-800 leading-tight mt-1 truncate" title={activeParsed.subjectTitle}>
+                  {activeParsed.subjectTitle}
+                </h2>
+              </div>
             </div>
 
             {/* Quick Switch / เปลี่ยนห้อง */}
-            <div className="flex items-center gap-1.5 sm:ml-2">
+            <div className="flex items-center gap-2 shrink-0">
               <div className="relative">
                 <select
                   value={selectedClass}
                   onChange={e => setSelectedClass(e.target.value)}
-                  className="form-input text-xs font-bold py-1.5 pl-2.5 pr-7 bg-white hover:bg-slate-50 border-slate-200 rounded-xl focus:border-indigo-400 focus:ring focus:ring-indigo-200/50 transition-all text-slate-700 cursor-pointer shadow-xs"
+                  className="form-input text-xs font-bold py-2 pl-3 pr-8 bg-white/90 hover:bg-white border-slate-200 rounded-xl focus:border-indigo-400 focus:ring focus:ring-indigo-200/50 transition-all text-slate-700 cursor-pointer shadow-xs max-w-[200px] sm:max-w-[260px] truncate"
                   title="สลับห้องเรียนเร็ว"
                 >
                   {classrooms.map(c => (
@@ -1476,7 +1478,7 @@ export default function Attendance() {
               <button
                 type="button"
                 onClick={() => setSelectedClass('')}
-                className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/60 transition-all shadow-xs cursor-pointer"
+                className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/70 transition-all shadow-xs cursor-pointer shrink-0"
                 title="ย้อนกลับไปดูการ์ดห้องเรียนทั้งหมด"
               >
                 <Grid className="w-3.5 h-3.5 text-indigo-600" />
@@ -1485,37 +1487,52 @@ export default function Attendance() {
             </div>
           </div>
 
-          {/* Right side: Attendance threshold info + Tab switchers */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-gradient-to-r from-indigo-50/80 to-purple-50/60 border border-indigo-100/80 text-indigo-900 text-xs font-semibold">
-              <AlertCircle className="w-4 h-4 text-indigo-600 shrink-0" />
-              <div className="leading-tight">
-                <div>เวลาเรียนขั้นต่ำ: <strong className="font-black text-indigo-950">{selectedClassData.min_attendance_percent || 80}%</strong></div>
-                <div className="text-[11px] text-slate-600 font-medium">ขาดได้ไม่เกิน: <strong className="font-black text-rose-600">{maxAllowedAbsences} คาบ</strong> / {selectedClassData.total_classes || 40} คาบ</div>
-              </div>
-            </div>
+          {/* Divider */}
+          <div className="border-t border-slate-100/80" />
 
-            <div className="flex bg-slate-100/80 p-1.5 rounded-xl border border-slate-200/50 shrink-0">
+          {/* Bottom Row: Tab Switcher & Attendance Threshold Badge */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-0.5">
+            {/* View Mode Tabs */}
+            <div className="flex bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200/60 shrink-0">
               <button
                 onClick={() => setActiveTab('daily')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all duration-200 ${activeTab === 'daily'
-                  ? 'bg-white text-indigo-600 shadow-md'
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${activeTab === 'daily'
+                  ? 'bg-white text-indigo-600 shadow-sm'
                   : 'text-slate-600 hover:text-indigo-600'
                   }`}
               >
                 <List className="w-4 h-4" />
-                เช็คชื่อประจำวัน
+                <span>เช็คชื่อประจำวัน</span>
               </button>
               <button
                 onClick={() => setActiveTab('matrix')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all duration-200 ${activeTab === 'matrix'
-                  ? 'bg-white text-indigo-600 shadow-md'
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${activeTab === 'matrix'
+                  ? 'bg-white text-indigo-600 shadow-sm'
                   : 'text-slate-600 hover:text-indigo-600'
                   }`}
               >
                 <Grid className="w-4 h-4" />
-                ตารางประวัติย้อนหลัง
+                <span>ตารางประวัติย้อนหลัง</span>
               </button>
+            </div>
+
+            {/* Attendance Threshold Info Pill */}
+            <div className="flex items-center gap-3 px-4 py-2 rounded-2xl bg-gradient-to-r from-indigo-50/90 via-purple-50/60 to-indigo-50/90 border border-indigo-100/90 text-indigo-950 text-xs font-medium shrink-0 shadow-2xs">
+              <div className="w-7 h-7 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                <AlertCircle className="w-4 h-4" />
+              </div>
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="leading-tight">
+                  <span className="text-slate-500 text-[11px]">เวลาเรียนขั้นต่ำ: </span>
+                  <strong className="font-black text-indigo-900">{selectedClassData.min_attendance_percent || 80}%</strong>
+                </div>
+                <span className="text-slate-300 hidden sm:inline">|</span>
+                <div className="leading-tight">
+                  <span className="text-slate-500 text-[11px]">ขาดได้ไม่เกิน: </span>
+                  <strong className="font-black text-rose-600">{maxAllowedAbsences} คาบ</strong>
+                  <span className="text-slate-500 text-[11px] font-normal"> / {selectedClassData.total_classes || 40} คาบ</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1795,7 +1812,7 @@ export default function Attendance() {
                   <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-end">
                     <button
                       onClick={setToday}
-                      className={`px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-xl border transition-all ${isToday
+                      className={`px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-xl border transition-all cursor-pointer ${isToday
                         ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
                         : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                         }`}
@@ -1804,7 +1821,7 @@ export default function Attendance() {
                     </button>
                     <button
                       onClick={setYesterday}
-                      className="px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-xl bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition-all"
+                      className="px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-xl bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition-all cursor-pointer"
                     >
                       เมื่อวาน
                     </button>
@@ -1813,11 +1830,24 @@ export default function Attendance() {
                     <button
                       type="button"
                       onClick={() => setShowRetroactiveModal(true)}
-                      className="px-4 py-2 text-xs sm:text-sm font-bold rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/30 transition-all flex items-center gap-1.5 hover:scale-[1.02] active:scale-[0.98]"
+                      className="px-4 py-2 text-xs sm:text-sm font-bold rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/30 transition-all flex items-center gap-1.5 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
                       title="เปิดหน้าต่างเลือกสัปดาห์หรือวันย้อนหลังเพื่อเช็คชื่อ"
                     >
                       <History className="w-4 h-4" />
                       <span>เช็คชื่อย้อนหลัง</span>
+                    </button>
+
+                    {/* ปุ่มลบข้อมูลวันที่เลือก */}
+                    <button
+                      type="button"
+                      onClick={handleClearData}
+                      disabled={saving}
+                      className="px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-200/70 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      title="ลบข้อมูลการเช็คชื่อทั้งห้องสำหรับวันที่เลือกอยู่"
+                    >
+                      <Trash2 className="w-4 h-4 text-red-500" />
+                      <span className="hidden sm:inline">ลบข้อมูลวันที่เลือก ({new Date(date).getDate()} {THAI_MONTHS_SHORT[new Date(date).getMonth()]})</span>
+                      <span className="sm:hidden">ลบข้อมูล ({new Date(date).getDate()} {THAI_MONTHS_SHORT[new Date(date).getMonth()]})</span>
                     </button>
                   </div>
                 </div>
