@@ -12,7 +12,7 @@ module.exports = {
         foreground: "#334155",
       },
       fontFamily: {
-        sans: ['IBM Plex Sans Thai', 'Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: ['var(--font-sarabun)', 'Sarabun', 'system-ui', '-apple-system', 'sans-serif'],
       },
       animation: {
         'fade-in-up': 'fadeInUp 0.6s ease-out forwards',

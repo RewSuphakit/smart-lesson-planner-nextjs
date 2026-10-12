@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { IBM_Plex_Sans_Thai, Inter } from 'next/font/google';
+import { Sarabun } from 'next/font/google';
 import './globals.css';
 import { Toaster as HotToaster } from 'react-hot-toast';
 import { Toaster as SonnerToaster } from 'sonner';
@@ -9,18 +9,11 @@ import { SemesterProvider } from '@/context/SemesterContext';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 
-const ibmPlexSansThai = IBM_Plex_Sans_Thai({
-  weight: ['300', '400', '500', '600', '700'],
+const sarabun = Sarabun({
+  weight: ['300', '400', '500', '600', '700', '800'],
   subsets: ['thai', 'latin'],
   display: 'swap',
-  variable: '--font-ibm-plex-sans-thai',
-});
-
-const inter = Inter({
-  weight: ['300', '400', '500', '600', '700', '800'],
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-inter',
+  variable: '--font-sarabun',
 });
 
 export const viewport: Viewport = {
@@ -41,7 +34,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="th" className={`h-full antialiased ${ibmPlexSansThai.variable} ${inter.variable}`}>
+    <html lang="th" className={`h-full antialiased ${sarabun.variable}`}>
       <body className="min-h-full flex flex-col">
         <QueryProvider>
           <AuthProvider>

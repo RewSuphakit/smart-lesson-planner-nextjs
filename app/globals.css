@@ -32,7 +32,7 @@ input, button, select, textarea {
 }
 
 body {
-  font-family: var(--font-ibm-plex-sans-thai), var(--font-inter), 'IBM Plex Sans Thai', 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sarabun), 'Sarabun', system-ui, -apple-system, sans-serif;
   background: #f0f4ff;
   min-height: 100vh;
   color: #334155;
