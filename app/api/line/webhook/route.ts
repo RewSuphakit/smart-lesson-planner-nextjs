@@ -33,6 +33,33 @@ import {
   LineEvent,
 } from '@/lib/line';
 
+// GET /api/line/webhook — Health and configuration check for Webhook
+export async function GET() {
+  const hasEnvSecret = !!process.env.LINE_CHANNEL_SECRET;
+  const hasEnvToken = !!process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  const hasEnvId = !!process.env.LINE_CHANNEL_ID;
+  const dbConfigsCount = await prisma.lineChannelConfig.count({ where: { isActive: true } });
+  const totalStudents = await prisma.student.count();
+  const totalBindings = await prisma.lineBinding.count();
+
+  return NextResponse.json({
+    status: 'ready',
+    env: {
+      hasChannelSecret: hasEnvSecret,
+      hasChannelAccessToken: hasEnvToken,
+      hasChannelId: hasEnvId,
+      secretLength: process.env.LINE_CHANNEL_SECRET?.trim().length || 0,
+      tokenLength: process.env.LINE_CHANNEL_ACCESS_TOKEN?.trim().length || 0,
+    },
+    database: {
+      activeConfigsCount: dbConfigsCount,
+      totalStudents,
+      totalBindings,
+    },
+    message: 'Webhook endpoint is running',
+  });
+}
+
 // POST /api/line/webhook
 export async function POST(request: NextRequest) {
   try {
@@ -62,11 +89,59 @@ export async function POST(request: NextRequest) {
       where: { isActive: true },
     });
 
-    let matchedConfig: typeof activeConfigs[0] | null = null;
+    let matchedConfig: { channelSecret: string; channelAccessToken: string; userId: number } | null = null;
     for (const config of activeConfigs) {
       if (verifyLineSignature(rawBody, signature, config.channelSecret)) {
         matchedConfig = config;
         break;
+      }
+    }
+
+    // Fallback: check environment variables from .env
+    const envSecret = process.env.LINE_CHANNEL_SECRET;
+    const envToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    const envChannelId = process.env.LINE_CHANNEL_ID || 'env-default';
+
+    if (!matchedConfig && envSecret && envToken) {
+      if (verifyLineSignature(rawBody, signature, envSecret)) {
+        let teacherUserId = process.env.LINE_USER_ID ? parseInt(process.env.LINE_USER_ID, 10) : 0;
+        if (!teacherUserId) {
+          const defaultUser = await prisma.user.findFirst({
+            orderBy: { id: 'asc' },
+            select: { id: true },
+          });
+          teacherUserId = defaultUser?.id || 1;
+        }
+
+        matchedConfig = {
+          channelSecret: envSecret,
+          channelAccessToken: envToken,
+          userId: teacherUserId,
+        };
+
+        // Auto-save/sync into database
+        try {
+          await prisma.lineChannelConfig.upsert({
+            where: { userId: teacherUserId },
+            update: {
+              channelId: envChannelId,
+              channelSecret: envSecret,
+              channelAccessToken: envToken,
+              isActive: true,
+            },
+            create: {
+              userId: teacherUserId,
+              channelId: envChannelId,
+              channelSecret: envSecret,
+              channelAccessToken: envToken,
+              isActive: true,
+            },
+          });
+        } catch (dbErr) {
+          console.warn('Auto-save env LINE config warning:', dbErr);
+        }
+      } else {
+        console.warn('LINE webhook: signature does not match LINE_CHANNEL_SECRET in .env');
       }
     }
 
@@ -79,6 +154,7 @@ export async function POST(request: NextRequest) {
 
     // 4. Process events
     for (const event of body.events) {
+      console.log(`[LINE Webhook] Processing event: ${event.type}, text: ${event.message?.text || event.postback?.data || ''}`);
       await processEvent(event, accessToken, matchedConfig.userId);
     }
 
@@ -201,13 +277,23 @@ async function handlePostback(
     }
 
     // Verify the classroom belongs to this teacher and student is in it
-    const student = await prisma.student.findFirst({
+    let student = await prisma.student.findFirst({
       where: {
         studentCode: binding.studentCode,
         classroomId: classroomId,
-        userId: teacherUserId,
+        ...(teacherUserId ? { userId: teacherUserId } : {}),
       },
     });
+
+    if (!student) {
+      // Fallback search across all teachers
+      student = await prisma.student.findFirst({
+        where: {
+          studentCode: binding.studentCode,
+          classroomId: classroomId,
+        },
+      });
+    }
 
     if (!student) {
       await replyMessage(event.replyToken!, [
@@ -242,16 +328,29 @@ async function handleBind(
   teacherUserId: number
 ) {
   // Check if student code exists under this teacher
-  const students = await prisma.student.findMany({
+  let students = await prisma.student.findMany({
     where: {
       studentCode,
-      userId: teacherUserId,
+      ...(teacherUserId ? { userId: teacherUserId } : {}),
       classroomId: { not: null },
     },
     include: {
       classroom: { select: { id: true, name: true } },
     },
   });
+
+  // If not found with teacherUserId filter, search across all teachers as fallback
+  if (students.length === 0) {
+    students = await prisma.student.findMany({
+      where: {
+        studentCode,
+        classroomId: { not: null },
+      },
+      include: {
+        classroom: { select: { id: true, name: true } },
+      },
+    });
+  }
 
   if (students.length === 0) {
     await replyMessage(replyToken, [
@@ -347,16 +446,28 @@ async function handleSwitchClassroom(
     return;
   }
 
-  const students = await prisma.student.findMany({
+  let students = await prisma.student.findMany({
     where: {
       studentCode: binding.studentCode,
-      userId: teacherUserId,
+      ...(teacherUserId ? { userId: teacherUserId } : {}),
       classroomId: { not: null },
     },
     include: {
       classroom: { select: { id: true, name: true } },
     },
   });
+
+  if (students.length === 0) {
+    students = await prisma.student.findMany({
+      where: {
+        studentCode: binding.studentCode,
+        classroomId: { not: null },
+      },
+      include: {
+        classroom: { select: { id: true, name: true } },
+      },
+    });
+  }
 
   if (students.length <= 1) {
     await replyMessage(replyToken, [
@@ -624,16 +735,29 @@ async function resolveStudentContext(lineUserId: string, teacherUserId: number) 
   }
 
   // Find all classrooms for this student under this teacher
-  const students = await prisma.student.findMany({
+  let students = await prisma.student.findMany({
     where: {
       studentCode: binding.studentCode,
-      userId: teacherUserId,
+      ...(teacherUserId ? { userId: teacherUserId } : {}),
       classroomId: { not: null },
     },
     include: {
       classroom: true,
     },
   });
+
+  if (students.length === 0) {
+    // Fallback search across teachers
+    students = await prisma.student.findMany({
+      where: {
+        studentCode: binding.studentCode,
+        classroomId: { not: null },
+      },
+      include: {
+        classroom: true,
+      },
+    });
+  }
 
   if (students.length === 0) {
     return {

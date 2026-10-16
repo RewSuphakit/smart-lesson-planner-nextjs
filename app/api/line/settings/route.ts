@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
   try {
     const user = requireAuth(request);
 
-    const config = await prisma.lineChannelConfig.findUnique({
+    let config = await prisma.lineChannelConfig.findUnique({
       where: { userId: user.id },
       select: {
         id: true,
@@ -29,12 +29,22 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    if (!config) {
+    const isEnvConfigured = !!(process.env.LINE_CHANNEL_SECRET && process.env.LINE_CHANNEL_ACCESS_TOKEN);
+
+    if (!config && !isEnvConfigured) {
       return NextResponse.json({
         data: null,
         message: 'ยังไม่ได้ตั้งค่า LINE Bot',
       });
     }
+
+    const effectiveConfig = config || {
+      id: 0,
+      channelId: process.env.LINE_CHANNEL_ID || 'env-configured',
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
 
     // Get binding count for this teacher's students
     const bindingCount = await prisma.lineBinding.count({
@@ -57,11 +67,12 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       data: {
-        ...config,
-        channelSecret: config ? '••••••••' : null,
-        channelAccessToken: config ? '••••••••' : null,
+        ...effectiveConfig,
+        channelSecret: '••••••••',
+        channelAccessToken: '••••••••',
         bindingCount,
         webhookUrl,
+        source: config ? 'database' : 'env',
       },
     });
   } catch (error) {

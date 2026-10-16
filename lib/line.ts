@@ -55,11 +55,13 @@ export function verifyLineSignature(
   signature: string,
   channelSecret: string
 ): boolean {
+  if (!body || !signature || !channelSecret) return false;
+  const cleanSecret = channelSecret.trim().replace(/^["']|["']$/g, '');
   const hash = crypto
-    .createHmac('SHA256', channelSecret)
+    .createHmac('SHA256', cleanSecret)
     .update(body)
     .digest('base64');
-  return hash === signature;
+  return hash === signature.trim();
 }
 
 // ==================== Reply / Push Messages ====================
@@ -69,11 +71,12 @@ export async function replyMessage(
   messages: Record<string, unknown>[],
   channelAccessToken: string
 ): Promise<void> {
+  const cleanToken = channelAccessToken.trim().replace(/^["']|["']$/g, '');
   const response = await fetch('https://api.line.me/v2/bot/message/reply', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${channelAccessToken}`,
+      Authorization: `Bearer ${cleanToken}`,
     },
     body: JSON.stringify({ replyToken, messages }),
   });
