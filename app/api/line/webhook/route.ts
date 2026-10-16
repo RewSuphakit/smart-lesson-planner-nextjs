@@ -218,8 +218,10 @@ async function handleTextMessage(
     return;
   }
 
-  // --- Unbind: "ยกเลิก" ---
-  if (['ยกเลิก', 'unbind', 'unlink', 'ยกเลิกผูก'].includes(lowerText)) {
+  // --- Unbind / ลบการผูก: "ยกเลิก" / "ลบ" / "ลบการผูก" / "ปลดผูก" ---
+  const isUnbind =
+    /^(?:ยกเลิก|ลบ|ปลด|unbind|unlink|delete|remove|reset|รีเซ็ต|รีเซต)(?:\s*(?:การผูก|ผูก|บัญชี|เชื่อมต่อ)?(?:\s+\S+)?)?$/i.test(text);
+  if (isUnbind) {
     await handleUnbind(replyToken, lineUserId, accessToken);
     return;
   }
@@ -414,17 +416,35 @@ async function handleBind(
 }
 
 async function handleUnbind(replyToken: string, lineUserId: string, accessToken: string) {
+  // Find current binding to show student name in response
+  const existing = await prisma.lineBinding.findFirst({
+    where: { lineUserId },
+  });
+
+  let studentName = '';
+  if (existing?.studentCode) {
+    const student = await prisma.student.findFirst({
+      where: { studentCode: existing.studentCode },
+      select: { name: true },
+    });
+    studentName = student?.name || '';
+  }
+
   const deleted = await prisma.lineBinding.deleteMany({
     where: { lineUserId },
   });
 
   if (deleted.count === 0) {
     await replyMessage(replyToken, [
-      textMessage('ℹ️ ไม่มีบัญชีที่ผูกอยู่'),
+      textMessage('ℹ️ ไม่พบบัญชีที่ผูกอยู่กับ LINE นี้\n\nพิมพ์ "ผูก <รหัสนักเรียน>" เพื่อเริ่มต้นใช้งาน'),
     ], accessToken);
   } else {
+    const infoText = studentName ? `\n👤 ${studentName} (รหัส ${existing?.studentCode})` : (existing?.studentCode ? ` (รหัส ${existing.studentCode})` : '');
     await replyMessage(replyToken, [
-      textMessage('✅ ยกเลิกผูกบัญชีเรียบร้อย\nพิมพ์ "ผูก <รหัสนักเรียน>" เพื่อผูกบัญชีใหม่'),
+      textMessage(
+        `✅ ลบการผูกบัญชีเรียบร้อยแล้ว${infoText}\n\n` +
+        `คุณสามารถพิมพ์ "ผูก <รหัสนักเรียน>" เพื่อผูกบัญชีใหม่ได้ตลอดเวลา`
+      ),
     ], accessToken);
   }
 }

@@ -465,14 +465,14 @@ export function buildHelpMessage(): Record<string, unknown> {
             { type: 'separator', margin: 'md' },
             {
               type: 'text',
-              text: '❌ ยกเลิกผูกบัญชี',
+              text: '❌ ลบ / ยกเลิกผูกบัญชี',
               weight: 'bold',
               size: 'md',
               color: '#95a5a6',
             },
             {
               type: 'text',
-              text: 'พิมพ์ "ยกเลิก"',
+              text: 'พิมพ์ "ลบ" หรือ "ยกเลิก"',
               size: 'sm',
               color: '#555555',
               wrap: true,
