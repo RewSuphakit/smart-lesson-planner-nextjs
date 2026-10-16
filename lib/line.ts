@@ -407,6 +407,211 @@ export function buildClassroomSelectionFlex(
   };
 }
 
+export interface MissingTaskWeek {
+  lessonNumber: number;
+  lessonName: string;
+  missingAssignment: boolean;
+  missingPostTest: boolean;
+  maxAssignmentScore: number;
+  maxPostTestScore: number;
+}
+
+/**
+ * Build a Flex Message showing missing tasks/assignments per week
+ */
+export function buildMissingTasksFlexMessage(data: {
+  studentName: string;
+  classroomName: string;
+  totalMissing: number;
+  totalCompleted: number;
+  weeks: MissingTaskWeek[];
+}): Record<string, unknown> {
+  // If no missing tasks at all!
+  if (data.weeks.length === 0) {
+    const successBubble: FlexBubble = {
+      type: 'bubble',
+      size: 'mega',
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: [
+          {
+            type: 'text',
+            text: '🎉 ยอดเยี่ยมมาก!',
+            weight: 'bold',
+            size: 'xl',
+            color: '#27ae60',
+            align: 'center',
+          },
+          {
+            type: 'text',
+            text: 'คุณไม่มีงานค้างเลย ส่งงานครบทุกสัปดาห์แล้ว 💯',
+            size: 'sm',
+            color: '#333333',
+            align: 'center',
+            margin: 'sm',
+          },
+          { type: 'separator', margin: 'lg' },
+          {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'xs',
+            margin: 'md',
+            contents: [
+              {
+                type: 'text',
+                text: `👤 ${data.studentName}`,
+                size: 'xs',
+                color: '#666666',
+                align: 'center',
+              },
+              {
+                type: 'text',
+                text: `📚 ${data.classroomName}`,
+                size: 'xs',
+                color: '#888888',
+                align: 'center',
+                wrap: true,
+              },
+            ],
+          },
+        ],
+      },
+      styles: {
+        body: { separator: false },
+      },
+    };
+
+    return {
+      type: 'flex',
+      altText: `ไม่มีงานค้าง: ${data.studentName}`,
+      contents: successBubble,
+    };
+  }
+
+  // Items for each missing week (limit to 12 weeks to fit inside 1 bubble)
+  const displayWeeks = data.weeks.slice(0, 12);
+  const weekBoxes: Record<string, unknown>[] = [];
+
+  for (const w of displayWeeks) {
+    const tasksDetail: string[] = [];
+    if (w.missingAssignment) {
+      tasksDetail.push(`• 📝 ใบงาน/การบ้าน (เต็ม ${w.maxAssignmentScore} คะแนน)`);
+    }
+    if (w.missingPostTest) {
+      tasksDetail.push(`• 📊 แบบทดสอบ (เต็ม ${w.maxPostTestScore} คะแนน)`);
+    }
+
+    weekBoxes.push({
+      type: 'box',
+      layout: 'vertical',
+      spacing: 'xs',
+      margin: 'md',
+      paddingAll: 'sm',
+      backgroundColor: '#fff5f5',
+      cornerRadius: 'md',
+      contents: [
+        {
+          type: 'text',
+          text: `สัปดาห์ที่ ${w.lessonNumber}: ${w.lessonName || `บทเรียนที่ ${w.lessonNumber}`}`,
+          weight: 'bold',
+          size: 'xs',
+          color: '#e74c3c',
+        },
+        ...tasksDetail.map((detail) => ({
+          type: 'text',
+          text: detail,
+          size: 'xxs',
+          color: '#555555',
+        })),
+      ],
+    });
+  }
+
+  if (data.weeks.length > 12) {
+    weekBoxes.push({
+      type: 'text',
+      text: `... และอีก ${data.weeks.length - 12} สัปดาห์`,
+      size: 'xs',
+      color: '#888888',
+      align: 'center',
+      margin: 'sm',
+    });
+  }
+
+  const bubble: FlexBubble = {
+    type: 'bubble',
+    size: 'mega',
+    body: {
+      type: 'box',
+      layout: 'vertical',
+      spacing: 'sm',
+      contents: [
+        {
+          type: 'text',
+          text: '📝 รายการงานค้าง / ยังไม่ส่ง',
+          weight: 'bold',
+          size: 'md',
+          color: '#1a1a2e',
+        },
+        {
+          type: 'text',
+          text: `${data.studentName} — ${data.classroomName}`,
+          size: 'xs',
+          color: '#666666',
+          wrap: true,
+        },
+        { type: 'separator', margin: 'sm' },
+        {
+          type: 'box',
+          layout: 'horizontal',
+          margin: 'sm',
+          contents: [
+            {
+              type: 'box',
+              layout: 'vertical',
+              flex: 1,
+              contents: [
+                { type: 'text', text: '🔴 ค้างส่ง', size: 'xs', color: '#e74c3c', align: 'center', weight: 'bold' },
+                { type: 'text', text: `${data.totalMissing} งาน`, size: 'sm', color: '#e74c3c', align: 'center', weight: 'bold' },
+              ],
+            },
+            {
+              type: 'box',
+              layout: 'vertical',
+              flex: 1,
+              contents: [
+                { type: 'text', text: '🟢 ส่งแล้ว', size: 'xs', color: '#27ae60', align: 'center', weight: 'bold' },
+                { type: 'text', text: `${data.totalCompleted} งาน`, size: 'sm', color: '#27ae60', align: 'center', weight: 'bold' },
+              ],
+            },
+          ],
+        },
+        { type: 'separator', margin: 'sm' },
+        ...weekBoxes,
+        {
+          type: 'text',
+          text: '💡 ติดต่อครูผู้สอนเพื่อส่งงานหรือสอบแก้ตัวย้อนหลัง',
+          size: 'xxs',
+          color: '#888888',
+          align: 'center',
+          margin: 'md',
+        },
+      ],
+    },
+    styles: {
+      body: { separator: false },
+    },
+  };
+
+  return {
+    type: 'flex',
+    altText: `งานค้าง: ${data.studentName} (${data.totalMissing} รายการ)`,
+    contents: bubble,
+  };
+}
+
 /**
  * Build welcome / help message
  */
@@ -473,6 +678,21 @@ export function buildHelpMessage(): Record<string, unknown> {
             {
               type: 'text',
               text: 'พิมพ์ "เข้าเรียน" "ขาด" "สาย" หรือ "ลา"',
+              size: 'sm',
+              color: '#555555',
+              wrap: true,
+            },
+            { type: 'separator', margin: 'md' },
+            {
+              type: 'text',
+              text: '📝 เช็คงานค้าง',
+              weight: 'bold',
+              size: 'md',
+              color: '#9b59b6',
+            },
+            {
+              type: 'text',
+              text: 'พิมพ์ "งานค้าง" "งานที่ขาด" หรือ "การบ้าน"',
               size: 'sm',
               color: '#555555',
               wrap: true,

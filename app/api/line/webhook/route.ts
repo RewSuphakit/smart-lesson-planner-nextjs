@@ -20,7 +20,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { calculateAffectiveScore } from '@/lib/affective';
-import { resolveTargetWeeks } from '@/lib/semester';
+import { resolveTargetWeeks, getCurrentWeek } from '@/lib/semester';
 import {
   verifyLineSignature,
   replyMessage,
@@ -28,7 +28,9 @@ import {
   buildAttendanceFlexMessage,
   buildScoreFlexMessage,
   buildClassroomSelectionFlex,
+  buildMissingTasksFlexMessage,
   buildHelpMessage,
+  MissingTaskWeek,
   LineWebhookBody,
   LineEvent,
 } from '@/lib/line';
@@ -229,6 +231,23 @@ async function handleTextMessage(
   // --- Change classroom: "เปลี่ยนวิชา" ---
   if (['เปลี่ยนวิชา', 'เปลี่ยน', 'switch', 'เลือกวิชา'].includes(lowerText)) {
     await handleSwitchClassroom(replyToken, lineUserId, accessToken, teacherUserId);
+    return;
+  }
+
+  // --- Missing tasks queries: "งานค้าง" / "งานที่ขาด" / "การบ้าน" / "เช็คงาน" ---
+  const normalizedText = lowerText.replace(/\s+/g, '');
+  const missingKeywords = [
+    'งานค้าง', 'ค้างงาน', 'งานที่ขาด', 'งานขาด', 'ขาดงาน', 'เช็คงาน', 'เช็คงานขาด',
+    'เช็คงานค้าง', 'การบ้าน', 'การบ้านค้าง', 'เช็คการบ้าน', 'งานที่ยังไม่ส่ง',
+    'งาน', 'homework', 'task', 'tasks', 'missing',
+  ];
+  const isMissingQuery =
+    missingKeywords.includes(normalizedText) ||
+    /(?:เช็ค|ดู|มี)?(?:งาน|การบ้าน)(?:ค้าง|ขาด|ที่ขาด|ที่ยังไม่ส่ง)/i.test(normalizedText) ||
+    /^(?:เช็ค)?(?:งาน|การบ้าน)(?:ค้าง|ขาด|ที่ขาด|ที่ยังไม่ส่ง)?$/i.test(normalizedText);
+
+  if (isMissingQuery) {
+    await handleMissingTasksQuery(replyToken, lineUserId, accessToken, teacherUserId);
     return;
   }
 
@@ -749,6 +768,169 @@ async function handleAttendanceQuery(
         `อัตราเข้าเรียน: ${attendancePercent}%`
       ),
     ], accessToken);
+  }
+}
+
+async function handleMissingTasksQuery(
+  replyToken: string,
+  lineUserId: string,
+  accessToken: string,
+  teacherUserId: number
+) {
+  const { binding, student, classroom, errorMsg } = await resolveStudentContext(
+    lineUserId, teacherUserId
+  );
+
+  if (errorMsg || !binding || !student || !classroom) {
+    if (errorMsg === 'NEED_CLASSROOM') {
+      await handleSwitchClassroom(replyToken, lineUserId, accessToken, teacherUserId);
+    } else {
+      await replyMessage(replyToken, [textMessage(errorMsg || '❌ เกิดข้อผิดพลาด')], accessToken);
+    }
+    return;
+  }
+
+  const targetWeeks = resolveTargetWeeks(classroom);
+
+  // Parallel fetch: score structures, student scores, and latest recorded score in classroom
+  const [structures, studentScores, latestScoreInClassroom] = await Promise.all([
+    prisma.scoreStructure.findMany({
+      where: { classroomId: classroom.id },
+      orderBy: { lessonNumber: 'asc' },
+    }),
+    prisma.studentScore.findMany({
+      where: { studentId: student.id, classroomId: classroom.id },
+      orderBy: { lessonNumber: 'asc' },
+    }),
+    prisma.studentScore.findFirst({
+      where: { classroomId: classroom.id },
+      orderBy: { lessonNumber: 'desc' },
+      select: { lessonNumber: true },
+    }),
+  ]);
+
+  // Determine current active week limit
+  const highestRecordedWeek = latestScoreInClassroom?.lessonNumber || 0;
+  let maxWeekToCheck = targetWeeks;
+
+  if (classroom.semesterStartDate) {
+    const currentWeek = getCurrentWeek(classroom.semesterStartDate, targetWeeks);
+    if (currentWeek !== null) {
+      maxWeekToCheck = Math.min(targetWeeks, Math.max(currentWeek, highestRecordedWeek));
+    }
+  } else if (highestRecordedWeek > 0) {
+    maxWeekToCheck = Math.min(targetWeeks, highestRecordedWeek);
+  } else if (structures.length > 0) {
+    const maxStructureWeek = Math.max(...structures.map((s) => s.lessonNumber));
+    if (maxStructureWeek > 0) {
+      maxWeekToCheck = Math.min(targetWeeks, maxStructureWeek);
+    }
+  }
+
+  const scoresMap = new Map<number, { assignmentScore: number | null; postTestScore: number | null }>();
+  for (const sc of studentScores) {
+    scoresMap.set(sc.lessonNumber, {
+      assignmentScore: sc.assignmentScore !== null ? Number(sc.assignmentScore) : null,
+      postTestScore: sc.postTestScore !== null ? Number(sc.postTestScore) : null,
+    });
+  }
+
+  const structureMap = new Map<number, (typeof structures)[0]>();
+  for (const st of structures) {
+    structureMap.set(st.lessonNumber, st);
+  }
+
+  const missingWeeks: MissingTaskWeek[] = [];
+  let totalMissing = 0;
+  let totalCompleted = 0;
+
+  for (let w = 1; w <= maxWeekToCheck; w++) {
+    const st = structureMap.get(w);
+    const sc = scoresMap.get(w);
+
+    const maxAssignment = st ? Number(st.maxAssignmentScore ?? 0) : 10;
+    const maxPostTest = st ? Number(st.maxPostTestScore ?? 0) : 10;
+    const assignmentScore = sc?.assignmentScore ?? null;
+    const postTestScore = sc?.postTestScore ?? null;
+
+    const hasAssignment = maxAssignment > 0;
+    const hasPostTest = maxPostTest > 0;
+
+    const isMissingAssignment = hasAssignment && (assignmentScore === null || assignmentScore === 0);
+    const isMissingPostTest = hasPostTest && (postTestScore === null || postTestScore === 0);
+
+    if (hasAssignment) {
+      if (isMissingAssignment) {
+        totalMissing++;
+      } else {
+        totalCompleted++;
+      }
+    }
+
+    if (hasPostTest) {
+      if (isMissingPostTest) {
+        totalMissing++;
+      } else {
+        totalCompleted++;
+      }
+    }
+
+    if (isMissingAssignment || isMissingPostTest) {
+      missingWeeks.push({
+        lessonNumber: w,
+        lessonName: st?.lessonName || `สัปดาห์ที่ ${w}`,
+        missingAssignment: isMissingAssignment,
+        missingPostTest: isMissingPostTest,
+        maxAssignmentScore: maxAssignment,
+        maxPostTestScore: maxPostTest,
+      });
+    }
+  }
+
+  try {
+    await replyMessage(replyToken, [
+      buildMissingTasksFlexMessage({
+        studentName: student.name,
+        classroomName: classroom.name,
+        totalMissing,
+        totalCompleted,
+        weeks: missingWeeks,
+      }),
+    ], accessToken);
+  } catch (err) {
+    console.error('Missing tasks flex reply error, falling back to text:', err);
+    if (missingWeeks.length === 0) {
+      await replyMessage(replyToken, [
+        textMessage(
+          `🎉 ยอดเยี่ยมมาก!\n` +
+          `👤 ${student.name}\n` +
+          `📚 ${classroom.name}\n\n` +
+          `คุณไม่มีงานค้างเลย ส่งงานครบทุกสัปดาห์แล้ว 💯`
+        ),
+      ], accessToken);
+    } else {
+      const weekLines = missingWeeks.slice(0, 10).map((w) => {
+        const details: string[] = [];
+        if (w.missingAssignment) details.push(`• 📝 ใบงาน/การบ้าน (${w.maxAssignmentScore} คะแนน)`);
+        if (w.missingPostTest) details.push(`• 📊 แบบทดสอบ (${w.maxPostTestScore} คะแนน)`);
+        return `📌 สัปดาห์ที่ ${w.lessonNumber}: ${w.lessonName}\n${details.join('\n')}`;
+      });
+
+      const moreText = missingWeeks.length > 10 ? `\n...และอีก ${missingWeeks.length - 10} สัปดาห์` : '';
+
+      await replyMessage(replyToken, [
+        textMessage(
+          `📝 รายการงานค้าง / ยังไม่ส่ง\n` +
+          `👤 ${student.name}\n` +
+          `📚 ${classroom.name}\n\n` +
+          `🔴 ค้างส่ง: ${totalMissing} งาน\n` +
+          `🟢 ส่งแล้ว: ${totalCompleted} งาน\n\n` +
+          weekLines.join('\n\n') +
+          moreText +
+          `\n\n💡 ติดต่อครูผู้สอนเพื่อส่งงานหรือสอบแก้ตัวย้อนหลัง`
+        ),
+      ], accessToken);
+    }
   }
 }
 
