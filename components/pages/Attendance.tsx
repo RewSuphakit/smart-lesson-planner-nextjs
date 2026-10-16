@@ -1386,17 +1386,6 @@ export default function Attendance() {
     <div className="space-y-6 animate-fade-in-up">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2.5">
-            <span className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100/80 text-indigo-600 flex items-center justify-center shadow-xs">
-              <ClipboardCheck className="w-5 h-5 text-indigo-600" />
-            </span>
-            <span>เช็คชื่อเข้าเรียน</span>
-          </h1>
-          <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
-            บันทึกเวลาเรียนรายวัน ติดตามสถิติการมาเรียน และสรุปรายงานประวัติการเข้าชั้นเรียน
-          </p>
-        </div>
 
         {/* Global Action Tools */}
         {selectedClass && students.length > 0 && (

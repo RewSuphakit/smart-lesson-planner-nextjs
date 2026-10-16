@@ -69,6 +69,7 @@ model User {
   classrooms  Classroom[]
   weeklySchedules WeeklySchedule[]
   semesters   Semester[]
+  lineChannelConfigs LineChannelConfig[]
 
   @@map("users")
 }
@@ -128,6 +129,7 @@ model Classroom {
   scoreStructures ScoreStructure[]
   studentScores   StudentScore[]
   weeklySchedules WeeklySchedule[]
+  lineBindings    LineBinding[]
 
   @@index([userId], map: "idx_classrooms_user")
   @@index([semesterId], map: "idx_classrooms_semester")
@@ -300,4 +302,41 @@ model WeeklySchedule {
   @@index([semesterId], map: "idx_timetable_semester")
   @@index([userId, semesterId], map: "idx_timetable_user_semester")
   @@map("weekly_schedules")
+}
+
+// ==================== LINE Bot Bindings ====================
+model LineBinding {
+  id          Int      @id @default(autoincrement())
+  lineUserId  String   @map("line_user_id") @db.VarChar(64)
+  studentCode String   @map("student_code") @db.VarChar(50)
+  classroomId Int?     @map("classroom_id")
+  displayName String?  @map("display_name") @db.VarChar(255)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  classroom Classroom? @relation(fields: [classroomId], references: [id], onDelete: SetNull)
+
+  @@unique([lineUserId, studentCode], map: "unique_line_binding")
+  @@index([lineUserId], map: "idx_line_binding_user")
+  @@index([studentCode], map: "idx_line_binding_code")
+  @@map("line_bindings")
+}
+
+// ==================== LINE Channel Config (per teacher) ====================
+model LineChannelConfig {
+  id                 Int      @id @default(autoincrement())
+  userId             Int      @map("user_id")
+  channelId          String   @map("channel_id") @db.VarChar(255)
+  channelSecret      String   @map("channel_secret") @db.VarChar(255)
+  channelAccessToken String   @map("channel_access_token") @db.Text
+  isActive           Boolean  @default(true) @map("is_active")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId], map: "unique_line_channel_user")
+  @@unique([channelId], map: "unique_line_channel_id")
+  @@index([userId], map: "idx_line_channel_user")
+  @@map("line_channel_configs")
 }
