@@ -324,23 +324,37 @@ export function buildClassroomSelectionFlex(
   studentName: string,
   classrooms: { classroomId: number; classroomName: string; teacherName: string }[]
 ): Record<string, unknown> {
-  const items = classrooms.map((c) => ({
-    type: 'button',
-    action: {
-      type: 'postback',
-      label: c.classroomName.length > 20 ? c.classroomName.substring(0, 17) + '...' : c.classroomName,
-      data: `action=select_classroom&classroom_id=${c.classroomId}`,
-      displayText: c.classroomName,
-    },
-    style: 'primary',
-    color: '#4a6cf7',
-    margin: 'sm',
-    height: 'sm',
+  const items = classrooms.map((c) => {
+    const teacherShort = c.teacherName ? ` (${c.teacherName})` : '';
+    const fullTitle = `${c.classroomName}${teacherShort}`;
+    const buttonLabel = fullTitle.length > 20 ? fullTitle.substring(0, 17) + '...' : fullTitle;
+
+    return {
+      type: 'button',
+      action: {
+        type: 'postback',
+        label: buttonLabel,
+        data: `action=select_classroom&classroom_id=${c.classroomId}`,
+        displayText: `เลือก ${c.classroomName}`,
+      },
+      style: 'primary',
+      color: '#4a6cf7',
+      margin: 'sm',
+      height: 'sm',
+    };
+  });
+
+  const classroomList = classrooms.map((c, idx) => ({
+    type: 'text',
+    text: `${idx + 1}. ${c.classroomName}${c.teacherName ? ` (ผู้สอน: ${c.teacherName})` : ''}`,
+    size: 'xs',
+    color: '#555555',
+    wrap: true,
   }));
 
   const bubble: FlexBubble = {
     type: 'bubble',
-    size: 'kilo',
+    size: 'mega',
     body: {
       type: 'box',
       layout: 'vertical',
@@ -348,17 +362,33 @@ export function buildClassroomSelectionFlex(
       contents: [
         {
           type: 'text',
-          text: '📚 เลือกวิชา',
+          text: '📚 เลือกวิชาที่ต้องการดูข้อมูล',
           weight: 'bold',
-          size: 'lg',
+          size: 'md',
           color: '#1a1a2e',
         },
         {
           type: 'text',
-          text: `สวัสดี ${studentName}\nกรุณาเลือกวิชาที่ต้องการดูข้อมูล`,
+          text: `สวัสดี ${studentName}\nคุณมีรายวิชาในระบบดังนี้:`,
           size: 'sm',
           color: '#666666',
           wrap: true,
+        },
+        { type: 'separator', margin: 'sm' },
+        {
+          type: 'box',
+          layout: 'vertical',
+          spacing: 'xs',
+          margin: 'sm',
+          contents: classroomList,
+        },
+        { type: 'separator', margin: 'sm' },
+        {
+          type: 'text',
+          text: '👇 กดปุ่มด้านล่างเพื่อเลือกวิชา:',
+          size: 'xs',
+          color: '#888888',
+          margin: 'sm',
         },
       ],
     },

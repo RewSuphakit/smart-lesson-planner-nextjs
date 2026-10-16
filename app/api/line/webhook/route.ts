@@ -278,24 +278,13 @@ async function handlePostback(
       return;
     }
 
-    // Verify the classroom belongs to this teacher and student is in it
-    let student = await prisma.student.findFirst({
+    // Verify the classroom belongs to student (across any teacher)
+    const student = await prisma.student.findFirst({
       where: {
         studentCode: binding.studentCode,
         classroomId: classroomId,
-        ...(teacherUserId ? { userId: teacherUserId } : {}),
       },
     });
-
-    if (!student) {
-      // Fallback search across all teachers
-      student = await prisma.student.findFirst({
-        where: {
-          studentCode: binding.studentCode,
-          classroomId: classroomId,
-        },
-      });
-    }
 
     if (!student) {
       await replyMessage(event.replyToken!, [
@@ -311,11 +300,19 @@ async function handlePostback(
 
     const classroom = await prisma.classroom.findUnique({
       where: { id: classroomId },
-      select: { name: true },
+      select: {
+        name: true,
+        user: { select: { name: true } },
+      },
     });
 
+    const teacherInfo = classroom?.user?.name ? `\n👨‍🏫 ผู้สอน: ${classroom.user.name}` : '';
     await replyMessage(event.replyToken!, [
-      textMessage(`✅ เลือกวิชา "${classroom?.name}" แล้ว\n\nพิมพ์ "คะแนน" หรือ "เข้าเรียน" เพื่อดูข้อมูล`),
+      textMessage(
+        `✅ เลือกวิชา "${classroom?.name}" แล้ว${teacherInfo}\n\n` +
+        `พิมพ์ "คะแนน" หรือ "เข้าเรียน" เพื่อดูข้อมูลวิชานี้\n` +
+        `(หรือพิมพ์ "เปลี่ยนวิชา" เมื่อต้องการดูวิชาอื่น)`
+      ),
     ], accessToken);
   }
 }
@@ -329,30 +326,22 @@ async function handleBind(
   accessToken: string,
   teacherUserId: number
 ) {
-  // Check if student code exists under this teacher
-  let students = await prisma.student.findMany({
+  // Search all classrooms for this student across all teachers (Shared Bot model)
+  const students = await prisma.student.findMany({
     where: {
       studentCode,
-      ...(teacherUserId ? { userId: teacherUserId } : {}),
       classroomId: { not: null },
     },
     include: {
-      classroom: { select: { id: true, name: true } },
+      classroom: {
+        select: {
+          id: true,
+          name: true,
+          user: { select: { name: true } },
+        },
+      },
     },
   });
-
-  // If not found with teacherUserId filter, search across all teachers as fallback
-  if (students.length === 0) {
-    students = await prisma.student.findMany({
-      where: {
-        studentCode,
-        classroomId: { not: null },
-      },
-      include: {
-        classroom: { select: { id: true, name: true } },
-      },
-    });
-  }
 
   if (students.length === 0) {
     await replyMessage(replyToken, [
@@ -390,11 +379,12 @@ async function handleBind(
   });
 
   if (students.length === 1) {
+    const teacherName = students[0].classroom?.user?.name ? `\n👨‍🏫 ผู้สอน: ${students[0].classroom.user.name}` : '';
     await replyMessage(replyToken, [
       textMessage(
         `✅ ผูกบัญชีสำเร็จ!\n\n` +
         `👤 ${students[0].name}\n` +
-        `📚 ${students[0].classroom?.name}\n\n` +
+        `📚 ${students[0].classroom?.name}${teacherName}\n\n` +
         `พิมพ์ "คะแนน" หรือ "เข้าเรียน" เพื่อดูข้อมูล`
       ),
     ], accessToken);
@@ -405,11 +395,11 @@ async function handleBind(
       .map((s) => ({
         classroomId: s.classroom!.id,
         classroomName: s.classroom!.name,
-        teacherName: '',
+        teacherName: s.classroom!.user?.name || '',
       }));
 
     await replyMessage(replyToken, [
-      textMessage(`✅ ผูกบัญชีสำเร็จ! คุณ ${students[0].name}`),
+      textMessage(`✅ ผูกบัญชีสำเร็จ! คุณ ${students[0].name}\nกรุณาเลือกวิชาที่ต้องการดูข้อมูลด้านล่าง:`),
       buildClassroomSelectionFlex(students[0].name, classrooms),
     ], accessToken);
   }
@@ -466,28 +456,21 @@ async function handleSwitchClassroom(
     return;
   }
 
-  let students = await prisma.student.findMany({
+  const students = await prisma.student.findMany({
     where: {
       studentCode: binding.studentCode,
-      ...(teacherUserId ? { userId: teacherUserId } : {}),
       classroomId: { not: null },
     },
     include: {
-      classroom: { select: { id: true, name: true } },
+      classroom: {
+        select: {
+          id: true,
+          name: true,
+          user: { select: { name: true } },
+        },
+      },
     },
   });
-
-  if (students.length === 0) {
-    students = await prisma.student.findMany({
-      where: {
-        studentCode: binding.studentCode,
-        classroomId: { not: null },
-      },
-      include: {
-        classroom: { select: { id: true, name: true } },
-      },
-    });
-  }
 
   if (students.length <= 1) {
     await replyMessage(replyToken, [
@@ -502,7 +485,7 @@ async function handleSwitchClassroom(
     .map((s) => ({
       classroomId: s.classroom!.id,
       classroomName: s.classroom!.name,
-      teacherName: '',
+      teacherName: s.classroom!.user?.name || '',
     }));
 
   await replyMessage(replyToken, [
@@ -787,29 +770,16 @@ async function resolveStudentContext(lineUserId: string, teacherUserId: number) 
   }
 
   // Find all classrooms for this student under this teacher
-  let students = await prisma.student.findMany({
+  // Find all classrooms for this student across all teachers
+  const students = await prisma.student.findMany({
     where: {
       studentCode: binding.studentCode,
-      ...(teacherUserId ? { userId: teacherUserId } : {}),
       classroomId: { not: null },
     },
     include: {
       classroom: true,
     },
   });
-
-  if (students.length === 0) {
-    // Fallback search across teachers
-    students = await prisma.student.findMany({
-      where: {
-        studentCode: binding.studentCode,
-        classroomId: { not: null },
-      },
-      include: {
-        classroom: true,
-      },
-    });
-  }
 
   if (students.length === 0) {
     return {
