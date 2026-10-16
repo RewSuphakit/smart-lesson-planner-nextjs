@@ -177,9 +177,9 @@ export function buildAttendanceFlexMessage(data: {
           spacing: 'sm',
           margin: 'lg',
           contents: [
-            buildStatRow('ขาดรวม (แปลงแล้ว)', `${data.totalConverted}/${data.maxAllowed}`, '#333'),
-            buildStatRow('เหลือขาดได้อีก', `${data.remaining} ครั้ง`, data.remaining <= 2 ? '#e74c3c' : '#333'),
-            buildStatRow('อัตราเข้าเรียน', `${data.percent}%`, '#333'),
+            buildStatRow('ขาดรวม (แปลงแล้ว)', `${data.totalConverted}/${data.maxAllowed}`, '#333333'),
+            buildStatRow('เหลือขาดได้อีก', `${data.remaining} ครั้ง`, data.remaining <= 2 ? '#e74c3c' : '#333333'),
+            buildStatRow('อัตราเข้าเรียน', `${data.percent}%`, '#333333'),
           ],
         },
         {
@@ -235,18 +235,18 @@ export function buildScoreFlexMessage(data: {
   const gradeColor = getGradeColor(data.grade);
 
   const scoreRows: Record<string, unknown>[] = [
-    buildStatRow('📝 งาน', `${data.scaledAssignment}/${data.maxAssignment}`, '#333'),
-    buildStatRow('📊 ทดสอบ', `${data.scaledPostTest}/${data.maxPostTest}`, '#333'),
+    buildStatRow('📝 งาน', `${data.scaledAssignment}/${data.maxAssignment}`, '#333333'),
+    buildStatRow('📊 ทดสอบ', `${data.scaledPostTest}/${data.maxPostTest}`, '#333333'),
   ];
 
   if (data.maxMidterm > 0) {
-    scoreRows.push(buildStatRow('📑 กลางภาค', `${data.scaledMidterm}/${data.maxMidterm}`, '#333'));
+    scoreRows.push(buildStatRow('📑 กลางภาค', `${data.scaledMidterm}/${data.maxMidterm}`, '#333333'));
   }
   if (data.maxFinal > 0) {
-    scoreRows.push(buildStatRow('📑 ปลายภาค', `${data.scaledFinal}/${data.maxFinal}`, '#333'));
+    scoreRows.push(buildStatRow('📑 ปลายภาค', `${data.scaledFinal}/${data.maxFinal}`, '#333333'));
   }
 
-  scoreRows.push(buildStatRow('💭 จิตพิสัย', `${data.affectiveScore.toFixed(1)}/${data.maxAffective}`, '#333'));
+  scoreRows.push(buildStatRow('💭 จิตพิสัย', `${data.affectiveScore.toFixed(1)}/${data.maxAffective}`, '#333333'));
 
   const bubble: FlexBubble = {
     type: 'bubble',
@@ -493,6 +493,12 @@ export function buildHelpMessage(): Record<string, unknown> {
 // ==================== Private Helpers ====================
 
 function buildStatRow(label: string, value: string, color: string): Record<string, unknown> {
+  // Normalize 3-digit hex like #333 to #333333 (LINE Flex strictly requires 6 or 8 digits)
+  const normalizedColor =
+    color.length === 4 && color.startsWith('#')
+      ? `#${color[1]}${color[1]}${color[2]}${color[2]}${color[3]}${color[3]}`
+      : color;
+
   return {
     type: 'box',
     layout: 'horizontal',
@@ -508,7 +514,7 @@ function buildStatRow(label: string, value: string, color: string): Record<strin
         type: 'text',
         text: value,
         size: 'sm',
-        color: color,
+        color: normalizedColor,
         align: 'end',
         weight: 'bold',
         flex: 4,

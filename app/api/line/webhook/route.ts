@@ -624,26 +624,40 @@ async function handleScoreQuery(
     }
   }
 
-  await replyMessage(replyToken, [
-    buildScoreFlexMessage({
-      studentName: student.name,
-      classroomName: classroom.name,
-      grade: finalGrade,
-      percentage: percentage.toFixed(2),
-      totalScore: Math.round(totalScorePrecise),
-      maxScore: totalWeightSum,
-      scaledAssignment: Math.round(preciseScaledAssign),
-      maxAssignment: weightAssign,
-      scaledPostTest: Math.round(preciseScaledPostTest),
-      maxPostTest: weightPostTest,
-      scaledMidterm: Math.round(preciseScaledMidterm),
-      maxMidterm: weightMidterm,
-      scaledFinal: Math.round(preciseScaledFinal),
-      maxFinal: weightFinal,
-      affectiveScore,
-      maxAffective: weightAffective,
-    }),
-  ], accessToken);
+  try {
+    await replyMessage(replyToken, [
+      buildScoreFlexMessage({
+        studentName: student.name,
+        classroomName: classroom.name,
+        grade: finalGrade,
+        percentage: percentage.toFixed(2),
+        totalScore: Math.round(totalScorePrecise),
+        maxScore: totalWeightSum,
+        scaledAssignment: Math.round(preciseScaledAssign),
+        maxAssignment: weightAssign,
+        scaledPostTest: Math.round(preciseScaledPostTest),
+        maxPostTest: weightPostTest,
+        scaledMidterm: Math.round(preciseScaledMidterm),
+        maxMidterm: weightMidterm,
+        scaledFinal: Math.round(preciseScaledFinal),
+        maxFinal: weightFinal,
+        affectiveScore,
+        maxAffective: weightAffective,
+      }),
+    ], accessToken);
+  } catch (err) {
+    console.error('Score flex reply error, falling back to text:', err);
+    await replyMessage(replyToken, [
+      textMessage(
+        `📊 สรุปคะแนน\n` +
+        `👤 ${student.name}\n` +
+        `📚 ${classroom.name}\n\n` +
+        `🏆 เกรด: ${finalGrade}\n` +
+        `📈 ร้อยละ: ${percentage.toFixed(2)}%\n` +
+        `🎯 คะแนนรวม: ${Math.round(totalScorePrecise)}/${totalWeightSum}`
+      ),
+    ], accessToken);
+  }
 }
 
 async function handleAttendanceQuery(
@@ -699,22 +713,40 @@ async function handleAttendanceQuery(
     status = 'warning';
   }
 
-  await replyMessage(replyToken, [
-    buildAttendanceFlexMessage({
-      studentName: student.name,
-      classroomName: classroom.name,
-      present: presentCount,
-      late: lateCount,
-      absent: absentCount,
-      leave: leaveCount,
-      totalConverted,
-      maxAllowed: maxAllowedAbsences,
-      remaining,
-      percent: attendancePercent,
-      status,
-      isF,
-    }),
-  ], accessToken);
+  try {
+    await replyMessage(replyToken, [
+      buildAttendanceFlexMessage({
+        studentName: student.name,
+        classroomName: classroom.name,
+        present: presentCount,
+        late: lateCount,
+        absent: absentCount,
+        leave: leaveCount,
+        totalConverted,
+        maxAllowed: maxAllowedAbsences,
+        remaining,
+        percent: attendancePercent,
+        status,
+        isF,
+      }),
+    ], accessToken);
+  } catch (err) {
+    console.error('Attendance flex reply error, falling back to text:', err);
+    await replyMessage(replyToken, [
+      textMessage(
+        `📋 สถิติการเข้าเรียน\n` +
+        `👤 ${student.name}\n` +
+        `📚 ${classroom.name}\n\n` +
+        `🟢 มาเรียน: ${presentCount} ครั้ง\n` +
+        `🟡 สาย: ${lateCount} ครั้ง\n` +
+        `🔴 ขาด: ${absentCount} ครั้ง\n` +
+        `🔵 ลา: ${leaveCount} ครั้ง\n\n` +
+        `ขาดรวม (แปลงแล้ว): ${totalConverted}/${maxAllowedAbsences}\n` +
+        `เหลือขาดได้อีก: ${remaining} ครั้ง\n` +
+        `อัตราเข้าเรียน: ${attendancePercent}%`
+      ),
+    ], accessToken);
+  }
 }
 
 // ==================== Helpers ====================
