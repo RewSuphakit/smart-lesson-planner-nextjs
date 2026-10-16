@@ -3,20 +3,22 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function main() {
+  const dotenvResult = require('dotenv').config();
+  const allKeys = Object.keys(dotenvResult.parsed || {});
+  console.log('Total keys in env file:', allKeys.length);
+  console.log('All key names in env:', allKeys);
+
   const args = process.argv.slice(2);
-  let id = args[0] || process.env.LINE_CHANNEL_ID;
-  let secret = args[1] || process.env.LINE_CHANNEL_SECRET;
-  let token = args[2] || process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  let id = args[0] || process.env.LINE_CHANNEL_ID || process.env.channel_id;
+  let secret = args[1] || process.env.LINE_CHANNEL_SECRET || process.env.channel_secret;
+  let token = args[2] || process.env.LINE_CHANNEL_ACCESS_TOKEN || process.env.channel_access_token;
 
   id = id?.trim().replace(/^["']|["']$/g, '') || 'line-channel';
   secret = secret?.trim().replace(/^["']|["']$/g, '');
   token = token?.trim().replace(/^["']|["']$/g, '');
 
   if (!secret || !token) {
-    console.log('ENV_STATUS: NOT_SAVED_YET');
-    console.log('LINE_CHANNEL_ID:', !!id && id !== 'line-channel');
-    console.log('LINE_CHANNEL_SECRET:', !!secret);
-    console.log('LINE_CHANNEL_ACCESS_TOKEN:', !!token);
+    console.log('STATUS: MISSING_SECRET_OR_TOKEN');
     return;
   }
 
@@ -26,7 +28,7 @@ async function main() {
   });
 
   if (!user) {
-    console.log('ENV_STATUS: NO_USER_IN_DB');
+    console.log('STATUS: NO_USER_IN_DB');
     return;
   }
 
@@ -47,10 +49,9 @@ async function main() {
     },
   });
 
-  console.log('ENV_STATUS: SYNCED_SUCCESS_TO_DB');
+  console.log('STATUS: SYNCED_SUCCESS_TO_DB for user ID:', user.id);
 }
 
 main()
   .catch((err) => console.error('SYNC_ERROR:', err.message))
   .finally(() => prisma.$disconnect());
-

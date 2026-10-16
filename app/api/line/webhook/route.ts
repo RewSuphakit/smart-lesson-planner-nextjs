@@ -35,9 +35,9 @@ import {
 
 // GET /api/line/webhook — Health and configuration check for Webhook
 export async function GET() {
-  const hasEnvSecret = !!process.env.LINE_CHANNEL_SECRET;
-  const hasEnvToken = !!process.env.LINE_CHANNEL_ACCESS_TOKEN;
-  const hasEnvId = !!process.env.LINE_CHANNEL_ID;
+  const hasEnvSecret = !!(process.env.LINE_CHANNEL_SECRET || process.env.channel_secret);
+  const hasEnvToken = !!(process.env.LINE_CHANNEL_ACCESS_TOKEN || process.env.channel_access_token);
+  const hasEnvId = !!(process.env.LINE_CHANNEL_ID || process.env.channel_id);
   const dbConfigsCount = await prisma.lineChannelConfig.count({ where: { isActive: true } });
   const totalStudents = await prisma.student.count();
   const totalBindings = await prisma.lineBinding.count();
@@ -98,9 +98,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Fallback: check environment variables from .env
-    const envSecret = process.env.LINE_CHANNEL_SECRET;
-    const envToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-    const envChannelId = process.env.LINE_CHANNEL_ID || 'env-default';
+    const envSecret = process.env.LINE_CHANNEL_SECRET || process.env.channel_secret;
+    const envToken = process.env.LINE_CHANNEL_ACCESS_TOKEN || process.env.channel_access_token;
+    const envChannelId = process.env.LINE_CHANNEL_ID || process.env.channel_id || 'env-default';
 
     if (!matchedConfig && envSecret && envToken) {
       if (verifyLineSignature(rawBody, signature, envSecret)) {
