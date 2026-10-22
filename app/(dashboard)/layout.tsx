@@ -121,8 +121,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Logo */}
         <div className="p-6 pb-3 shrink-0">
           <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-400 via-purple-400 to-emerald-400 flex items-center justify-center shadow-lg shadow-indigo-300/30 animate-pulse-glow">
-              <GraduationCap className="w-5 h-5 text-white" />
+            <div className="w-11 h-11 rounded-2xl overflow-hidden flex items-center justify-center shadow-lg shadow-indigo-300/30 animate-pulse-glow shrink-0 border border-indigo-200/50">
+              <img src="/logo.png" alt="Smart Planner Logo" className="w-full h-full object-cover" />
             </div>
             <div>
               <h1 className="text-[1.05rem] font-bold gradient-text">

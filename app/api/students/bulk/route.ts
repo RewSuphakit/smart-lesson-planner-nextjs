@@ -17,6 +17,7 @@ export async function POST(request: NextRequest) {
       name: string;
       student_code?: string;
       grade_level?: string;
+      branch?: string;
       email?: string;
       classroom_id?: number | string;
       avatar?: string;
@@ -50,6 +51,7 @@ export async function POST(request: NextRequest) {
       name: s.name,
       studentCode: s.student_code || null,
       gradeLevel: s.grade_level || null,
+      branch: s.branch || null,
       email: s.email || null,
       classroomId: s.classroom_id ? Number(s.classroom_id) : null,
       avatar: s.avatar || null,

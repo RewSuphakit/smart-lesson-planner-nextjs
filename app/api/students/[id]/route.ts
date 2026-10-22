@@ -23,7 +23,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const updateData: Record<string, unknown> = {};
     const fieldMap: Record<string, string> = {
       name: 'name', student_code: 'studentCode', grade_level: 'gradeLevel',
-      email: 'email', classroom_id: 'classroomId',
+      branch: 'branch', email: 'email', classroom_id: 'classroomId',
       midterm_score: 'midtermScore', final_score: 'finalScore',
       avatar: 'avatar',
     };
@@ -90,7 +90,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             // Keep existing avatar if not explicitly set or removed
             continue;
           }
-        } else if (['studentCode', 'gradeLevel', 'email'].includes(prismaKey)) {
+        } else if (['studentCode', 'gradeLevel', 'branch', 'email'].includes(prismaKey)) {
           val = val ? String(val).trim() : null;
         }
         updateData[prismaKey] = val;

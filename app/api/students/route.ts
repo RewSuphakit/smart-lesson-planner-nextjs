@@ -12,8 +12,13 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const classroomId = searchParams.get('classroom_id');
 
+    const branch = searchParams.get('branch');
+    const gradeLevel = searchParams.get('grade_level');
+
     const where: Record<string, unknown> = { userId: user.id };
     if (classroomId) where.classroomId = Number(classroomId);
+    if (branch) where.branch = branch;
+    if (gradeLevel) where.gradeLevel = gradeLevel;
 
     const pageStr = searchParams.get('page');
     const limitStr = searchParams.get('limit');
@@ -25,6 +30,7 @@ export async function GET(request: NextRequest) {
           name: true,
           studentCode: true,
           gradeLevel: true,
+          branch: true,
           email: true,
           classroomId: true,
           avatar: true,
@@ -37,6 +43,7 @@ export async function GET(request: NextRequest) {
           name: true,
           studentCode: true,
           gradeLevel: true,
+          branch: true,
           email: true,
           classroomId: true,
           midtermScore: true,
@@ -121,6 +128,7 @@ export async function POST(request: NextRequest) {
         name: s.name,
         studentCode: s.student_code || null,
         gradeLevel: s.grade_level || null,
+        branch: s.branch || null,
         email: s.email || null,
         classroomId: s.classroom_id ? Number(s.classroom_id) : null,
         avatar: s.avatar || null,
@@ -154,6 +162,7 @@ export async function POST(request: NextRequest) {
         name: validation.data.name,
         studentCode: validation.data.student_code || null,
         gradeLevel: validation.data.grade_level || null,
+        branch: validation.data.branch || null,
         email: validation.data.email || null,
         classroomId: validation.data.classroom_id ? Number(validation.data.classroom_id) : null,
         avatar: validation.data.avatar || null,

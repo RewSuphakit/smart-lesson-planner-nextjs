@@ -188,6 +188,7 @@ export function formatStudentListItem(s: {
   name: string;
   studentCode?: string | null;
   gradeLevel?: string | null;
+  branch?: string | null;
   email?: string | null;
   classroomId?: number | null;
   avatar?: string | null;
@@ -200,6 +201,7 @@ export function formatStudentListItem(s: {
     name: s.name,
     student_code: s.studentCode ?? null,
     grade_level: s.gradeLevel ?? null,
+    branch: s.branch ?? null,
     email: s.email ?? null,
     classroom_id: s.classroomId ?? null,
     avatar: s.avatar ?? null,

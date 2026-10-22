@@ -144,6 +144,7 @@ model Student {
   name           String   @db.VarChar(255)
   studentCode    String?  @map("student_code") @db.VarChar(50)
   gradeLevel     String?  @map("grade_level") @db.VarChar(100)
+  branch         String?  @db.VarChar(255)
   email          String?  @db.VarChar(255)
   classroomId    Int?     @map("classroom_id")
   midtermScore   Decimal? @default(0) @map("midterm_score") @db.Decimal(5, 2)
@@ -164,6 +165,7 @@ model Student {
   @@index([classroomId, name], map: "idx_students_classroom_name")
   @@index([classroomId, studentCode], map: "idx_students_classroom_code")
   @@index([studentCode], map: "idx_students_code")
+  @@index([userId, branch], map: "idx_students_user_branch")
   @@map("students")
 }
 

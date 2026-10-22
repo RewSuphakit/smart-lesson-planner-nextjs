@@ -695,7 +695,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
 
             {/* Top brand */}
             <div className="relative z-10 flex items-center gap-2 text-indigo-200 text-xs font-medium tracking-wide">
-              <GraduationCap className="w-4 h-4 text-indigo-300" />
+              <img src="/logo.png" alt="Logo" className="w-5 h-5 rounded-md object-cover shadow-xs" />
               <span>SMART LESSON PLANNER</span>
             </div>
 

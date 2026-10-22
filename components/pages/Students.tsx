@@ -4,10 +4,10 @@ import { useState, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
-import { 
-  Plus, Edit, Trash2, X, Users as UsersIcon, Loader2, Search, 
-  GraduationCap, Upload, CheckCircle, FileSpreadsheet, Eye, 
-  Camera, Sparkles, Image as ImageIcon 
+import {
+  Plus, Edit, Trash2, X, Users as UsersIcon, Loader2, Search,
+  GraduationCap, Upload, CheckCircle, FileSpreadsheet, Eye,
+  Camera, Sparkles, Image as ImageIcon, GitBranch
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import dynamic from 'next/dynamic';
@@ -26,6 +26,7 @@ interface Student {
   student_code?: string;
   name: string;
   grade_level?: string;
+  branch?: string | null;
   email?: string;
   classroom_id?: string | number | null;
   avatar?: string | null;
@@ -35,6 +36,7 @@ interface ImportRow {
   student_code?: string;
   name: string;
   grade_level?: string;
+  branch?: string;
   email?: string;
   avatar?: string | null;
 }
@@ -45,10 +47,12 @@ export default function Students() {
   const [showForm, setShowForm] = useState(false);
   const [showImportForm, setShowImportForm] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
-  
+
   const [editing, setEditing] = useState<string | number | null>(null);
   const [search, setSearch] = useState('');
   const [filterClassroomId, setFilterClassroomId] = useState('');
+  const [filterBranch, setFilterBranch] = useState('');
+  const [filterGradeLevel, setFilterGradeLevel] = useState('');
   const [selectedStudents, setSelectedStudents] = useState<Array<string | number>>([]);
   const [bulkAssignClassroomId, setBulkAssignClassroomId] = useState('');
 
@@ -56,7 +60,7 @@ export default function Students() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
 
-  const emptyForm = { name: '', student_code: '', grade_level: '', email: '', classroom_id: '', avatar: '', remove_avatar: false };
+  const emptyForm = { name: '', student_code: '', grade_level: '', branch: '', email: '', classroom_id: '', avatar: '', remove_avatar: false };
   const [form, setForm] = useState(emptyForm);
 
   // Single student photo & emoji picker state
@@ -88,6 +92,24 @@ export default function Students() {
     },
   });
 
+  // ─── Query: ดึงรายชื่อสาขาที่ไม่ซ้ำ ───
+  const { data: branches = [] } = useQuery<string[]>({
+    queryKey: ['student-branches'],
+    queryFn: async () => {
+      const res = await api.get('/students/branches');
+      return res.data.data || [];
+    },
+  });
+
+  // ─── Query: ดึงรายชื่อระดับชั้นที่ไม่ซ้ำ ───
+  const { data: gradeLevels = [] } = useQuery<string[]>({
+    queryKey: ['student-grade-levels'],
+    queryFn: async () => {
+      const res = await api.get('/students/grade-levels');
+      return res.data.data || [];
+    },
+  });
+
   const isLoading = loadingStudents || loadingClassrooms;
 
   // ─── Mutation: สร้าง/แก้ไขนักเรียน ───
@@ -105,6 +127,8 @@ export default function Students() {
       setEditing(null);
       setForm(emptyForm);
       queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['student-branches'] });
+      queryClient.invalidateQueries({ queryKey: ['student-grade-levels'] });
       queryClient.invalidateQueries({ queryKey: ['classrooms'] });
       queryClient.invalidateQueries({ queryKey: ['grades'] });
       queryClient.invalidateQueries({ queryKey: ['scores-matrix'] });
@@ -121,6 +145,8 @@ export default function Students() {
     onSuccess: () => {
       toast.success('ลบนักเรียนแล้ว');
       queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['student-branches'] });
+      queryClient.invalidateQueries({ queryKey: ['student-grade-levels'] });
       queryClient.invalidateQueries({ queryKey: ['classrooms'] });
       queryClient.invalidateQueries({ queryKey: ['grades'] });
       queryClient.invalidateQueries({ queryKey: ['scores-matrix'] });
@@ -158,6 +184,8 @@ export default function Students() {
       toast.success('ลบนักเรียนที่เลือกเรียบร้อยแล้ว');
       setSelectedStudents([]);
       queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['student-branches'] });
+      queryClient.invalidateQueries({ queryKey: ['student-grade-levels'] });
       queryClient.invalidateQueries({ queryKey: ['classrooms'] });
       queryClient.invalidateQueries({ queryKey: ['grades'] });
       queryClient.invalidateQueries({ queryKey: ['scores-matrix'] });
@@ -178,6 +206,8 @@ export default function Students() {
       toast.success('ลบนักเรียนเรียบร้อยแล้ว');
       setSelectedStudents([]);
       queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['student-branches'] });
+      queryClient.invalidateQueries({ queryKey: ['student-grade-levels'] });
       queryClient.invalidateQueries({ queryKey: ['classrooms'] });
       queryClient.invalidateQueries({ queryKey: ['grades'] });
       queryClient.invalidateQueries({ queryKey: ['scores-matrix'] });
@@ -199,6 +229,8 @@ export default function Students() {
       setImportData([]);
       setImportClassroomId('');
       queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['student-branches'] });
+      queryClient.invalidateQueries({ queryKey: ['student-grade-levels'] });
       queryClient.invalidateQueries({ queryKey: ['classrooms'] });
       queryClient.invalidateQueries({ queryKey: ['grades'] });
       queryClient.invalidateQueries({ queryKey: ['scores-matrix'] });
@@ -216,12 +248,13 @@ export default function Students() {
       toast.error('ไม่มีข้อมูลนักเรียนสำหรับส่งออก');
       return;
     }
-    
+
     const XLSX = await import('xlsx');
     const exportData = filtered.map(s => ({
       'รหัสนักเรียน': s.student_code || '',
       'ชื่อ-นามสกุล': s.name || '',
       'ระดับชั้น': s.grade_level || '',
+      'สาขา': s.branch || '',
       'ห้องเรียน': classrooms.find(c => String(c.id) === String(s.classroom_id))?.name || 'ไม่ระบุ',
       'อีเมล': s.email || ''
     }));
@@ -229,10 +262,10 @@ export default function Students() {
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Students");
-    
+
     const className = filterClassroomId ? classrooms.find(c => String(c.id) === String(filterClassroomId))?.name : 'ทั้งหมด';
     const fileName = `รายชื่อนักเรียน_${className}_${new Date().toISOString().split('T')[0]}.xlsx`;
-    
+
     XLSX.writeFile(wb, fileName);
     toast.success('ส่งออกไฟล์เรียบร้อย');
   };
@@ -310,6 +343,7 @@ export default function Students() {
       name: s.name,
       student_code: s.student_code || '',
       grade_level: s.grade_level || '',
+      branch: s.branch || '',
       email: s.email || '',
       classroom_id: s.classroom_id ? String(s.classroom_id) : '',
       avatar: s.avatar || '',
@@ -326,7 +360,7 @@ export default function Students() {
   };
 
   const handleToggleSelect = (id: string | number) => {
-    setSelectedStudents(prev => 
+    setSelectedStudents(prev =>
       prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id]
     );
   };
@@ -356,10 +390,10 @@ export default function Students() {
   const handleDeleteAll = () => {
     const isFiltered = !!filterClassroomId;
     const targetClassName = isFiltered ? classrooms.find(c => String(c.id) === String(filterClassroomId))?.name || 'ห้องเรียนที่เลือก' : 'ทั้งหมด';
-    const msg = isFiltered 
+    const msg = isFiltered
       ? `ยืนยันการลบนักเรียนทั้งหมดในห้องเรียน "${targetClassName}" ใช่หรือไม่? (ข้อมูลคะแนนและประวัติการประเมินของนักเรียนจะถูกลบไปด้วย)`
       : `ยืนยันการลบนักเรียนทั้งหมด (${students.length} คน) ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้!`;
-      
+
     if (!window.confirm(msg)) return;
     deleteAllMutation.mutate(isFiltered ? filterClassroomId : undefined);
   };
@@ -379,12 +413,12 @@ export default function Students() {
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json<Record<string, string>>(ws);
-        
+
         const mappedData = data.map((row: Record<string, string>) => {
           const prefix = row['คำนำหน้า'] || '';
           const firstName = row['ชื่อ'] || row['name'] || '';
           const lastName = row['นามสกุล'] || '';
-          
+
           let fullName = row['ชื่อ-นามสกุล'] || '';
           if (!fullName && firstName) {
             fullName = `${prefix} ${firstName} ${lastName}`.trim().replace(/\s+/g, ' ');
@@ -396,6 +430,7 @@ export default function Students() {
             student_code: String(row['รหัสนักเรียน'] || row['student_code'] || ''),
             name: String(fullName),
             grade_level: String(row['ระดับชั้น'] || row['ชั้น'] || row['grade_level'] || ''),
+            branch: String(row['สาขา'] || row['สาขาวิชา'] || row['branch'] || row['department'] || ''),
             email: String(row['อีเมล'] || row['email'] || ''),
             avatar: rawAvatar ? String(rawAvatar).trim() : null,
           };
@@ -423,9 +458,34 @@ export default function Students() {
     return students.filter(s => {
       const matchSearch = s.name?.toLowerCase().includes(search.toLowerCase()) || s.student_code?.toLowerCase().includes(search.toLowerCase());
       const matchClass = filterClassroomId ? String(s.classroom_id) === String(filterClassroomId) : true;
-      return matchSearch && matchClass;
+      const matchBranch = filterBranch ? (s.branch || '') === filterBranch : true;
+      const matchGradeLevel = filterGradeLevel ? (s.grade_level || '') === filterGradeLevel : true;
+      return matchSearch && matchClass && matchBranch && matchGradeLevel;
     });
-  }, [students, search, filterClassroomId]);
+  }, [students, search, filterClassroomId, filterBranch, filterGradeLevel]);
+
+  // Group students by branch for summary display
+  const branchGroups = useMemo(() => {
+    const groups = new Map<string, number>();
+    for (const s of students) {
+      const b = s.branch || 'ไม่ระบุสาขา';
+      groups.set(b, (groups.get(b) || 0) + 1);
+    }
+    return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0], 'th'));
+  }, [students]);
+
+  // Group students by grade level (within selected branch, or all students)
+  const gradeLevelGroups = useMemo(() => {
+    const pool = filterBranch
+      ? students.filter(s => (s.branch || '') === filterBranch)
+      : students;
+    const groups = new Map<string, number>();
+    for (const s of pool) {
+      const g = s.grade_level || 'ไม่ระบุระดับ';
+      groups.set(g, (groups.get(g) || 0) + 1);
+    }
+    return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0], 'th'));
+  }, [students, filterBranch]);
 
   // Paginated subset
   const paginatedStudents = useMemo(() => {
@@ -434,14 +494,14 @@ export default function Students() {
   }, [filtered, currentPage, itemsPerPage]);
 
   // Reset to page 1 when filters change — derived from useMemo instead of useEffect
-  const prevFilterKey = `${search}|${filterClassroomId}`;
+  const prevFilterKey = `${search}|${filterClassroomId}|${filterBranch}|${filterGradeLevel}`;
   const [lastFilterKey, setLastFilterKey] = useState(prevFilterKey);
   if (prevFilterKey !== lastFilterKey) {
     setLastFilterKey(prevFilterKey);
     setCurrentPage(1);
   }
 
-  if (isLoading) return <div className="space-y-4">{[1,2,3].map(i => <div key={i} className="skeleton h-24 rounded-2xl" />)}</div>;
+  if (isLoading) return <div className="space-y-4">{[1, 2, 3].map(i => <div key={i} className="skeleton h-24 rounded-2xl" />)}</div>;
 
   return (
     <div className="space-y-6 animate-fade-in-up">
@@ -453,7 +513,7 @@ export default function Students() {
         </div>
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           {students.length > 0 && (
-            <button 
+            <button
               onClick={handleDeleteAll}
               disabled={isMutating}
               className="btn bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 flex-1 sm:flex-none flex items-center justify-center gap-1.5"
@@ -462,8 +522,8 @@ export default function Students() {
               <span>ลบทั้งหมด</span>
             </button>
           )}
-          <button 
-            onClick={() => setShowExportModal(true)} 
+          <button
+            onClick={() => setShowExportModal(true)}
             className="btn bg-emerald-600 hover:bg-emerald-700 text-white flex-1 sm:flex-none flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 font-bold text-xs"
             title="พรีวิวตัวอย่างตาราง Excel ก่อนส่งออก"
           >
@@ -479,21 +539,21 @@ export default function Students() {
       </div>
 
       {/* Filter and Search */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
         <div className="relative w-full sm:w-64">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-          <input 
-            value={search} 
-            onChange={e => setSearch(e.target.value)} 
-            className="form-input pl-11" 
-            placeholder="ค้นหานักเรียน..." 
-            id="student-search" 
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="form-input pl-11"
+            placeholder="ค้นหานักเรียน..."
+            id="student-search"
             aria-label="ค้นหานักเรียน"
           />
         </div>
-        <select 
-          value={filterClassroomId} 
-          onChange={e => setFilterClassroomId(e.target.value)} 
+        <select
+          value={filterClassroomId}
+          onChange={e => setFilterClassroomId(e.target.value)}
           className="form-input w-full sm:w-64"
           id="filter-classroom"
           aria-label="กรองตามห้องเรียน"
@@ -501,7 +561,128 @@ export default function Students() {
           <option value="">-- ทุกห้องเรียน --</option>
           {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
+
+
       </div>
+
+      {/* Branch Summary Cards (when no branch selected) */}
+      {branchGroups.length > 1 && !filterBranch && (
+        <div className="space-y-1.5 animate-fade-in-up">
+          <div className="flex flex-wrap gap-2">
+            {branchGroups.map(([branch, count]) => (
+              <button
+                key={branch}
+                onClick={() => {
+                  setFilterBranch(branch === 'ไม่ระบุสาขา' ? '' : branch);
+                  setFilterGradeLevel('');
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all hover:scale-105 hover:shadow-sm bg-white/80 border-indigo-100 text-slate-700 hover:bg-indigo-50 hover:border-indigo-300"
+              >
+                <GitBranch className="w-3 h-3 text-indigo-500" />
+                {branch}
+                <span className="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full text-[10px] font-bold ml-0.5">{count}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Branch & Grade Level Drill-Down Bar (when branch is selected) */}
+      {filterBranch && (
+        <div className="glass p-3.5 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/70 via-purple-50/50 to-white space-y-2.5 animate-fade-in-up">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-slate-500 font-medium">สาขาที่เลือก:</span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-indigo-600 text-white shadow-sm shadow-indigo-600/20">
+                <GitBranch className="w-3.5 h-3.5" />
+                {filterBranch}
+              </span>
+              <button
+                onClick={() => {
+                  setFilterBranch('');
+                  setFilterGradeLevel('');
+                }}
+                className="text-xs text-slate-500 hover:text-red-500 underline transition-colors flex items-center gap-1"
+                title="ยกเลิกการเลือกสาขา"
+              >
+                <X className="w-3 h-3" /> แสดงทุกสาขา
+              </button>
+            </div>
+
+            {filterGradeLevel && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-slate-500 font-medium">ระดับที่เลือก:</span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-emerald-600 text-white shadow-sm shadow-emerald-600/20">
+                  <GraduationCap className="w-3.5 h-3.5" />
+                  {filterGradeLevel}
+                </span>
+                <button
+                  onClick={() => setFilterGradeLevel('')}
+                  className="text-xs text-slate-500 hover:text-red-500 transition-colors p-0.5"
+                  title="ล้างการเลือกระดับ"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Sub-level chips: "พอกดกรอกตามสาขาแล้วอยากให้มีกรอกตามระดับ อีก" */}
+          {gradeLevelGroups.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 pt-1.5 border-t border-indigo-100/60">
+              <span className="text-xs font-medium text-slate-600 mr-1 flex items-center gap-1">
+                <GraduationCap className="w-3.5 h-3.5 text-emerald-600" /> ระดับในสาขานี้:
+              </span>
+              <button
+                onClick={() => setFilterGradeLevel('')}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${!filterGradeLevel
+                  ? 'bg-purple-600 text-white shadow-sm shadow-purple-600/20 font-semibold'
+                  : 'bg-white/80 text-slate-600 hover:bg-purple-50 border border-slate-200'
+                  }`}
+              >
+                ทุกระดับ
+              </button>
+              {gradeLevelGroups.map(([grade, count]) => {
+                const actualGrade = grade === 'ไม่ระบุระดับ' ? '' : grade;
+                const isSelected = filterGradeLevel === actualGrade;
+                return (
+                  <button
+                    key={grade}
+                    onClick={() => setFilterGradeLevel(isSelected ? '' : actualGrade)}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${isSelected
+                      ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/20 font-bold scale-105'
+                      : 'bg-white/90 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200 hover:border-emerald-300'
+                      }`}
+                  >
+                    <GraduationCap className={`w-3 h-3 ${isSelected ? 'text-white' : 'text-emerald-500'}`} />
+                    {grade}
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${isSelected ? 'bg-emerald-700 text-white' : 'bg-emerald-100/80 text-emerald-700'
+                      }`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* When no branch is selected but a grade level is selected via dropdown */}
+      {!filterBranch && filterGradeLevel && (
+        <div className="flex items-center gap-2 animate-fade-in-up">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white">
+            <GraduationCap className="w-3.5 h-3.5" />
+            ระดับ {filterGradeLevel}
+          </span>
+          <button
+            onClick={() => setFilterGradeLevel('')}
+            className="text-xs text-slate-500 hover:text-emerald-600 underline transition-colors"
+          >
+            แสดงทุกระดับ
+          </button>
+        </div>
+      )}
 
       {/* Bulk Actions Bar */}
       {selectedStudents.length > 0 && (
@@ -510,7 +691,7 @@ export default function Students() {
             <span className="bg-indigo-500 text-slate-800 px-3 py-1 rounded-full text-sm font-medium">
               เลือกแล้ว {selectedStudents.length} คน
             </span>
-            <button 
+            <button
               onClick={() => setSelectedStudents([])}
               className="text-slate-600 hover:text-slate-800 text-sm underline"
             >
@@ -518,9 +699,9 @@ export default function Students() {
             </button>
           </div>
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            <select 
-              value={bulkAssignClassroomId} 
-              onChange={e => setBulkAssignClassroomId(e.target.value)} 
+            <select
+              value={bulkAssignClassroomId}
+              onChange={e => setBulkAssignClassroomId(e.target.value)}
               className="form-input flex-1 sm:flex-none"
               id="bulk-assign-classroom"
               aria-label="เลือกห้องเรียนเป้าหมายสำหรับนักเรียนที่เลือก"
@@ -529,14 +710,14 @@ export default function Students() {
               <option value="null">ไม่มีห้องเรียน (ลอยแพ)</option>
               {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
-            <button 
+            <button
               onClick={handleBulkAssign}
               disabled={isMutating}
               className="btn btn-primary flex-1 sm:flex-none"
             >
               {bulkAssignMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'ย้ายห้อง'}
             </button>
-            <button 
+            <button
               onClick={handleBulkDelete}
               disabled={isMutating}
               className="btn bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 flex-1 sm:flex-none flex items-center justify-center gap-1.5"
@@ -552,8 +733,8 @@ export default function Students() {
       {filtered.length > 0 && (
         <div className="flex items-center px-2 py-1 gap-3">
           <label className="flex items-center gap-2 cursor-pointer group">
-            <input 
-              type="checkbox" 
+            <input
+              type="checkbox"
               className="sr-only peer"
               checked={selectedStudents.length === filtered.length}
               onChange={handleSelectAll}
@@ -585,8 +766,8 @@ export default function Students() {
           >
             <div className="p-4 flex items-center gap-4">
               <label className="cursor-pointer group flex-shrink-0">
-                <input 
-                  type="checkbox" 
+                <input
+                  type="checkbox"
                   className="sr-only peer"
                   checked={selectedStudents.includes(student.id)}
                   onChange={() => handleToggleSelect(student.id)}
@@ -607,23 +788,32 @@ export default function Students() {
                 <p className="font-semibold text-slate-800 text-[0.95rem]">{student.name}</p>
                 <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-0.5">
                   {student.student_code && <span>รหัส: {student.student_code}</span>}
-                  {student.grade_level && <span>ระดับ {student.grade_level}</span>}
+                  {student.grade_level && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100 font-medium">
+                      <GraduationCap className="w-3 h-3" />ระดับ {student.grade_level}
+                    </span>
+                  )}
+                  {student.branch && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-violet-50 text-violet-700 border border-violet-100 font-medium">
+                      <GitBranch className="w-3 h-3" />{student.branch}
+                    </span>
+                  )}
                   {student.classroom_id && <span>ห้อง: {classrooms.find(c => String(c.id) === String(student.classroom_id))?.name || 'ไม่ทราบ'}</span>}
                   {student.email && <span>{student.email}</span>}
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                <button 
-                  onClick={() => handleEdit(student)} 
-                  className="p-2.5 rounded-xl hover:bg-indigo-500/10 text-slate-500 hover:text-indigo-700 transition-all" 
+                <button
+                  onClick={() => handleEdit(student)}
+                  className="p-2.5 rounded-xl hover:bg-indigo-500/10 text-slate-500 hover:text-indigo-700 transition-all"
                   title="แก้ไข"
                   aria-label={`แก้ไขข้อมูลของ ${student.name}`}
                 >
                   <Edit className="w-4 h-4" />
                 </button>
-                <button 
-                  onClick={() => handleDelete(student.id)} 
-                  className="p-2.5 rounded-xl hover:bg-red-500/10 text-slate-500 hover:text-red-400 transition-all" 
+                <button
+                  onClick={() => handleDelete(student.id)}
+                  className="p-2.5 rounded-xl hover:bg-red-500/10 text-slate-500 hover:text-red-400 transition-all"
                   title="ลบ"
                   aria-label={`ลบข้อมูลของ ${student.name}`}
                 >
@@ -754,51 +944,73 @@ export default function Students() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="form-label" htmlFor="student-name">ชื่อ-นามสกุล</label>
-                <input 
-                  value={form.name} 
-                  onChange={e => setForm({...form, name: e.target.value})} 
-                  className="form-input" 
-                  required 
-                  id="student-name" 
-                  placeholder="กรอกชื่อ-นามสกุล" 
+                <input
+                  value={form.name}
+                  onChange={e => setForm({ ...form, name: e.target.value })}
+                  className="form-input"
+                  required
+                  id="student-name"
+                  placeholder="กรอกชื่อ-นามสกุล"
                 />
               </div>
               <div>
                 <label className="form-label" htmlFor="student-code">รหัสนักเรียน</label>
-                <input 
-                  value={form.student_code} 
-                  onChange={e => setForm({...form, student_code: e.target.value})} 
-                  className="form-input" 
-                  id="student-code" 
-                  placeholder="เช่น 65010001" 
+                <input
+                  value={form.student_code}
+                  onChange={e => setForm({ ...form, student_code: e.target.value })}
+                  className="form-input"
+                  id="student-code"
+                  placeholder="เช่น 65010001"
                 />
               </div>
               <div>
                 <label className="form-label" htmlFor="student-grade">ระดับชั้น</label>
-                <input 
-                  value={form.grade_level} 
-                  onChange={e => setForm({...form, grade_level: e.target.value})} 
-                  className="form-input" 
-                  id="student-grade" 
-                  placeholder="เช่น ม.3 หรือ ปวช.1" 
+                <input
+                  value={form.grade_level}
+                  onChange={e => setForm({ ...form, grade_level: e.target.value })}
+                  className="form-input"
+                  id="student-grade"
+                  placeholder="เช่น ม.3 หรือ ปวช.1"
+                  list="grade-level-suggestions"
                 />
+                {gradeLevels.length > 0 && (
+                  <datalist id="grade-level-suggestions">
+                    {gradeLevels.map(g => <option key={g} value={g} />)}
+                  </datalist>
+                )}
+              </div>
+              <div>
+                <label className="form-label" htmlFor="student-branch">สาขา</label>
+                <input
+                  value={form.branch}
+                  onChange={e => setForm({ ...form, branch: e.target.value })}
+                  className="form-input"
+                  id="student-branch"
+                  placeholder="เช่น สาขาคอมพิวเตอร์, สาขาบัญชี"
+                  list="branch-suggestions"
+                />
+                {branches.length > 0 && (
+                  <datalist id="branch-suggestions">
+                    {branches.map(b => <option key={b} value={b} />)}
+                  </datalist>
+                )}
               </div>
               <div>
                 <label className="form-label" htmlFor="student-email">อีเมล</label>
-                <input 
-                  type="email" 
-                  value={form.email} 
-                  onChange={e => setForm({...form, email: e.target.value})} 
-                  className="form-input" 
-                  id="student-email" 
-                  placeholder="student@email.com (ไม่บังคับ)" 
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={e => setForm({ ...form, email: e.target.value })}
+                  className="form-input"
+                  id="student-email"
+                  placeholder="student@email.com (ไม่บังคับ)"
                 />
               </div>
               <div>
                 <label className="form-label" htmlFor="student-classroom">ห้องเรียน</label>
-                <select 
-                  value={form.classroom_id} 
-                  onChange={e => setForm({...form, classroom_id: e.target.value})} 
+                <select
+                  value={form.classroom_id}
+                  onChange={e => setForm({ ...form, classroom_id: e.target.value })}
                   className="form-input"
                   id="student-classroom"
                 >
@@ -831,14 +1043,14 @@ export default function Students() {
               </div>
               <button onClick={() => setShowImportForm(false)} className="p-2 hover:bg-indigo-50 rounded-xl"><X className="w-5 h-5 text-slate-500" /></button>
             </div>
-            
+
             <div className="space-y-4">
               {/* Step 1: Select Excel/CSV File */}
               <div className="border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-indigo-50/20 hover:bg-indigo-50/50 rounded-2xl p-6 text-center transition-colors cursor-pointer relative">
-                <input 
-                  type="file" 
-                  accept=".xlsx, .xls, .csv" 
-                  onChange={handleFileUpload} 
+                <input
+                  type="file"
+                  accept=".xlsx, .xls, .csv"
+                  onChange={handleFileUpload}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                   id="import-file-input"
                   aria-label="อัปโหลดไฟล์ Excel หรือ CSV"
@@ -911,9 +1123,9 @@ export default function Students() {
                       <label className="text-xs font-semibold text-slate-600 shrink-0" htmlFor="import-classroom">
                         ห้องเรียน:
                       </label>
-                      <select 
-                        value={importClassroomId} 
-                        onChange={e => setImportClassroomId(e.target.value)} 
+                      <select
+                        value={importClassroomId}
+                        onChange={e => setImportClassroomId(e.target.value)}
                         className="form-input py-1.5 text-xs w-44"
                         id="import-classroom"
                       >
@@ -922,7 +1134,7 @@ export default function Students() {
                       </select>
                     </div>
                   </div>
-                  
+
                   {/* Preview Table */}
                   <div className="bg-white rounded-2xl max-h-64 overflow-y-auto border border-indigo-100 shadow-xs">
                     <table className="w-full text-left text-xs border-collapse">
@@ -971,10 +1183,10 @@ export default function Students() {
                       </div>
                     )}
                   </div>
-                  
-                  <button 
-                    onClick={handleImportSubmit} 
-                    disabled={importMutation.isPending || isMatchingPhotos} 
+
+                  <button
+                    onClick={handleImportSubmit}
+                    disabled={importMutation.isPending || isMatchingPhotos}
                     className="btn btn-primary w-full py-3 text-sm font-bold shadow-md shadow-indigo-500/20"
                   >
                     {importMutation.isPending ? (

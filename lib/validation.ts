@@ -31,6 +31,7 @@ export const CreateStudentSchema = z.object({
   name: z.string().trim().min(1, 'Student name is required'),
   student_code: z.string().trim().nullable().optional(),
   grade_level: z.string().trim().nullable().optional(),
+  branch: z.string().trim().nullable().optional(),
   email: z.string().trim().email('Invalid email address').nullable().optional().or(z.literal('')),
   classroom_id: z.number().nullable().optional(),
   avatar: z.string().nullable().optional(),

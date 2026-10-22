@@ -20,6 +20,7 @@ export interface Student {
   student_code?: string;
   name: string;
   grade_level?: string;
+  branch?: string | null;
   email?: string;
   classroom_id?: string | number | null;
   avatar?: string | null;
@@ -100,8 +101,15 @@ export default function StudentExcelModal({
       getValue: s => s.grade_level || '-'
     },
     {
+      id: 'branch',
+      label: 'สาขาวิชา',
+      defaultChecked: true,
+      wch: 22,
+      getValue: s => s.branch || '-'
+    },
+    {
       id: 'classroom',
-      label: 'ห้องเรียน / สาขาวิชา',
+      label: 'ห้องเรียน',
       defaultChecked: true,
       wch: 26,
       getValue: (s, _, cls) => cls.find(c => String(c.id) === String(s.classroom_id))?.name || 'ไม่ระบุห้องเรียน'

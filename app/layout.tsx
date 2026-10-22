@@ -26,6 +26,15 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: 'Smart Lesson Planner — ระบบวางแผนการสอนอัจฉริยะ',
   description: 'ระบบวางแผนการสอนอัจฉริยะด้วย AI สำหรับครูและผู้สอน',
+  icons: {
+    icon: [
+      { url: '/icon.png', sizes: '512x512', type: 'image/png' },
+      { url: '/favicon.ico', sizes: 'any' },
+    ],
+    apple: [
+      { url: '/apple-icon.png', sizes: '512x512', type: 'image/png' },
+    ],
+  },
 };
 
 export default function RootLayout({
