@@ -313,24 +313,22 @@ export default function SemestersPage() {
     return (
       <div
         key={sem.id}
-        className={`glass p-5 rounded-2xl flex flex-col justify-between transition-all duration-300 relative overflow-hidden h-full ${
-          isActive
-            ? 'border-2 border-indigo-500 shadow-lg shadow-indigo-500/10 bg-gradient-to-br from-white via-white to-indigo-50/40'
-            : 'hover:border-indigo-300 hover:shadow-md bg-white'
-        }`}
+        className={`glass p-5 rounded-2xl flex flex-col justify-between transition-all duration-300 relative overflow-hidden h-full ${isActive
+          ? 'border-2 border-indigo-500 shadow-lg shadow-indigo-500/10 bg-gradient-to-br from-white via-white to-indigo-50/40'
+          : 'hover:border-indigo-300 hover:shadow-md bg-white'
+          }`}
       >
         {/* Top Status & Badge */}
         <div>
           <div className="flex items-start justify-between gap-2 mb-3">
             <div className="flex items-center gap-2">
               <span
-                className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black shrink-0 ${
-                  isActive
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'bg-slate-100 text-slate-700'
-                }`}
+                className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-black shrink-0 ${isActive
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'bg-slate-100 text-slate-700'
+                  }`}
               >
-                เทอม {sem.term_number}
+                เทอม{sem.term_number}
               </span>
               <div>
                 <span className="text-[11px] font-bold text-slate-600">
@@ -594,10 +592,10 @@ export default function SemestersPage() {
                   {(activeSemester.pvch_count ?? 0) > 0 && (activeSemester.pvs_count ?? 0) > 0
                     ? `รวม ปวช. (${activeSemester.pvch_count}) & ปวส. (${activeSemester.pvs_count})`
                     : activeSemester.curriculum_type === 'pvs'
-                    ? 'ปวส. 15 สัปดาห์'
-                    : activeSemester.curriculum_type === 'custom'
-                    ? `กำหนดเอง ${activeSemester.total_weeks} สัปดาห์`
-                    : 'ปวช. / รวม (18 สัปดาห์)'}
+                      ? 'ปวส. 15 สัปดาห์'
+                      : activeSemester.curriculum_type === 'custom'
+                        ? `กำหนดเอง ${activeSemester.total_weeks} สัปดาห์`
+                        : 'ปวช. / รวม (18 สัปดาห์)'}
                 </span>
               </div>
 
@@ -640,9 +638,6 @@ export default function SemestersPage() {
               {semesters.length} รายการ
             </span>
           </h2>
-          <span className="text-xs text-slate-600 hidden sm:inline">
-            คลิก &quot;ตั้งเป็นภาคเรียนปัจจุบัน&quot; เพื่อสลับการแสดงผลห้องเรียนและตารางสอน
-          </span>
         </div>
 
         {loading ? (
@@ -704,9 +699,6 @@ export default function SemestersPage() {
                             </span>
                           )}
                         </div>
-                        <p className="text-[11px] text-slate-500 mt-0.5">
-                          1 ปีการศึกษา = 2 ภาคเรียน (เทอม 1 และ เทอม 2) • รวมห้องเรียนทั้งหมดในปีนี้: {group.totalClassrooms} ห้อง
-                        </p>
                       </div>
                     </div>
 
@@ -825,11 +817,10 @@ export default function SemestersPage() {
                       key={term}
                       type="button"
                       onClick={() => handleTermOrYearChange(term, createForm.academic_year)}
-                      className={`py-2 px-3 rounded-xl font-bold text-xs border transition-all ${
-                        createForm.term_number === term
-                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                      }`}
+                      className={`py-2 px-3 rounded-xl font-bold text-xs border transition-all ${createForm.term_number === term
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
                     >
                       {term === 3 ? 'ภาคฤดูร้อน' : `ภาคเรียนที่ ${term}`}
                     </button>
@@ -881,11 +872,10 @@ export default function SemestersPage() {
                       key={cur.id}
                       type="button"
                       onClick={() => handleCurriculumChange(cur.id as 'pvch' | 'pvs' | 'custom')}
-                      className={`p-2.5 text-center rounded-xl text-xs border transition-all ${
-                        createForm.curriculum_type === cur.id
-                          ? 'bg-indigo-50 text-indigo-700 border-indigo-300 font-bold shadow-xs'
-                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                      }`}
+                      className={`p-2.5 text-center rounded-xl text-xs border transition-all ${createForm.curriculum_type === cur.id
+                        ? 'bg-indigo-50 text-indigo-700 border-indigo-300 font-bold shadow-xs'
+                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                        }`}
                     >
                       <span className="block font-bold">{cur.label}</span>
                       <span className="block text-[10px] text-slate-500 mt-0.5">{cur.desc}</span>
