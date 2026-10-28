@@ -118,6 +118,13 @@ export const UpdateSemesterSchema = z.object({
   total_weeks: z.number().int().min(1).max(52).optional(),
 });
 
+export const CloneSemesterSchema = z.object({
+  target_semester_id: z.coerce.number().int().positive('target_semester_id must be a positive integer'),
+  include_students: z.boolean().optional().default(true),
+  include_timetable: z.boolean().optional().default(false),
+  force_overwrite: z.boolean().optional().default(false),
+});
+
 
 // ==================== Attendance Schemas ====================
 export const AttendanceStatusEnum = z.enum(['present', 'late', 'absent', 'leave']);

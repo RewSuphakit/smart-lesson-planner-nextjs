@@ -1543,9 +1543,6 @@ export default function Attendance() {
                     {classrooms.length} ห้อง
                   </span>
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  เลือกรายวิชาและห้องเรียนที่ต้องการเช็คชื่อรายวัน หรือจัดการประวัติการเข้าเรียน
-                </p>
               </div>
             </div>
 
@@ -2415,9 +2412,7 @@ export default function Attendance() {
                   </div>
                 )}
 
-                <div className="p-4 border-t border-indigo-50/50 bg-indigo-50/30">
-                  <p className="text-xs text-slate-600 font-medium">💡 คลิกที่ชื่อย่อสถานะเพื่อเปิดเมนูสำหรับแก้ไขสถิติการมาเรียนย้อนหลังของนักเรียนได้โดยตรง</p>
-                </div>
+
               </div>
             </div>
           )}

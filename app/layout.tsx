@@ -25,7 +25,7 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: 'Smart Lesson Planner — ระบบวางแผนการสอนอัจฉริยะ',
-  description: 'ระบบวางแผนการสอนอัจฉริยะด้วย AI สำหรับครูและผู้สอน',
+  description: '',
   icons: {
     icon: [
       { url: '/icon.png', sizes: '512x512', type: 'image/png' },

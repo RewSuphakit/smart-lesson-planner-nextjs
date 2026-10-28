@@ -3,6 +3,35 @@ import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { invalidateCache, userCacheKey } from '@/lib/cache';
 
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const user = requireAuth(request);
+    const { id } = await params;
+    const numericId = Number(id);
+    if (isNaN(numericId) || numericId <= 0) {
+      return NextResponse.json({ message: 'Invalid student ID' }, { status: 400 });
+    }
+
+    const student = await prisma.student.findFirst({
+      where: { id: numericId, userId: user.id },
+      include: {
+        classroom: {
+          select: { id: true, name: true },
+        },
+      },
+    });
+
+    if (!student) {
+      return NextResponse.json({ message: 'Student not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ data: student });
+  } catch (error) {
+    if (error instanceof AuthError) return handleAuthError();
+    return NextResponse.json({ message: 'Failed to get student' }, { status: 500 });
+  }
+}
+
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = requireAuth(request);

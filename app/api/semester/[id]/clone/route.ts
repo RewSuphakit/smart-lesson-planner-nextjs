@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
+import { CloneSemesterSchema, validateRequestBody } from '@/lib/validation';
 import { invalidateCache, userCacheKey } from '@/lib/cache';
 
 /**
@@ -8,10 +9,11 @@ import { invalidateCache, userCacheKey } from '@/lib/cache';
  * 
  * Clones classrooms and their students from this semester to a target semester.
  * 
- * Request body:
+ * Request body (validated by CloneSemesterSchema):
  *   - target_semester_id: The semester to clone INTO
  *   - include_students: boolean (default true) — also copy student assignments
  *   - include_timetable: boolean (default false) — also copy weekly schedules
+ *   - force_overwrite: boolean (default false) — if true, skip duplicate warning when target has classrooms
  */
 export async function POST(
   request: NextRequest,
@@ -21,17 +23,24 @@ export async function POST(
     const user = requireAuth(request);
     const { id } = await params;
     const sourceSemesterId = Number(id);
-    const body = await request.json();
-    const targetSemesterId = Number(body.target_semester_id);
-    const includeStudents = body.include_students !== false; // default true
-    const includeTimetable = body.include_timetable === true; // default false
 
     if (isNaN(sourceSemesterId) || sourceSemesterId <= 0) {
       return NextResponse.json({ message: 'Invalid source semester ID' }, { status: 400 });
     }
-    if (isNaN(targetSemesterId) || targetSemesterId <= 0) {
-      return NextResponse.json({ message: 'target_semester_id is required' }, { status: 400 });
+
+    // Validate request body with Zod
+    const validation = await validateRequestBody(request, CloneSemesterSchema);
+    if (!validation.success) {
+      return validation.response;
     }
+
+    const {
+      target_semester_id: targetSemesterId,
+      include_students: includeStudents,
+      include_timetable: includeTimetable,
+      force_overwrite: forceOverwrite,
+    } = validation.data;
+
     if (sourceSemesterId === targetSemesterId) {
       return NextResponse.json({ message: 'ไม่สามารถคัดลอกไปยังภาคเรียนเดียวกันได้' }, { status: 400 });
     }
@@ -47,6 +56,22 @@ export async function POST(
     }
     if (!targetSemester) {
       return NextResponse.json({ message: 'ภาคเรียนปลายทางไม่พบ' }, { status: 404 });
+    }
+
+    // Check if target semester already has classrooms — warn unless force_overwrite
+    if (!forceOverwrite) {
+      const existingCount = await prisma.classroom.count({
+        where: { semesterId: targetSemesterId, userId: user.id },
+      });
+
+      if (existingCount > 0) {
+        return NextResponse.json({
+          message: `ภาคเรียน "${targetSemester.name}" มี ${existingCount} ห้องเรียนอยู่แล้ว การคัดลอกจะเพิ่มห้องเรียนซ้ำ ต้องการดำเนินการต่อหรือไม่?`,
+          requires_confirmation: true,
+          existing_classrooms: existingCount,
+          target_semester_name: targetSemester.name,
+        }, { status: 409 });
+      }
     }
 
     // Get source classrooms with students, score structures, and grade criteria

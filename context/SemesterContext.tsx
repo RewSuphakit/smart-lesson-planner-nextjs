@@ -8,7 +8,8 @@ import semesterApi, {
   Semester,
   CreateSemesterInput,
   UpdateSemesterInput,
-  CloneSemesterInput
+  CloneSemesterInput,
+  CloneSemesterResult
 } from '@/services/semester';
 
 interface SemesterContextType {
@@ -20,7 +21,7 @@ interface SemesterContextType {
   createSemester: (data: CreateSemesterInput) => Promise<Semester | null>;
   updateSemester: (id: number, data: UpdateSemesterInput) => Promise<Semester | null>;
   deleteSemester: (id: number) => Promise<boolean>;
-  cloneSemester: (sourceId: number, data: CloneSemesterInput) => Promise<boolean>;
+  cloneSemester: (sourceId: number, data: CloneSemesterInput) => Promise<CloneSemesterResult>;
 }
 
 const SemesterContext = createContext<SemesterContextType | null>(null);
@@ -156,7 +157,7 @@ export function SemesterProvider({ children }: { children: ReactNode }) {
   };
 
   // Clone semester
-  const cloneSemester = async (sourceId: number, data: CloneSemesterInput): Promise<boolean> => {
+  const cloneSemester = async (sourceId: number, data: CloneSemesterInput): Promise<CloneSemesterResult> => {
     try {
       const res = await semesterApi.cloneSemester(sourceId, data);
       await refreshSemesters();
@@ -165,11 +166,30 @@ export function SemesterProvider({ children }: { children: ReactNode }) {
         icon: '📋',
         duration: 4000,
       });
-      return true;
+      return { success: true };
     } catch (err: unknown) {
-      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'ไม่สามารถคัดลอกภาคเรียนได้';
+      const axiosErr = err as {
+        response?: {
+          status?: number;
+          data?: {
+            message?: string;
+            requires_confirmation?: boolean;
+            existing_classrooms?: number;
+          };
+        };
+      };
+      const resData = axiosErr?.response?.data;
+      if (axiosErr?.response?.status === 409 && resData?.requires_confirmation) {
+        return {
+          success: false,
+          requiresConfirmation: true,
+          message: resData.message,
+          existingClassrooms: resData.existing_classrooms,
+        };
+      }
+      const message = resData?.message || 'ไม่สามารถคัดลอกภาคเรียนได้';
       toast.error(message);
-      return false;
+      return { success: false, message };
     }
   };
 

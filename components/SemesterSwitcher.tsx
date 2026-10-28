@@ -21,24 +21,53 @@ import {
 interface SemesterSwitcherProps {
   className?: string;
   isCompact?: boolean;
+  isCollapsed?: boolean;
 }
 
-export default function SemesterSwitcher({ className = '', isCompact = false }: SemesterSwitcherProps) {
+export default function SemesterSwitcher({ className = '', isCompact = false, isCollapsed = false }: SemesterSwitcherProps) {
   const { semesters, activeSemester, switchSemester, loading } = useSemester();
   const [isOpen, setIsOpen] = useState(false);
   const [isSwitchingId, setIsSwitchingId] = useState<number | null>(null);
   const [pendingSemester, setPendingSemester] = useState<Semester | null>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const collapsedButtonRef = useRef<HTMLButtonElement>(null);
+  const portalMenuRef = useRef<HTMLDivElement>(null);
+  const [portalPos, setPortalPos] = useState<{ top: number; left: number } | null>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  // Calculate position for collapsed flyout dropdown
+  useEffect(() => {
+    if (isOpen && isCollapsed && collapsedButtonRef.current) {
+      const updatePos = () => {
+        if (!collapsedButtonRef.current) return;
+        const rect = collapsedButtonRef.current.getBoundingClientRect();
+        const maxTop = Math.max(16, window.innerHeight - 440);
+        setPortalPos({
+          top: Math.max(16, Math.min(rect.top, maxTop)),
+          left: rect.right + 10,
+        });
+      };
+      updatePos();
+      window.addEventListener('resize', updatePos);
+      window.addEventListener('scroll', updatePos, true);
+      return () => {
+        window.removeEventListener('resize', updatePos);
+        window.removeEventListener('scroll', updatePos, true);
+      };
+    }
+  }, [isOpen, isCollapsed]);
+
   // Close dropdown on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      const inContainer = containerRef.current && containerRef.current.contains(target);
+      const inPortal = portalMenuRef.current && portalMenuRef.current.contains(target);
+      if (!inContainer && !inPortal) {
         setIsOpen(false);
       }
     }
@@ -113,210 +142,262 @@ export default function SemesterSwitcher({ className = '', isCompact = false }: 
     );
   }
 
-  return (
-    <div ref={dropdownRef} className={`relative z-30 ${className}`}>
-      {/* Trigger Button */}
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl transition-all duration-300 group text-left ${
-          isCompact
-            ? 'bg-indigo-50/80 hover:bg-indigo-100/70 border border-indigo-200/60 shadow-xs'
-            : 'bg-white/80 hover:bg-white border border-indigo-200/50 hover:border-indigo-300 shadow-xs hover:shadow-sm'
-        }`}
-        aria-expanded={isOpen}
-        aria-haspopup="listbox"
-        title="สลับปีการศึกษา / เทอม 1 หรือ เทอม 2"
-      >
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shrink-0 shadow-xs group-hover:scale-105 transition-transform">
-            <Layers className="w-3.5 h-3.5" />
+  const dropdownBody = (
+    <>
+      {/* Header */}
+      <div className="px-3 py-1.5 border-b border-slate-100 flex items-center justify-between gap-1.5">
+        <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider shrink-0">
+          เลือกภาคเรียน
+        </span>
+        {activeSemester && (
+          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 shrink-0">
+            ปัจจุบัน: เทอม {activeSemester.term_number}/{activeSemester.academic_year}
+          </span>
+        )}
+      </div>
+
+      {/* Quick Flip Toggle (1-click switch to opposite term) */}
+      {counterpartTerm && (
+        <div className="px-2.5 pt-2 pb-1">
+          <button
+            type="button"
+            onClick={() => handleSelect(counterpartTerm.id)}
+            disabled={isSwitchingId === counterpartTerm.id}
+            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-50 via-purple-50 to-indigo-50 hover:from-indigo-100 hover:to-purple-100 border border-indigo-200/80 text-indigo-900 transition-all text-xs font-bold group/flip shadow-xs"
+          >
+            <div className="flex items-center gap-1.5 min-w-0">
+              <ArrowRightLeft className="w-3.5 h-3.5 text-indigo-600 shrink-0 group-hover/flip:rotate-180 transition-transform duration-300" />
+              <span className="truncate">สลับไป <strong>เทอม {counterpartTerm.term_number}/{counterpartTerm.academic_year}</strong></span>
+            </div>
+            {isSwitchingId === counterpartTerm.id ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600 shrink-0" />
+            ) : (
+              <span className="text-[10px] text-indigo-600 font-semibold underline shrink-0 ml-1">สลับ</span>
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Grouped by Academic Year List */}
+      <div className="max-h-72 overflow-y-auto p-2.5 space-y-2.5">
+        {groupedByYear.length === 0 ? (
+          <div className="p-4 text-center text-xs text-slate-400">
+            ยังไม่มีข้อมูลภาคเรียนในระบบ
           </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-bold text-slate-800 truncate group-hover:text-indigo-600 transition-colors">
-                {activeSemester ? `ปี ${activeSemester.academic_year}` : 'เลือกภาคเรียน'}
-              </span>
-              {activeSemester && (
-                <span className="text-[10px] font-black px-1.5 py-0.2 rounded-md bg-indigo-600 text-white shadow-2xs">
-                  เทอม {activeSemester.term_number}
+        ) : (
+          groupedByYear.map(([year, { term1, term2, term3 }]) => (
+            <div key={year} className="p-2 rounded-xl bg-slate-50/80 border border-slate-200/70 space-y-1.5">
+              <div className="flex items-center justify-between text-xs px-0.5">
+                <span className="font-extrabold text-slate-700 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                  <span>ปีการศึกษา {year}</span>
                 </span>
+                <span className="text-[10px] text-slate-500 font-medium">
+                  {term1 && term2 ? 'ครบ 2 เทอม' : term1 ? 'มีเทอม 1' : 'มีเทอม 2'}
+                </span>
+              </div>
+
+              {/* 2-Column Buttons for Term 1 and Term 2 */}
+              <div className="grid grid-cols-2 gap-1.5">
+                {/* Term 1 Button */}
+                {term1 ? (
+                  <button
+                    type="button"
+                    onClick={() => handleSelect(term1.id)}
+                    disabled={isSwitchingId === term1.id}
+                    className={`flex items-center justify-between px-2 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      term1.is_active
+                        ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20'
+                        : 'bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 border border-slate-200/80'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1 min-w-0">
+                      {term1.is_active && <Check className="w-3 h-3 text-white shrink-0" />}
+                      <span className="truncate">เทอม 1</span>
+                    </div>
+                    <span className={`text-[10px] font-mono shrink-0 ${term1.is_active ? 'text-indigo-200' : 'text-slate-500'}`}>
+                      {term1.classroom_count ?? 0} ห้อง
+                    </span>
+                  </button>
+                ) : (
+                  <Link
+                    href="/semesters"
+                    onClick={() => setIsOpen(false)}
+                    className="flex items-center justify-center gap-1 py-1.5 px-1.5 rounded-xl text-[11px] font-medium text-slate-600 hover:text-indigo-600 border border-dashed border-slate-300 hover:border-indigo-300 bg-white/50 transition-colors"
+                  >
+                    <Plus className="w-3 h-3 shrink-0" />
+                    <span className="truncate">สร้างเทอม 1</span>
+                  </Link>
+                )}
+
+                {/* Term 2 Button */}
+                {term2 ? (
+                  <button
+                    type="button"
+                    onClick={() => handleSelect(term2.id)}
+                    disabled={isSwitchingId === term2.id}
+                    className={`flex items-center justify-between px-2 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      term2.is_active
+                        ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20'
+                        : 'bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 border border-slate-200/80'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1 min-w-0">
+                      {term2.is_active && <Check className="w-3 h-3 text-white shrink-0" />}
+                      <span className="truncate">เทอม 2</span>
+                    </div>
+                    <span className={`text-[10px] font-mono shrink-0 ${term2.is_active ? 'text-indigo-200' : 'text-slate-500'}`}>
+                      {term2.classroom_count ?? 0} ห้อง
+                    </span>
+                  </button>
+                ) : (
+                  <Link
+                    href="/semesters"
+                    onClick={() => setIsOpen(false)}
+                    className="flex items-center justify-center gap-1 py-1.5 px-1.5 rounded-xl text-[11px] font-medium text-slate-600 hover:text-indigo-600 border border-dashed border-slate-300 hover:border-indigo-300 bg-white/50 transition-colors"
+                  >
+                    <Plus className="w-3 h-3 shrink-0" />
+                    <span className="truncate">สร้างเทอม 2</span>
+                  </Link>
+                )}
+              </div>
+
+              {/* Optional Summer Term if exists */}
+              {term3 && (
+                <button
+                  type="button"
+                  onClick={() => handleSelect(term3.id)}
+                  disabled={isSwitchingId === term3.id}
+                  className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    term3.is_active
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 border border-slate-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-1 min-w-0">
+                    {term3.is_active && <Check className="w-3 h-3 shrink-0" />}
+                    <span className="truncate">ภาคฤดูร้อน (Summer)</span>
+                  </div>
+                  <span className={`text-[10px] shrink-0 ${term3.is_active ? 'text-indigo-200' : 'text-slate-500'}`}>
+                    {term3.classroom_count ?? 0} ห้อง
+                  </span>
+                </button>
               )}
             </div>
-            <p className="text-[10px] text-slate-500 truncate">
-              {activeSemester ? activeSemester.name : 'ยังไม่ได้เลือก'}
-            </p>
-          </div>
-        </div>
+          ))
+        )}
+      </div>
 
-        <ChevronDown
-          className={`w-4 h-4 text-slate-400 transition-transform duration-300 shrink-0 ${
-            isOpen ? 'rotate-180 text-indigo-600' : 'group-hover:text-slate-600'
+      {/* Footer Action */}
+      <div className="pt-2 mt-0.5 border-t border-slate-100 px-2.5">
+        <Link
+          href="/semesters"
+          onClick={() => setIsOpen(false)}
+          className="flex items-center justify-center gap-1.5 w-full py-2 px-2.5 rounded-xl bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-colors"
+        >
+          <Settings className="w-3.5 h-3.5 shrink-0" />
+          <span className="truncate">จัดการและคัดลอกข้อมูลภาคเรียน</span>
+        </Link>
+      </div>
+    </>
+  );
+
+  return (
+    <div ref={containerRef} className={`relative z-30 ${className}`}>
+      {/* Collapsed Trigger (Desktop only) */}
+      <div className={isCollapsed ? 'hidden lg:flex justify-center' : 'hidden'}>
+        <button
+          type="button"
+          ref={collapsedButtonRef}
+          onClick={() => setIsOpen(!isOpen)}
+          className={`w-10 h-10 rounded-xl flex items-center justify-center relative transition-all duration-200 group ${
+            isOpen
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+              : 'bg-indigo-50/80 hover:bg-indigo-100 border border-indigo-200/60 text-indigo-700 hover:border-indigo-300'
           }`}
-        />
-      </button>
+          aria-expanded={isOpen}
+          aria-haspopup="listbox"
+          title={activeSemester ? `ปี ${activeSemester.academic_year} เทอม ${activeSemester.term_number} (${activeSemester.name}) - คลิกเพื่อเปลี่ยน` : 'เลือกภาคเรียน'}
+        >
+          <Layers className={`w-4 h-4 transition-transform group-hover:scale-110 ${isOpen ? 'text-white' : 'text-indigo-600'}`} />
+          {activeSemester && (
+            <span className={`absolute -top-1 -right-1 text-[9px] font-black px-1.5 py-0.2 rounded-full border shadow-2xs ${
+              isOpen ? 'bg-white text-indigo-600 border-indigo-600' : 'bg-indigo-600 text-white border-white'
+            }`}>
+              {activeSemester.term_number}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Expanded Trigger (Mobile & Desktop expanded) */}
+      <div className={isCollapsed ? 'lg:hidden' : 'block'}>
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl transition-all duration-300 group text-left ${
+            isCompact
+              ? 'bg-indigo-50/80 hover:bg-indigo-100/70 border border-indigo-200/60 shadow-xs'
+              : 'bg-white/80 hover:bg-white border border-indigo-200/50 hover:border-indigo-300 shadow-xs hover:shadow-sm'
+          }`}
+          aria-expanded={isOpen}
+          aria-haspopup="listbox"
+          title="สลับปีการศึกษา / เทอม 1 หรือ เทอม 2"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+              <Layers className="w-3.5 h-3.5" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-slate-800 truncate group-hover:text-indigo-600 transition-colors">
+                  {activeSemester ? `ปี ${activeSemester.academic_year}` : 'เลือกภาคเรียน'}
+                </span>
+                {activeSemester && (
+                  <span className="text-[10px] font-black px-1.5 py-0.2 rounded-md bg-indigo-600 text-white shadow-2xs">
+                    เทอม {activeSemester.term_number}
+                  </span>
+                )}
+              </div>
+              <p className="text-[10px] text-slate-500 truncate">
+                {activeSemester ? activeSemester.name : 'ยังไม่ได้เลือก'}
+              </p>
+            </div>
+          </div>
+
+          <ChevronDown
+            className={`w-4 h-4 text-slate-400 transition-transform duration-300 shrink-0 ${
+              isOpen ? 'rotate-180 text-indigo-600' : 'group-hover:text-slate-600'
+            }`}
+          />
+        </button>
+      </div>
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className={`absolute top-full mt-2 py-2.5 bg-white border border-indigo-200/80 rounded-2xl shadow-2xl shadow-indigo-900/10 z-[100] animate-fade-in-up ${
-          isCompact ? 'right-0 w-[290px] max-w-[calc(100vw-1.5rem)]' : 'left-0 right-0 w-full'
-        }`}>
-          {/* Header */}
-          <div className="px-3 py-1.5 border-b border-slate-100 flex items-center justify-between gap-1.5">
-            <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider shrink-0">
-              เลือกภาคเรียน
-            </span>
-            {activeSemester && (
-              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 shrink-0">
-                ปัจจุบัน: เทอม {activeSemester.term_number}/{activeSemester.academic_year}
-              </span>
-            )}
-          </div>
-
-          {/* Quick Flip Toggle (1-click switch to opposite term) */}
-          {counterpartTerm && (
-            <div className="px-2.5 pt-2 pb-1">
-              <button
-                type="button"
-                onClick={() => handleSelect(counterpartTerm.id)}
-                disabled={isSwitchingId === counterpartTerm.id}
-                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-50 via-purple-50 to-indigo-50 hover:from-indigo-100 hover:to-purple-100 border border-indigo-200/80 text-indigo-900 transition-all text-xs font-bold group/flip shadow-xs"
-              >
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <ArrowRightLeft className="w-3.5 h-3.5 text-indigo-600 shrink-0 group-hover/flip:rotate-180 transition-transform duration-300" />
-                  <span className="truncate">สลับไป <strong>เทอม {counterpartTerm.term_number}/{counterpartTerm.academic_year}</strong></span>
-                </div>
-                {isSwitchingId === counterpartTerm.id ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600 shrink-0" />
-                ) : (
-                  <span className="text-[10px] text-indigo-600 font-semibold underline shrink-0 ml-1">สลับ</span>
-                )}
-              </button>
-            </div>
-          )}
-
-          {/* Grouped by Academic Year List */}
-          <div className="max-h-72 overflow-y-auto p-2.5 space-y-2.5">
-            {groupedByYear.length === 0 ? (
-              <div className="p-4 text-center text-xs text-slate-400">
-                ยังไม่มีข้อมูลภาคเรียนในระบบ
-              </div>
-            ) : (
-              groupedByYear.map(([year, { term1, term2, term3 }]) => (
-                <div key={year} className="p-2 rounded-xl bg-slate-50/80 border border-slate-200/70 space-y-1.5">
-                  <div className="flex items-center justify-between text-xs px-0.5">
-                    <span className="font-extrabold text-slate-700 flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                      <span>ปีการศึกษา {year}</span>
-                    </span>
-                    <span className="text-[10px] text-slate-500 font-medium">
-                      {term1 && term2 ? 'ครบ 2 เทอม' : term1 ? 'มีเทอม 1' : 'มีเทอม 2'}
-                    </span>
-                  </div>
-
-                  {/* 2-Column Buttons for Term 1 and Term 2 */}
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {/* Term 1 Button */}
-                    {term1 ? (
-                      <button
-                        type="button"
-                        onClick={() => handleSelect(term1.id)}
-                        disabled={isSwitchingId === term1.id}
-                        className={`flex items-center justify-between px-2 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                          term1.is_active
-                            ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20'
-                            : 'bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 border border-slate-200/80'
-                        }`}
-                      >
-                        <div className="flex items-center gap-1 min-w-0">
-                          {term1.is_active && <Check className="w-3 h-3 text-white shrink-0" />}
-                          <span className="truncate">เทอม 1</span>
-                        </div>
-                        <span className={`text-[10px] font-mono shrink-0 ${term1.is_active ? 'text-indigo-200' : 'text-slate-500'}`}>
-                          {term1.classroom_count ?? 0} ห้อง
-                        </span>
-                      </button>
-                    ) : (
-                      <Link
-                        href="/semesters"
-                        onClick={() => setIsOpen(false)}
-                        className="flex items-center justify-center gap-1 py-1.5 px-1.5 rounded-xl text-[11px] font-medium text-slate-600 hover:text-indigo-600 border border-dashed border-slate-300 hover:border-indigo-300 bg-white/50 transition-colors"
-                      >
-                        <Plus className="w-3 h-3 shrink-0" />
-                        <span className="truncate">สร้างเทอม 1</span>
-                      </Link>
-                    )}
-
-                    {/* Term 2 Button */}
-                    {term2 ? (
-                      <button
-                        type="button"
-                        onClick={() => handleSelect(term2.id)}
-                        disabled={isSwitchingId === term2.id}
-                        className={`flex items-center justify-between px-2 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                          term2.is_active
-                            ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20'
-                            : 'bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 border border-slate-200/80'
-                        }`}
-                      >
-                        <div className="flex items-center gap-1 min-w-0">
-                          {term2.is_active && <Check className="w-3 h-3 text-white shrink-0" />}
-                          <span className="truncate">เทอม 2</span>
-                        </div>
-                        <span className={`text-[10px] font-mono shrink-0 ${term2.is_active ? 'text-indigo-200' : 'text-slate-500'}`}>
-                          {term2.classroom_count ?? 0} ห้อง
-                        </span>
-                      </button>
-                    ) : (
-                      <Link
-                        href="/semesters"
-                        onClick={() => setIsOpen(false)}
-                        className="flex items-center justify-center gap-1 py-1.5 px-1.5 rounded-xl text-[11px] font-medium text-slate-600 hover:text-indigo-600 border border-dashed border-slate-300 hover:border-indigo-300 bg-white/50 transition-colors"
-                      >
-                        <Plus className="w-3 h-3 shrink-0" />
-                        <span className="truncate">สร้างเทอม 2</span>
-                      </Link>
-                    )}
-                  </div>
-
-                  {/* Optional Summer Term if exists */}
-                  {term3 && (
-                    <button
-                      type="button"
-                      onClick={() => handleSelect(term3.id)}
-                      disabled={isSwitchingId === term3.id}
-                      className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                        term3.is_active
-                          ? 'bg-indigo-600 text-white shadow-xs'
-                          : 'bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 border border-slate-200'
-                      }`}
-                    >
-                      <div className="flex items-center gap-1 min-w-0">
-                        {term3.is_active && <Check className="w-3 h-3 shrink-0" />}
-                        <span className="truncate">ภาคฤดูร้อน (Summer)</span>
-                      </div>
-                      <span className={`text-[10px] shrink-0 ${term3.is_active ? 'text-indigo-200' : 'text-slate-500'}`}>
-                        {term3.classroom_count ?? 0} ห้อง
-                      </span>
-                    </button>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-
-          {/* Footer Action */}
-          <div className="pt-2 mt-0.5 border-t border-slate-100 px-2.5">
-            <Link
-              href="/semesters"
-              onClick={() => setIsOpen(false)}
-              className="flex items-center justify-center gap-1.5 w-full py-2 px-2.5 rounded-xl bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-colors"
+        isCollapsed && mounted ? (
+          createPortal(
+            <div
+              ref={portalMenuRef}
+              style={{
+                position: 'fixed',
+                top: `${portalPos?.top ?? 75}px`,
+                left: `${portalPos?.left ?? 86}px`,
+                zIndex: 9999,
+              }}
+              className="w-[290px] py-2.5 bg-white border border-indigo-200/80 rounded-2xl shadow-2xl shadow-indigo-900/15 animate-fade-in-up"
             >
-              <Settings className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">จัดการและคัดลอกข้อมูลภาคเรียน</span>
-            </Link>
+              {dropdownBody}
+            </div>,
+            document.body
+          )
+        ) : (
+          <div className={`absolute top-full mt-2 py-2.5 bg-white border border-indigo-200/80 rounded-2xl shadow-2xl shadow-indigo-900/10 z-[100] animate-fade-in-up ${
+            isCompact ? 'right-0 w-[290px] max-w-[calc(100vw-1.5rem)]' : 'left-0 right-0 w-full'
+          }`}>
+            {dropdownBody}
           </div>
-        </div>
+        )
       )}
 
       {/* ── Confirmation Modal ── */}

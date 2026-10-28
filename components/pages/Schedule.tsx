@@ -765,7 +765,6 @@ export default function Schedule() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 mb-1">ตารางสอนประจำสัปดาห์</h1>
-          <p className="text-slate-500 text-sm">จัดการเวลาเรียนและการสอนของคุณ</p>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={() => setShowUpload(true)} className="btn btn-primary flex items-center gap-2">
@@ -1001,8 +1000,8 @@ export default function Schedule() {
             <form onSubmit={handleUploadSubmit} className="space-y-4 pt-1">
               <div
                 className={`border-2 border-dashed rounded-2xl p-6 sm:p-7 text-center transition-all cursor-pointer ${uploadFile
-                    ? 'border-indigo-400 bg-indigo-50/40 ring-2 ring-indigo-200/50'
-                    : 'border-indigo-200 hover:border-indigo-400 bg-indigo-50/20 hover:bg-indigo-50/40'
+                  ? 'border-indigo-400 bg-indigo-50/40 ring-2 ring-indigo-200/50'
+                  : 'border-indigo-200 hover:border-indigo-400 bg-indigo-50/20 hover:bg-indigo-50/40'
                   }`}
                 onClick={() => fileInputRef.current?.click()}
               >

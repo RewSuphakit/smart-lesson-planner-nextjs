@@ -97,6 +97,7 @@ export default function SemestersPage() {
   const [cloneTargetId, setCloneTargetId] = useState<number | null>(null);
   const [includeStudents, setIncludeStudents] = useState(true);
   const [includeTimetable, setIncludeTimetable] = useState(false);
+  const [cloneWarning, setCloneWarning] = useState<{ message: string; existingCount: number } | null>(null);
 
   // Helper when term or year changes in create form
   const handleTermOrYearChange = (term: number, year: string) => {
@@ -179,18 +180,25 @@ export default function SemestersPage() {
   };
 
   // Submit Clone
-  const handleCloneSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCloneSubmit = async (e?: React.FormEvent, forceOverwrite = false) => {
+    if (e) e.preventDefault();
     if (!cloneSourceId || !cloneTargetId) return;
     setIsSubmitting(true);
     try {
-      const success = await cloneSemester(cloneSourceId, {
+      const res = await cloneSemester(cloneSourceId, {
         target_semester_id: cloneTargetId,
         include_students: includeStudents,
         include_timetable: includeTimetable,
+        force_overwrite: forceOverwrite,
       });
-      if (success) {
+      if (res.success) {
+        setCloneWarning(null);
         setShowCloneModal(false);
+      } else if (res.requiresConfirmation) {
+        setCloneWarning({
+          message: res.message || 'ภาคเรียนปลายทางมีห้องเรียนอยู่แล้ว ต้องการคัดลอกเพิ่มหรือไม่?',
+          existingCount: res.existingClassrooms || 0,
+        });
       }
     } finally {
       setIsSubmitting(false);
@@ -224,6 +232,7 @@ export default function SemestersPage() {
     setCloneSourceId(sourceId || activeSemester?.id || semesters[0]?.id || null);
     const otherSemester = semesters.find(s => s.id !== (sourceId || activeSemester?.id));
     setCloneTargetId(otherSemester?.id || null);
+    setCloneWarning(null);
     setShowCloneModal(true);
   };
 
@@ -233,6 +242,7 @@ export default function SemestersPage() {
       if (e.key === 'Escape') {
         setShowCreateModal(false);
         setShowCloneModal(false);
+        setCloneWarning(null);
         setEditingSemester(null);
         setDeletingId(null);
       }
@@ -1028,7 +1038,10 @@ export default function SemestersPage() {
                 </label>
                 <select
                   value={cloneTargetId || ''}
-                  onChange={(e) => setCloneTargetId(Number(e.target.value))}
+                  onChange={(e) => {
+                    setCloneTargetId(Number(e.target.value));
+                    setCloneWarning(null);
+                  }}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   required
                 >
@@ -1066,23 +1079,59 @@ export default function SemestersPage() {
                 </label>
               </div>
 
+              {/* Duplicate Classroom Warning Box */}
+              {cloneWarning && (
+                <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-2.5">
+                  <div className="flex items-start gap-2.5">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-amber-900">ตรวจพบห้องเรียนในภาคเรียนปลายทาง ({cloneWarning.existingCount} ห้อง)</p>
+                      <p className="text-amber-700 mt-1 leading-relaxed">{cloneWarning.message}</p>
+                    </div>
+                  </div>
+                  <div className="pt-2 border-t border-amber-200/60 flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCloneWarning(null)}
+                      className="px-3 py-1.5 rounded-xl bg-white border border-amber-200 text-amber-800 hover:bg-amber-100/50 text-xs font-bold transition-colors"
+                    >
+                      ยกเลิก
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCloneSubmit(undefined, true)}
+                      disabled={isSubmitting}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs transition-colors disabled:opacity-50"
+                    >
+                      {isSubmitting && <Loader2 className="w-3 h-3 animate-spin" />}
+                      <span>ดำเนินการต่อ (คัดลอกเพิ่ม)</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Modal Actions */}
               <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2.5">
                 <button
                   type="button"
-                  onClick={() => setShowCloneModal(false)}
+                  onClick={() => {
+                    setShowCloneModal(false);
+                    setCloneWarning(null);
+                  }}
                   className="px-4 py-2 rounded-xl hover:bg-slate-100 text-slate-600 text-xs font-bold transition-colors"
                 >
                   ยกเลิก
                 </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting || !cloneSourceId || !cloneTargetId || cloneSourceId === cloneTargetId}
-                  className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-md transition-all disabled:opacity-50"
-                >
-                  {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  <span>ยืนยันการคัดลอก</span>
-                </button>
+                {!cloneWarning && (
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || !cloneSourceId || !cloneTargetId || cloneSourceId === cloneTargetId}
+                    className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-md transition-all disabled:opacity-50"
+                  >
+                    {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    <span>ยืนยันการคัดลอก</span>
+                  </button>
+                )}
               </div>
             </form>
           </div>

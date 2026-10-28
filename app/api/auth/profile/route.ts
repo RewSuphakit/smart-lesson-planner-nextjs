@@ -149,8 +149,7 @@ export async function DELETE(request: NextRequest) {
     });
 
     const response = NextResponse.json({ message: 'ลบบัญชีผู้ใช้และข้อมูลทั้งหมดเรียบร้อยแล้ว' });
-    response.cookies.set('token', '', { maxAge: 0, path: '/' });
-    response.cookies.set('auth_token', '', { maxAge: 0, path: '/' });
+    clearAuthCookie(response);
     return response;
   } catch (error) {
     if (error instanceof AuthError) return handleAuthError();

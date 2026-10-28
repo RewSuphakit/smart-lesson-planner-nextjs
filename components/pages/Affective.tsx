@@ -387,8 +387,8 @@ export default function Affective() {
                   </span>
                 )}
                 <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${activeParsed.curriculumType === 'pvs'
-                    ? 'bg-purple-50 text-purple-700 border-purple-200'
-                    : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                  ? 'bg-purple-50 text-purple-700 border-purple-200'
+                  : 'bg-indigo-50 text-indigo-700 border-indigo-200'
                   }`}>
                   {activeParsed.curriculumType === 'pvs' ? 'ปวส.' : 'ปวช.'}
                 </span>
@@ -479,7 +479,7 @@ export default function Affective() {
           classrooms={classrooms}
           onSelect={setSelectedClass}
           title="เลือกห้องเรียนเพื่อจัดการจิตพิสัย"
-          subtitle="เลือกห้องเรียนที่กำลังสอน เพื่อบวกหรือหักคะแนนพฤติกรรมในชั้นเรียนแบบเรียลไทม์"
+          subtitle=""
           icon={<HeartHandshake className="w-6 h-6" />}
           themeColor="pink"
           actionText="เริ่มให้คะแนนจิตพิสัย"
@@ -596,8 +596,8 @@ export default function Affective() {
                 <div
                   key={s.id}
                   className={`glass overflow-hidden rounded-2xl transition-all duration-300 p-5 border flex flex-col md:flex-row gap-4 bg-white ${s.affective_score < (maxAffectiveWeight * 0.5)
-                      ? 'border-rose-200 bg-rose-50/30'
-                      : 'border-indigo-100 hover:border-indigo-300'
+                    ? 'border-rose-200 bg-rose-50/30'
+                    : 'border-indigo-100 hover:border-indigo-300'
                     }`}
                 >
                   {/* Left Side: Avatar, Name and Attendance Stats */}
@@ -766,8 +766,8 @@ export default function Affective() {
               <label
                 onClick={() => setCalcMode('deductFromCurrent')}
                 className={`flex items-start gap-3.5 p-4 rounded-2xl border-2 transition-all cursor-pointer select-none ${calcMode === 'deductFromCurrent'
-                    ? 'bg-amber-50/80 border-amber-500/80 shadow-md shadow-amber-500/10'
-                    : 'bg-white border-slate-200 hover:border-slate-300'
+                  ? 'bg-amber-50/80 border-amber-500/80 shadow-md shadow-amber-500/10'
+                  : 'bg-white border-slate-200 hover:border-slate-300'
                   }`}
               >
                 <input
@@ -795,8 +795,8 @@ export default function Affective() {
               <label
                 onClick={() => setCalcMode('resetFromMax')}
                 className={`flex items-start gap-3.5 p-4 rounded-2xl border-2 transition-all cursor-pointer select-none ${calcMode === 'resetFromMax'
-                    ? 'bg-indigo-50/80 border-indigo-500/80 shadow-md shadow-indigo-500/10'
-                    : 'bg-white border-slate-200 hover:border-slate-300'
+                  ? 'bg-indigo-50/80 border-indigo-500/80 shadow-md shadow-indigo-500/10'
+                  : 'bg-white border-slate-200 hover:border-slate-300'
                   }`}
               >
                 <input
@@ -892,11 +892,10 @@ export default function Affective() {
                       key={val}
                       type="button"
                       onClick={() => setCustomWeightInput(val)}
-                      className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
-                        customWeightInput === val
+                      className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition-all cursor-pointer ${customWeightInput === val
                           ? 'bg-pink-600 text-white border-pink-600 shadow-sm'
                           : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
-                      }`}
+                        }`}
                     >
                       {val} คะแนน
                     </button>

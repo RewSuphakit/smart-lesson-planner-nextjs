@@ -6,11 +6,16 @@
  * DELETE /api/line/settings — Remove LINE channel config
  *
  * Protected by requireAuth() — only authenticated teachers
+ *
+ * Security: Channel secrets and access tokens are encrypted at rest
+ * using AES-256-GCM when ENCRYPTION_KEY is configured. Falls back
+ * to plaintext storage for backward compatibility.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
+import { encrypt, isEncryptionConfigured } from '@/lib/encryption';
 
 // GET — Retrieve current teacher's LINE channel config
 export async function GET(request: NextRequest) {
@@ -73,6 +78,7 @@ export async function GET(request: NextRequest) {
         bindingCount,
         webhookUrl,
         source: config ? 'database' : 'env',
+        encryptionEnabled: isEncryptionConfigured(),
       },
     });
   } catch (error) {
@@ -116,20 +122,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Encrypt sensitive values if ENCRYPTION_KEY is available
+    const secretValue = isEncryptionConfigured()
+      ? encrypt(channel_secret.trim())
+      : channel_secret.trim();
+    const tokenValue = isEncryptionConfigured()
+      ? encrypt(channel_access_token.trim())
+      : channel_access_token.trim();
+
     // Upsert
     const config = await prisma.lineChannelConfig.upsert({
       where: { userId: user.id },
       update: {
         channelId: channel_id.trim(),
-        channelSecret: channel_secret.trim(),
-        channelAccessToken: channel_access_token.trim(),
+        channelSecret: secretValue,
+        channelAccessToken: tokenValue,
         isActive: true,
       },
       create: {
         userId: user.id,
         channelId: channel_id.trim(),
-        channelSecret: channel_secret.trim(),
-        channelAccessToken: channel_access_token.trim(),
+        channelSecret: secretValue,
+        channelAccessToken: tokenValue,
         isActive: true,
       },
     });
@@ -143,6 +157,7 @@ export async function POST(request: NextRequest) {
         channelId: config.channelId,
         isActive: config.isActive,
         webhookUrl,
+        encryptionEnabled: isEncryptionConfigured(),
       },
     }, { status: 201 });
   } catch (error) {

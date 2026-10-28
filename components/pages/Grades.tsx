@@ -743,7 +743,7 @@ export default function Grades() {
           classrooms={classrooms}
           onSelect={setSelectedClass}
           title="เลือกห้องเรียนเพื่อดูผลการเรียนและตัดเกรด"
-          subtitle="เลือกรายวิชาและห้องเรียนเพื่อประมวลผลการตัดเกรด บันทึกคะแนนกลางภาค/ปลายภาค และออกรายงาน ศธ.02"
+          subtitle=""
           icon={<Award className="w-6 h-6" />}
           themeColor="purple"
           actionText="ดูผลการเรียน & ตัดเกรด"

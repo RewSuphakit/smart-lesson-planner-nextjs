@@ -61,6 +61,14 @@ export interface CloneSemesterInput {
   target_semester_id: number;
   include_students?: boolean;
   include_timetable?: boolean;
+  force_overwrite?: boolean;
+}
+
+export interface CloneSemesterResult {
+  success: boolean;
+  requiresConfirmation?: boolean;
+  message?: string;
+  existingClassrooms?: number;
 }
 
 export const semesterApi = {

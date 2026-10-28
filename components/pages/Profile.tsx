@@ -357,12 +357,9 @@ export default function ProfilePage() {
               {user?.role === 'admin' ? 'ผู้ดูแลระบบ (Admin)' : 'ครูผู้สอน (Teacher)'}
             </span>
           </div>
-          <h1 className="text-2xl lg:text-3xl font-bold gradient-text">
+          <h1 className="text-2xl lg:text-3xl font-bold gradient-text p-2">
             ข้อมูลส่วนตัว & ความปลอดภัย
           </h1>
-          <p className="text-slate-600 text-sm mt-0.5">
-            จัดการชื่อผู้ใช้งาน รูปประจำตัว และรหัสผ่านเพื่อความปลอดภัยของบัญชี
-          </p>
         </div>
 
         {/* Tab Switcher */}
@@ -461,9 +458,6 @@ export default function ProfilePage() {
                 <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                   <User className="w-5 h-5 text-indigo-600" /> แก้ไขข้อมูลส่วนตัว
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  เปลี่ยนชื่อที่แสดงในระบบและเลือกรูปประจำตัวของคุณ
-                </p>
               </div>
 
               <form onSubmit={handleSaveProfile} className="space-y-6">
@@ -585,7 +579,7 @@ export default function ProfilePage() {
 
                   {/* TAB 1: UPLOAD PHOTO */}
                   {avatarType === 'upload' && (
-                    <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-200 space-y-3">
+                    <div className="">
                       {isImageUrl(selectedAvatar) ? (
                         <div className="flex flex-col sm:flex-row items-center gap-4 p-3.5 bg-white rounded-2xl border border-indigo-100 shadow-xs">
                           <UserAvatar

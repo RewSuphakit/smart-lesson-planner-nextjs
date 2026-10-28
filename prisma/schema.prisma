@@ -187,6 +187,7 @@ model Attendance {
   @@index([studentId], map: "idx_attendance_student")
   @@index([classroomId, date], map: "idx_attendance_classroom_date")
   @@index([classroomId, status], map: "idx_attendance_classroom_status")
+  @@index([date], map: "idx_attendance_date")
   @@map("attendance")
 }
 
@@ -303,6 +304,7 @@ model WeeklySchedule {
   @@index([userId, dayOfWeek], map: "idx_timetable_user_day")
   @@index([semesterId], map: "idx_timetable_semester")
   @@index([userId, semesterId], map: "idx_timetable_user_semester")
+  @@index([classroomId], map: "idx_timetable_classroom")
   @@map("weekly_schedules")
 }
 
@@ -321,6 +323,7 @@ model LineBinding {
   @@unique([lineUserId, studentCode], map: "unique_line_binding")
   @@index([lineUserId], map: "idx_line_binding_user")
   @@index([studentCode], map: "idx_line_binding_code")
+  @@index([classroomId], map: "idx_line_binding_classroom")
   @@map("line_bindings")
 }
 

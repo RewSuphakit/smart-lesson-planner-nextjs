@@ -1227,8 +1227,8 @@ export default function Scores() {
                   </span>
                 )}
                 <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${activeParsed.curriculumType === 'pvs'
-                    ? 'bg-purple-50 text-purple-700 border-purple-200'
-                    : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                  ? 'bg-purple-50 text-purple-700 border-purple-200'
+                  : 'bg-indigo-50 text-indigo-700 border-indigo-200'
                   }`}>
                   {activeParsed.curriculumType === 'pvs' ? 'ปวส.' : 'ปวช.'}
                 </span>
@@ -1282,7 +1282,7 @@ export default function Scores() {
           classrooms={classrooms}
           onSelect={(id) => handleClassroomSelectChange(id)}
           title="เลือกห้องเรียนเพื่อจัดการคะแนน"
-          subtitle="เลือกรายวิชาและห้องเรียนเพื่อดูภาพรวมสถิติ กำหนดโครงสร้างคะแนนเต็ม และกรอกคะแนนเก็บรายสัปดาห์"
+          subtitle=""
           icon={<BookOpen className="w-6 h-6" />}
           themeColor="indigo"
           actionText="เปิดสมุดคะแนนห้องนี้"

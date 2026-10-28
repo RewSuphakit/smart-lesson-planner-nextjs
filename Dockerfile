@@ -66,16 +66,14 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
+# คัดลอก node_modules สำหรับ production ก่อน
+COPY --from=deps-prod /app/node_modules ./node_modules
+
 # คัดลอก Prisma schema + client ที่ generate แล้ว สำหรับรัน migration ตอน startup
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
-
-# คัดลอก node_modules สำหรับ production (เขียนทับ modules ที่ standalone มีไม่ครบ)
-COPY --from=deps-prod /app/node_modules ./node_modules
-# คัดลอก Prisma client ที่ generate แล้วทับอีกครั้ง (deps-prod ไม่มี)
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
 # สร้างโฟลเดอร์ uploads และตั้งค่า ownership
 RUN mkdir -p /app/public/uploads && \

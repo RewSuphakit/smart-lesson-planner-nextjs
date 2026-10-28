@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { calculateAffectiveScore } from '@/lib/affective';
 import { resolveTargetWeeks, getCurrentWeek } from '@/lib/semester';
+import { decryptIfPresent, encryptIfPresent } from '@/lib/encryption';
 import {
   verifyLineSignature,
   replyMessage,
@@ -93,8 +94,13 @@ export async function POST(request: NextRequest) {
 
     let matchedConfig: { channelSecret: string; channelAccessToken: string; userId: number } | null = null;
     for (const config of activeConfigs) {
-      if (verifyLineSignature(rawBody, signature, config.channelSecret)) {
-        matchedConfig = config;
+      const secret = decryptIfPresent(config.channelSecret);
+      if (verifyLineSignature(rawBody, signature, secret)) {
+        matchedConfig = {
+          channelSecret: secret,
+          channelAccessToken: decryptIfPresent(config.channelAccessToken),
+          userId: config.userId,
+        };
         break;
       }
     }
@@ -127,15 +133,15 @@ export async function POST(request: NextRequest) {
             where: { userId: teacherUserId },
             update: {
               channelId: envChannelId,
-              channelSecret: envSecret,
-              channelAccessToken: envToken,
+              channelSecret: encryptIfPresent(envSecret),
+              channelAccessToken: encryptIfPresent(envToken),
               isActive: true,
             },
             create: {
               userId: teacherUserId,
               channelId: envChannelId,
-              channelSecret: envSecret,
-              channelAccessToken: envToken,
+              channelSecret: encryptIfPresent(envSecret),
+              channelAccessToken: encryptIfPresent(envToken),
               isActive: true,
             },
           });
@@ -620,15 +626,15 @@ async function handleScoreQuery(
   const criteria = dbCriteria.length > 0
     ? dbCriteria.map((c) => ({ grade: c.grade, minScore: Number(c.minScore) }))
     : [
-        { grade: '4', minScore: 80 },
-        { grade: '3.5', minScore: 75 },
-        { grade: '3', minScore: 70 },
-        { grade: '2.5', minScore: 65 },
-        { grade: '2', minScore: 60 },
-        { grade: '1.5', minScore: 55 },
-        { grade: '1', minScore: 50 },
-        { grade: '0', minScore: 0 },
-      ];
+      { grade: '4', minScore: 80 },
+      { grade: '3.5', minScore: 75 },
+      { grade: '3', minScore: 70 },
+      { grade: '2.5', minScore: 65 },
+      { grade: '2', minScore: 60 },
+      { grade: '1.5', minScore: 55 },
+      { grade: '1', minScore: 50 },
+      { grade: '0', minScore: 0 },
+    ];
 
   let finalGrade = '0';
   if (isF) {
@@ -763,7 +769,7 @@ async function handleAttendanceQuery(
         `🟡 สาย: ${lateCount} ครั้ง\n` +
         `🔴 ขาด: ${absentCount} ครั้ง\n` +
         `🔵 ลา: ${leaveCount} ครั้ง\n\n` +
-        `ขาดรวม (แปลงแล้ว): ${totalConverted}/${maxAllowedAbsences}\n` +
+        `ขาดรวม: ${totalConverted}/${maxAllowedAbsences}\n` +
         `เหลือขาดได้อีก: ${remaining} ครั้ง\n` +
         `อัตราเข้าเรียน: ${attendancePercent}%`
       ),
