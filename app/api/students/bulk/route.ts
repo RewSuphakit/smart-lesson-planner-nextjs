@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
       skipDuplicates: true,
     });
 
+    invalidateCache(userCacheKey(user.id, 'students'));
     invalidateCache(userCacheKey(user.id, 'classrooms'));
     invalidateCache(userCacheKey(user.id, 'dashboard'));
 

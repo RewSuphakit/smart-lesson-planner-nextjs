@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { formatAttendanceRecord, calculateAttendanceStatsFromGrouped } from '@/lib/formatters';
-import { invalidateCache, userCacheKey } from '@/lib/cache';
+import { getOrSetCache, invalidateCache, userCacheKey } from '@/lib/cache';
 import { validateData, BulkRecordAttendanceSchema, RecordAttendanceSchema } from '@/lib/validation';
 
 export async function GET(request: NextRequest) {
@@ -70,6 +70,30 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ data: records.map(formatAttendanceRecord) });
     }
 
+    // Distinct attendance dates for a classroom (lightweight alternative to type=records)
+    if (classroomId && searchParams.get('type') === 'dates') {
+      const classroom = await prisma.classroom.findFirst({
+        where: { id: Number(classroomId), userId: user.id },
+        select: { id: true },
+      });
+      if (!classroom) return NextResponse.json({ message: 'Classroom not found' }, { status: 404 });
+
+      const grouped = await getOrSetCache(
+        userCacheKey(user.id, 'attendance:dates', Number(classroomId)),
+        45,
+        async () => {
+          const rows = await prisma.attendance.groupBy({
+            by: ['date'],
+            where: { classroomId: Number(classroomId) },
+            _count: true,
+            orderBy: { date: 'asc' },
+          });
+          return rows.map(r => ({ date: r.date.toISOString().split('T')[0], count: r._count }));
+        }
+      );
+      return NextResponse.json({ data: grouped });
+    }
+
     // Get all individual attendance records for a classroom (e.g. for Scores matrix week-date mapping)
     if (classroomId && (searchParams.get('type') === 'records' || searchParams.get('records') === 'true')) {
       const classroom = await prisma.classroom.findFirst({
@@ -77,28 +101,40 @@ export async function GET(request: NextRequest) {
       });
       if (!classroom) return NextResponse.json({ message: 'Classroom not found' }, { status: 404 });
 
-      const records = await prisma.attendance.findMany({
-        where: { classroomId: Number(classroomId) },
-        orderBy: { date: 'asc' },
-      });
-      return NextResponse.json({ data: records.map(formatAttendanceRecord) });
+      const formatted = await getOrSetCache(
+        userCacheKey(user.id, 'attendance:records', Number(classroomId)),
+        45,
+        async () => {
+          const records = await prisma.attendance.findMany({
+            where: { classroomId: Number(classroomId) },
+            orderBy: { date: 'asc' },
+          });
+          return records.map(formatAttendanceRecord);
+        }
+      );
+      return NextResponse.json({ data: formatted });
     }
 
-    // Get stats
+    // Get stats (cached for 45s)
     if (classroomId) {
-      // Verify classroom ownership
-      const classroom = await prisma.classroom.findFirst({
-        where: { id: Number(classroomId), userId: user.id },
-      });
-      if (!classroom) return NextResponse.json([], { status: 200 });
+      const stats = await getOrSetCache(
+        userCacheKey(user.id, 'attendance:stats', Number(classroomId)),
+        45,
+        async () => {
+          const classroom = await prisma.classroom.findFirst({
+            where: { id: Number(classroomId), userId: user.id },
+          });
+          if (!classroom) return [];
 
-      const groupedCounts = await prisma.attendance.groupBy({
-        by: ['studentId', 'status'],
-        where: { classroomId: Number(classroomId) },
-        _count: true,
-      });
+          const groupedCounts = await prisma.attendance.groupBy({
+            by: ['studentId', 'status'],
+            where: { classroomId: Number(classroomId) },
+            _count: true,
+          });
 
-      const stats = calculateAttendanceStatsFromGrouped(groupedCounts, classroom);
+          return calculateAttendanceStatsFromGrouped(groupedCounts, classroom);
+        }
+      );
       return NextResponse.json({ data: stats });
     }
 
@@ -168,7 +204,8 @@ export async function POST(request: NextRequest) {
         where: {
           classroomId: { in: classroomIds },
           studentId: { in: studentIds },
-          date: { in: Array.from(new Set(dedupedList.map(r => r.date))) },
+          // Dedupe by timestamp (Set of Date objects would compare by reference)
+          date: { in: Array.from(new Set(dedupedList.map(r => r.date.getTime()))).map(t => new Date(t)) },
         },
         select: { id: true, studentId: true, classroomId: true, date: true, status: true },
       });
@@ -224,6 +261,8 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      invalidateCache(userCacheKey(user.id, 'attendance'));
+      invalidateCache(userCacheKey(user.id, 'grades'));
       invalidateCache(userCacheKey(user.id, 'dashboard'));
       return NextResponse.json({ message: 'Attendance marked' });
     }
@@ -265,6 +304,8 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    invalidateCache(userCacheKey(user.id, 'attendance'));
+    invalidateCache(userCacheKey(user.id, 'grades'));
     invalidateCache(userCacheKey(user.id, 'dashboard'));
     return NextResponse.json({ message: 'Attendance marked' });
   } catch (error) {
@@ -300,6 +341,8 @@ export async function DELETE(request: NextRequest) {
       if (!attendance) return NextResponse.json({ message: 'Attendance record not found' }, { status: 404 });
 
       await prisma.attendance.delete({ where: { id: numericId } });
+      invalidateCache(userCacheKey(user.id, 'attendance'));
+      invalidateCache(userCacheKey(user.id, 'grades'));
       invalidateCache(userCacheKey(user.id, 'dashboard'));
       return NextResponse.json({ message: 'Attendance deleted' });
     }
@@ -349,6 +392,8 @@ export async function DELETE(request: NextRequest) {
       });
     }
 
+    invalidateCache(userCacheKey(user.id, 'attendance'));
+    invalidateCache(userCacheKey(user.id, 'grades'));
     invalidateCache(userCacheKey(user.id, 'dashboard'));
     return NextResponse.json({ message: 'Attendance deleted' });
   } catch (error) {

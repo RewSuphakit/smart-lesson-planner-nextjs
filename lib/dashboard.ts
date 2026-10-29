@@ -17,6 +17,7 @@ import {
   resolveTargetWeeks,
   getSemesterEndDate,
   getActiveSemester,
+  type ClassroomSemesterFields,
 } from '@/lib/semester';
 import { getAttendanceConfig, computeAbsentConversion } from '@/lib/formatters';
 
@@ -154,28 +155,29 @@ export async function calculateAtRiskStudents(
 
   const atRiskStudents: AtRiskStudent[] = [];
 
-  const students = await withDbRetry(() =>
-    prisma.student.findMany({
-      where: { classroomId: { in: classroomIds }, userId },
-      select: {
-        id: true,
-        name: true,
-        studentCode: true,
-        classroomId: true,
-      },
-    })
-  );
-
-  const attendanceCountsGrouped = await withDbRetry(() =>
-    prisma.attendance.groupBy({
-      by: ['studentId', 'classroomId', 'status'],
-      where: {
-        classroomId: { in: classroomIds },
-        status: { in: ['absent', 'late', 'leave'] },
-      },
-      _count: true,
-    })
-  );
+  const [students, attendanceCountsGrouped] = await Promise.all([
+    withDbRetry(() =>
+      prisma.student.findMany({
+        where: { classroomId: { in: classroomIds }, userId },
+        select: {
+          id: true,
+          name: true,
+          studentCode: true,
+          classroomId: true,
+        },
+      })
+    ),
+    withDbRetry(() =>
+      prisma.attendance.groupBy({
+        by: ['studentId', 'classroomId', 'status'],
+        where: {
+          classroomId: { in: classroomIds },
+          status: { in: ['absent', 'late', 'leave'] },
+        },
+        _count: true,
+      })
+    ),
+  ]);
 
   const attStatsMap = new Map<string, { absent: number; late: number; leave: number }>();
   for (const row of attendanceCountsGrouped) {
@@ -196,7 +198,7 @@ export async function calculateAtRiskStudents(
     const classroom = classroomMap.get(student.classroomId);
     if (!classroom) continue;
 
-    const attConfig = getAttendanceConfig(classroom as any);
+    const attConfig = getAttendanceConfig(classroom);
     const stats = attStatsMap.get(`${student.id}_${student.classroomId}`) || {
       absent: 0,
       late: 0,
@@ -313,10 +315,14 @@ export async function fetchDashboardData(userId: number): Promise<DashboardData>
   for (const c of classrooms) {
     const effectiveStartDate = c.semesterStartDate || activeSemester?.startDate || null;
     if (effectiveStartDate) {
-      const tempClassroom = { ...c, semesterStartDate: effectiveStartDate };
-      const isEnded = isClassroomSemesterEnded(tempClassroom as any, todayDate);
-      const isTeachingActive = isClassroomTeachingActive(tempClassroom as any, todayDate);
-      const endDate = getSemesterEndDate(effectiveStartDate, resolveTargetWeeks(c as any));
+      const tempClassroom: ClassroomSemesterFields = {
+        curriculumType: c.curriculumType,
+        totalWeeks: c.totalWeeks,
+        semesterStartDate: effectiveStartDate,
+      };
+      const isEnded = isClassroomSemesterEnded(tempClassroom, todayDate);
+      const isTeachingActive = isClassroomTeachingActive(tempClassroom, todayDate);
+      const endDate = getSemesterEndDate(effectiveStartDate, resolveTargetWeeks(c));
 
       if (!maxSemesterEndDate || endDate > maxSemesterEndDate) {
         maxSemesterEndDate = endDate;
@@ -332,28 +338,28 @@ export async function fetchDashboardData(userId: number): Promise<DashboardData>
 
   const isSemesterEnded = classroomsWithDates.length > 0 && allClassroomsEnded;
 
-  // At-risk students
-  const atRiskStudents = await calculateAtRiskStudents(userId, classrooms);
-
-  // Today's timetable
-  const rawTodayTimetable = await withDbRetry(() =>
-    prisma.weeklySchedule.findMany({
-      where: {
-        userId,
-        dayOfWeek: schemaDayOfWeek,
-        ...(activeSemester ? { semesterId: activeSemester.id } : {}),
-      },
-      include: {
-        classroom: {
-          select: {
-            id: true,
-            name: true,
+  // At-risk students & Today's timetable (Parallelized)
+  const [atRiskStudents, rawTodayTimetable] = await Promise.all([
+    calculateAtRiskStudents(userId, classrooms),
+    withDbRetry(() =>
+      prisma.weeklySchedule.findMany({
+        where: {
+          userId,
+          dayOfWeek: schemaDayOfWeek,
+          ...(activeSemester ? { semesterId: activeSemester.id } : {}),
+        },
+        include: {
+          classroom: {
+            select: {
+              id: true,
+              name: true,
+            },
           },
         },
-      },
-      orderBy: [{ startPeriod: 'asc' }],
-    })
-  );
+        orderBy: [{ startPeriod: 'asc' }],
+      })
+    ),
+  ]);
 
   const todayTimetable = isSemesterEnded
     ? []

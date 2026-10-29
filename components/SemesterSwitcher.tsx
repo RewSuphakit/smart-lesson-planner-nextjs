@@ -304,74 +304,72 @@ export default function SemesterSwitcher({ className = '', isCompact = false, is
 
   return (
     <div ref={containerRef} className={`relative z-30 ${className}`}>
-      {/* Collapsed Trigger (Desktop only) */}
-      <div className={isCollapsed ? 'hidden lg:flex justify-center' : 'hidden'}>
-        <button
-          type="button"
-          ref={collapsedButtonRef}
-          onClick={() => setIsOpen(!isOpen)}
-          className={`w-10 h-10 rounded-xl flex items-center justify-center relative transition-all duration-200 group ${
-            isOpen
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-              : 'bg-indigo-50/80 hover:bg-indigo-100 border border-indigo-200/60 text-indigo-700 hover:border-indigo-300'
-          }`}
-          aria-expanded={isOpen}
-          aria-haspopup="listbox"
-          title={activeSemester ? `ปี ${activeSemester.academic_year} เทอม ${activeSemester.term_number} (${activeSemester.name}) - คลิกเพื่อเปลี่ยน` : 'เลือกภาคเรียน'}
-        >
-          <Layers className={`w-4 h-4 transition-transform group-hover:scale-110 ${isOpen ? 'text-white' : 'text-indigo-600'}`} />
-          {activeSemester && (
-            <span className={`absolute -top-1 -right-1 text-[9px] font-black px-1.5 py-0.2 rounded-full border shadow-2xs ${
-              isOpen ? 'bg-white text-indigo-600 border-indigo-600' : 'bg-indigo-600 text-white border-white'
-            }`}>
-              {activeSemester.term_number}
-            </span>
-          )}
-        </button>
-      </div>
-
-      {/* Expanded Trigger (Mobile & Desktop expanded) */}
-      <div className={isCollapsed ? 'lg:hidden' : 'block'}>
-        <button
-          type="button"
-          onClick={() => setIsOpen(!isOpen)}
-          className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl transition-all duration-300 group text-left ${
-            isCompact
-              ? 'bg-indigo-50/80 hover:bg-indigo-100/70 border border-indigo-200/60 shadow-xs'
-              : 'bg-white/80 hover:bg-white border border-indigo-200/50 hover:border-indigo-300 shadow-xs hover:shadow-sm'
-          }`}
-          aria-expanded={isOpen}
-          aria-haspopup="listbox"
-          title="สลับปีการศึกษา / เทอม 1 หรือ เทอม 2"
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shrink-0 shadow-xs group-hover:scale-105 transition-transform">
-              <Layers className="w-3.5 h-3.5" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-slate-800 truncate group-hover:text-indigo-600 transition-colors">
-                  {activeSemester ? `ปี ${activeSemester.academic_year}` : 'เลือกภาคเรียน'}
-                </span>
-                {activeSemester && (
-                  <span className="text-[10px] font-black px-1.5 py-0.2 rounded-md bg-indigo-600 text-white shadow-2xs">
-                    เทอม {activeSemester.term_number}
-                  </span>
-                )}
-              </div>
-              <p className="text-[10px] text-slate-500 truncate">
-                {activeSemester ? activeSemester.name : 'ยังไม่ได้เลือก'}
-              </p>
-            </div>
+      {/* Unified Trigger Button with smooth collapse/expand transition */}
+      <button
+        type="button"
+        ref={collapsedButtonRef}
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full flex items-center rounded-xl transition-all duration-300 group text-left relative overflow-hidden ${
+          isCompact
+            ? 'px-3 py-2 justify-between gap-2 bg-indigo-50/80 hover:bg-indigo-100/70 border border-indigo-200/60 shadow-xs'
+            : isCollapsed
+              ? 'px-3 py-2 justify-between gap-2 bg-white/80 hover:bg-white border border-indigo-200/50 hover:border-indigo-300 shadow-xs lg:h-10 lg:px-2.5 lg:justify-center lg:bg-indigo-50/80 lg:hover:bg-indigo-100 lg:border-indigo-200/60 lg:text-indigo-700 lg:shadow-2xs'
+              : 'px-3 py-2 justify-between gap-2 bg-white/80 hover:bg-white border border-indigo-200/50 hover:border-indigo-300 shadow-xs hover:shadow-sm'
+        }`}
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
+        title={
+          isCollapsed && activeSemester
+            ? `ปี ${activeSemester.academic_year} เทอม ${activeSemester.term_number} (${activeSemester.name}) - คลิกเพื่อเปลี่ยน`
+            : 'สลับปีการศึกษา / เทอม 1 หรือ เทอม 2'
+        }
+      >
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shrink-0 shadow-xs group-hover:scale-105 transition-transform relative">
+            <Layers className="w-3.5 h-3.5" />
+            {activeSemester && (
+              <span className={`absolute -top-1.5 -right-1.5 text-[9px] font-black px-1.5 py-0.2 rounded-full bg-indigo-600 text-white border border-white shadow-2xs transition-all duration-300 ${
+                isCollapsed ? 'opacity-0 lg:opacity-100 scale-100' : 'opacity-0 scale-75 pointer-events-none'
+              }`}>
+                {activeSemester.term_number}
+              </span>
+            )}
           </div>
+          <div
+            className={`min-w-0 overflow-hidden transition-all duration-300 ease-in-out ${
+              isCollapsed
+                ? 'max-w-[160px] opacity-100 lg:max-w-0 lg:opacity-0 lg:-translate-x-2'
+                : 'max-w-[160px] opacity-100 translate-x-0'
+            }`}
+          >
+            <div className="flex items-center gap-1.5 whitespace-nowrap">
+              <span className="text-xs font-bold text-slate-800 truncate group-hover:text-indigo-600 transition-colors">
+                {activeSemester ? `ปี ${activeSemester.academic_year}` : 'เลือกภาคเรียน'}
+              </span>
+              {activeSemester && (
+                <span className="text-[10px] font-black px-1.5 py-0.2 rounded-md bg-indigo-600 text-white shadow-2xs">
+                  เทอม {activeSemester.term_number}
+                </span>
+              )}
+            </div>
+            <p className="text-[10px] text-slate-500 truncate whitespace-nowrap">
+              {activeSemester ? activeSemester.name : 'ยังไม่ได้เลือก'}
+            </p>
+          </div>
+        </div>
 
+        <div
+          className={`transition-all duration-300 ease-in-out shrink-0 overflow-hidden ${
+            isCollapsed ? 'max-w-6 opacity-100 lg:max-w-0 lg:opacity-0 lg:scale-75' : 'max-w-6 opacity-100 scale-100'
+          }`}
+        >
           <ChevronDown
-            className={`w-4 h-4 text-slate-400 transition-transform duration-300 shrink-0 ${
+            className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${
               isOpen ? 'rotate-180 text-indigo-600' : 'group-hover:text-slate-600'
             }`}
           />
-        </button>
-      </div>
+        </div>
+      </button>
 
       {/* Dropdown Menu */}
       {isOpen && (

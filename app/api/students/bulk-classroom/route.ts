@@ -33,6 +33,9 @@ export async function PUT(request: NextRequest) {
       },
     });
 
+    invalidateCache(userCacheKey(user.id, 'students'));
+    invalidateCache(userCacheKey(user.id, 'grades'));
+    invalidateCache(userCacheKey(user.id, 'scores'));
     invalidateCache(userCacheKey(user.id, 'classrooms'));
     invalidateCache(userCacheKey(user.id, 'dashboard'));
 

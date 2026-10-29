@@ -8,7 +8,7 @@ import {
   Loader2, Users, Save, Calendar as CalendarIcon, CheckCircle, Clock, XCircle,
   FileText, AlertCircle, X, History, Trash2, ChevronLeft, ChevronRight,
   Search, Check, Grid, List, RefreshCw, Sparkles, RotateCcw,
-  FileSpreadsheet, Upload, BookOpen, GraduationCap, ArrowRight, ClipboardCheck
+  FileSpreadsheet, Upload, BookOpen, GraduationCap, ArrowRight
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import dynamic from 'next/dynamic';

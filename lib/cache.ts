@@ -11,6 +11,21 @@ interface CacheEntry<T> {
   expiresAt: number; // timestamp in ms
 }
 
+/**
+ * On serverless platforms (Vercel / AWS Lambda) each instance has its own memory, so
+ * cache invalidation on one instance is invisible to the others. Cap TTLs there so
+ * stale data is bounded to a few seconds. Override with CACHE_MAX_TTL_SECONDS.
+ * On a single long-lived server the requested TTL is used unchanged.
+ */
+const SERVERLESS_MAX_TTL_SECONDS = 8;
+
+function getMaxTtlSeconds(): number {
+  const override = Number(process.env.CACHE_MAX_TTL_SECONDS);
+  if (Number.isFinite(override) && override > 0) return override;
+  const isServerless = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+  return isServerless ? SERVERLESS_MAX_TTL_SECONDS : Infinity;
+}
+
 export class MemoryCache {
   private cache = new Map<string, CacheEntry<unknown>>();
   private maxEntries: number;
@@ -52,6 +67,7 @@ export class MemoryCache {
    * Evicts least recently used items if maxEntries is reached.
    */
   set<T>(key: string, value: T, ttlSeconds: number): void {
+    ttlSeconds = Math.min(ttlSeconds, getMaxTtlSeconds());
     if (this.cache.has(key)) {
       this.cache.delete(key);
     } else if (this.cache.size >= this.maxEntries) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
+import { getOrSetCache, userCacheKey } from '@/lib/cache';
 
 /**
  * GET /api/students/branches
@@ -11,19 +12,25 @@ export async function GET(request: NextRequest) {
   try {
     const user = requireAuth(request);
 
-    const branches = await prisma.student.findMany({
-      where: {
-        userId: user.id,
-        branch: { not: null },
-      },
-      select: { branch: true },
-      distinct: ['branch'],
-      orderBy: { branch: 'asc' },
-    });
+    const branchList = await getOrSetCache(
+      userCacheKey(user.id, 'students', 'branches'),
+      120,
+      async () => {
+        const branches = await prisma.student.findMany({
+          where: {
+            userId: user.id,
+            branch: { not: null },
+          },
+          select: { branch: true },
+          distinct: ['branch'],
+          orderBy: { branch: 'asc' },
+        });
 
-    const branchList = branches
-      .map(b => b.branch)
-      .filter((b): b is string => b !== null && b.trim() !== '');
+        return branches
+          .map(b => b.branch)
+          .filter((b): b is string => b !== null && b.trim() !== '');
+      }
+    );
 
     return NextResponse.json({ data: branchList });
   } catch (error) {

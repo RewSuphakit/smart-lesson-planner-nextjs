@@ -59,6 +59,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       },
     });
 
+    invalidateCache(userCacheKey(user.id, 'timetable'));
     invalidateCache(userCacheKey(user.id, 'dashboard'));
 
     return NextResponse.json({ message: 'Timetable moved successfully' });

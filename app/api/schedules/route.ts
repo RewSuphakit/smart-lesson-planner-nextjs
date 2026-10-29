@@ -3,7 +3,7 @@ import { ScheduleStatus } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { parseTimeToUtc } from '@/lib/constants';
-import { getWeekNumberForDate, getSemesterEndDate, resolveTargetWeeks } from '@/lib/semester';
+import { getWeekNumberForDate, getSemesterEndDate, resolveTargetWeeks, getActiveSemesterId } from '@/lib/semester';
 import { invalidateCache, userCacheKey } from '@/lib/cache';
 
 function isFlagpoleOrHomeroom(ws: { startPeriod?: number; entryType?: string; subjectName?: string | null; subjectCode?: string | null }) {
@@ -47,17 +47,32 @@ export async function GET(request: NextRequest) {
     const startUtc = new Date(Date.UTC(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0));
     const endUtc = new Date(Date.UTC(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999));
 
-    // Get classrooms with semester information
-    const classrooms = await prisma.classroom.findMany({
-      where: { userId: user.id },
-      select: {
-        id: true,
-        name: true,
-        semesterStartDate: true,
-        totalWeeks: true,
-        curriculumType: true,
-      },
-    });
+    // Scope weekly slots to the active semester (same rule as dashboard); cached lookup
+    const activeSemesterId = await getActiveSemesterId(user.id);
+
+    // Parallel fetch: classrooms, weekly schedules, and concrete schedules in single round-trip
+    const [classrooms, weeklySchedules, concreteSchedules] = await Promise.all([
+      prisma.classroom.findMany({
+        where: { userId: user.id },
+        select: {
+          id: true,
+          name: true,
+          semesterStartDate: true,
+          totalWeeks: true,
+          curriculumType: true,
+        },
+      }),
+      prisma.weeklySchedule.findMany({
+        where: { userId: user.id, ...(activeSemesterId ? { semesterId: activeSemesterId } : {}) },
+      }),
+      prisma.schedule.findMany({
+        where: {
+          userId: user.id,
+          scheduledDate: { gte: startUtc, lte: endUtc },
+        },
+        orderBy: [{ scheduledDate: 'asc' }, { startTime: 'asc' }],
+      }),
+    ]);
 
     let minSemesterStart: Date | null = null;
     let maxSemesterEnd: Date | null = null;
@@ -73,20 +88,6 @@ export async function GET(request: NextRequest) {
         if (cWeeks > maxTotalWeeks) maxTotalWeeks = cWeeks;
       }
     }
-
-    // Get weekly schedules
-    const weeklySchedules = await prisma.weeklySchedule.findMany({
-      where: { userId: user.id },
-    });
-
-    // Get concrete schedules
-    const concreteSchedules = await prisma.schedule.findMany({
-      where: {
-        userId: user.id,
-        scheduledDate: { gte: startUtc, lte: endUtc },
-      },
-      orderBy: [{ scheduledDate: 'asc' }, { startTime: 'asc' }],
-    });
 
     // Sort classrooms by name length descending so longer/more specific names match first (prevents "ปวช.1" matching before "ปวช.1/2")
     const sortedClassrooms = [...classrooms].sort((a, b) => b.name.length - a.name.length);

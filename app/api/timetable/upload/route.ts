@@ -113,7 +113,13 @@ async function callGeminiWithFallback(
   genAI: GoogleGenerativeAI,
   parts: (string | { inlineData: { data: string; mimeType: string } })[]
 ) {
-  const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+  const customModel = process.env.GEMINI_MODEL;
+  const models = [
+    ...(customModel ? [customModel] : []),
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
+  ];
   let lastError: Error | null = null;
 
   for (const modelName of models) {
@@ -546,6 +552,7 @@ export async function POST(request: NextRequest) {
       createdCount = created.count;
     }
 
+    invalidateCache(userCacheKey(user.id, 'timetable'));
     invalidateCache(userCacheKey(user.id, 'dashboard'));
 
     return NextResponse.json({

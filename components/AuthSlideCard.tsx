@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import {
-  GraduationCap, Loader2, Mail, Lock, User,
+  Loader2, Mail, Lock, User,
   Eye, EyeOff, ArrowRight, Check,
   KeyRound, RotateCcw, ArrowLeft
 } from 'lucide-react';
@@ -695,6 +695,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
 
             {/* Top brand */}
             <div className="relative z-10 flex items-center gap-2 text-indigo-200 text-xs font-medium tracking-wide">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/logo.png" alt="Logo" className="w-5 h-5 rounded-md object-cover shadow-xs" />
               <span>SMART LESSON PLANNER</span>
             </div>

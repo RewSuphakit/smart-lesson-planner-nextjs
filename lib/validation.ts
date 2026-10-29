@@ -34,7 +34,8 @@ export const CreateStudentSchema = z.object({
   branch: z.string().trim().nullable().optional(),
   email: z.string().trim().email('Invalid email address').nullable().optional().or(z.literal('')),
   classroom_id: z.number().nullable().optional(),
-  avatar: z.string().nullable().optional(),
+  // Cap avatar payload (client compresses to ~3-8 KB WebP; 150k chars leaves generous headroom)
+  avatar: z.string().max(150_000, 'Avatar is too large').nullable().optional(),
 });
 
 export const BulkCreateStudentSchema = z.object({

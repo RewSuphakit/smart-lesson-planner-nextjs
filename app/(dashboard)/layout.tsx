@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Calendar, Users,
   LogOut, Menu, GraduationCap,
   Presentation, CheckCircle, Award, CheckSquare,
-  Smile, UserCog, Mail, Layers, ChevronsLeft, ChevronsRight,
+  Smile, UserCog, Mail, Layers, ChevronsLeft,
   type LucideIcon
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
@@ -110,26 +110,31 @@ function NavItem({
         }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        title={label}
-        className={`flex items-center gap-3 rounded-xl text-[0.82rem] font-medium transition-all duration-200 group relative ${isCollapsed
-            ? 'justify-start lg:justify-center px-3.5 lg:px-0 py-2 lg:py-2.5 lg:w-11 lg:h-11 lg:mx-auto'
-            : 'px-3.5 py-2'
-          } ${isActive
-            ? isCollapsed
-              ? 'bg-indigo-100/80 text-indigo-700 font-bold shadow-xs border border-indigo-200/60 lg:bg-indigo-600 lg:text-white lg:shadow-md lg:shadow-indigo-600/30 lg:border-indigo-600'
-              : 'bg-indigo-100/80 text-indigo-700 font-bold shadow-xs shadow-indigo-200/40 border border-indigo-200/60'
+        title={isCollapsed ? label : undefined}
+        className={`flex items-center rounded-xl text-[0.82rem] font-medium transition-colors duration-150 group relative h-10 w-full overflow-hidden ${
+          isCollapsed
+            ? 'px-3 justify-start gap-3 lg:px-2.5 lg:justify-center lg:gap-0'
+            : 'px-3 justify-start gap-3'
+        } ${
+          isActive
+            ? 'bg-indigo-100/80 text-indigo-700 font-bold shadow-xs border border-indigo-200/60'
             : 'text-slate-600 hover:bg-indigo-50/70 hover:text-indigo-600 border border-transparent'
-          }`}
+        }`}
       >
-        <Icon
-          className={`w-[18px] h-[18px] transition-transform duration-200 group-hover:scale-110 shrink-0 ${isActive
-              ? isCollapsed
-                ? 'text-indigo-600 lg:text-white'
-                : 'text-indigo-600'
-              : 'text-slate-400 group-hover:text-indigo-600'
+        <div className="w-5 h-5 flex items-center justify-center shrink-0">
+          <Icon
+            className={`w-[18px] h-[18px] transition-transform duration-200 group-hover:scale-110 shrink-0 ${
+              isActive ? 'text-indigo-600' : 'text-slate-400 group-hover:text-indigo-600'
             }`}
-        />
-        <span className={`truncate ${isCollapsed ? 'lg:hidden' : ''}`}>
+          />
+        </div>
+        <span
+          className={`truncate whitespace-nowrap transition-all duration-300 ease-in-out ${
+            isCollapsed
+              ? 'max-w-[160px] opacity-100 translate-x-0 lg:max-w-0 lg:opacity-0 lg:-translate-x-2'
+              : 'max-w-[160px] opacity-100 translate-x-0'
+          }`}
+        >
           {label}
         </span>
       </Link>
@@ -157,22 +162,25 @@ function NavItem({
   );
 }
 
-function CollapsedTooltip({
+function CollapsedTooltip<T extends HTMLElement>({
   label,
+  enabled = true,
   children,
 }: {
   label: string;
+  enabled?: boolean;
   children: (props: {
     onMouseEnter: () => void;
     onMouseLeave: () => void;
-    ref: React.RefObject<any>;
+    ref: React.RefObject<T | null>;
   }) => React.ReactNode;
 }) {
   const [show, setShow] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
-  const ref = useRef<any>(null);
+  const ref = useRef<T | null>(null);
 
   const onMouseEnter = () => {
+    if (!enabled) return;
     if (ref.current) {
       const rect = ref.current.getBoundingClientRect();
       setPos({
@@ -195,7 +203,7 @@ function CollapsedTooltip({
   return (
     <>
       {children({ onMouseEnter, onMouseLeave, ref })}
-      {show && typeof document !== 'undefined' && createPortal(
+      {show && enabled && typeof document !== 'undefined' && createPortal(
         <div
           style={{
             position: 'fixed',
@@ -220,6 +228,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   // Restore collapsed preference
   useEffect(() => {
@@ -228,9 +237,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       if (saved === 'true') {
         setIsCollapsed(true);
       }
-    } catch (e) {
+    } catch {
       // ignore
     }
+    setMounted(true);
   }, []);
 
   const toggleSidebar = () => {
@@ -238,7 +248,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       const next = !prev;
       try {
         localStorage.setItem('smart_planner_sidebar_collapsed', String(next));
-      } catch (e) {
+      } catch {
         // ignore
       }
       return next;
@@ -282,7 +292,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen w-full overflow-x-hidden">
       {/* Mobile overlay - zero blur for 60fps mobile animation */}
       {sidebarOpen && (
         <div
@@ -293,86 +303,88 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Sidebar - GPU accelerated with smooth width and transform transitions */}
       <aside className={`
-        fixed lg:sticky lg:top-0 h-screen h-[100dvh] max-h-screen inset-y-0 left-0 z-50
+        fixed lg:sticky lg:top-0 h-screen h-[100dvh] max-h-screen inset-y-0 left-0 z-50 shrink-0
         ${isCollapsed ? 'w-[270px] lg:w-[76px]' : 'w-[270px]'}
         bg-white lg:bg-white/80 lg:backdrop-blur-2xl
         border-r border-indigo-200/40
         flex flex-col justify-between overflow-x-hidden
-        transition-all duration-300 ease-in-out will-change-[width,transform]
+        ${mounted ? 'transition-[width,transform] duration-300 ease-in-out' : ''}
         shadow-2xl shadow-indigo-950/20 lg:shadow-lg lg:shadow-indigo-100/30
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         {/* Logo and Collapse Toggle */}
-        <div className={`shrink-0 transition-all duration-300 ${isCollapsed ? 'p-3 pb-2' : 'p-5 lg:p-6 pb-3'}`}>
-          {/* Desktop Collapsed Header */}
-          <div className={isCollapsed ? 'hidden lg:flex flex-col items-center gap-2' : 'hidden'}>
-            <div
-              className="w-10 h-10 rounded-2xl overflow-hidden flex items-center justify-center shadow-lg shadow-indigo-300/30 animate-pulse-glow shrink-0 border border-indigo-200/50 cursor-pointer hover:scale-105 transition-transform"
-              onClick={toggleSidebar}
-              title="คลิกเพื่อขยายเมนู"
-            >
-              <img src="/logo.png" alt="Smart Planner Logo" className="w-full h-full object-cover" />
-            </div>
-            <button
-              type="button"
-              onClick={toggleSidebar}
-              title="ขยายเมนู"
-              aria-label="ขยายเมนู"
-              className="flex items-center justify-center w-8 h-8 rounded-xl bg-indigo-50/80 hover:bg-indigo-100 text-indigo-600 transition-colors shadow-2xs"
-            >
-              <ChevronsRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Expanded Header (Mobile + Desktop Expanded) */}
-          <div className={isCollapsed ? 'flex lg:hidden items-center justify-between' : 'flex items-center justify-between'}>
-            <div className="flex items-center gap-3.5 min-w-0">
-              <div className="w-11 h-11 rounded-2xl overflow-hidden flex items-center justify-center shadow-lg shadow-indigo-300/30 animate-pulse-glow shrink-0 border border-indigo-200/50">
+        <div className={`shrink-0 transition-all duration-300 ${isCollapsed ? 'p-3.5 lg:p-3 pb-2' : 'p-4 pb-2'}`}>
+          <div className={`flex items-center transition-all duration-300 ${isCollapsed ? 'justify-between lg:flex-col lg:gap-2' : 'justify-between'}`}>
+            <div className="flex items-center gap-3 min-w-0 overflow-hidden">
+              <div
+                className="w-10 h-10 rounded-2xl overflow-hidden flex items-center justify-center shadow-md shadow-indigo-300/30 animate-pulse-glow shrink-0 border border-indigo-200/50 cursor-pointer hover:scale-105 transition-transform"
+                onClick={isCollapsed ? toggleSidebar : undefined}
+                title={isCollapsed ? 'คลิกเพื่อขยายเมนู' : 'Smart Planner'}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/logo.png" alt="Smart Planner Logo" className="w-full h-full object-cover" />
               </div>
-              <div className="min-w-0">
-                <h1 className="text-[1.05rem] font-bold gradient-text truncate">
+              <div className={`min-w-0 overflow-hidden transition-all duration-300 ease-in-out ${
+                isCollapsed
+                  ? 'max-w-[140px] opacity-100 lg:max-w-0 lg:opacity-0 lg:-translate-x-2'
+                  : 'max-w-[140px] opacity-100 translate-x-0'
+              }`}>
+                <h1 className="text-[1.05rem] font-bold gradient-text whitespace-nowrap">
                   Smart Planner
                 </h1>
-
               </div>
             </div>
+
+            {/* Collapse / Expand Toggle Button (Desktop) */}
             <button
               type="button"
               onClick={toggleSidebar}
-              title="ย่อเมนู (เหลือแต่ไอคอน)"
-              aria-label="ย่อเมนู"
-              className="hidden lg:flex items-center justify-center w-8 h-8 rounded-xl hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition-colors shrink-0"
+              title={isCollapsed ? 'ขยายเมนู' : 'ย่อเมนู (เหลือแต่ไอคอน)'}
+              aria-label={isCollapsed ? 'ขยายเมนู' : 'ย่อเมนู'}
+              className={`hidden lg:flex items-center justify-center w-8 h-8 rounded-xl transition-all duration-300 shrink-0 ${
+                isCollapsed
+                  ? 'bg-indigo-50/80 hover:bg-indigo-100 text-indigo-600 shadow-2xs'
+                  : 'hover:bg-indigo-50 text-slate-400 hover:text-indigo-600'
+              }`}
             >
-              <ChevronsLeft className="w-4 h-4" />
+              <ChevronsLeft className={`w-4 h-4 transition-transform duration-300 ${isCollapsed ? 'rotate-180 text-indigo-600' : ''}`} />
             </button>
           </div>
         </div>
 
         {/* Semester Switcher */}
-        <div className={`pb-2 relative z-30 shrink-0 transition-all duration-300 ${isCollapsed ? 'px-3 lg:px-2' : 'px-4'}`}>
+        <div className={`pb-2 relative z-30 shrink-0 transition-all duration-300 ${isCollapsed ? 'px-3 lg:px-2' : 'px-3'}`}>
           <SemesterSwitcher isCollapsed={isCollapsed} />
         </div>
 
-        <div className={`shrink-0 transition-all duration-300 ${isCollapsed ? 'divider mx-5 lg:hidden' : 'divider mx-5'}`} />
+        <div className={`shrink-0 transition-all duration-300 ${isCollapsed ? 'divider mx-3 lg:mx-2 opacity-50' : 'divider mx-4 opacity-100'}`} />
 
         {/* Navigation */}
-        <nav className={`flex-1 py-2 space-y-3 overflow-y-auto min-h-0 transition-all duration-300 ${isCollapsed ? 'px-4 lg:px-2' : 'px-4'
-          }`}>
+        <nav className={`flex-1 py-2 space-y-3 overflow-y-auto min-h-0 transition-all duration-300 ${
+          isCollapsed ? 'px-3 lg:px-2' : 'px-3'
+        }`}>
           {navSections.map((section, sIdx) => (
             <div key={sIdx} className="space-y-1">
               {section.title && (
-                <>
-                  <p className={`text-[0.62rem] font-bold text-slate-400 uppercase tracking-wider px-3 pt-1.5 pb-0.5 ${isCollapsed ? 'lg:hidden' : ''
-                    }`}>
-                    {section.title}
-                  </p>
-                  {isCollapsed && (
-                    <div className="hidden lg:flex justify-center my-2">
-                      <div className="w-7 h-[1px] bg-slate-200/80" />
-                    </div>
-                  )}
-                </>
+                <div className="overflow-hidden transition-all duration-300 ease-in-out">
+                  <div className={`transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap ${
+                    isCollapsed
+                      ? 'max-h-8 opacity-100 my-1 lg:max-h-0 lg:opacity-0 lg:-translate-y-1 lg:my-0'
+                      : 'max-h-8 opacity-100 translate-y-0 my-1'
+                  }`}>
+                    <p className="text-[0.62rem] font-bold text-slate-400 uppercase tracking-wider px-3.5 pt-1.5 pb-0.5">
+                      {section.title}
+                    </p>
+                  </div>
+                  {/* Subtle separator when collapsed on desktop */}
+                  <div className={`transition-all duration-300 ease-in-out hidden lg:flex justify-center overflow-hidden ${
+                    isCollapsed
+                      ? 'max-h-4 opacity-100 my-2'
+                      : 'max-h-0 opacity-0 my-0 pointer-events-none'
+                  }`}>
+                    <div className="w-7 h-[1px] bg-slate-200/80 shrink-0" />
+                  </div>
+                </div>
               )}
               <div className="space-y-0.5">
                 {section.items.map(({ path, icon, label }) => (
@@ -392,19 +404,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
 
         {/* User Profile */}
-        <div className={`pt-2 shrink-0 border-t border-indigo-100/60 bg-white/95 transition-all duration-300 ${isCollapsed ? 'p-3 lg:p-2' : 'p-4'
+        <div className={`pt-2 shrink-0 border-t border-indigo-100/60 bg-white/95 transition-all duration-300 ${
+          isCollapsed ? 'p-3 lg:p-2' : 'p-3'
+        }`}>
+          <div className={`rounded-2xl transition-all duration-300 ${
+            isCollapsed
+              ? 'bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-200/40 p-2.5 shadow-2xs lg:bg-transparent lg:border-transparent lg:p-0 lg:shadow-none'
+              : 'bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-200/40 p-2.5 shadow-2xs'
           }`}>
-          {/* Collapsed view on desktop */}
-          {isCollapsed && (
-            <div className="hidden lg:flex flex-col items-center gap-2">
-              <CollapsedTooltip label={`โปรไฟล์: ${user?.name || ''} (${user?.role === 'admin' ? 'ผู้ดูแลระบบ' : 'ครูผู้สอน'})`}>
+            <div className={`flex items-center transition-all duration-300 ${
+              isCollapsed ? 'justify-between gap-2.5 lg:flex-col lg:gap-2' : 'justify-between gap-2.5'
+            }`}>
+              <CollapsedTooltip<HTMLAnchorElement>
+                label={`โปรไฟล์: ${user?.name || ''} (${user?.role === 'admin' ? 'ผู้ดูแลระบบ' : 'ครูผู้สอน'})`}
+                enabled={isCollapsed}
+              >
                 {({ onMouseEnter, onMouseLeave, ref }) => (
                   <Link
                     ref={ref}
                     href="/profile"
                     onMouseEnter={onMouseEnter}
                     onMouseLeave={onMouseLeave}
-                    className="p-1 rounded-2xl hover:bg-indigo-50 transition-all group flex items-center justify-center"
+                    className={`flex items-center rounded-xl transition-all duration-300 min-w-0 group ${
+                      isCollapsed ? 'gap-2.5 flex-1 lg:p-1 lg:hover:bg-indigo-50 lg:justify-center lg:flex-initial' : 'gap-2.5 flex-1'
+                    }`}
                     title="แก้ไขข้อมูลส่วนตัว"
                   >
                     <UserAvatar
@@ -412,62 +435,46 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       name={user?.name}
                       userId={user?.id}
                       size="md"
-                      className="transition-transform duration-200 group-hover:scale-105 shadow-xs"
+                      className="transition-transform duration-300 group-hover:scale-105 shadow-xs shrink-0"
                     />
+                    <div className={`min-w-0 overflow-hidden transition-all duration-300 ease-in-out ${
+                      isCollapsed
+                        ? 'max-w-[130px] opacity-100 lg:max-w-0 lg:opacity-0 lg:-translate-x-2'
+                        : 'max-w-[130px] opacity-100 translate-x-0'
+                    }`}>
+                      <p className="text-xs font-bold text-slate-700 truncate group-hover:text-indigo-600 transition-colors whitespace-nowrap">
+                        {user?.name}
+                      </p>
+                      <p className="text-[0.65rem] text-indigo-700 font-semibold truncate whitespace-nowrap">
+                        {user?.role === 'admin' ? 'ผู้ดูแลระบบ' : 'ครูผู้สอน'}
+                      </p>
+                    </div>
                   </Link>
                 )}
               </CollapsedTooltip>
 
-              <CollapsedTooltip label="ออกจากระบบ">
+              <CollapsedTooltip<HTMLButtonElement>
+                label="ออกจากระบบ"
+                enabled={isCollapsed}
+              >
                 {({ onMouseEnter, onMouseLeave, ref }) => (
                   <button
                     ref={ref}
                     onClick={handleLogout}
                     onMouseEnter={onMouseEnter}
                     onMouseLeave={onMouseLeave}
-                    className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-rose-50 text-slate-400 hover:text-rose-500 transition-all"
+                    className={`rounded-xl flex items-center justify-center transition-all duration-300 shrink-0 ${
+                      isCollapsed
+                        ? 'p-2 hover:bg-rose-100 text-slate-400 hover:text-rose-600 lg:w-9 lg:h-9 lg:p-0 lg:hover:bg-rose-50 lg:hover:text-rose-500'
+                        : 'p-2 hover:bg-rose-100 text-slate-400 hover:text-rose-600'
+                    }`}
                     title="ออกจากระบบ"
+                    aria-label="ออกจากระบบ"
                   >
                     <LogOut className="w-4 h-4 text-rose-500" />
                   </button>
                 )}
               </CollapsedTooltip>
-            </div>
-          )}
-
-          {/* Expanded view (Mobile or Desktop expanded) */}
-          <div className={isCollapsed ? 'lg:hidden' : 'block'}>
-            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-200/30 p-3.5 rounded-2xl transition-all duration-300 hover:shadow-md hover:border-indigo-300/60">
-              <div className="flex items-center gap-3">
-                <Link
-                  href="/profile"
-                  className="flex items-center gap-3 flex-1 min-w-0 group"
-                  title="แก้ไขข้อมูลส่วนตัว"
-                >
-                  <UserAvatar
-                    avatar={user?.avatar}
-                    name={user?.name}
-                    userId={user?.id}
-                    size="md"
-                    className="transition-transform duration-300 group-hover:scale-110 shadow-sm"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-700 truncate group-hover:text-indigo-600 transition-colors">
-                      {user?.name}
-                    </p>
-                    <p className="text-[0.68rem] text-indigo-700 font-semibold">
-                      {user?.role === 'admin' ? 'ผู้ดูแลระบบ' : 'ครูผู้สอน'}
-                    </p>
-                  </div>
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="p-2 rounded-xl hover:bg-rose-100 text-slate-600 hover:text-rose-500 transition-all duration-300"
-                  title="ออกจากระบบ"
-                >
-                  <LogOut className="w-4 h-4 text-rose-500" />
-                </button>
-              </div>
             </div>
           </div>
         </div>

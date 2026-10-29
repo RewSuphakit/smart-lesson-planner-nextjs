@@ -281,7 +281,7 @@ async function handlePostback(
   event: LineEvent,
   lineUserId: string,
   accessToken: string,
-  teacherUserId: number
+  _teacherUserId: number
 ) {
   const data = event.postback!.data;
   const params = new URLSearchParams(data);
@@ -349,7 +349,7 @@ async function handleBind(
   lineUserId: string,
   studentCode: string,
   accessToken: string,
-  teacherUserId: number
+  _teacherUserId: number
 ) {
   // Search all classrooms for this student across all teachers (Shared Bot model)
   const students = await prisma.student.findMany({
@@ -468,7 +468,7 @@ async function handleSwitchClassroom(
   replyToken: string,
   lineUserId: string,
   accessToken: string,
-  teacherUserId: number
+  _teacherUserId: number
 ) {
   const binding = await prisma.lineBinding.findFirst({
     where: { lineUserId },
@@ -942,7 +942,7 @@ async function handleMissingTasksQuery(
 
 // ==================== Helpers ====================
 
-async function resolveStudentContext(lineUserId: string, teacherUserId: number) {
+async function resolveStudentContext(lineUserId: string, _teacherUserId: number) {
   // Find binding
   const binding = await prisma.lineBinding.findFirst({
     where: { lineUserId },

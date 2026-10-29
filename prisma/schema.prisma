@@ -90,7 +90,6 @@ model Schedule {
 
   user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId], map: "idx_schedules_user")
   @@index([scheduledDate], map: "idx_schedules_date")
   @@index([userId, scheduledDate], map: "idx_schedules_user_date")
   @@map("schedules")
@@ -131,7 +130,6 @@ model Classroom {
   weeklySchedules WeeklySchedule[]
   lineBindings    LineBinding[]
 
-  @@index([userId], map: "idx_classrooms_user")
   @@index([semesterId], map: "idx_classrooms_semester")
   @@index([userId, semesterId], map: "idx_classrooms_user_semester")
   @@map("classrooms")
@@ -159,8 +157,6 @@ model Student {
   attendance    Attendance[]
   studentScores StudentScore[]
 
-  @@index([userId], map: "idx_students_user")
-  @@index([classroomId], map: "idx_students_classroom")
   @@index([userId, classroomId], map: "idx_students_user_classroom")
   @@index([classroomId, name], map: "idx_students_classroom_name")
   @@index([classroomId, studentCode], map: "idx_students_classroom_code")
@@ -183,10 +179,10 @@ model Attendance {
   classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, classroomId, date], map: "unique_attendance")
-  @@index([classroomId], map: "idx_attendance_classroom")
   @@index([studentId], map: "idx_attendance_student")
   @@index([classroomId, date], map: "idx_attendance_classroom_date")
   @@index([classroomId, status], map: "idx_attendance_classroom_status")
+  @@index([classroomId, studentId, status], map: "idx_attendance_classroom_student_status")
   @@index([date], map: "idx_attendance_date")
   @@map("attendance")
 }
@@ -240,9 +236,8 @@ model StudentScore {
   classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, classroomId, lessonNumber], map: "unique_student_score")
-  @@index([classroomId], map: "idx_student_scores_classroom")
-  @@index([studentId], map: "idx_student_scores_student")
   @@index([classroomId, lessonNumber], map: "idx_student_scores_classroom_lesson")
+  @@index([classroomId, studentId], map: "idx_student_scores_classroom_student")
   @@map("student_scores")
 }
 
@@ -299,8 +294,6 @@ model WeeklySchedule {
   classroom Classroom? @relation(fields: [classroomId], references: [id], onDelete: SetNull)
   semesterRef Semester? @relation(fields: [semesterId], references: [id], onDelete: SetNull)
 
-  @@index([userId], map: "idx_timetable_user")
-  @@index([dayOfWeek], map: "idx_timetable_day")
   @@index([userId, dayOfWeek], map: "idx_timetable_user_day")
   @@index([semesterId], map: "idx_timetable_semester")
   @@index([userId, semesterId], map: "idx_timetable_user_semester")
@@ -323,7 +316,7 @@ model LineBinding {
   @@unique([lineUserId, studentCode], map: "unique_line_binding")
   @@index([lineUserId], map: "idx_line_binding_user")
   @@index([studentCode], map: "idx_line_binding_code")
-  @@index([classroomId], map: "idx_line_binding_classroom")
+  @@index([classroomId], map: "line_bindings_classroom_id_fkey")
   @@map("line_bindings")
 }
 

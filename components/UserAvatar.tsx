@@ -23,6 +23,7 @@ export function isImageUrl(str?: string | null): boolean {
     s.startsWith('http://') ||
     s.startsWith('https://') ||
     s.startsWith('/uploads/') ||
+    s.startsWith('/api/students/') ||
     s.startsWith('data:image/') ||
     s.startsWith('blob:')
   );

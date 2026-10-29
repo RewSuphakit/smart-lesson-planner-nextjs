@@ -4,7 +4,7 @@ import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { SemesterSchema, validateRequestBody } from '@/lib/validation';
 import { CurriculumType } from '@prisma/client';
 import { getDefaultWeeks } from '@/lib/semester';
-import { invalidateCache, userCacheKey } from '@/lib/cache';
+import { getOrSetCache, invalidateCache, userCacheKey } from '@/lib/cache';
 
 /**
  * GET /api/semester
@@ -49,42 +49,46 @@ export async function GET(request: NextRequest) {
     if (academicYear) where.academicYear = academicYear;
     if (activeOnly) where.isActive = true;
 
-    const semesters = await prisma.semester.findMany({
-      where,
-      include: {
-        classrooms: {
-          select: { id: true, curriculumType: true },
-        },
-        _count: {
-          select: { classrooms: true, weeklySchedules: true },
-        },
-      },
-      orderBy: [{ academicYear: 'desc' }, { termNumber: 'asc' }],
-    });
+    const cacheKey = userCacheKey(userId, 'semesters', academicYear || 'all', String(activeOnly));
 
-    const result = semesters.map(s => {
-      const pvchCount = s.classrooms.filter(c => c.curriculumType === 'pvch').length;
-      const pvsCount = s.classrooms.filter(c => c.curriculumType === 'pvs').length;
-      const customCount = s.classrooms.filter(c => c.curriculumType === 'custom').length;
+    const result = await getOrSetCache(cacheKey, 60, async () => {
+      const semesters = await prisma.semester.findMany({
+        where,
+        include: {
+          classrooms: {
+            select: { id: true, curriculumType: true },
+          },
+          _count: {
+            select: { classrooms: true, weeklySchedules: true },
+          },
+        },
+        orderBy: [{ academicYear: 'desc' }, { termNumber: 'asc' }],
+      });
 
-      return {
-        id: s.id,
-        name: s.name,
-        term_number: s.termNumber,
-        academic_year: s.academicYear,
-        start_date: s.startDate ? s.startDate.toISOString().split('T')[0] : null,
-        end_date: s.endDate ? s.endDate.toISOString().split('T')[0] : null,
-        is_active: s.isActive,
-        curriculum_type: s.curriculumType,
-        total_weeks: s.totalWeeks,
-        classroom_count: s._count.classrooms,
-        pvch_count: pvchCount,
-        pvs_count: pvsCount,
-        custom_count: customCount,
-        timetable_count: s._count.weeklySchedules,
-        created_at: s.createdAt,
-        updated_at: s.updatedAt,
-      };
+      return semesters.map(s => {
+        const pvchCount = s.classrooms.filter(c => c.curriculumType === 'pvch').length;
+        const pvsCount = s.classrooms.filter(c => c.curriculumType === 'pvs').length;
+        const customCount = s.classrooms.filter(c => c.curriculumType === 'custom').length;
+
+        return {
+          id: s.id,
+          name: s.name,
+          term_number: s.termNumber,
+          academic_year: s.academicYear,
+          start_date: s.startDate ? s.startDate.toISOString().split('T')[0] : null,
+          end_date: s.endDate ? s.endDate.toISOString().split('T')[0] : null,
+          is_active: s.isActive,
+          curriculum_type: s.curriculumType,
+          total_weeks: s.totalWeeks,
+          classroom_count: s._count.classrooms,
+          pvch_count: pvchCount,
+          pvs_count: pvsCount,
+          custom_count: customCount,
+          timetable_count: s._count.weeklySchedules,
+          created_at: s.createdAt,
+          updated_at: s.updatedAt,
+        };
+      });
     });
 
     return NextResponse.json({ data: result });
@@ -165,6 +169,7 @@ export async function POST(request: NextRequest) {
     });
 
     invalidateCache(userCacheKey(user.id, 'semester'));
+    invalidateCache(userCacheKey(user.id, 'semesters'));
     invalidateCache(userCacheKey(user.id, 'classrooms'));
     invalidateCache(userCacheKey(user.id, 'dashboard'));
 

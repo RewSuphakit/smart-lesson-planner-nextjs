@@ -644,6 +644,17 @@ export default function Scores() {
     };
   }, [students, structures, matrixScores, classroomObj]);
 
+  // Index of `${studentId}_${YYYY-MM-DD}` -> status (first match wins, same as the previous Array.find)
+  const attendanceStatusIndex = useMemo(() => {
+    const index = new Map<string, string>();
+    for (const r of allClassAttendance) {
+      if (!r.status) continue;
+      const key = `${r.student_id}_${parseSafeDateStr(r.date)}`;
+      if (!index.has(key)) index.set(key, r.status);
+    }
+    return index;
+  }, [allClassAttendance]);
+
   // Helper to determine attendance status for any student in a given week
   const getStudentAttendanceStatus = useCallback((studentId: string | number, weekLesson: string | number, targetDate?: string): string => {
     const idStr = String(studentId);
@@ -655,12 +666,10 @@ export default function Scores() {
       return attendanceRecords[idStr];
     }
 
-    // 2. Check in allClassAttendance by student_id and dateStr
-    if (dateStr && allClassAttendance.length > 0) {
-      const match = allClassAttendance.find(
-        r => String(r.student_id) === idStr && parseSafeDateStr(r.date) === dateStr
-      );
-      if (match && match.status) return match.status;
+    // 2. Check in allClassAttendance by student_id and dateStr (O(1) via precomputed index)
+    if (dateStr) {
+      const matchStatus = attendanceStatusIndex.get(`${idStr}_${dateStr}`);
+      if (matchStatus) return matchStatus;
     }
 
     // 3. Fallback to weekAttendanceMap by studentId_weekNum
@@ -674,7 +683,7 @@ export default function Scores() {
     }
 
     return '';
-  }, [attendanceRecords, allClassAttendance, weekAttendanceMap, calculatedWeekDates, weekDateMap, attendanceDate, selectedLesson]);
+  }, [attendanceRecords, attendanceStatusIndex, weekAttendanceMap, calculatedWeekDates, weekDateMap, attendanceDate, selectedLesson]);
 
   // Weekly displayed students: hide absent students when in weekly focus
   const weeklyDisplayedStudents = useMemo(() => {

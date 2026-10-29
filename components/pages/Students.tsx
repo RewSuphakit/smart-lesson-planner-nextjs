@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
 import {
   Plus, Edit, Trash2, X, Users as UsersIcon, Loader2, Search,
-  GraduationCap, Upload, CheckCircle, FileSpreadsheet, Eye,
+  GraduationCap, Upload, CheckCircle, FileSpreadsheet,
   Camera, Sparkles, Image as ImageIcon, GitBranch
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -243,7 +243,7 @@ export default function Students() {
 
   const isMutating = saveMutation.isPending || deleteMutation.isPending || bulkAssignMutation.isPending || bulkDeleteMutation.isPending || deleteAllMutation.isPending || importMutation.isPending;
 
-  const handleExport = async () => {
+  const _handleExport = async () => {
     if (filtered.length === 0) {
       toast.error('ไม่มีข้อมูลนักเรียนสำหรับส่งออก');
       return;
@@ -338,7 +338,17 @@ export default function Students() {
     }
   };
 
-  const handleEdit = (s: Student) => {
+  const handleEdit = async (s: Student) => {
+    // List responses expose avatars as lightweight URLs; load the real value only when editing
+    let avatar = s.avatar || '';
+    if (avatar.startsWith('/api/students/')) {
+      try {
+        const res = await api.get('/students/' + s.id);
+        avatar = res.data?.data?.avatar || '';
+      } catch {
+        avatar = '';
+      }
+    }
     setForm({
       name: s.name,
       student_code: s.student_code || '',
@@ -346,7 +356,7 @@ export default function Students() {
       branch: s.branch || '',
       email: s.email || '',
       classroom_id: s.classroom_id ? String(s.classroom_id) : '',
-      avatar: s.avatar || '',
+      avatar,
       remove_avatar: false
     });
     setEditing(s.id);

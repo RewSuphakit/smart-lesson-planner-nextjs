@@ -35,38 +35,67 @@ export async function GET(request: NextRequest) {
     });
     if (!classroom) return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
 
-    // Composite Matrix Mode (Single payload response)
+    // Composite Matrix Mode (Single payload response with caching)
     if (mode === 'matrix') {
-      const [students, structures, scores] = await Promise.all([
-        prisma.student.findMany({
-          where: { classroomId: numericClassroomId, userId: user.id },
-          select: {
-            id: true,
-            studentCode: true,
-            name: true,
-            classroomId: true,
-            midtermScore: true,
-            finalScore: true,
-            affectiveScore: true,
-          },
-          orderBy: [{ studentCode: 'asc' }, { name: 'asc' }],
-        }),
-        prisma.scoreStructure.findMany({
-          where: { classroomId: numericClassroomId },
-          orderBy: { lessonNumber: 'asc' },
-        }),
-        prisma.studentScore.findMany({
-          where: { classroomId: numericClassroomId },
-        }),
-      ]);
+      const matrixData = await getOrSetCache(
+        userCacheKey(user.id, 'scores:matrix', numericClassroomId),
+        45,
+        async () => {
+          const [students, structures, scores] = await Promise.all([
+            prisma.student.findMany({
+              where: { classroomId: numericClassroomId, userId: user.id },
+              select: {
+                id: true,
+                studentCode: true,
+                name: true,
+                classroomId: true,
+                midtermScore: true,
+                finalScore: true,
+                affectiveScore: true,
+              },
+              orderBy: [{ studentCode: 'asc' }, { name: 'asc' }],
+            }),
+            prisma.scoreStructure.findMany({
+              where: { classroomId: numericClassroomId },
+              select: {
+                id: true,
+                classroomId: true,
+                lessonNumber: true,
+                lessonName: true,
+                maxAssignmentScore: true,
+                maxPostTestScore: true,
+                hours: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+              orderBy: { lessonNumber: 'asc' },
+            }),
+            prisma.studentScore.findMany({
+              where: { classroomId: numericClassroomId },
+              select: {
+                id: true,
+                studentId: true,
+                classroomId: true,
+                lessonNumber: true,
+                assignmentScore: true,
+                postTestScore: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+            }),
+          ]);
+
+          return {
+            classroom,
+            students: students.map(formatStudentListItem),
+            structures: structures.map(formatScoreStructureResponse),
+            scores: scores.map(formatScoreResponse),
+          };
+        }
+      );
 
       return NextResponse.json({
-        data: {
-          classroom,
-          students: students.map(formatStudentListItem),
-          structures: structures.map(formatScoreStructureResponse),
-          scores: scores.map(formatScoreResponse),
-        },
+        data: matrixData,
       });
     }
 
@@ -183,6 +212,8 @@ export async function POST(request: NextRequest) {
         }
       }
       invalidateCache(userCacheKey(user.id, 'scores:structure', classroomId));
+      invalidateCache(userCacheKey(user.id, 'scores:matrix', classroomId));
+      invalidateCache(userCacheKey(user.id, 'grades:report', classroomId));
       return NextResponse.json({ message: 'Structure saved successfully' });
     }
 
@@ -262,15 +293,24 @@ export async function POST(request: NextRequest) {
             skipDuplicates: true,
           });
         }
-        for (const upd of updates) {
-          const { id, ...updateData } = upd;
-          await tx.studentScore.update({
-            where: { id },
-            data: updateData,
-          });
+        const BATCH_SIZE = 25;
+        for (let i = 0; i < updates.length; i += BATCH_SIZE) {
+          const batch = updates.slice(i, i + BATCH_SIZE);
+          await Promise.all(
+            batch.map((upd) => {
+              const { id, ...updateData } = upd;
+              return tx.studentScore.update({
+                where: { id },
+                data: updateData,
+              });
+            })
+          );
         }
       });
 
+      // Prefixes must match the cached keys: `scores:matrix:{cid}` and `grades:report:{cid}`
+      invalidateCache(userCacheKey(user.id, 'scores:matrix', classroomId));
+      invalidateCache(userCacheKey(user.id, 'grades:report', classroomId));
       invalidateCache(userCacheKey(user.id, 'dashboard'));
 
       return NextResponse.json({ message: 'Scores saved successfully', updatedCount: creates.length + updates.length });
@@ -429,6 +469,8 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      invalidateCache(userCacheKey(user.id, 'scores:matrix', classroomId));
+      invalidateCache(userCacheKey(user.id, 'grades:report', classroomId));
       invalidateCache(userCacheKey(user.id, 'dashboard'));
 
       return NextResponse.json({

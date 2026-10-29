@@ -6,8 +6,9 @@ function getDatasourceUrl(): string | undefined {
 
   // In serverless environments (Vercel/AWS Lambda), keep per-container connection limit low (2)
   // to prevent concurrent serverless functions from exhausting MySQL's max_connections pool.
+  // In server/docker environments, increase to 20 to eliminate pool queuing under concurrent page loads.
   const isServerless = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
-  const defaultLimit = isServerless ? '2' : '10';
+  const defaultLimit = isServerless ? '2' : '20';
 
   try {
     const parsed = new URL(url);

@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { PERIOD_TIMES, parseTimeToUtc } from '@/lib/constants';
 import { getActiveSemesterId } from '@/lib/semester';
-import { invalidateCache, userCacheKey } from '@/lib/cache';
+import { getOrSetCache, invalidateCache, userCacheKey } from '@/lib/cache';
 
 function normalizeEntryType(type?: string | null): 'lecture' | 'lab' | 'activity' | 'homeroom' {
   const lower = String(type || '').toLowerCase().trim();
@@ -20,58 +20,63 @@ export async function GET(request: NextRequest) {
     const semesterIdParam = searchParams.get('semester_id');
     const allSemesters = searchParams.get('all') === 'true';
 
-    // Build where clause with semester scoping
-    const where: Record<string, unknown> = { userId: user.id };
+    const cacheKey = userCacheKey(user.id, 'timetable', allSemesters ? 'all' : (semesterIdParam || 'active'));
+    const data = await getOrSetCache(cacheKey, 60, async () => {
+      // Build where clause with semester scoping
+      const where: Record<string, unknown> = { userId: user.id };
 
-    if (!allSemesters) {
-      if (semesterIdParam) {
-        const semesterId = Number(semesterIdParam);
-        if (!isNaN(semesterId) && semesterId > 0) {
-          where.semesterId = semesterId;
-        }
-      } else {
-        const activeSemesterId = await getActiveSemesterId(user.id);
-        if (activeSemesterId) {
-          where.semesterId = activeSemesterId;
+      if (!allSemesters) {
+        if (semesterIdParam) {
+          const semesterId = Number(semesterIdParam);
+          if (!isNaN(semesterId) && semesterId > 0) {
+            where.semesterId = semesterId;
+          }
+        } else {
+          const activeSemesterId = await getActiveSemesterId(user.id);
+          if (activeSemesterId) {
+            where.semesterId = activeSemesterId;
+          }
         }
       }
-    }
 
-    const entries = await prisma.weeklySchedule.findMany({
-      where,
-      orderBy: [{ dayOfWeek: 'asc' }, { startPeriod: 'asc' }],
-    });
-    const mappedEntries = entries.map(e => {
-      const hours = e.startPeriod === 0 ? 0 : (e.endPeriod - e.startPeriod + 1);
-      return {
-        id: e.id,
-        day_of_week: e.dayOfWeek,
-        start_period: e.startPeriod,
-        end_period: e.endPeriod,
-        start_time: e.startTime ? e.startTime.toISOString().split('T')[1].slice(0, 5) : null,
-        end_time: e.endTime ? e.endTime.toISOString().split('T')[1].slice(0, 5) : null,
-        subject_code: e.subjectCode,
-        subject_name: e.subjectName,
-        room: e.room,
-        instructor: e.instructor,
-        group_name: e.groupName,
-        hours: hours,
-        entry_type: e.entryType,
-        color: e.color,
-        classroom_id: e.classroomId
-      };
-    });
-    const summaryMap = new Map();
-    mappedEntries.forEach(e => {
-      if (!e.subject_code) return;
-      if (!summaryMap.has(e.subject_code)) {
-        summaryMap.set(e.subject_code, { subject_code: e.subject_code, subject_name: e.subject_name, total_hours: 0 });
-      }
-      summaryMap.get(e.subject_code).total_hours += e.hours;
-    });
-    const summary = Array.from(summaryMap.values());
+      const entries = await prisma.weeklySchedule.findMany({
+        where,
+        orderBy: [{ dayOfWeek: 'asc' }, { startPeriod: 'asc' }],
+      });
+      const mappedEntries = entries.map(e => {
+        const hours = e.startPeriod === 0 ? 0 : (e.endPeriod - e.startPeriod + 1);
+        return {
+          id: e.id,
+          day_of_week: e.dayOfWeek,
+          start_period: e.startPeriod,
+          end_period: e.endPeriod,
+          start_time: e.startTime ? e.startTime.toISOString().split('T')[1].slice(0, 5) : null,
+          end_time: e.endTime ? e.endTime.toISOString().split('T')[1].slice(0, 5) : null,
+          subject_code: e.subjectCode,
+          subject_name: e.subjectName,
+          room: e.room,
+          instructor: e.instructor,
+          group_name: e.groupName,
+          hours: hours,
+          entry_type: e.entryType,
+          color: e.color,
+          classroom_id: e.classroomId
+        };
+      });
+      const summaryMap = new Map();
+      mappedEntries.forEach(e => {
+        if (!e.subject_code) return;
+        if (!summaryMap.has(e.subject_code)) {
+          summaryMap.set(e.subject_code, { subject_code: e.subject_code, subject_name: e.subject_name, total_hours: 0 });
+        }
+        summaryMap.get(e.subject_code).total_hours += e.hours;
+      });
+      const summary = Array.from(summaryMap.values());
 
-    return NextResponse.json({ data: { entries: mappedEntries, summary } });
+      return { entries: mappedEntries, summary };
+    });
+
+    return NextResponse.json({ data });
   } catch (error) {
     if (error instanceof AuthError) return handleAuthError();
     return NextResponse.json({ message: 'Failed to get timetable' }, { status: 500 });
@@ -150,6 +155,7 @@ export async function POST(request: NextRequest) {
       });
 
       await prisma.weeklySchedule.createMany({ data });
+      invalidateCache(userCacheKey(user.id, 'timetable'));
       invalidateCache(userCacheKey(user.id, 'dashboard'));
       return NextResponse.json({ message: 'Timetable entries created' }, { status: 201 });
     }
@@ -204,6 +210,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    invalidateCache(userCacheKey(user.id, 'timetable'));
     invalidateCache(userCacheKey(user.id, 'dashboard'));
     return NextResponse.json({ data: entry }, { status: 201 });
   } catch (error) {
@@ -237,6 +244,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     await prisma.weeklySchedule.deleteMany({ where: deleteWhere });
+    invalidateCache(userCacheKey(user.id, 'timetable'));
     invalidateCache(userCacheKey(user.id, 'dashboard'));
     return NextResponse.json({ message: 'Timetable cleared' });
   } catch (error) {

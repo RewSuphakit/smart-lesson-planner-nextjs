@@ -62,6 +62,7 @@ export async function POST(
     ]);
 
     invalidateCache(userCacheKey(userId, 'semester'));
+    invalidateCache(userCacheKey(userId, 'semesters'));
     invalidateCache(userCacheKey(userId, 'classrooms'));
     invalidateCache(userCacheKey(userId, 'dashboard'));
 

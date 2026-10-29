@@ -58,6 +58,9 @@ export async function PUT(request: NextRequest) {
       await prisma.$transaction(updateOperations);
     }
 
+    invalidateCache(userCacheKey(user.id, 'grades'));
+    invalidateCache(userCacheKey(user.id, 'scores'));
+    invalidateCache(userCacheKey(user.id, 'students'));
     invalidateCache(userCacheKey(user.id, 'dashboard'));
     invalidateCache(userCacheKey(user.id, 'classrooms'));
 

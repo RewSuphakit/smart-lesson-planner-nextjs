@@ -6,15 +6,13 @@ import api from '@/services/api';
 import { createPortal } from 'react-dom';
 import {
   Loader2, Search, RotateCcw, Zap, Plus, Minus,
-  ThumbsUp, ThumbsDown, AlertCircle, HeartHandshake, CheckCircle2, AlertTriangle, Users, Award, X, Grid,
+  ThumbsUp, ThumbsDown, AlertCircle, HeartHandshake, CheckCircle2, AlertTriangle, Award, X, Grid,
   Sliders, Pencil
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import UserAvatar from '@/components/UserAvatar';
 import ClassroomCardPicker from '@/components/ClassroomCardPicker';
 import { parseClassroomName } from '@/lib/classroom';
-
-const animalAvatars = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐧', '🐥', '🦉', '🦄', '🐙', '🐢', '🦖', '🦕', '🦦', '🦥'];
 
 interface Classroom {
   id: string | number;
@@ -209,8 +207,9 @@ export default function Affective() {
       setShowWeightModal(false);
       toast.success(`กำหนดคะแนนเต็มจิตพิสัยเป็น ${variables.weight} คะแนนเรียบร้อยแล้ว`, { icon: '🎯' });
     },
-    onError: (err: any) => {
-      toast.error(err?.response?.data?.message || 'ไม่สามารถอัปเดตคะแนนเต็มได้');
+    onError: (err: unknown) => {
+      const error = err as { response?: { data?: { message?: string } } };
+      toast.error(error?.response?.data?.message || 'ไม่สามารถอัปเดตคะแนนเต็มได้');
     },
   });
 

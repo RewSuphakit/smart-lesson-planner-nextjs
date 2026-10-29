@@ -187,8 +187,10 @@ export async function PUT(
     });
 
     invalidateCache(userCacheKey(userId, 'semester'));
+    invalidateCache(userCacheKey(userId, 'semesters'));
     invalidateCache(userCacheKey(userId, 'classrooms'));
     invalidateCache(userCacheKey(userId, 'dashboard'));
+    invalidateCache(userCacheKey(userId, 'timetable'));
 
     return NextResponse.json({
       data: {
@@ -248,8 +250,10 @@ export async function DELETE(
     await prisma.semester.delete({ where: { id: semesterId } });
 
     invalidateCache(userCacheKey(userId, 'semester'));
+    invalidateCache(userCacheKey(userId, 'semesters'));
     invalidateCache(userCacheKey(userId, 'classrooms'));
     invalidateCache(userCacheKey(userId, 'dashboard'));
+    invalidateCache(userCacheKey(userId, 'timetable'));
 
     return NextResponse.json({ message: 'ลบภาคเรียนสำเร็จ' });
   } catch (error) {

@@ -20,9 +20,32 @@ export async function GET(request: NextRequest) {
     if (branch) where.branch = branch;
     if (gradeLevel) where.gradeLevel = gradeLevel;
 
+    // Server-side search (name / student code) so clients don't need to load every row to filter
+    const search = searchParams.get('search')?.trim();
+    if (search) {
+      where.OR = [
+        { name: { contains: search } },
+        { studentCode: { contains: search } },
+      ];
+    }
+
     const pageStr = searchParams.get('page');
     const limitStr = searchParams.get('limit');
     const includeAvatar = searchParams.get('include_avatar') === 'true';
+
+    // When avatars are requested, embedded base64 images are replaced by a cacheable
+    // per-student URL (/api/students/:id/avatar) so list payloads stay small.
+    // Preset emoji keys / external URLs are passed through unchanged.
+    const withAvatarUrl = <T extends { id: number; avatar?: string | null; updatedAt?: Date }>(s: T) => {
+      const { updatedAt, ...rest } = s;
+      return {
+        ...rest,
+        avatar:
+          typeof s.avatar === 'string' && s.avatar.startsWith('data:image/')
+            ? `/api/students/${s.id}/avatar?v=${updatedAt ? updatedAt.getTime() : 0}`
+            : s.avatar ?? null,
+      };
+    };
 
     const selectFields = includeAvatar
       ? {
@@ -34,6 +57,7 @@ export async function GET(request: NextRequest) {
           email: true,
           classroomId: true,
           avatar: true,
+          updatedAt: true,
           midtermScore: true,
           finalScore: true,
           affectiveScore: true,
@@ -67,7 +91,7 @@ export async function GET(request: NextRequest) {
         }),
       ]);
 
-      const mappedStudents = students.map(formatStudentListItem);
+      const mappedStudents = students.map((s) => formatStudentListItem(includeAvatar ? withAvatarUrl(s) : s));
 
       return NextResponse.json({
         data: mappedStudents,
@@ -86,7 +110,7 @@ export async function GET(request: NextRequest) {
       orderBy: { name: 'asc' },
     });
 
-    const mappedStudents = students.map(formatStudentListItem);
+    const mappedStudents = students.map((s) => formatStudentListItem(includeAvatar ? withAvatarUrl(s) : s));
 
     return NextResponse.json({ data: mappedStudents });
   } catch (error) {
@@ -135,6 +159,7 @@ export async function POST(request: NextRequest) {
       }));
 
       const result = await prisma.student.createMany({ data });
+      invalidateCache(userCacheKey(user.id, 'students'));
       invalidateCache(userCacheKey(user.id, 'classrooms'));
       invalidateCache(userCacheKey(user.id, 'dashboard'));
       return NextResponse.json({ message: `Created ${result.count} students` }, { status: 201 });
@@ -169,6 +194,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    invalidateCache(userCacheKey(user.id, 'students'));
     invalidateCache(userCacheKey(user.id, 'classrooms'));
     invalidateCache(userCacheKey(user.id, 'dashboard'));
 
@@ -307,6 +333,7 @@ export async function DELETE(request: NextRequest) {
         classroomId: cid,
       },
     });
+    invalidateCache(userCacheKey(user.id, 'students'));
     invalidateCache(userCacheKey(user.id, 'classrooms'));
     invalidateCache(userCacheKey(user.id, 'dashboard'));
     return NextResponse.json({ message: `Deleted ${result.count} students`, count: result.count });

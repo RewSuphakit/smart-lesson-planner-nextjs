@@ -4,9 +4,9 @@ import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
 import {
-  Loader2, BookOpen, Save, Settings, AlertCircle, TrendingUp, Plus, Trash2,
-  FileSpreadsheet, Printer, Zap, AlertTriangle, Search, Filter, Award, CheckCircle2, XCircle, Download,
-  SlidersHorizontal, LayoutGrid, Table as TableIcon, ChevronRight, ChevronDown, Sparkles, Check, RefreshCw, Grid
+  Loader2, Save, Settings, AlertCircle, Plus, Trash2,
+  FileSpreadsheet, Printer, Zap, AlertTriangle, Search, Award, CheckCircle2, XCircle, Download,
+  SlidersHorizontal, LayoutGrid, Table as TableIcon, Grid
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Pagination from '@/components/Pagination';
@@ -88,8 +88,6 @@ export interface Weights {
   max_post_test_raw?: number;
 }
 
-const animalAvatars = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐧', '🐥', '🦉', '🦄', '🐙', '🐢', '🦖', '🦕', '🦦', '🦥'];
-
 const EMPTY_CLASSROOMS: Classroom[] = [];
 
 const DEFAULT_CRITERIA: Criterion[] = [
@@ -144,7 +142,6 @@ export default function Grades() {
   // Auto & Dynamic Column Width State for "ชื่อ-นามสกุล"
   const [nameColMode, setNameColMode] = useState<'auto' | 'compact' | 'normal' | 'wide'>('auto');
   const [customWidthOffset, setCustomWidthOffset] = useState<number>(0);
-  const [showColumnSettings, setShowColumnSettings] = useState(false);
 
   // Track unsaved changes for floating save button
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -282,7 +279,6 @@ export default function Grades() {
     }
 
     const dist: Record<string, number> = {};
-    let totalScoreSum = 0;
     let numericGradeSum = 0;
     let numericGradeCount = 0;
     let passCount = 0;
@@ -294,8 +290,6 @@ export default function Grades() {
     report.forEach(student => {
       const g = student.grade || 'ไม่มีเกรด';
       dist[g] = (dist[g] || 0) + 1;
-      const score = Number(student.total_score_precise ?? student.total_score ?? 0);
-      totalScoreSum += score;
 
       if (g === 'ข.ร.' || g === 'ขร' || student.is_f) {
         krCount++;
@@ -747,7 +741,7 @@ export default function Grades() {
           icon={<Award className="w-6 h-6" />}
           themeColor="purple"
           actionText="ดูผลการเรียน & ตัดเกรด"
-          customCardStat={(c) => (
+          customCardStat={(_c) => (
             <div className="pt-1.5 border-t border-slate-200/50 flex items-center justify-between text-[11px] text-purple-700 font-semibold">
               <span>เกณฑ์ประเมิน</span>
               <span>สัดส่วน 100% · 8 ระดับ</span>
@@ -1420,7 +1414,7 @@ export default function Grades() {
             ) : (
               /* ==================== VIEW MODE 2: MOBILE-FIRST CARD VIEW ==================== */
               <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                {paginatedReport.map((student, idx) => {
+                {paginatedReport.map((student, _idx) => {
                   const totalScore = Number(student.total_score_precise ?? student.total_score ?? 0);
                   const isKr = student.is_f || student.grade === 'ข.ร.' || student.grade === 'ขร';
                   const isKs = student.grade === 'ข.ส.' || student.is_absent_final || student.final_score === -1;

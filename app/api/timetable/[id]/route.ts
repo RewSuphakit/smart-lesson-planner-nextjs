@@ -76,6 +76,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     await prisma.weeklySchedule.update({ where: { id: Number(id) }, data: updateData });
+    invalidateCache(userCacheKey(user.id, 'timetable'));
     invalidateCache(userCacheKey(user.id, 'dashboard'));
     return NextResponse.json({ message: 'Entry updated' });
   } catch (error) {
@@ -96,6 +97,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     if (!entry) return NextResponse.json({ message: 'Entry not found' }, { status: 404 });
 
     await prisma.weeklySchedule.delete({ where: { id: Number(id) } });
+    invalidateCache(userCacheKey(user.id, 'timetable'));
     invalidateCache(userCacheKey(user.id, 'dashboard'));
     return NextResponse.json({ message: 'Entry deleted' });
   } catch (error) {

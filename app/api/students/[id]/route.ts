@@ -115,6 +115,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             val = null;
           } else if (val && String(val).trim()) {
             val = String(val).trim();
+            // Ignore avatar endpoint URLs echoed back by list responses; enforce size cap
+            if (val.startsWith('/api/students/')) continue;
+            if (val.length > 150_000) {
+              return NextResponse.json({ message: 'Avatar is too large' }, { status: 400 });
+            }
           } else {
             // Keep existing avatar if not explicitly set or removed
             continue;
@@ -127,6 +132,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     await prisma.student.update({ where: { id: numericId }, data: updateData });
+    invalidateCache(userCacheKey(user.id, 'students'));
+    invalidateCache(userCacheKey(user.id, 'grades'));
+    invalidateCache(userCacheKey(user.id, 'scores'));
     invalidateCache(userCacheKey(user.id, 'classrooms'));
     invalidateCache(userCacheKey(user.id, 'dashboard'));
     return NextResponse.json({ message: 'Student updated' });
@@ -153,6 +161,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     if (!student) return NextResponse.json({ message: 'Student not found' }, { status: 404 });
 
     await prisma.student.delete({ where: { id: numericId } });
+    invalidateCache(userCacheKey(user.id, 'students'));
+    invalidateCache(userCacheKey(user.id, 'grades'));
+    invalidateCache(userCacheKey(user.id, 'scores'));
     invalidateCache(userCacheKey(user.id, 'classrooms'));
     invalidateCache(userCacheKey(user.id, 'dashboard'));
     return NextResponse.json({ message: 'Student deleted' });

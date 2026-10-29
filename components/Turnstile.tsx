@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
+import { useEffect, useRef, useImperativeHandle, forwardRef, useCallback } from 'react';
 
 declare global {
   interface Window {
@@ -47,7 +47,7 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(
     const siteKey =
       process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || PROJECT_TURNSTILE_SITE_KEY;
 
-    const renderWidget = () => {
+    const renderWidget = useCallback(() => {
       if (!window.turnstile || !containerRef.current || widgetIdRef.current) return;
       if (!siteKey) return;
 
@@ -71,7 +71,7 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(
       } catch (err) {
         console.error('[Turnstile render error]:', err);
       }
-    };
+    }, [siteKey, action, theme, onSuccess, onError, onExpire]);
 
     useImperativeHandle(ref, () => ({
       reset: () => {
@@ -119,7 +119,7 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(
           widgetIdRef.current = null;
         }
       };
-    }, [siteKey, theme, action]);
+    }, [siteKey, renderWidget]);
 
     if (!siteKey) {
       return null;
