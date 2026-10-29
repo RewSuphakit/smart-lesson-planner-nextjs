@@ -2,13 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { getOrSetCache, userCacheKey } from '@/lib/cache';
 import { fetchDashboardData, getEmptyDashboardData } from '@/lib/dashboard';
+import { getActiveSemesterId } from '@/lib/semester';
 
 export async function GET(request: NextRequest) {
   try {
     const user = requireAuth(request);
+    const activeSemesterId = await getActiveSemesterId(user.id);
 
     const data = await getOrSetCache(
-      userCacheKey(user.id, 'dashboard'),
+      userCacheKey(user.id, 'dashboard', String(activeSemesterId ?? 'none')),
       30,
       () => fetchDashboardData(user.id)
     );

@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import api from '@/services/api';
 
 interface User {
@@ -104,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [fetchProfile]);
 
-  const notifyTabs = (type: 'LOGIN' | 'LOGOUT') => {
+  const notifyTabs = useCallback((type: 'LOGIN' | 'LOGOUT') => {
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
       try {
         const channel = new BroadcastChannel(AUTH_CHANNEL_NAME);
@@ -114,47 +114,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Ignore
       }
     }
-  };
+  }, []);
 
-  const login = async (email: string, password: string, rememberMe?: boolean, turnstileToken?: string) => {
+  const login = useCallback(async (email: string, password: string, rememberMe?: boolean, turnstileToken?: string) => {
     const { data } = await api.post('/auth/login', { email, password, rememberMe, turnstileToken });
     // Cookie is set securely by server via Set-Cookie header (httpOnly, Secure, SameSite)
     setUser(data.user);
     notifyTabs('LOGIN');
     return data;
-  };
+  }, [notifyTabs]);
 
-  const register = async (name: string, email: string, password: string, role?: string) => {
+  const register = useCallback(async (name: string, email: string, password: string, role?: string) => {
     const { data } = await api.post('/auth/register', { name, email, password, role });
     if (data.user) {
       setUser(data.user);
       notifyTabs('LOGIN');
     }
     return data;
-  };
+  }, [notifyTabs]);
 
-  const verifyEmail = async (email: string, code: string) => {
+  const verifyEmail = useCallback(async (email: string, code: string) => {
     const { data } = await api.post('/auth/verify-email', { email, code });
     if (data.user) {
       setUser(data.user);
       notifyTabs('LOGIN');
     }
     return data;
-  };
+  }, [notifyTabs]);
 
-  const resendCode = async (email: string) => {
+  const resendCode = useCallback(async (email: string) => {
     const { data } = await api.post('/auth/resend-code', { email });
     return data;
-  };
+  }, []);
 
-  const googleLogin = async (credential: string) => {
+  const googleLogin = useCallback(async (credential: string) => {
     const { data } = await api.post('/auth/google', { credential });
     setUser(data.user);
     notifyTabs('LOGIN');
     return data;
-  };
+  }, [notifyTabs]);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await api.post('/auth/logout');
     } catch {
@@ -172,17 +172,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       notifyTabs('LOGOUT');
     }
-  };
+  }, [notifyTabs]);
 
-  const updateUser = (updatedFields: Partial<User>) => {
+  const updateUser = useCallback((updatedFields: Partial<User>) => {
     setUser((prev) => {
       if (!prev) return null;
       return { ...prev, ...updatedFields };
     });
-  };
+  }, []);
+
+  const contextValue = useMemo(
+    () => ({ user, loading, login, register, verifyEmail, resendCode, googleLogin, logout, updateUser }),
+    [user, loading, login, register, verifyEmail, resendCode, googleLogin, logout, updateUser]
+  );
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, verifyEmail, resendCode, googleLogin, logout, updateUser }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

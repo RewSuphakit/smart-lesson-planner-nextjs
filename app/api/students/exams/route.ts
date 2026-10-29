@@ -25,7 +25,9 @@ export async function PUT(request: NextRequest) {
     });
     const ownedSet = new Set(ownedStudents.map(s => s.id));
 
-    const updateOperations = [];
+    // Group students with identical score payloads so bulk updates (e.g. resetting affective score)
+    // execute a single `updateMany` query instead of N individual `update` queries.
+    const groupedUpdates = new Map<string, { data: Record<string, unknown>; ids: number[] }>();
 
     for (const score of body.scores) {
       const studentId = Number(score.student_id);
@@ -45,14 +47,27 @@ export async function PUT(request: NextRequest) {
       }
 
       if (Object.keys(dataToUpdate).length > 0) {
-        updateOperations.push(
-          prisma.student.update({
-            where: { id: studentId },
-            data: dataToUpdate,
-          })
-        );
+        const key = JSON.stringify(dataToUpdate);
+        const existing = groupedUpdates.get(key);
+        if (existing) {
+          existing.ids.push(studentId);
+        } else {
+          groupedUpdates.set(key, { data: dataToUpdate, ids: [studentId] });
+        }
       }
     }
+
+    const updateOperations = Array.from(groupedUpdates.values()).map(({ data, ids }) =>
+      ids.length === 1
+        ? prisma.student.update({
+            where: { id: ids[0] },
+            data,
+          })
+        : prisma.student.updateMany({
+            where: { id: { in: ids }, userId: user.id },
+            data,
+          })
+    );
 
     if (updateOperations.length > 0) {
       await prisma.$transaction(updateOperations);

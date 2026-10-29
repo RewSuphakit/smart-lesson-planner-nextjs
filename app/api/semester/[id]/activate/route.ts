@@ -64,7 +64,11 @@ export async function POST(
     invalidateCache(userCacheKey(userId, 'semester'));
     invalidateCache(userCacheKey(userId, 'semesters'));
     invalidateCache(userCacheKey(userId, 'classrooms'));
+    invalidateCache(userCacheKey(userId, 'timetable'));
     invalidateCache(userCacheKey(userId, 'dashboard'));
+    invalidateCache(userCacheKey(userId, 'scores'));
+    invalidateCache(userCacheKey(userId, 'grades'));
+    invalidateCache(userCacheKey(userId, 'attendance'));
 
     return NextResponse.json({
       data: {

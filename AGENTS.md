@@ -92,7 +92,7 @@ eslint.config.mjs              # ESLint config
 .gitignore
 ```
 
-### ❌ Files Gemini Should NOT Touch (Claude's Territory)
+
 
 ```
 app/(auth)/                    # Login/Register pages (UI)

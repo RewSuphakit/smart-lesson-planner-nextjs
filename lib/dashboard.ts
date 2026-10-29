@@ -236,15 +236,23 @@ export async function calculateAtRiskStudents(
   }
 
   // Performance Optimization: Only fetch avatar for students who are actually at risk
+  // Convert inline base64 data URLs to lightweight cacheable avatar endpoint URLs
   if (atRiskStudents.length > 0) {
     const atRiskIds = atRiskStudents.map((s) => s.student_id);
     const studentAvatars = await withDbRetry(() =>
       prisma.student.findMany({
         where: { id: { in: atRiskIds } },
-        select: { id: true, avatar: true },
+        select: { id: true, avatar: true, updatedAt: true },
       })
     );
-    const avatarMap = new Map(studentAvatars.map((a) => [a.id, a.avatar]));
+    const avatarMap = new Map(
+      studentAvatars.map((a) => {
+        const avatarUrl = a.avatar?.startsWith('data:image/')
+          ? `/api/students/${a.id}/avatar?v=${a.updatedAt ? a.updatedAt.getTime() : 0}`
+          : a.avatar || null;
+        return [a.id, avatarUrl] as const;
+      })
+    );
     for (const s of atRiskStudents) {
       s.avatar = avatarMap.get(s.student_id) || null;
     }
@@ -270,26 +278,24 @@ export async function fetchDashboardData(userId: number): Promise<DashboardData>
   const activeSemester = await getActiveSemester(userId);
   const semesterFilter = activeSemester ? { semesterId: activeSemester.id } : {};
 
-  // Fetch classrooms first with retry
-  const classrooms = await withDbRetry(() =>
-    prisma.classroom.findMany({
-      where: { userId, ...semesterFilter },
-      select: {
-        id: true,
-        name: true,
-        lateToAbsentRatio: true,
-        leaveToAbsentRatio: true,
-        totalClasses: true,
-        minAttendancePercent: true,
-        semesterStartDate: true,
-        totalWeeks: true,
-        curriculumType: true,
-      },
-    })
-  );
-  const classroomCount = classrooms.length;
-
-  const [studentCount, weeklyHoursAgg] = await Promise.all([
+  // Parallelize all independent initial dashboard queries
+  const [classrooms, studentCount, weeklyHoursAgg, rawTodayTimetable] = await Promise.all([
+    withDbRetry(() =>
+      prisma.classroom.findMany({
+        where: { userId, ...semesterFilter },
+        select: {
+          id: true,
+          name: true,
+          lateToAbsentRatio: true,
+          leaveToAbsentRatio: true,
+          totalClasses: true,
+          minAttendancePercent: true,
+          semesterStartDate: true,
+          totalWeeks: true,
+          curriculumType: true,
+        },
+      })
+    ),
     withDbRetry(() =>
       prisma.student.count({
         where: {
@@ -304,7 +310,26 @@ export async function fetchDashboardData(userId: number): Promise<DashboardData>
         _sum: { hours: true },
       })
     ),
+    withDbRetry(() =>
+      prisma.weeklySchedule.findMany({
+        where: {
+          userId,
+          dayOfWeek: schemaDayOfWeek,
+          ...(activeSemester ? { semesterId: activeSemester.id } : {}),
+        },
+        include: {
+          classroom: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+        orderBy: [{ startPeriod: 'asc' }],
+      })
+    ),
   ]);
+  const classroomCount = classrooms.length;
 
   // Semester Active & Ended Status Calculation
   const classroomsWithDates = classrooms.filter((c) => c.semesterStartDate || activeSemester?.startDate);
@@ -338,28 +363,7 @@ export async function fetchDashboardData(userId: number): Promise<DashboardData>
 
   const isSemesterEnded = classroomsWithDates.length > 0 && allClassroomsEnded;
 
-  // At-risk students & Today's timetable (Parallelized)
-  const [atRiskStudents, rawTodayTimetable] = await Promise.all([
-    calculateAtRiskStudents(userId, classrooms),
-    withDbRetry(() =>
-      prisma.weeklySchedule.findMany({
-        where: {
-          userId,
-          dayOfWeek: schemaDayOfWeek,
-          ...(activeSemester ? { semesterId: activeSemester.id } : {}),
-        },
-        include: {
-          classroom: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-        },
-        orderBy: [{ startPeriod: 'asc' }],
-      })
-    ),
-  ]);
+  const atRiskStudents = await calculateAtRiskStudents(userId, classrooms);
 
   const todayTimetable = isSemesterEnded
     ? []

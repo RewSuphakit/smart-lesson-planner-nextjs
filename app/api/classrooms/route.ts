@@ -14,27 +14,29 @@ export async function GET(request: NextRequest) {
     const semesterIdParam = searchParams.get('semester_id');
     const allSemesters = searchParams.get('all') === 'true';
 
-    const cacheKey = userCacheKey(user.id, 'classrooms', allSemesters ? 'all' : (semesterIdParam || 'active'));
+    let targetSemesterId: number | null = null;
+    if (!allSemesters) {
+      if (semesterIdParam) {
+        const semesterId = Number(semesterIdParam);
+        if (!isNaN(semesterId) && semesterId > 0) {
+          targetSemesterId = semesterId;
+        }
+      } else {
+        targetSemesterId = await getActiveSemesterId(user.id);
+      }
+    }
+
+    const cacheKey = userCacheKey(
+      user.id,
+      'classrooms',
+      allSemesters ? 'all' : String(targetSemesterId ?? 'none')
+    );
 
     const result = await getOrSetCache(cacheKey, 60, async () => {
       // Build where clause with semester scoping
       const where: Record<string, unknown> = { userId: user.id };
-
-      if (!allSemesters) {
-        if (semesterIdParam) {
-          // Explicit semester filter
-          const semesterId = Number(semesterIdParam);
-          if (!isNaN(semesterId) && semesterId > 0) {
-            where.semesterId = semesterId;
-          }
-        } else {
-          // Default: scope to active semester (if one exists)
-          const activeSemesterId = await getActiveSemesterId(user.id);
-          if (activeSemesterId) {
-            where.semesterId = activeSemesterId;
-          }
-          // If no active semester, show all classrooms (backward compat)
-        }
+      if (!allSemesters && targetSemesterId) {
+        where.semesterId = targetSemesterId;
       }
 
       const classrooms = await withDbRetry(() =>

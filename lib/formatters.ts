@@ -191,6 +191,7 @@ export function formatStudentListItem(s: {
   branch?: string | null;
   email?: string | null;
   classroomId?: number | null;
+  classroom?: { name: string } | null;
   avatar?: string | null;
   midtermScore?: unknown;
   finalScore?: unknown;
@@ -204,6 +205,7 @@ export function formatStudentListItem(s: {
     branch: s.branch ?? null,
     email: s.email ?? null,
     classroom_id: s.classroomId ?? null,
+    classroom_name: s.classroom?.name ?? null,
     avatar: s.avatar ?? null,
     midterm_score: s.midtermScore != null ? Number(s.midtermScore) : null,
     final_score: s.finalScore != null ? Number(s.finalScore) : null,

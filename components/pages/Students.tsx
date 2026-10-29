@@ -29,6 +29,7 @@ interface Student {
   branch?: string | null;
   email?: string;
   classroom_id?: string | number | null;
+  classroom_name?: string | null;
   avatar?: string | null;
 }
 
@@ -255,7 +256,7 @@ export default function Students() {
       'ชื่อ-นามสกุล': s.name || '',
       'ระดับชั้น': s.grade_level || '',
       'สาขา': s.branch || '',
-      'ห้องเรียน': classrooms.find(c => String(c.id) === String(s.classroom_id))?.name || 'ไม่ระบุ',
+      'ห้องเรียน': classrooms.find(c => String(c.id) === String(s.classroom_id))?.name || s.classroom_name || 'ไม่ระบุ',
       'อีเมล': s.email || ''
     }));
 
@@ -771,8 +772,7 @@ export default function Students() {
         ) : paginatedStudents.map((student, i) => (
           <div
             key={student.id}
-            className={`glass overflow-hidden transition-all duration-300 animate-fade-in-up ${selectedStudents.includes(student.id) ? 'border-indigo-500/50 bg-indigo-500/5' : ''}`}
-            style={{ animationDelay: (i * 50) + 'ms', animationFillMode: 'forwards' }}
+            className={`glass overflow-hidden transition-colors duration-200 ${selectedStudents.includes(student.id) ? 'border-indigo-500/50 bg-indigo-500/5' : ''}`}
           >
             <div className="p-4 flex items-center gap-4">
               <label className="cursor-pointer group flex-shrink-0">
@@ -808,7 +808,10 @@ export default function Students() {
                       <GitBranch className="w-3 h-3" />{student.branch}
                     </span>
                   )}
-                  {student.classroom_id && <span>ห้อง: {classrooms.find(c => String(c.id) === String(student.classroom_id))?.name || 'ไม่ทราบ'}</span>}
+                  {student.classroom_id && (() => {
+                    const roomName = classrooms.find(c => String(c.id) === String(student.classroom_id))?.name || student.classroom_name;
+                    return roomName ? <span>ห้อง: {roomName}</span> : null;
+                  })()}
                   {student.email && <span>{student.email}</span>}
                 </div>
               </div>

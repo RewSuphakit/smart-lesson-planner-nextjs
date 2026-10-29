@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { CreateStudentSchema, BulkCreateStudentSchema, UpdateStudentExamScoresSchema, validateRequestBody, validateData } from '@/lib/validation';
-import { invalidateCache, userCacheKey } from '@/lib/cache';
+import { invalidateCache, userCacheKey, getOrSetCache } from '@/lib/cache';
 import { formatStudentListItem } from '@/lib/formatters';
 import { sanitizeExamScore } from '@/lib/sanitize';
 
@@ -56,6 +56,7 @@ export async function GET(request: NextRequest) {
           branch: true,
           email: true,
           classroomId: true,
+          classroom: { select: { name: true } },
           avatar: true,
           updatedAt: true,
           midtermScore: true,
@@ -70,6 +71,7 @@ export async function GET(request: NextRequest) {
           branch: true,
           email: true,
           classroomId: true,
+          classroom: { select: { name: true } },
           midtermScore: true,
           finalScore: true,
           affectiveScore: true,
@@ -104,13 +106,20 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const students = await prisma.student.findMany({
-      where,
-      select: selectFields,
-      orderBy: { name: 'asc' },
-    });
+    const cacheKey = userCacheKey(
+      user.id,
+      'students:list',
+      `${classroomId || 'all'}:${branch || ''}:${gradeLevel || ''}:${search || ''}:${includeAvatar ? '1' : '0'}`
+    );
 
-    const mappedStudents = students.map((s) => formatStudentListItem(includeAvatar ? withAvatarUrl(s) : s));
+    const mappedStudents = await getOrSetCache(cacheKey, 45, async () => {
+      const students = await prisma.student.findMany({
+        where,
+        select: selectFields,
+        orderBy: { name: 'asc' },
+      });
+      return students.map((s) => formatStudentListItem(includeAvatar ? withAvatarUrl(s) : s));
+    });
 
     return NextResponse.json({ data: mappedStudents });
   } catch (error) {

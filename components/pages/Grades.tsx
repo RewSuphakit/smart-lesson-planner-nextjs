@@ -1261,6 +1261,18 @@ export default function Grades() {
                       const isMs = student.grade === 'ม.ส.' || student.is_incomplete || student.final_score === -2;
                       const isAtRisk = !isKr && !isKs && !isMs && (totalScore < 50 || (student.remaining_absences !== undefined && student.remaining_absences <= 2 && student.remaining_absences >= 0));
 
+                      const stickyCellBg = isKr
+                        ? 'bg-rose-50'
+                        : isKs
+                          ? 'bg-amber-50'
+                          : isMs
+                            ? 'bg-purple-50'
+                            : isAtRisk
+                              ? 'bg-amber-50'
+                              : idx % 2 === 0
+                                ? 'bg-white'
+                                : 'bg-slate-50';
+
                       return (
                         <tr
                           key={student.student_id}
@@ -1269,7 +1281,7 @@ export default function Grades() {
                         >
                           <td className="p-2.5 text-slate-500 font-medium text-center font-mono">{student.student_code || '-'}</td>
                           <td
-                            className="p-2.5 font-semibold text-slate-800 border-r border-indigo-100/80 sticky left-0 z-10 bg-inherit shadow-xs"
+                            className={`p-2.5 font-semibold text-slate-800 border-r border-indigo-100/80 sticky left-0 z-10 ${stickyCellBg} shadow-xs`}
                             style={{ minWidth: `${activeNameWidth}px`, width: `${activeNameWidth}px` }}
                           >
                             <div className="flex items-center justify-between gap-2">

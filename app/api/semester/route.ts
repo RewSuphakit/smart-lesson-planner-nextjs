@@ -171,6 +171,7 @@ export async function POST(request: NextRequest) {
     invalidateCache(userCacheKey(user.id, 'semester'));
     invalidateCache(userCacheKey(user.id, 'semesters'));
     invalidateCache(userCacheKey(user.id, 'classrooms'));
+    invalidateCache(userCacheKey(user.id, 'timetable'));
     invalidateCache(userCacheKey(user.id, 'dashboard'));
 
     return NextResponse.json({

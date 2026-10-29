@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
@@ -26,6 +26,28 @@ interface SemesterContextType {
 
 const SemesterContext = createContext<SemesterContextType | null>(null);
 
+const SEMESTER_SCOPED_QUERY_PREFIXES = new Set([
+  'classrooms',
+  'dashboard',
+  'timetable',
+  'timetable-schedule',
+  'timetable-classroom-options',
+  'timetable-all',
+  'semesters',
+  'semester-info',
+  'students',
+  'attendance',
+  'attendance-data',
+  'attendance-matrix',
+  'attendance-for-scores',
+  'attendance-all-class-for-scores',
+  'scores',
+  'scores-matrix-data',
+  'grades',
+  'affective',
+  'affective-students',
+]);
+
 export function SemesterProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -33,18 +55,17 @@ export function SemesterProvider({ children }: { children: ReactNode }) {
   const [activeSemester, setActiveSemester] = useState<Semester | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Invalidate all related React Query caches when semester changes
+  // Batch-invalidate all semester-scoped React Query caches in one pass.
+  // Only active (mounted) queries are refetched immediately; inactive ones are marked stale
+  // so they don't cause a background network/re-render storm during term switching.
   const invalidateAllSemesterQueries = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['classrooms'] });
-    queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-    queryClient.invalidateQueries({ queryKey: ['timetable'] });
-    queryClient.invalidateQueries({ queryKey: ['timetable-classroom-options'] });
-    queryClient.invalidateQueries({ queryKey: ['semesters'] });
-    queryClient.invalidateQueries({ queryKey: ['students'] });
-    queryClient.invalidateQueries({ queryKey: ['attendance'] });
-    queryClient.invalidateQueries({ queryKey: ['scores'] });
-    queryClient.invalidateQueries({ queryKey: ['grades'] });
-    queryClient.invalidateQueries({ queryKey: ['affective'] });
+    queryClient.invalidateQueries({
+      predicate: (query) => {
+        const rootKey = String(query.queryKey[0] ?? '');
+        return SEMESTER_SCOPED_QUERY_PREFIXES.has(rootKey);
+      },
+      refetchType: 'active',
+    });
   }, [queryClient]);
 
   // Fetch all semesters
@@ -73,7 +94,7 @@ export function SemesterProvider({ children }: { children: ReactNode }) {
   }, [refreshSemesters]);
 
   // Switch active semester
-  const switchSemester = async (id: number): Promise<boolean> => {
+  const switchSemester = useCallback(async (id: number): Promise<boolean> => {
     const target = semesters.find((s) => s.id === id);
     if (!target) return false;
     if (target.is_active) return true; // Already active
@@ -82,11 +103,12 @@ export function SemesterProvider({ children }: { children: ReactNode }) {
       await semesterApi.activateSemester(id);
 
       // Optimistically update local state
-      const updated = semesters.map((s) => ({
-        ...s,
-        is_active: s.id === id,
-      }));
-      setSemesters(updated);
+      setSemesters((prev) =>
+        prev.map((s) => ({
+          ...s,
+          is_active: s.id === id,
+        }))
+      );
       setActiveSemester({ ...target, is_active: true });
 
       // Invalidate queries so that pages immediately fetch data for the new active semester
@@ -100,16 +122,14 @@ export function SemesterProvider({ children }: { children: ReactNode }) {
     } catch (err: unknown) {
       console.error('[switchSemester] full error:', err);
       const axiosErr = err as { response?: { status?: number; data?: { message?: string } } };
-      console.error('[switchSemester] response status:', axiosErr?.response?.status);
-      console.error('[switchSemester] response data:', axiosErr?.response?.data);
       const message = axiosErr?.response?.data?.message || 'ไม่สามารถเปลี่ยนภาคเรียนได้';
       toast.error(message);
       return false;
     }
-  };
+  }, [semesters, invalidateAllSemesterQueries]);
 
   // Create new semester
-  const createSemester = async (data: CreateSemesterInput): Promise<Semester | null> => {
+  const createSemester = useCallback(async (data: CreateSemesterInput): Promise<Semester | null> => {
     try {
       const created = await semesterApi.createSemester(data);
       await refreshSemesters();
@@ -123,10 +143,10 @@ export function SemesterProvider({ children }: { children: ReactNode }) {
       toast.error(message);
       return null;
     }
-  };
+  }, [refreshSemesters, invalidateAllSemesterQueries]);
 
   // Update semester
-  const updateSemester = async (id: number, data: UpdateSemesterInput): Promise<Semester | null> => {
+  const updateSemester = useCallback(async (id: number, data: UpdateSemesterInput): Promise<Semester | null> => {
     try {
       const updated = await semesterApi.updateSemester(id, data);
       await refreshSemesters();
@@ -140,10 +160,10 @@ export function SemesterProvider({ children }: { children: ReactNode }) {
       toast.error(message);
       return null;
     }
-  };
+  }, [refreshSemesters, activeSemester?.id, invalidateAllSemesterQueries]);
 
   // Delete semester
-  const deleteSemester = async (id: number): Promise<boolean> => {
+  const deleteSemester = useCallback(async (id: number): Promise<boolean> => {
     try {
       await semesterApi.deleteSemester(id);
       await refreshSemesters();
@@ -154,10 +174,10 @@ export function SemesterProvider({ children }: { children: ReactNode }) {
       toast.error(message);
       return false;
     }
-  };
+  }, [refreshSemesters]);
 
   // Clone semester
-  const cloneSemester = async (sourceId: number, data: CloneSemesterInput): Promise<CloneSemesterResult> => {
+  const cloneSemester = useCallback(async (sourceId: number, data: CloneSemesterInput): Promise<CloneSemesterResult> => {
     try {
       const res = await semesterApi.cloneSemester(sourceId, data);
       await refreshSemesters();
@@ -191,22 +211,35 @@ export function SemesterProvider({ children }: { children: ReactNode }) {
       toast.error(message);
       return { success: false, message };
     }
-  };
+  }, [refreshSemesters, invalidateAllSemesterQueries]);
+
+  const contextValue = useMemo<SemesterContextType>(
+    () => ({
+      semesters,
+      activeSemester,
+      loading,
+      switchSemester,
+      refreshSemesters,
+      createSemester,
+      updateSemester,
+      deleteSemester,
+      cloneSemester,
+    }),
+    [
+      semesters,
+      activeSemester,
+      loading,
+      switchSemester,
+      refreshSemesters,
+      createSemester,
+      updateSemester,
+      deleteSemester,
+      cloneSemester,
+    ]
+  );
 
   return (
-    <SemesterContext.Provider
-      value={{
-        semesters,
-        activeSemester,
-        loading,
-        switchSemester,
-        refreshSemesters,
-        createSemester,
-        updateSemester,
-        deleteSemester,
-        cloneSemester,
-      }}
-    >
+    <SemesterContext.Provider value={contextValue}>
       {children}
     </SemesterContext.Provider>
   );

@@ -252,22 +252,12 @@ export async function getActiveSemester(userId: number): Promise<SemesterRecord 
 
 /**
  * Lightweight helper that returns only the active semester ID (cached for 120s).
+ * Shares the same cache & in-flight request deduplication as `getActiveSemester`.
  * Returns null if no active semester is set.
  */
 export async function getActiveSemesterId(userId: number): Promise<number | null> {
-  return getOrSetCache(
-    userCacheKey(userId, 'semester', 'active_id'),
-    120,
-    async () => {
-      const semester = await withDbRetry(() =>
-        prisma.semester.findFirst({
-          where: { userId, isActive: true },
-          select: { id: true },
-        })
-      );
-      return semester?.id ?? null;
-    }
-  );
+  const semester = await getActiveSemester(userId);
+  return semester?.id ?? null;
 }
 
 /**

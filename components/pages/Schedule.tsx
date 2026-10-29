@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
+import { useSemester } from '@/context/SemesterContext';
 import {
   X, Loader2, Trash2, AlertCircle,
   UploadCloud, FileText, Table, Download,
@@ -67,6 +68,7 @@ interface HoverTooltip {
 
 export default function Schedule() {
   const queryClient = useQueryClient();
+  const { activeSemester } = useSemester();
 
   const invalidateAllTimetableQueries = () => {
     queryClient.invalidateQueries({ queryKey: ['timetable-schedule'] });
@@ -112,9 +114,10 @@ export default function Schedule() {
     semester_end_date?: string | null;
     total_weeks?: number;
   }>>({
-    queryKey: ['classrooms'],
+    queryKey: ['classrooms', activeSemester?.id ?? 'active'],
     queryFn: async () => {
-      const res = await api.get('/classrooms');
+      const url = activeSemester?.id ? `/classrooms?semester_id=${activeSemester.id}` : '/classrooms';
+      const res = await api.get(url);
       return res.data.data || [];
     }
   });
@@ -124,9 +127,10 @@ export default function Schedule() {
     entries: TimetableEntry[];
     summary: TimetableSummaryItem[];
   }>({
-    queryKey: ['timetable-schedule'],
+    queryKey: ['timetable-schedule', activeSemester?.id ?? 'active'],
     queryFn: async () => {
-      const res = await api.get('/timetable');
+      const url = activeSemester?.id ? `/timetable?semester_id=${activeSemester.id}` : '/timetable';
+      const res = await api.get(url);
       const data = res.data.data || {};
       return {
         entries: Array.isArray(data.entries) ? data.entries : (Array.isArray(data) ? data : []),
@@ -458,7 +462,8 @@ export default function Schedule() {
   const handleDragOver = (e: React.DragEvent, dayIdx: number, slotId: string | number) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    setDragOverCell(`${dayIdx}-${slotId}`);
+    const nextCell = `${dayIdx}-${slotId}`;
+    setDragOverCell((prev) => (prev === nextCell ? prev : nextCell));
   };
 
   const handleDragLeave = () => {
@@ -671,7 +676,10 @@ export default function Schedule() {
                               e.preventDefault();
                               e.dataTransfer.dropEffect = 'move';
                               const period = calcPeriodFromMouse(e);
-                              if (period !== undefined) setDragOverCell(`${dayIdx}-${period}`);
+                              if (period !== undefined) {
+                                const nextCell = `${dayIdx}-${period}`;
+                                setDragOverCell((prev) => (prev === nextCell ? prev : nextCell));
+                              }
                             }}
                             onDragLeave={handleDragLeave}
                             onDrop={(e) => {

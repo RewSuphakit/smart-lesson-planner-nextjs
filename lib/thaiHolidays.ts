@@ -54,10 +54,59 @@ const VARIABLE_THAI_HOLIDAYS: Record<string, string> = {
   '2027-07-19': 'วันเข้าพรรษา',
 };
 
+// In-memory caches to avoid repeated Date allocations and range loops during table renders
+const singleDateHolidayCache = new Map<string, HolidayInfo | null>();
+const rangeHolidayCache = new Map<string, HolidayInfo[]>();
+
+/**
+ * Helper to check a specific date string (YYYY-MM-DD) in O(1) after first lookup.
+ */
+export function checkThaiHoliday(dateStr: string): HolidayInfo | null {
+  if (!dateStr) return null;
+  if (singleDateHolidayCache.has(dateStr)) {
+    return singleDateHolidayCache.get(dateStr)!;
+  }
+
+  let info: HolidayInfo | null = null;
+  const mmdd = dateStr.length >= 10 ? dateStr.slice(5, 10) : '';
+  const govHolidayName = VARIABLE_THAI_HOLIDAYS[dateStr] || FIXED_THAI_HOLIDAYS[mmdd];
+
+  if (govHolidayName) {
+    info = {
+      date: dateStr,
+      name: govHolidayName,
+      type: 'government',
+    };
+  } else {
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      const dayOfWeek = d.getDay();
+      if (dayOfWeek === 0 || dayOfWeek === 6) {
+        info = {
+          date: dateStr,
+          name: dayOfWeek === 6 ? 'วันเสาร์' : 'วันอาทิตย์',
+          type: 'weekend',
+        };
+      }
+    }
+  }
+
+  if (singleDateHolidayCache.size > 2000) {
+    singleDateHolidayCache.clear();
+  }
+  singleDateHolidayCache.set(dateStr, info);
+  return info;
+}
+
 /**
  * Returns all holidays (government and weekend) within the given date range [startDateStr, endDateStr]
  */
 export function getThaiHolidays(startDateStr: string, endDateStr: string): HolidayInfo[] {
+  if (!startDateStr || !endDateStr) return [];
+  const cacheKey = `${startDateStr}_${endDateStr}`;
+  const cached = rangeHolidayCache.get(cacheKey);
+  if (cached) return cached;
+
   const result: HolidayInfo[] = [];
 
   const start = new Date(startDateStr);
@@ -74,36 +123,18 @@ export function getThaiHolidays(startDateStr: string, endDateStr: string): Holid
     const month = String(curr.getMonth() + 1).padStart(2, '0');
     const day = String(curr.getDate()).padStart(2, '0');
     const dateStr = `${year}-${month}-${day}`;
-    const mmdd = `${month}-${day}`;
-    const dayOfWeek = curr.getDay(); // 0 = Sunday, 6 = Saturday
 
-    // Check fixed or variable government holidays
-    const govHolidayName = VARIABLE_THAI_HOLIDAYS[dateStr] || FIXED_THAI_HOLIDAYS[mmdd];
-
-    if (govHolidayName) {
-      result.push({
-        date: dateStr,
-        name: govHolidayName,
-        type: 'government',
-      });
-    } else if (dayOfWeek === 0 || dayOfWeek === 6) {
-      result.push({
-        date: dateStr,
-        name: dayOfWeek === 6 ? 'วันเสาร์' : 'วันอาทิตย์',
-        type: 'weekend',
-      });
+    const info = checkThaiHoliday(dateStr);
+    if (info) {
+      result.push(info);
     }
 
     curr.setDate(curr.getDate() + 1);
   }
 
+  if (rangeHolidayCache.size > 200) {
+    rangeHolidayCache.clear();
+  }
+  rangeHolidayCache.set(cacheKey, result);
   return result;
-}
-
-/**
- * Helper to check a specific date string (YYYY-MM-DD)
- */
-export function checkThaiHoliday(dateStr: string): HolidayInfo | null {
-  const holidays = getThaiHolidays(dateStr, dateStr);
-  return holidays.length > 0 ? holidays[0] : null;
 }

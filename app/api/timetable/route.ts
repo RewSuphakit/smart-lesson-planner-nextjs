@@ -20,23 +20,28 @@ export async function GET(request: NextRequest) {
     const semesterIdParam = searchParams.get('semester_id');
     const allSemesters = searchParams.get('all') === 'true';
 
-    const cacheKey = userCacheKey(user.id, 'timetable', allSemesters ? 'all' : (semesterIdParam || 'active'));
+    let targetSemesterId: number | null = null;
+    if (!allSemesters) {
+      if (semesterIdParam) {
+        const parsed = Number(semesterIdParam);
+        if (!isNaN(parsed) && parsed > 0) {
+          targetSemesterId = parsed;
+        }
+      } else {
+        targetSemesterId = await getActiveSemesterId(user.id);
+      }
+    }
+
+    const cacheKey = userCacheKey(
+      user.id,
+      'timetable',
+      allSemesters ? 'all' : String(targetSemesterId ?? 'none')
+    );
     const data = await getOrSetCache(cacheKey, 60, async () => {
       // Build where clause with semester scoping
       const where: Record<string, unknown> = { userId: user.id };
-
-      if (!allSemesters) {
-        if (semesterIdParam) {
-          const semesterId = Number(semesterIdParam);
-          if (!isNaN(semesterId) && semesterId > 0) {
-            where.semesterId = semesterId;
-          }
-        } else {
-          const activeSemesterId = await getActiveSemesterId(user.id);
-          if (activeSemesterId) {
-            where.semesterId = activeSemesterId;
-          }
-        }
+      if (!allSemesters && targetSemesterId) {
+        where.semesterId = targetSemesterId;
       }
 
       const entries = await prisma.weeklySchedule.findMany({

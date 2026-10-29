@@ -292,7 +292,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   return (
-    <div className="flex min-h-screen w-full overflow-x-hidden">
+    <div className="flex min-h-screen w-full overflow-x-clip">
       {/* Mobile overlay - zero blur for 60fps mobile animation */}
       {sidebarOpen && (
         <div
@@ -530,7 +530,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         )}
 
-        <div className="flex-1 p-4 lg:p-8 overflow-y-auto overflow-x-hidden">
+        <div className="flex-1 p-4 lg:p-8 overflow-x-hidden">
           <ErrorBoundary>
             {children}
           </ErrorBoundary>

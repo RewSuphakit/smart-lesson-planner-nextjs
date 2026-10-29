@@ -117,7 +117,12 @@ const MemoizedAttendanceCell = memo(({ status, isEditing, onEditClick, onStatusS
       )}
     </td>
   );
-});
+}, (prev, next) => (
+  prev.status === next.status &&
+  prev.isEditing === next.isEditing &&
+  prev.holiday?.date === next.holiday?.date &&
+  prev.holiday?.type === next.holiday?.type
+));
 
 MemoizedAttendanceCell.displayName = 'MemoizedAttendanceCell';
 
@@ -1222,32 +1227,39 @@ export default function Attendance() {
     setDate(d.toISOString().split('T')[0]);
   };
 
-  // Filters students by search query
-  const filteredStudents = students.filter(student =>
-    student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (student.student_code && student.student_code.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  // Filters students by search query (Memoized)
+  const filteredStudents = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return students;
+    return students.filter(student =>
+      student.name.toLowerCase().includes(q) ||
+      (student.student_code && student.student_code.toLowerCase().includes(q))
+    );
+  }, [students, searchQuery]);
 
-  // Daily statistics calculated in real-time
-  const dailyStats = {
-    present: 0,
-    late: 0,
-    absent: 0,
-    leave: 0,
-    total: students.length,
-    marked: 0
-  };
+  // Daily statistics calculated in real-time (Memoized)
+  const dailyStats = useMemo(() => {
+    const stats = {
+      present: 0,
+      late: 0,
+      absent: 0,
+      leave: 0,
+      total: students.length,
+      marked: 0
+    };
 
-  students.forEach(s => {
-    const sStatus = attendance[s.id];
-    if (sStatus) {
-      dailyStats.marked++;
-      if (sStatus === 'present') dailyStats.present++;
-      else if (sStatus === 'late') dailyStats.late++;
-      else if (sStatus === 'absent') dailyStats.absent++;
-      else if (sStatus === 'leave') dailyStats.leave++;
-    }
-  });
+    students.forEach(s => {
+      const sStatus = attendance[s.id];
+      if (sStatus) {
+        stats.marked++;
+        if (sStatus === 'present') stats.present++;
+        else if (sStatus === 'late') stats.late++;
+        else if (sStatus === 'absent') stats.absent++;
+        else if (sStatus === 'leave') stats.leave++;
+      }
+    });
+    return stats;
+  }, [students, attendance]);
 
   // Calculate unique dates in range for Matrix View
   // ─── Holiday Calculation ───
@@ -1269,7 +1281,7 @@ export default function Attendance() {
     });
   }, [holidayMap, teachingDays]);
 
-  const getUniqueDates = () => {
+  const matrixDates = useMemo(() => {
     const dates = new Set<string>();
 
     // Add dates that have records
@@ -1295,9 +1307,21 @@ export default function Attendance() {
 
     // Sort dates ascending
     return Array.from(dates).sort();
-  };
+  }, [matrixRecords, matrixStartDate, matrixEndDate, teachingDays]);
 
-  const matrixDates = getUniqueDates();
+  // O(1) lookup map for matrix cells instead of O(N) .find() inside nested student x date loops
+  const matrixRecordMap = useMemo(() => {
+    const map = new Map<string, string>();
+    matrixRecords.forEach(r => {
+      if (r.date && r.student_id !== undefined) {
+        const dStr = r.date.split('T')[0];
+        if (dStr) {
+          map.set(`${r.student_id}_${dStr}`, r.status);
+        }
+      }
+    });
+    return map;
+  }, [matrixRecords]);
   const selectedClassData = classrooms.find(c => String(c.id) === String(selectedClass));
   const maxAllowedAbsences = selectedClassData ? Math.floor((Number(selectedClassData.total_classes) || 40) * (100 - (Number(selectedClassData.min_attendance_percent) || 80)) / 100) : 0;
 
@@ -2367,7 +2391,7 @@ export default function Attendance() {
                                 className={`border-b border-indigo-50/50 hover:bg-indigo-50/20 transition-colors ${idx % 2 === 0 ? 'bg-white/20' : 'bg-transparent'
                                   }`}
                               >
-                                <td className="p-4 font-semibold text-slate-800 text-sm sticky left-0 bg-white/95 backdrop-blur-md z-20 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)] border-r border-indigo-100 flex items-center gap-2 h-14 overflow-hidden text-ellipsis whitespace-nowrap">
+                                <td className="p-4 font-semibold text-slate-800 text-sm sticky left-0 bg-white z-20 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)] border-r border-indigo-100 flex items-center gap-2 h-14 overflow-hidden text-ellipsis whitespace-nowrap">
                                   <div className="w-6 h-6 rounded-full bg-indigo-50 text-indigo-600 font-bold text-[10px] flex items-center justify-center flex-shrink-0">
                                     {student.name.charAt(0)}
                                   </div>
@@ -2380,13 +2404,7 @@ export default function Attendance() {
                                 </td>
 
                                 {matrixDates.map(dateStr => {
-                                  // Find matching record
-                                  const record = matrixRecords.find(r =>
-                                    (String(r.student_id) === String(student.id)) &&
-                                    (r.date ? r.date.split('T')[0] === dateStr : false)
-                                  );
-
-                                  const status = record ? record.status : null;
+                                  const status = matrixRecordMap.get(`${student.id}_${dateStr}`) ?? null;
                                   const isEditing = matrixEditingCell?.studentId === student.id && matrixEditingCell?.date === dateStr;
                                   const holiday = holidayMap[dateStr] || checkThaiHoliday(dateStr);
 
