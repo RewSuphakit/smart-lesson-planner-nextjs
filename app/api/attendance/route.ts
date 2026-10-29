@@ -344,6 +344,7 @@ export async function DELETE(request: NextRequest) {
     const classroomId = searchParams.get('classroom_id');
     const date = searchParams.get('date');
     const studentId = searchParams.get('student_id');
+    const studentIdsParam = searchParams.get('student_ids');
     const id = searchParams.get('id');
 
     if (!id && !classroomId) {
@@ -383,7 +384,43 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ message: 'Invalid date format' }, { status: 400 });
     }
 
-    if (studentId) {
+    if (studentIdsParam) {
+      const targetIds = Array.from(
+        new Set(
+          studentIdsParam
+            .split(',')
+            .map(s => Number(s.trim()))
+            .filter(n => !isNaN(n) && n > 0)
+        )
+      );
+      if (targetIds.length === 0) {
+        return NextResponse.json({ message: 'Invalid student_ids parameter' }, { status: 400 });
+      }
+
+      const [classroom, ownedStudents] = await Promise.all([
+        prisma.classroom.findFirst({
+          where: { id: numericClassroomId, userId: user.id },
+          select: { id: true },
+        }),
+        prisma.student.findMany({
+          where: { id: { in: targetIds }, userId: user.id },
+          select: { id: true },
+        }),
+      ]);
+      if (!classroom) return NextResponse.json({ message: 'Classroom not found' }, { status: 404 });
+      const ownedIds = ownedStudents.map(s => s.id);
+      if (ownedIds.length === 0) {
+        return NextResponse.json({ message: 'No matching authorized students found' }, { status: 404 });
+      }
+
+      await prisma.attendance.deleteMany({
+        where: {
+          studentId: { in: ownedIds },
+          classroomId: numericClassroomId,
+          date: parsedDate,
+        },
+      });
+    } else if (studentId) {
       const numericStudentId = Number(studentId);
       if (isNaN(numericStudentId) || numericStudentId <= 0) {
         return NextResponse.json({ message: 'Invalid student ID' }, { status: 400 });

@@ -1,9 +1,9 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback, useMemo } from 'react';
 import api from '@/services/api';
 
-interface User {
+export interface User {
   id: number;
   email: string;
   name: string;
@@ -11,6 +11,8 @@ interface User {
   avatar?: string | null;
   emailVerified?: boolean;
   createdAt?: string;
+  hasPassword?: boolean;
+  isGoogleUser?: boolean;
 }
 
 interface AuthContextType {
@@ -30,9 +32,18 @@ const AuthContext = createContext<AuthContextType | null>(null);
 // BroadcastChannel for cross-tab auth state synchronization without localStorage
 const AUTH_CHANNEL_NAME = 'smart_lesson_auth_sync';
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+export function AuthProvider({
+  children,
+  initialUser,
+}: {
+  children: ReactNode;
+  initialUser?: User | null;
+}) {
+  const hasInitialUser = initialUser !== undefined;
+  const hasInitialUserRef = useRef(hasInitialUser);
+  const hasInitialSessionRef = useRef(Boolean(initialUser));
+  const [user, setUser] = useState<User | null>(initialUser ?? null);
+  const [loading, setLoading] = useState(!hasInitialUser);
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -65,12 +76,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Ignore in restricted environments
     }
 
-    const initAuth = async () => {
-      await fetchProfile();
-      setLoading(false);
-    };
-
-    initAuth();
+    if (!hasInitialUserRef.current) {
+      const initAuth = async () => {
+        await fetchProfile();
+        setLoading(false);
+      };
+      initAuth();
+    } else if (hasInitialSessionRef.current && typeof document !== 'undefined') {
+      document.cookie = 'logged_in=true; Max-Age=2592000; path=/; SameSite=Lax';
+    }
 
     // Listen for global 401 Unauthorized event
     const handleUnauthorized = () => {

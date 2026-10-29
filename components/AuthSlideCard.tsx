@@ -8,7 +8,9 @@ import {
   Eye, EyeOff, ArrowRight, Check,
   KeyRound, RotateCcw, ArrowLeft
 } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
+import logoImg from '@/public/logo.png';
 import toast from 'react-hot-toast';
 import GoogleSignInButton from '@/components/GoogleSignInButton';
 import Turnstile, { TurnstileRef } from '@/components/Turnstile';
@@ -695,8 +697,14 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
 
             {/* Top brand */}
             <div className="relative z-10 flex items-center gap-2 text-indigo-200 text-xs font-medium tracking-wide">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.png" alt="Logo" className="w-5 h-5 rounded-md object-cover shadow-xs" />
+              <Image
+                src={logoImg}
+                alt="Logo"
+                width={20}
+                height={20}
+                loading="eager"
+                className="w-5 h-5 rounded-md object-cover shadow-xs"
+              />
               <span>SMART LESSON PLANNER</span>
             </div>
 

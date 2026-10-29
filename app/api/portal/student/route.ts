@@ -6,6 +6,34 @@ import { protectRequest, portalLimiter } from '@/lib/arcjet';
 import { invalidateCache, userCacheKey } from '@/lib/cache';
 import { generatePortalSession, verifyPortalSession, getAuthUser } from '@/lib/auth';
 
+function stripThaiNamePrefix(raw: string): string {
+  return raw
+    .trim()
+    .replace(/^(นางสาว|เด็กชาย|เด็กหญิง|น\.ส\.|ด\.ช\.|ด\.ญ\.|นาย|นาง)\s*/i, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function matchesStudentNameVerification(fullName: string, verifyInput: string): boolean {
+  const cleanFull = stripThaiNamePrefix(fullName);
+  const cleanInput = stripThaiNamePrefix(verifyInput);
+  if (!cleanInput || cleanInput.length < 2) return false;
+  if (cleanFull === cleanInput) return true;
+
+  const tokens = cleanFull.split(' ').filter(Boolean);
+  return tokens.some(
+    (token) => token === cleanInput || (cleanInput.length >= 3 && token.startsWith(cleanInput))
+  );
+}
+
+function toLightweightAvatarUrl(student: { id: number; avatar?: string | null; updatedAt: Date }): string | null {
+  if (!student.avatar) return null;
+  if (student.avatar.startsWith('data:image/')) {
+    return `/api/students/${student.id}/avatar?v=${student.updatedAt.getTime()}`;
+  }
+  return student.avatar;
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,6 +45,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const code = searchParams.get('code')?.trim();
+    const verifyName = searchParams.get('verify_name')?.trim() || '';
     const classroomIdParam = searchParams.get('classroom_id');
 
     if (!code) {
@@ -26,8 +55,25 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Check if caller already holds a verified portal_session for this studentCode
+    const portalSessionCookie = request.cookies.get('portal_session')?.value;
+    const existingSession = portalSessionCookie ? verifyPortalSession(portalSessionCookie) : null;
+    const hasActiveSessionForCode = Boolean(
+      existingSession &&
+        existingSession.studentCode.trim().toLowerCase() === code.toLowerCase() &&
+        existingSession.studentIds &&
+        existingSession.studentIds.length > 0
+    );
+
+    if (!hasActiveSessionForCode && stripThaiNamePrefix(verifyName).length < 2) {
+      return NextResponse.json(
+        { message: 'กรุณาระบุชื่อหรือนามสกุล (อย่างน้อย 2 ตัวอักษร) เพื่อยืนยันตัวตน' },
+        { status: 400 }
+      );
+    }
+
     // Look up students with matching studentCode
-    const matchingStudents = await prisma.student.findMany({
+    const rawMatchingStudents = await prisma.student.findMany({
       where: {
         studentCode: code,
       },
@@ -46,13 +92,21 @@ export async function GET(request: NextRequest) {
       orderBy: { id: 'asc' },
     });
 
+    // Filter down strictly to the verified student identity (prevents cross-school collisions & ID snooping)
+    const matchingStudents = verifyName
+      ? rawMatchingStudents.filter((s) => matchesStudentNameVerification(s.name, verifyName))
+      : hasActiveSessionForCode
+        ? rawMatchingStudents.filter((s) => existingSession!.studentIds!.includes(s.id))
+        : [];
+
     if (matchingStudents.length === 0) {
       return NextResponse.json(
-        { message: 'ไม่พบข้อมูลนักเรียนด้วยรหัสประจำตัวนี้ กรุณาตรวจสอบรหัสอีกครั้ง' },
+        { message: 'ไม่พบข้อมูลนักเรียน หรือรหัสประจำตัวและชื่อ-นามสกุลไม่ตรงกัน' },
         { status: 404 }
       );
     }
 
+    const verifiedStudentIds = matchingStudents.map((s) => s.id);
     const validClassrooms = matchingStudents.filter((s) => s.classroom !== null);
     if (validClassrooms.length === 0) {
       return NextResponse.json(
@@ -69,7 +123,7 @@ export async function GET(request: NextRequest) {
           id: matchingStudents[0].id,
           name: matchingStudents[0].name,
           student_code: matchingStudents[0].studentCode,
-          avatar: matchingStudents[0].avatar,
+          avatar: toLightweightAvatarUrl(matchingStudents[0]),
         },
         classrooms: validClassrooms.map((s) => ({
           student_id: s.id,
@@ -83,7 +137,7 @@ export async function GET(request: NextRequest) {
 
       resp.cookies.set({
         name: 'portal_session',
-        value: generatePortalSession(code),
+        value: generatePortalSession(code, verifiedStudentIds),
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
@@ -291,7 +345,7 @@ export async function GET(request: NextRequest) {
         name: targetStudent.name,
         student_code: targetStudent.studentCode,
         grade_level: targetStudent.gradeLevel,
-        avatar: targetStudent.avatar,
+        avatar: toLightweightAvatarUrl(targetStudent),
       },
       classroom: {
         id: classroom.id,
@@ -363,7 +417,7 @@ export async function GET(request: NextRequest) {
 
     response.cookies.set({
       name: 'portal_session',
-      value: generatePortalSession(code!),
+      value: generatePortalSession(code!, verifiedStudentIds),
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
@@ -417,22 +471,25 @@ async function handleAvatarUpdate(request: NextRequest) {
       );
     }
 
-    // Security Verification: Require valid signed portal session or teacher auth
+    // Security Verification: Require valid signed portal session (scoped to verified studentIds) or teacher auth
     const portalSessionCookie = request.cookies.get('portal_session')?.value;
     const verifiedSession = portalSessionCookie ? verifyPortalSession(portalSessionCookie) : null;
     const authUser = getAuthUser(request);
 
-    let isAuthorized = false;
-    if (verifiedSession && verifiedSession.studentCode.trim().toLowerCase() === studentCode.toLowerCase()) {
-      isAuthorized = true;
+    let authorizedStudents: Array<{ id: number; userId: number }> = [];
+    if (
+      verifiedSession &&
+      verifiedSession.studentCode.trim().toLowerCase() === studentCode.toLowerCase() &&
+      verifiedSession.studentIds &&
+      verifiedSession.studentIds.length > 0
+    ) {
+      const allowedSet = new Set(verifiedSession.studentIds);
+      authorizedStudents = students.filter((s) => allowedSet.has(s.id));
     } else if (authUser) {
-      const teacherOwnsStudent = students.some((s) => s.userId === authUser.id);
-      if (teacherOwnsStudent) {
-        isAuthorized = true;
-      }
+      authorizedStudents = students.filter((s) => s.userId === authUser.id);
     }
 
-    if (!isAuthorized) {
+    if (authorizedStudents.length === 0) {
       return NextResponse.json(
         { message: 'ไม่ได้รับอนุญาตให้แก้ไขข้อมูลนักเรียน กรุณาเปิดดูข้อมูลผ่านพอร์ทัลก่อนทำรายการ' },
         { status: 403 }
@@ -459,22 +516,30 @@ async function handleAvatarUpdate(request: NextRequest) {
       avatar = rawAvatar;
     }
 
-    // Update all student records with this studentCode
+    const authorizedIds = authorizedStudents.map((s) => s.id);
+
+    // Update ONLY the verified student's own records (never cross-school records sharing the same code)
     await prisma.student.updateMany({
-      where: { studentCode },
+      where: {
+        id: { in: authorizedIds },
+        studentCode,
+      },
       data: { avatar },
     });
 
-    // Invalidate caches for all affected teachers
-    const distinctUserIds = Array.from(new Set(students.map((s) => s.userId)));
+    // Invalidate caches for affected teachers (including students:list)
+    const distinctUserIds = Array.from(new Set(authorizedStudents.map((s) => s.userId)));
     for (const uId of distinctUserIds) {
+      invalidateCache(userCacheKey(uId, 'students'));
       invalidateCache(userCacheKey(uId, 'classrooms'));
       invalidateCache(userCacheKey(uId, 'dashboard'));
     }
 
+    const avatarUrl = avatar ? `/api/students/${authorizedIds[0]}/avatar?v=${Date.now()}` : null;
+
     return NextResponse.json({
       message: avatar ? 'อัพเดทรูปโปรไฟล์สำเร็จ' : 'ลบรูปโปรไฟล์สำเร็จ',
-      avatar,
+      avatar: avatarUrl,
     });
   } catch (error) {
     console.error('Portal student avatar update error:', error);

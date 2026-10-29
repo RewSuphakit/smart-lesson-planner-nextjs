@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, memo, Fragment } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
 import { createPortal } from 'react-dom';
@@ -8,7 +8,8 @@ import {
   Loader2, Users, Save, Calendar as CalendarIcon, CheckCircle, Clock, XCircle,
   FileText, AlertCircle, X, History, Trash2, ChevronLeft, ChevronRight,
   Search, Check, Grid, List, RefreshCw, Sparkles, RotateCcw,
-  FileSpreadsheet, Upload, BookOpen, GraduationCap, ArrowRight
+  FileSpreadsheet, Upload, BookOpen, GraduationCap, ArrowRight,
+  GitBranch, ChevronDown
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import dynamic from 'next/dynamic';
@@ -17,6 +18,7 @@ const AttendanceCsvModal = dynamic(() => import('@/components/AttendanceCsvModal
 const AttendanceImportModal = dynamic(() => import('@/components/AttendanceImportModal'), { ssr: false });
 
 import { getThaiHolidays, checkThaiHoliday, HolidayInfo } from '@/lib/thaiHolidays';
+import { buildStudentSectionGroups } from '@/lib/studentSections';
 
 const THAI_MONTHS_SHORT = [
   'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
@@ -569,6 +571,8 @@ interface Student {
   name: string;
   classroom_id: string;
   email?: string;
+  grade_level?: string | null;
+  branch?: string | null;
 }
 
 interface AttendanceRecord {
@@ -595,6 +599,7 @@ interface MobileStudentAttendanceCardProps {
   status: string | undefined;
   stats: StudentStats;
   maxAllowedAbsences: number;
+  sectionBadge?: string | null;
   onStatusSelect: (studentId: string, status: string) => void;
   onViewHistory: (student: Student) => void;
 }
@@ -604,6 +609,7 @@ const MobileStudentAttendanceCard = memo(({
   status,
   stats,
   maxAllowedAbsences,
+  sectionBadge,
   onStatusSelect,
   onViewHistory,
 }: MobileStudentAttendanceCardProps) => {
@@ -629,7 +635,14 @@ const MobileStudentAttendanceCard = memo(({
                 <History className="w-3.5 h-3.5" />
               </button>
             </div>
-            <p className="text-[11px] text-slate-400 font-mono">รหัส: {student.student_code || '-'}</p>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <p className="text-[11px] text-slate-400 font-mono">รหัส: {student.student_code || '-'}</p>
+              {sectionBadge && (
+                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/70">
+                  {sectionBadge}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -724,6 +737,8 @@ export default function Attendance() {
   const [attendance, setAttendance] = useState<Record<string, string>>({});
   const [stats, setStats] = useState<StudentStats[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedSectionKey, setSelectedSectionKey] = useState<string>('all');
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
 
   // Auto-Save state
   const [autoSave, setAutoSave] = useState<boolean>(() => {
@@ -906,14 +921,121 @@ export default function Attendance() {
     }
   }, [attendanceData]);
 
-  // Reset local state if no class is selected
+  // Reset local state if no class is selected, and reset section filter when switching classrooms
   useEffect(() => {
+    setSelectedSectionKey('all');
+    setCollapsedSections({});
     if (!selectedClass) {
       setStudents([]);
       setAttendance({});
       setStats([]);
     }
   }, [selectedClass]);
+
+  // ─── Sub-room / Section Grouping (แยกห้องย่อยเมื่อเรียนรวม เช่น ปวช.1/1 + ปวช.1/2) ───
+  const { groups: sectionGroups, hasMultipleSections, sharedBranch } = useMemo(
+    () => buildStudentSectionGroups(students),
+    [students]
+  );
+
+  useEffect(() => {
+    if (selectedSectionKey !== 'all' && !sectionGroups.some(g => g.key === selectedSectionKey)) {
+      setSelectedSectionKey('all');
+    }
+  }, [selectedSectionKey, sectionGroups]);
+
+  const activeSectionGroup = useMemo(
+    () => (selectedSectionKey === 'all' ? null : sectionGroups.find(g => g.key === selectedSectionKey) || null),
+    [selectedSectionKey, sectionGroups]
+  );
+
+  const sectionScopedStudents = useMemo(() => {
+    if (activeSectionGroup) return activeSectionGroup.students;
+    if (sectionGroups.length > 0) return sectionGroups.flatMap(g => g.students);
+    return students;
+  }, [activeSectionGroup, sectionGroups, students]);
+
+  // Filters students by search query within active section scope (Memoized)
+  const filteredStudents = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return sectionScopedStudents;
+    return sectionScopedStudents.filter(student =>
+      student.name.toLowerCase().includes(q) ||
+      (student.student_code && student.student_code.toLowerCase().includes(q)) ||
+      (student.grade_level && student.grade_level.toLowerCase().includes(q)) ||
+      (student.branch && student.branch.toLowerCase().includes(q))
+    );
+  }, [sectionScopedStudents, searchQuery]);
+
+  // Grouped sections filtered by searchQuery (for combined 'all' mode when hasMultipleSections)
+  const visibleSectionGroups = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return sectionGroups;
+    return sectionGroups
+      .map(grp => ({
+        ...grp,
+        students: grp.students.filter(student =>
+          student.name.toLowerCase().includes(q) ||
+          (student.student_code && student.student_code.toLowerCase().includes(q)) ||
+          (student.grade_level && student.grade_level.toLowerCase().includes(q)) ||
+          (student.branch && student.branch.toLowerCase().includes(q))
+        ),
+      }))
+      .filter(grp => grp.students.length > 0);
+  }, [sectionGroups, searchQuery]);
+
+  // Live daily statistics per section (for section switcher badges & group headers)
+  const sectionDailyStatsMap = useMemo(() => {
+    const map: Record<string, { present: number; late: number; absent: number; leave: number; marked: number; total: number }> = {};
+    sectionGroups.forEach(grp => {
+      const st = { present: 0, late: 0, absent: 0, leave: 0, marked: 0, total: grp.students.length };
+      grp.students.forEach(s => {
+        const val = attendance[s.id];
+        if (val) {
+          st.marked++;
+          if (val === 'present') st.present++;
+          else if (val === 'late') st.late++;
+          else if (val === 'absent') st.absent++;
+          else if (val === 'leave') st.leave++;
+        }
+      });
+      map[grp.key] = st;
+    });
+    return map;
+  }, [sectionGroups, attendance]);
+
+  const overallDailyMarked = useMemo(
+    () => students.reduce((acc, s) => (attendance[s.id] ? acc + 1 : acc), 0),
+    [students, attendance]
+  );
+
+  // Daily statistics calculated in real-time for active scope (Memoized)
+  const dailyStats = useMemo(() => {
+    const scStats = {
+      present: 0,
+      late: 0,
+      absent: 0,
+      leave: 0,
+      total: sectionScopedStudents.length,
+      marked: 0
+    };
+
+    sectionScopedStudents.forEach(s => {
+      const sStatus = attendance[s.id];
+      if (sStatus) {
+        scStats.marked++;
+        if (sStatus === 'present') scStats.present++;
+        else if (sStatus === 'late') scStats.late++;
+        else if (sStatus === 'absent') scStats.absent++;
+        else if (sStatus === 'leave') scStats.leave++;
+      }
+    });
+    return scStats;
+  }, [sectionScopedStudents, attendance]);
+
+  const toggleSectionCollapse = useCallback((sectionKey: string) => {
+    setCollapsedSections(prev => ({ ...prev, [sectionKey]: !prev[sectionKey] }));
+  }, []);
 
 
 
@@ -1014,21 +1136,35 @@ export default function Attendance() {
   });
 
   const handleSave = () => {
-    if (!selectedClass || students.length === 0) return;
+    if (!selectedClass || sectionScopedStudents.length === 0) return;
 
-    const uncheckedStudents = students.filter(s => !attendance[s.id]);
-    if (uncheckedStudents.length > 0) {
-      toast.error(`กรุณาเช็คชื่อนักเรียนให้ครบทุกคนก่อนบันทึก (เหลืออีก ${uncheckedStudents.length} คน)`);
-      return;
+    const uncheckedInScope = sectionScopedStudents.filter(s => !attendance[s.id]);
+    if (activeSectionGroup) {
+      if (uncheckedInScope.length > 0) {
+        toast.error(`กรุณาเช็คชื่อนักเรียนห้อง ${activeSectionGroup.label} ให้ครบทุกคนก่อนบันทึก (เหลืออีก ${uncheckedInScope.length} คน)`);
+        return;
+      }
+    } else if (uncheckedInScope.length > 0) {
+      const checkedCount = sectionScopedStudents.length - uncheckedInScope.length;
+      if (!hasMultipleSections || checkedCount === 0) {
+        toast.error(`กรุณาเช็คชื่อนักเรียนให้ครบทุกคนก่อนบันทึก (เหลืออีก ${uncheckedInScope.length} คน)`);
+        return;
+      }
+      if (!confirm(`ยังมีนักเรียนที่ไม่ได้เช็คชื่ออีก ${uncheckedInScope.length} คน (เช็คแล้ว ${checkedCount}/${sectionScopedStudents.length} คน)\n\nต้องการบันทึกเฉพาะรายชื่อที่เช็คแล้วหรือไม่?`)) {
+        return;
+      }
     }
 
-    const records = Object.entries(attendance).map(([student_id, status]) => ({
-      student_id: Number(student_id),
-      classroom_id: Number(selectedClass),
-      date: date,
-      status: status
-    }));
+    const records = students
+      .filter(s => Boolean(attendance[s.id]))
+      .map(s => ({
+        student_id: Number(s.id),
+        classroom_id: Number(selectedClass),
+        date: date,
+        status: attendance[s.id]
+      }));
 
+    if (records.length === 0) return;
     saveMutation.mutate(records);
   };
 
@@ -1128,14 +1264,29 @@ export default function Attendance() {
     deleteHistoryMutation.mutate(recordId);
   };
 
-  // ─── Mutation: ล้างข้อมูลการเข้าเรียน ───
+  // ─── Mutation: ล้างข้อมูลการเข้าเรียน (ทั้งห้อง หรือ เฉพาะห้องย่อยที่เลือก) ───
   const clearDataMutation = useMutation({
-    mutationFn: async () => {
-      return api.delete(`/attendance?classroom_id=${selectedClass}&date=${date}`);
+    mutationFn: async (params?: { studentIds?: string[]; sectionLabel?: string }) => {
+      const idsQuery = params?.studentIds && params.studentIds.length > 0
+        ? `&student_ids=${params.studentIds.join(',')}`
+        : '';
+      return api.delete(`/attendance?classroom_id=${selectedClass}&date=${date}${idsQuery}`);
     },
-    onSuccess: () => {
-      toast.success('ลบข้อมูลการเช็คชื่อของวันที่เลือกเรียบร้อยแล้ว');
-      setAttendance({});
+    onSuccess: (_res, params) => {
+      if (params?.studentIds && params.studentIds.length > 0) {
+        const idSet = new Set(params.studentIds.map(String));
+        setAttendance(prev => {
+          const next = { ...prev };
+          idSet.forEach(id => {
+            delete next[id];
+          });
+          return next;
+        });
+        toast.success(`ลบข้อมูลการเช็คชื่อห้อง ${params.sectionLabel || ''} ของวันที่เลือกเรียบร้อยแล้ว`);
+      } else {
+        setAttendance({});
+        toast.success('ลบข้อมูลการเช็คชื่อของวันที่เลือกเรียบร้อยแล้ว');
+      }
       queryClient.invalidateQueries({ queryKey: ['attendance-data', selectedClass, date] });
       queryClient.invalidateQueries({ queryKey: ['attendance-matrix', selectedClass] });
     },
@@ -1145,15 +1296,26 @@ export default function Attendance() {
   });
 
   const handleClearData = () => {
-    if (!selectedClass || students.length === 0) return;
+    if (!selectedClass || sectionScopedStudents.length === 0) return;
 
     const dateObj = new Date(date);
     const formattedDateForConfirm = dateObj.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
 
+    if (activeSectionGroup) {
+      if (!confirm(`⚠️ ยืนยันการลบข้อมูลเช็คชื่อเฉพาะห้องย่อย?\n\nคุณต้องการลบข้อมูลการเช็คชื่อของห้อง "${activeSectionGroup.label}" (${activeSectionGroup.students.length} คน)\nสำหรับวันที่ "${formattedDateForConfirm}" ใช่หรือไม่?\n\n(ข้อมูลของห้องย่อยอื่นในรายวิชานี้จะไม่ถูกลบ)`)) {
+        return;
+      }
+      clearDataMutation.mutate({
+        studentIds: activeSectionGroup.students.map(s => String(s.id)),
+        sectionLabel: activeSectionGroup.label,
+      });
+      return;
+    }
+
     if (!confirm(`⚠️ ยืนยันการลบข้อมูลเช็คชื่อ?\n\nคุณต้องการลบข้อมูลการเช็คชื่อของทุกคนในห้องนี้\nสำหรับวันที่ "${formattedDateForConfirm}" ใช่หรือไม่?\n\n(เหมาะสำหรับกรณีลงชื่อผิดวัน หรือต้องการเริ่มลงใหม่ของวันนี้)`)) {
       return;
     }
-    clearDataMutation.mutate();
+    clearDataMutation.mutate(undefined);
   };
 
 
@@ -1187,16 +1349,20 @@ export default function Attendance() {
     }
   });
 
-  const handleMarkAll = (status: string) => {
-    const newAtt = { ...attendance };
-    filteredStudents.forEach(student => {
-      newAtt[student.id] = status;
+  const handleMarkStudents = useCallback((targetStudents: Student[], status: string, scopeLabel?: string) => {
+    if (targetStudents.length === 0) return;
+    setAttendance(prev => {
+      const next = { ...prev };
+      targetStudents.forEach(student => {
+        next[student.id] = status;
+      });
+      return next;
     });
-    setAttendance(newAtt);
-    toast.success(`เลือก ${status === 'present' ? 'มาเรียน' : status === 'absent' ? 'ขาด' : status === 'late' ? 'สาย' : 'ลา'} ให้กับรายชื่อที่แสดงอยู่`);
+    const statusText = status === 'present' ? 'มาเรียน' : status === 'absent' ? 'ขาด' : status === 'late' ? 'สาย' : 'ลา';
+    toast.success(`เลือก "${statusText}" ให้กับ${scopeLabel ? `ห้อง ${scopeLabel}` : 'รายชื่อที่แสดงอยู่'} (${targetStudents.length} คน)`);
 
     if (autoSave) {
-      const records = filteredStudents.map(student => ({
+      const records = targetStudents.map(student => ({
         student_id: Number(student.id),
         classroom_id: Number(selectedClass),
         date: date,
@@ -1204,6 +1370,10 @@ export default function Attendance() {
       }));
       markAllMutation.mutate({ status, records });
     }
+  }, [autoSave, selectedClass, date, markAllMutation]);
+
+  const handleMarkAll = (status: string) => {
+    handleMarkStudents(filteredStudents, status, activeSectionGroup?.label);
   };
 
   const handleResetDraft = () => {
@@ -1226,40 +1396,6 @@ export default function Attendance() {
     d.setDate(d.getDate() - 1);
     setDate(d.toISOString().split('T')[0]);
   };
-
-  // Filters students by search query (Memoized)
-  const filteredStudents = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return students;
-    return students.filter(student =>
-      student.name.toLowerCase().includes(q) ||
-      (student.student_code && student.student_code.toLowerCase().includes(q))
-    );
-  }, [students, searchQuery]);
-
-  // Daily statistics calculated in real-time (Memoized)
-  const dailyStats = useMemo(() => {
-    const stats = {
-      present: 0,
-      late: 0,
-      absent: 0,
-      leave: 0,
-      total: students.length,
-      marked: 0
-    };
-
-    students.forEach(s => {
-      const sStatus = attendance[s.id];
-      if (sStatus) {
-        stats.marked++;
-        if (sStatus === 'present') stats.present++;
-        else if (sStatus === 'late') stats.late++;
-        else if (sStatus === 'absent') stats.absent++;
-        else if (sStatus === 'leave') stats.leave++;
-      }
-    });
-    return stats;
-  }, [students, attendance]);
 
   // Calculate unique dates in range for Matrix View
   // ─── Holiday Calculation ───
@@ -1398,6 +1534,122 @@ export default function Attendance() {
   const saving = saveMutation.isPending || clearDataMutation.isPending || markAllMutation.isPending;
   const matrixLoading = loadingMatrix;
   const historyLoading = loadingHistory;
+
+  const renderDesktopStudentRow = (student: Student, idx: number, showRoomPill = false) => {
+    const sStats = getStudentStats(student.id);
+    const isCloseToFRisk = sStats.converted_absent_count >= maxAllowedAbsences * 0.75;
+    return (
+      <tr
+        key={student.id}
+        className={`border-b border-indigo-50/50 transition-colors duration-150 hover:bg-indigo-50/30 ${idx % 2 === 0 ? 'bg-white/20' : 'bg-transparent'
+          }`}
+      >
+        <td className="p-4 text-slate-600 text-sm font-semibold">{student.student_code || '-'}</td>
+        <td className="p-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-600 font-bold text-xs flex items-center justify-center shrink-0">
+              {student.name.charAt(0)}
+            </div>
+            <span className="font-semibold text-slate-800">{student.name}</span>
+            {showRoomPill && student.grade_level && (
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/70">
+                {student.grade_level}
+              </span>
+            )}
+            <button
+              onClick={() => setHistoryStudent(student)}
+              className="p-1 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-100/50 transition-all"
+              title="ดูประวัติการมาเรียนอย่างละเอียด"
+            >
+              <History className="w-4 h-4" />
+            </button>
+          </div>
+        </td>
+        <td className="p-4">
+          <div className="flex items-center gap-2.5">
+            {statusBtn(student.id, 'present', <CheckCircle className="w-4 h-4" />, 'มาเรียน', 'bg-emerald-500 text-white border border-emerald-600')}
+            {statusBtn(student.id, 'late', <Clock className="w-4 h-4" />, 'สาย', 'bg-amber-500 text-white border border-amber-600')}
+            {statusBtn(student.id, 'absent', <XCircle className="w-4 h-4" />, 'ขาด', 'bg-red-500 text-white border border-red-600')}
+            {statusBtn(student.id, 'leave', <FileText className="w-4 h-4" />, 'ลา', 'bg-blue-500 text-white border border-blue-600')}
+          </div>
+        </td>
+        <td className="p-4 text-center">
+          <div className="flex flex-col items-center">
+            {sStats.is_f ? (
+              <span className="text-[10px] font-extrabold text-white bg-red-600 px-2 py-0.5 rounded-full animate-pulse border border-red-700">
+                หมดสิทธิ์เรียน
+              </span>
+            ) : (
+              <div className="flex flex-col items-center w-full">
+                <div className="flex justify-between w-full max-w-[90px] text-xs font-semibold mb-1">
+                  <span className={sStats.converted_absent_count > 0 ? 'text-red-500' : 'text-slate-600'}>
+                    ขาด {sStats.converted_absent_count}
+                  </span>
+                  <span className="text-slate-600">/ {maxAllowedAbsences}</span>
+                </div>
+                <div className="w-full max-w-[90px] bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${isCloseToFRisk ? 'bg-red-500 animate-pulse' : 'bg-indigo-500'
+                      }`}
+                    style={{ width: `${Math.min((sStats.converted_absent_count / (maxAllowedAbsences || 1)) * 100, 100)}%` }}
+                  ></div>
+                </div>
+              </div>
+            )}
+
+            {(sStats.remaining_late_count > 0 || sStats.remaining_leave_count > 0) && (
+              <div className="flex gap-1 text-[9px] mt-1 font-semibold opacity-70">
+                {sStats.remaining_late_count > 0 && <span className="text-amber-600 bg-amber-50 px-1 py-0.5 rounded border border-amber-100">สายสะสม {sStats.remaining_late_count}</span>}
+                {sStats.remaining_leave_count > 0 && <span className="text-blue-500 bg-blue-50 px-1 py-0.5 rounded border border-blue-100 font-semibold">ลาสะสม {sStats.remaining_leave_count}</span>}
+              </div>
+            )}
+          </div>
+        </td>
+      </tr>
+    );
+  };
+
+  const renderMatrixStudentRow = (student: Student, idx: number, showRoomSubtitle = false) => (
+    <tr
+      key={student.id}
+      className={`border-b border-indigo-50/50 hover:bg-indigo-50/20 transition-colors ${idx % 2 === 0 ? 'bg-white/20' : 'bg-transparent'
+        }`}
+    >
+      <td className="p-4 font-semibold text-slate-800 text-sm sticky left-0 bg-white z-20 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)] border-r border-indigo-100 flex items-center gap-2 h-14 overflow-hidden text-ellipsis whitespace-nowrap">
+        <div className="w-6 h-6 rounded-full bg-indigo-50 text-indigo-600 font-bold text-[10px] flex items-center justify-center flex-shrink-0">
+          {student.name.charAt(0)}
+        </div>
+        <div className="min-w-0">
+          <p className="font-semibold text-slate-800 text-xs truncate leading-snug">{student.name}</p>
+          {(student.student_code || (showRoomSubtitle && student.grade_level)) && (
+            <p className="text-[10px] text-slate-500 leading-none mt-0.5 truncate">
+              {student.student_code || '-'}
+              {showRoomSubtitle && student.grade_level ? ` · ${student.grade_level}` : ''}
+            </p>
+          )}
+        </div>
+      </td>
+
+      {matrixDates.map(dateStr => {
+        const status = matrixRecordMap.get(`${student.id}_${dateStr}`) ?? null;
+        const isEditing = matrixEditingCell?.studentId === student.id && matrixEditingCell?.date === dateStr;
+        const holiday = holidayMap[dateStr] || checkThaiHoliday(dateStr);
+
+        return (
+          <MemoizedAttendanceCell
+            key={dateStr}
+            status={status}
+            isEditing={isEditing}
+            onEditClick={() => setMatrixEditingCell({ studentId: student.id, date: dateStr })}
+            onStatusSelect={statusVal => handleMatrixCellUpdate(student.id, dateStr, statusVal)}
+            onDeleteClick={status ? () => handleMatrixCellDelete(student.id, dateStr) : undefined}
+            popoverRef={isEditing ? cellPopoverRef : undefined}
+            holiday={holiday}
+          />
+        );
+      })}
+    </tr>
+  );
 
   if (loading) return (
     <div className="flex flex-col items-center justify-center h-96 space-y-4">
@@ -1548,6 +1800,99 @@ export default function Attendance() {
               </div>
             </div>
           </div>
+
+          {/* Sub-room / Section Switcher Bar (แสดงอัตโนมัติเมื่อห้องเรียนมีหลายห้องย่อย เช่น ปวช.1/1 เรียนรวมกับ ปวช.1/2) */}
+          {hasMultipleSections && (
+            <>
+              <div className="border-t border-slate-100/80" />
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-0.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-1.5 text-xs font-extrabold text-indigo-800 mr-1">
+                    <GitBranch className="w-4 h-4 text-indigo-600" />
+                    <span>แยกห้องเช็คชื่อ:</span>
+                    {sharedBranch && (
+                      <span className="px-2 py-0.5 rounded-md bg-violet-50 text-violet-700 border border-violet-200/80 font-bold text-[11px]">
+                        สาขา{sharedBranch}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Pill: รวมทุกห้อง */}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSectionKey('all')}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${selectedSectionKey === 'all'
+                      ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/20'
+                      : 'bg-white/90 hover:bg-indigo-50 text-slate-700 border border-slate-200/90'
+                      }`}
+                    title="แสดงรายชื่อรวมทุกห้องย่อย (จัดกลุ่มแยกหัวข้อให้ตามห้อง)"
+                  >
+                    <span>รวมทุกห้อง</span>
+                    <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${selectedSectionKey === 'all'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-slate-100 text-slate-600'
+                      }`}>
+                      {students.length}
+                    </span>
+                  </button>
+
+                  {/* Pills per Sub-room / Section */}
+                  {sectionGroups.map(grp => {
+                    const isSelected = selectedSectionKey === grp.key;
+                    const secStats = sectionDailyStatsMap[grp.key];
+                    const isAllMarked = secStats && secStats.total > 0 && secStats.marked === secStats.total;
+                    const isPartialMarked = secStats && secStats.marked > 0 && secStats.marked < secStats.total;
+
+                    return (
+                      <button
+                        key={grp.key}
+                        type="button"
+                        onClick={() => setSelectedSectionKey(grp.key)}
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${isSelected
+                          ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/20'
+                          : 'bg-white/90 hover:bg-indigo-50 text-slate-700 border border-slate-200/90'
+                          }`}
+                        title={`สลับไปเช็คชื่อเฉพาะห้อง ${grp.label} (${grp.students.length} คน)`}
+                      >
+                        <span>{grp.label}</span>
+                        {activeTab === 'daily' && secStats ? (
+                          <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold flex items-center gap-0.5 ${isSelected
+                            ? isAllMarked
+                              ? 'bg-emerald-400/30 text-white border border-emerald-200/40'
+                              : 'bg-white/20 text-white'
+                            : isAllMarked
+                              ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                              : isPartialMarked
+                                ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                : 'bg-slate-100 text-slate-600'
+                            }`}>
+                            {isAllMarked && <Check className="w-2.5 h-2.5" />}
+                            <span>{secStats.marked}/{secStats.total}</span>
+                          </span>
+                        ) : (
+                          <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${isSelected
+                            ? 'bg-white/20 text-white'
+                            : 'bg-slate-100 text-slate-600'
+                            }`}>
+                            {grp.students.length}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {activeTab === 'daily' && selectedSectionKey !== 'all' && (
+                  <div className="text-[11px] font-semibold text-slate-500 flex items-center gap-1.5 shrink-0">
+                    <span>เช็ครวมทั้งวิชาวันนี้:</span>
+                    <strong className={overallDailyMarked === students.length ? 'text-emerald-600 font-extrabold' : 'text-indigo-700 font-extrabold'}>
+                      {overallDailyMarked}/{students.length} คน
+                    </strong>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -1853,11 +2198,17 @@ export default function Attendance() {
                       onClick={handleClearData}
                       disabled={saving}
                       className="px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-200/70 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                      title="ลบข้อมูลการเช็คชื่อทั้งห้องสำหรับวันที่เลือกอยู่"
+                      title={activeSectionGroup
+                        ? `ลบข้อมูลการเช็คชื่อเฉพาะห้อง ${activeSectionGroup.label} สำหรับวันที่เลือกอยู่`
+                        : 'ลบข้อมูลการเช็คชื่อทั้งห้องสำหรับวันที่เลือกอยู่'}
                     >
                       <Trash2 className="w-4 h-4 text-red-500" />
-                      <span className="hidden sm:inline">ลบข้อมูลวันที่เลือก ({new Date(date).getDate()} {THAI_MONTHS_SHORT[new Date(date).getMonth()]})</span>
-                      <span className="sm:hidden">ลบข้อมูล ({new Date(date).getDate()} {THAI_MONTHS_SHORT[new Date(date).getMonth()]})</span>
+                      <span className="hidden sm:inline">
+                        ลบข้อมูล{activeSectionGroup ? ` (${activeSectionGroup.label})` : 'วันที่เลือก'} ({new Date(date).getDate()} {THAI_MONTHS_SHORT[new Date(date).getMonth()]})
+                      </span>
+                      <span className="sm:hidden">
+                        ลบ{activeSectionGroup ? ` ${activeSectionGroup.label}` : 'ข้อมูล'} ({new Date(date).getDate()} {THAI_MONTHS_SHORT[new Date(date).getMonth()]})
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -1987,18 +2338,20 @@ export default function Attendance() {
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
-                    <span className="text-xs text-slate-600 font-semibold mr-1">กำหนดเร็ว:</span>
+                    <span className="text-xs text-slate-600 font-semibold mr-1">
+                      กำหนดเร็ว{activeSectionGroup ? ` (${activeSectionGroup.label})` : ''}:
+                    </span>
                     <button
                       onClick={() => handleMarkAll('present')}
                       className="px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-600 text-xs font-semibold border border-emerald-200/40 transition-colors"
                     >
-                      มาเรียนทุกคน
+                      มาเรียนทุกคน{activeSectionGroup ? ` (${activeSectionGroup.label})` : ''}
                     </button>
                     <button
                       onClick={() => handleMarkAll('absent')}
                       className="px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 text-xs font-semibold border border-red-200/40 transition-colors"
                     >
-                      ขาดทุกคน
+                      ขาดทุกคน{activeSectionGroup ? ` (${activeSectionGroup.label})` : ''}
                     </button>
                     <button
                       onClick={handleResetDraft}
@@ -2011,17 +2364,101 @@ export default function Attendance() {
 
                 {/* Mobile Card List View (Thumb-Friendly & Super Fast) */}
                 <div className="block md:hidden p-3 space-y-3">
-                  {filteredStudents.map(student => (
-                    <MobileStudentAttendanceCard
-                      key={student.id}
-                      student={student}
-                      status={attendance[student.id]}
-                      stats={getStudentStats(student.id)}
-                      maxAllowedAbsences={maxAllowedAbsences}
-                      onStatusSelect={handleStatusChange}
-                      onViewHistory={setHistoryStudent}
-                    />
-                  ))}
+                  {filteredStudents.length === 0 ? (
+                    <div className="p-8 text-center text-sm text-slate-500 font-semibold">
+                      ไม่พบรายชื่อนักเรียนที่ตรงกับคำค้นหา
+                    </div>
+                  ) : hasMultipleSections && selectedSectionKey === 'all' ? (
+                    visibleSectionGroups.map(grp => {
+                      const isCollapsed = Boolean(collapsedSections[grp.key]);
+                      const secStats = sectionDailyStatsMap[grp.key];
+                      return (
+                        <div key={grp.key} className="space-y-2.5">
+                          <div className="p-3 rounded-2xl bg-gradient-to-r from-indigo-50/95 via-violet-50/70 to-white border border-indigo-100/90 shadow-2xs space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <button
+                                type="button"
+                                onClick={() => toggleSectionCollapse(grp.key)}
+                                className="flex items-center gap-2 min-w-0 text-left"
+                                title={isCollapsed ? 'คลิกเพื่อกางรายชื่อห้องนี้' : 'คลิกเพื่อพับเก็บรายชื่อห้องนี้'}
+                              >
+                                <ChevronDown className={`w-4 h-4 text-indigo-600 shrink-0 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
+                                <span className="font-extrabold text-sm text-indigo-950 truncate">{grp.fullLabel}</span>
+                                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white text-indigo-700 border border-indigo-200 shrink-0">
+                                  {grp.students.length} คน
+                                </span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => setSelectedSectionKey(grp.key)}
+                                className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 px-2 py-1 rounded-lg bg-white/90 border border-indigo-200/70 shrink-0"
+                              >
+                                แยกห้องนี้ →
+                              </button>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-2 flex-wrap pt-0.5">
+                              {secStats && (
+                                <div className="flex items-center gap-1.5 text-[11px] font-bold flex-wrap">
+                                  <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/70">มา {secStats.present}</span>
+                                  <span className="text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/70">สาย {secStats.late}</span>
+                                  <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200/70">ขาด {secStats.absent}</span>
+                                  <span className="text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200/70">ลา {secStats.leave}</span>
+                                </div>
+                              )}
+                              <div className="flex items-center gap-1.5 ml-auto">
+                                <button
+                                  type="button"
+                                  onClick={() => handleMarkStudents(grp.students, 'present', grp.label)}
+                                  className="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-bold shadow-2xs"
+                                >
+                                  ✓ มาทั้งห้อง
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleMarkStudents(grp.students, 'absent', grp.label)}
+                                  className="px-2 py-1 rounded-lg bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 text-[11px] font-bold"
+                                >
+                                  ขาดทั้งห้อง
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+
+                          {!isCollapsed && (
+                            <div className="space-y-2.5 pl-1">
+                              {grp.students.map(student => (
+                                <MobileStudentAttendanceCard
+                                  key={student.id}
+                                  student={student}
+                                  status={attendance[student.id]}
+                                  stats={getStudentStats(student.id)}
+                                  maxAllowedAbsences={maxAllowedAbsences}
+                                  sectionBadge={grp.label}
+                                  onStatusSelect={handleStatusChange}
+                                  onViewHistory={setHistoryStudent}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    filteredStudents.map(student => (
+                      <MobileStudentAttendanceCard
+                        key={student.id}
+                        student={student}
+                        status={attendance[student.id]}
+                        stats={getStudentStats(student.id)}
+                        maxAllowedAbsences={maxAllowedAbsences}
+                        sectionBadge={hasMultipleSections ? (student.grade_level || null) : null}
+                        onStatusSelect={handleStatusChange}
+                        onViewHistory={setHistoryStudent}
+                      />
+                    ))
+                  )}
                 </div>
 
                 {/* Desktop Table View */}
@@ -2036,74 +2473,91 @@ export default function Attendance() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredStudents.map((student, idx) => {
-                        const sStats = getStudentStats(student.id);
-                        const isCloseToFRisk = sStats.converted_absent_count >= maxAllowedAbsences * 0.75;
-                        return (
-                          <tr
-                            key={student.id}
-                            className={`border-b border-indigo-50/50 transition-colors duration-150 hover:bg-indigo-50/30 ${idx % 2 === 0 ? 'bg-white/20' : 'bg-transparent'
-                              }`}
-                          >
-                            <td className="p-4 text-slate-600 text-sm font-semibold">{student.student_code || '-'}</td>
-                            <td className="p-4">
-                              <div className="flex items-center gap-2">
-                                <div className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-600 font-bold text-xs flex items-center justify-center">
-                                  {student.name.charAt(0)}
-                                </div>
-                                <span className="font-semibold text-slate-800">{student.name}</span>
-                                <button
-                                  onClick={() => setHistoryStudent(student)}
-                                  className="p-1 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-100/50 transition-all"
-                                  title="ดูประวัติการมาเรียนอย่างละเอียด"
-                                >
-                                  <History className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </td>
-                            <td className="p-4">
-                              <div className="flex items-center gap-2.5">
-                                {statusBtn(student.id, 'present', <CheckCircle className="w-4 h-4" />, 'มาเรียน', 'bg-emerald-500 text-white border border-emerald-600')}
-                                {statusBtn(student.id, 'late', <Clock className="w-4 h-4" />, 'สาย', 'bg-amber-500 text-white border border-amber-600')}
-                                {statusBtn(student.id, 'absent', <XCircle className="w-4 h-4" />, 'ขาด', 'bg-red-500 text-white border border-red-600')}
-                                {statusBtn(student.id, 'leave', <FileText className="w-4 h-4" />, 'ลา', 'bg-blue-500 text-white border border-blue-600')}
-                              </div>
-                            </td>
-                            <td className="p-4 text-center">
-                              <div className="flex flex-col items-center">
-                                {sStats.is_f ? (
-                                  <span className="text-[10px] font-extrabold text-white bg-red-600 px-2 py-0.5 rounded-full animate-pulse border border-red-700">
-                                    หมดสิทธิ์เรียน
-                                  </span>
-                                ) : (
-                                  <div className="flex flex-col items-center w-full">
-                                    <div className="flex justify-between w-full max-w-[90px] text-xs font-semibold mb-1">
-                                      <span className={sStats.converted_absent_count > 0 ? 'text-red-500' : 'text-slate-600'}>
-                                        ขาด {sStats.converted_absent_count}
-                                      </span>
-                                      <span className="text-slate-600">/ {maxAllowedAbsences}</span>
-                                    </div>
-                                    <div className="w-full max-w-[90px] bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                                      <div
-                                        className={`h-full rounded-full ${isCloseToFRisk ? 'bg-red-500 animate-pulse' : 'bg-indigo-500'
-                                          }`}
-                                        style={{ width: `${Math.min((sStats.converted_absent_count / (maxAllowedAbsences || 1)) * 100, 100)}%` }}
-                                      ></div>
-                                    </div>
-                                  </div>
-                                )}
+                      {filteredStudents.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="p-10 text-center text-sm text-slate-500 font-semibold">
+                            ไม่พบรายชื่อนักเรียนที่ตรงกับคำค้นหา
+                          </td>
+                        </tr>
+                      ) : hasMultipleSections && selectedSectionKey === 'all' ? (
+                        visibleSectionGroups.map(grp => {
+                          const isCollapsed = Boolean(collapsedSections[grp.key]);
+                          const secStats = sectionDailyStatsMap[grp.key];
+                          const isAllMarked = secStats && secStats.total > 0 && secStats.marked === secStats.total;
+                          return (
+                            <Fragment key={grp.key}>
+                              <tr className="bg-gradient-to-r from-indigo-50/90 via-violet-50/50 to-indigo-50/30 border-y border-indigo-100">
+                                <td colSpan={4} className="px-4 py-2.5">
+                                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                                    <div className="flex items-center gap-2.5 flex-wrap">
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleSectionCollapse(grp.key)}
+                                        className="flex items-center gap-2 text-left group cursor-pointer"
+                                        title={isCollapsed ? 'คลิกเพื่อกางรายชื่อห้องนี้' : 'คลิกเพื่อพับเก็บรายชื่อห้องนี้'}
+                                      >
+                                        <div className="w-6 h-6 rounded-lg bg-white border border-indigo-200/80 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors shadow-2xs">
+                                          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
+                                        </div>
+                                        <span className="font-extrabold text-sm text-indigo-950">{grp.fullLabel}</span>
+                                      </button>
 
-                                {(sStats.remaining_late_count > 0 || sStats.remaining_leave_count > 0) && (
-                                  <div className="flex gap-1 text-[9px] mt-1 font-semibold opacity-70">
-                                    {sStats.remaining_late_count > 0 && <span className="text-amber-600 bg-amber-50 px-1 py-0.5 rounded border border-amber-100">สายสะสม {sStats.remaining_late_count}</span>}
-                                    {sStats.remaining_leave_count > 0 && <span className="text-blue-500 bg-blue-50 px-1 py-0.5 rounded border border-blue-100 font-semibold">ลาสะสม {sStats.remaining_leave_count}</span>}
+                                      <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-white text-indigo-700 border border-indigo-200/80 shadow-2xs">
+                                        {grp.students.length} คน
+                                      </span>
+
+                                      {secStats && (
+                                        <div className="flex items-center gap-1.5 text-[11px] font-bold ml-1 flex-wrap">
+                                          <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/70">มา {secStats.present}</span>
+                                          <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200/70">สาย {secStats.late}</span>
+                                          <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200/70">ขาด {secStats.absent}</span>
+                                          <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200/70">ลา {secStats.leave}</span>
+                                          <span className={`px-2 py-0.5 rounded-md border ${isAllMarked
+                                            ? 'bg-emerald-500 text-white border-emerald-600'
+                                            : 'bg-white text-slate-600 border-slate-200'
+                                            }`}>
+                                            เช็คแล้ว {secStats.marked}/{secStats.total}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleMarkStudents(grp.students, 'present', grp.label)}
+                                        className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/80 text-xs font-bold transition-colors cursor-pointer"
+                                        title={`เช็คชื่อมาเรียนทั้งห้อง ${grp.fullLabel}`}
+                                      >
+                                        ✓ มาทั้งห้อง {grp.label}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleMarkStudents(grp.students, 'absent', grp.label)}
+                                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-rose-50 text-rose-600 border border-rose-200/80 text-xs font-bold transition-colors cursor-pointer"
+                                        title={`เช็คชื่อขาดทั้งห้อง ${grp.fullLabel}`}
+                                      >
+                                        ขาดทั้งห้อง
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setSelectedSectionKey(grp.key)}
+                                        className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-colors shadow-2xs cursor-pointer"
+                                        title={`สลับไปแสดงเฉพาะห้อง ${grp.label}`}
+                                      >
+                                        แยกเช็คเฉพาะห้องนี้ →
+                                      </button>
+                                    </div>
                                   </div>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                                </td>
+                              </tr>
+                              {!isCollapsed && grp.students.map((student, idx) => renderDesktopStudentRow(student, idx, Boolean(searchQuery.trim())))}
+                            </Fragment>
+                          );
+                        })
+                      ) : (
+                        filteredStudents.map((student, idx) => renderDesktopStudentRow(student, idx, false))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -2384,46 +2838,48 @@ export default function Attendance() {
                           </tr>
                         </thead>
                         <tbody>
-                          {filteredStudents.map((student, idx) => {
-                            return (
-                              <tr
-                                key={student.id}
-                                className={`border-b border-indigo-50/50 hover:bg-indigo-50/20 transition-colors ${idx % 2 === 0 ? 'bg-white/20' : 'bg-transparent'
-                                  }`}
-                              >
-                                <td className="p-4 font-semibold text-slate-800 text-sm sticky left-0 bg-white z-20 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)] border-r border-indigo-100 flex items-center gap-2 h-14 overflow-hidden text-ellipsis whitespace-nowrap">
-                                  <div className="w-6 h-6 rounded-full bg-indigo-50 text-indigo-600 font-bold text-[10px] flex items-center justify-center flex-shrink-0">
-                                    {student.name.charAt(0)}
-                                  </div>
-                                  <div className="min-w-0">
-                                    <p className="font-semibold text-slate-800 text-xs truncate leading-snug">{student.name}</p>
-                                    {student.student_code && (
-                                      <p className="text-[10px] text-slate-500 leading-none mt-0.5">{student.student_code}</p>
-                                    )}
-                                  </div>
-                                </td>
-
-                                {matrixDates.map(dateStr => {
-                                  const status = matrixRecordMap.get(`${student.id}_${dateStr}`) ?? null;
-                                  const isEditing = matrixEditingCell?.studentId === student.id && matrixEditingCell?.date === dateStr;
-                                  const holiday = holidayMap[dateStr] || checkThaiHoliday(dateStr);
-
-                                  return (
-                                    <MemoizedAttendanceCell
-                                      key={dateStr}
-                                      status={status}
-                                      isEditing={isEditing}
-                                      onEditClick={() => setMatrixEditingCell({ studentId: student.id, date: dateStr })}
-                                      onStatusSelect={statusVal => handleMatrixCellUpdate(student.id, dateStr, statusVal)}
-                                      onDeleteClick={status ? () => handleMatrixCellDelete(student.id, dateStr) : undefined}
-                                      popoverRef={isEditing ? cellPopoverRef : undefined}
-                                      holiday={holiday}
-                                    />
-                                  );
-                                })}
-                              </tr>
-                            );
-                          })}
+                          {hasMultipleSections && selectedSectionKey === 'all' ? (
+                            visibleSectionGroups.map(grp => {
+                              const isCollapsed = Boolean(collapsedSections[grp.key]);
+                              return (
+                                <Fragment key={grp.key}>
+                                  <tr className="border-y border-indigo-200/80 bg-indigo-50/90">
+                                    <td className="px-3 py-2 sticky left-0 bg-indigo-100/95 z-20 border-r border-indigo-200 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)]">
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleSectionCollapse(grp.key)}
+                                        className="flex items-center justify-between gap-1.5 w-full text-left cursor-pointer"
+                                        title={isCollapsed ? 'คลิกเพื่อกางรายชื่อห้องนี้' : 'คลิกเพื่อพับเก็บรายชื่อห้องนี้'}
+                                      >
+                                        <span className="flex items-center gap-1.5 min-w-0">
+                                          <ChevronDown className={`w-3.5 h-3.5 text-indigo-700 shrink-0 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
+                                          <span className="font-extrabold text-xs text-indigo-950 truncate">{grp.label}</span>
+                                        </span>
+                                        <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-md bg-white text-indigo-700 border border-indigo-200 shrink-0">
+                                          {grp.students.length} คน
+                                        </span>
+                                      </button>
+                                    </td>
+                                    <td colSpan={matrixDates.length} className="px-3 py-2 bg-gradient-to-r from-indigo-50/90 to-violet-50/40 text-xs font-bold text-indigo-800">
+                                      <div className="flex items-center gap-2">
+                                        <span>กลุ่มเรียน: {grp.fullLabel} ({grp.students.length} คน)</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => setSelectedSectionKey(grp.key)}
+                                          className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
+                                        >
+                                          ดูเฉพาะห้องนี้ →
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                  {!isCollapsed && grp.students.map((student, idx) => renderMatrixStudentRow(student, idx, true))}
+                                </Fragment>
+                              );
+                            })
+                          ) : (
+                            filteredStudents.map((student, idx) => renderMatrixStudentRow(student, idx, false))
+                          )}
                         </tbody>
                       </table>
                     </div>
@@ -2523,6 +2979,7 @@ export default function Attendance() {
         } : null}
         initialStartDate={exportStartDate}
         initialEndDate={exportEndDate}
+        initialSectionKey={selectedSectionKey}
       />
 
       {/* ================= ATTENDANCE EXCEL IMPORT & TEMPLATE MODAL ================= */}

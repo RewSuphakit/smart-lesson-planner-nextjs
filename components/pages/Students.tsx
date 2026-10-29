@@ -15,6 +15,7 @@ import Pagination from '@/components/Pagination';
 const StudentExcelModal = dynamic(() => import('@/components/StudentExcelModal'), { ssr: false });
 import UserAvatar, { ANIMAL_AVATARS, TEACHER_EMOJIS } from '@/components/UserAvatar';
 import { compressImageFile, findMatchingStudentIndex } from '@/lib/avatarCompression';
+import { combineGradeAndRoom, normalizeGradeLevel } from '@/lib/studentSections';
 
 interface Classroom {
   id: string | number;
@@ -56,6 +57,8 @@ export default function Students() {
   const [filterGradeLevel, setFilterGradeLevel] = useState('');
   const [selectedStudents, setSelectedStudents] = useState<Array<string | number>>([]);
   const [bulkAssignClassroomId, setBulkAssignClassroomId] = useState('');
+  const [bulkGradeLevel, setBulkGradeLevel] = useState('');
+  const [bulkBranch, setBulkBranch] = useState('');
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -178,6 +181,28 @@ export default function Students() {
     },
   });
 
+  // ─── Mutation: กำหนดระดับชั้น/ห้องย่อย & สาขาแบบ bulk ───
+  const bulkMetaMutation = useMutation({
+    mutationFn: (payload: { student_ids: number[]; grade_level?: string | null; branch?: string | null }) =>
+      api.patch('/students', payload),
+    onSuccess: (res) => {
+      toast.success(res.data?.message || 'อัปเดตห้องย่อยและสาขาเรียบร้อย');
+      setSelectedStudents([]);
+      setBulkGradeLevel('');
+      setBulkBranch('');
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['student-branches'] });
+      queryClient.invalidateQueries({ queryKey: ['student-grade-levels'] });
+      queryClient.invalidateQueries({ queryKey: ['classrooms'] });
+      queryClient.invalidateQueries({ queryKey: ['grades'] });
+      queryClient.invalidateQueries({ queryKey: ['scores-matrix'] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-data'] });
+    },
+    onError: (err: { response?: { data?: { message?: string } } }) => {
+      toast.error(err.response?.data?.message || 'อัปเดตห้องย่อย/สาขาไม่สำเร็จ');
+    },
+  });
+
   // ─── Mutation: ลบนักเรียนที่เลือก (bulk) ───
   const bulkDeleteMutation = useMutation({
     mutationFn: () => api.delete(`/students?ids=${selectedStudents.join(',')}`),
@@ -242,7 +267,7 @@ export default function Students() {
     },
   });
 
-  const isMutating = saveMutation.isPending || deleteMutation.isPending || bulkAssignMutation.isPending || bulkDeleteMutation.isPending || deleteAllMutation.isPending || importMutation.isPending;
+  const isMutating = saveMutation.isPending || deleteMutation.isPending || bulkAssignMutation.isPending || bulkMetaMutation.isPending || bulkDeleteMutation.isPending || deleteAllMutation.isPending || importMutation.isPending;
 
   const _handleExport = async () => {
     if (filtered.length === 0) {
@@ -392,6 +417,24 @@ export default function Students() {
     bulkAssignMutation.mutate();
   };
 
+  const handleBulkMetaSave = () => {
+    const trimmedGrade = normalizeGradeLevel(bulkGradeLevel);
+    const trimmedBranch = bulkBranch.trim();
+
+    if (!trimmedGrade && !trimmedBranch) {
+      toast.error('กรุณากรอกระดับชั้น/ห้อง (เช่น ปวช.1/1) หรือสาขาที่ต้องการกำหนด');
+      return;
+    }
+
+    const payload: { student_ids: number[]; grade_level?: string | null; branch?: string | null } = {
+      student_ids: selectedStudents.map(Number).filter(n => !isNaN(n)),
+    };
+    if (trimmedGrade) payload.grade_level = trimmedGrade;
+    if (trimmedBranch) payload.branch = trimmedBranch;
+
+    bulkMetaMutation.mutate(payload);
+  };
+
   const handleBulkDelete = () => {
     if (selectedStudents.length === 0) return;
     if (!window.confirm(`ยืนยันการลบนักเรียนที่เลือกทั้งหมด ${selectedStudents.length} คนหรือไม่? (ข้อมูลคะแนนและการประเมินของนักเรียนจะถูกลบไปด้วย)`)) return;
@@ -413,6 +456,11 @@ export default function Students() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('ขนาดไฟล์เกินกำหนด (สูงสุดไม่เกิน 5MB)');
+      e.target.value = '';
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = async (evt) => {
@@ -436,12 +484,14 @@ export default function Students() {
           }
 
           const rawAvatar = row['รูปภาพ'] || row['รูปถ่าย'] || row['รูป'] || row['photo'] || row['image'] || row['avatar'] || row['picture'] || row['url'] || row['image_url'] || '';
+          const rawGrade = row['ระดับชั้น/ห้อง'] || row['ระดับชั้น'] || row['ชั้น'] || row['grade_level'] || '';
+          const rawRoom = row['ห้อง'] || row['กลุ่ม'] || row['กลุ่มเรียน'] || row['ห้องย่อย'] || row['ทับ'] || row['room'] || row['section'] || row['group'] || '';
 
           return {
-            student_code: String(row['รหัสนักเรียน'] || row['student_code'] || ''),
+            student_code: String(row['รหัสนักเรียน'] || row['รหัสนักศึกษา'] || row['student_code'] || ''),
             name: String(fullName),
-            grade_level: String(row['ระดับชั้น'] || row['ชั้น'] || row['grade_level'] || ''),
-            branch: String(row['สาขา'] || row['สาขาวิชา'] || row['branch'] || row['department'] || ''),
+            grade_level: combineGradeAndRoom(String(rawGrade), String(rawRoom)),
+            branch: String(row['สาขา'] || row['สาขาวิชา'] || row['แผนก'] || row['แผนกวิชา'] || row['branch'] || row['department'] || '').trim(),
             email: String(row['อีเมล'] || row['email'] || ''),
             avatar: rawAvatar ? String(rawAvatar).trim() : null,
           };
@@ -697,45 +747,94 @@ export default function Students() {
 
       {/* Bulk Actions Bar */}
       {selectedStudents.length > 0 && (
-        <div className="glass p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 border border-indigo-200 bg-indigo-500/5 animate-fade-in-up">
-          <div className="flex items-center gap-3">
-            <span className="bg-indigo-500 text-slate-800 px-3 py-1 rounded-full text-sm font-medium">
-              เลือกแล้ว {selectedStudents.length} คน
-            </span>
-            <button
-              onClick={() => setSelectedStudents([])}
-              className="text-slate-600 hover:text-slate-800 text-sm underline"
-            >
-              ยกเลิก
-            </button>
+        <div className="glass p-4 rounded-2xl space-y-3 border border-indigo-200 bg-indigo-500/5 animate-fade-in-up">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="bg-indigo-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-xs">
+                เลือกแล้ว {selectedStudents.length} คน
+              </span>
+              <button
+                onClick={() => setSelectedStudents([])}
+                className="text-slate-600 hover:text-slate-800 text-xs font-medium underline"
+              >
+                ยกเลิกการเลือก
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <select
+                value={bulkAssignClassroomId}
+                onChange={e => setBulkAssignClassroomId(e.target.value)}
+                className="form-input py-1.5 text-xs flex-1 sm:flex-none sm:w-52"
+                id="bulk-assign-classroom"
+                aria-label="เลือกห้องเรียนเป้าหมายสำหรับนักเรียนที่เลือก"
+              >
+                <option value="">-- ย้ายไปห้องเรียน/วิชา --</option>
+                <option value="null">ไม่มีห้องเรียน (ลอยแพ)</option>
+                {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <button
+                onClick={handleBulkAssign}
+                disabled={isMutating}
+                className="btn btn-primary py-1.5 px-3 text-xs flex-1 sm:flex-none"
+              >
+                {bulkAssignMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'ย้ายห้อง'}
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                disabled={isMutating}
+                className="btn bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 py-1.5 px-3 text-xs flex-1 sm:flex-none flex items-center justify-center gap-1.5"
+              >
+                {bulkDeleteMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                <span>ลบที่เลือก</span>
+              </button>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            <select
-              value={bulkAssignClassroomId}
-              onChange={e => setBulkAssignClassroomId(e.target.value)}
-              className="form-input flex-1 sm:flex-none"
-              id="bulk-assign-classroom"
-              aria-label="เลือกห้องเรียนเป้าหมายสำหรับนักเรียนที่เลือก"
-            >
-              <option value="">-- เลือกห้องเรียนเป้าหมาย --</option>
-              <option value="null">ไม่มีห้องเรียน (ลอยแพ)</option>
-              {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-            <button
-              onClick={handleBulkAssign}
-              disabled={isMutating}
-              className="btn btn-primary flex-1 sm:flex-none"
-            >
-              {bulkAssignMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'ย้ายห้อง'}
-            </button>
-            <button
-              onClick={handleBulkDelete}
-              disabled={isMutating}
-              className="btn bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 flex-1 sm:flex-none flex items-center justify-center gap-1.5"
-            >
-              {bulkDeleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-              <span>ลบที่เลือก</span>
-            </button>
+
+          {/* Bulk Assign Sub-room / Grade Level & Branch (สำหรับกรณีเรียนรวมหลายห้อง เช่น ปวช.1/1 กับ ปวช.1/2) */}
+          <div className="pt-2.5 border-t border-indigo-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <span className="text-xs font-semibold text-indigo-900 flex items-center gap-1.5 shrink-0">
+              <GraduationCap className="w-4 h-4 text-emerald-600" />
+              <span>กำหนดห้องย่อย / สาขา (ใช้แยกห้องตอนเช็คชื่อ):</span>
+            </span>
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <input
+                type="text"
+                value={bulkGradeLevel}
+                onChange={e => setBulkGradeLevel(e.target.value)}
+                placeholder="ระดับชั้น/ห้อง เช่น ปวช.1/1"
+                list="bulk-grade-suggestions"
+                className="form-input py-1.5 text-xs flex-1 sm:w-44 bg-white"
+                aria-label="กำหนดระดับชั้นหรือห้องย่อยแบบกลุ่ม"
+              />
+              {gradeLevels.length > 0 && (
+                <datalist id="bulk-grade-suggestions">
+                  {gradeLevels.map(g => <option key={g} value={g} />)}
+                </datalist>
+              )}
+              <input
+                type="text"
+                value={bulkBranch}
+                onChange={e => setBulkBranch(e.target.value)}
+                placeholder="สาขา เช่น คอมพิวเตอร์"
+                list="bulk-branch-suggestions"
+                className="form-input py-1.5 text-xs flex-1 sm:w-44 bg-white"
+                aria-label="กำหนดสาขาวิชาแบบกลุ่ม"
+              />
+              {branches.length > 0 && (
+                <datalist id="bulk-branch-suggestions">
+                  {branches.map(b => <option key={b} value={b} />)}
+                </datalist>
+              )}
+              <button
+                type="button"
+                onClick={handleBulkMetaSave}
+                disabled={isMutating}
+                className="btn bg-emerald-600 hover:bg-emerald-700 text-white py-1.5 px-3.5 text-xs font-bold shadow-xs flex items-center justify-center gap-1.5 w-full sm:w-auto"
+              >
+                {bulkMetaMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                <span>บันทึกห้องย่อย/สาขา</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -977,15 +1076,18 @@ export default function Students() {
                 />
               </div>
               <div>
-                <label className="form-label" htmlFor="student-grade">ระดับชั้น</label>
+                <label className="form-label" htmlFor="student-grade">ระดับชั้น / ห้อง (กลุ่มเรียน)</label>
                 <input
                   value={form.grade_level}
                   onChange={e => setForm({ ...form, grade_level: e.target.value })}
                   className="form-input"
                   id="student-grade"
-                  placeholder="เช่น ม.3 หรือ ปวช.1"
+                  placeholder="เช่น ปวช.1/1, ปวช.1/2 หรือ ม.3/1"
                   list="grade-level-suggestions"
                 />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  หากเรียนรวมหลายห้องในวิชาเดียวกัน ให้ระบุทับห้อง เช่น ปวช.1/1, ปวช.1/2 เพื่อแยกห้องตอนเช็คชื่อ
+                </p>
                 {gradeLevels.length > 0 && (
                   <datalist id="grade-level-suggestions">
                     {gradeLevels.map(g => <option key={g} value={g} />)}
@@ -1071,7 +1173,7 @@ export default function Students() {
                 <FileSpreadsheet className="w-8 h-8 text-indigo-500 mx-auto mb-2" />
                 <p className="text-slate-800 font-bold text-sm">คลิกเพื่อเลือกไฟล์ Excel / CSV หรือลากไฟล์มาวาง</p>
                 <p className="text-slate-500 text-xs mt-1">
-                  รองรับคอลัมน์: รหัสนักเรียน, ชื่อ-นามสกุล, ระดับชั้น, อีเมล, รูปภาพ (URL หรืออิโมจิ)
+                  รองรับคอลัมน์: รหัสนักเรียน, ชื่อ-นามสกุล, ระดับชั้น/ห้อง (เช่น ปวช.1/1 หรือแยกคอลัมน์ ระดับชั้น + ห้อง/กลุ่ม), สาขา, อีเมล, รูปภาพ
                 </p>
               </div>
 
@@ -1156,7 +1258,8 @@ export default function Students() {
                           <th className="p-2.5 font-bold text-slate-700 w-14 text-center">รูป</th>
                           <th className="p-2.5 font-bold text-slate-700 w-28">รหัสนักเรียน</th>
                           <th className="p-2.5 font-bold text-slate-700">ชื่อ-นามสกุล</th>
-                          <th className="p-2.5 font-bold text-slate-700 w-24">ระดับชั้น</th>
+                          <th className="p-2.5 font-bold text-slate-700 w-28">ระดับชั้น/ห้อง</th>
+                          <th className="p-2.5 font-bold text-slate-700 w-28">สาขา</th>
                           <th className="p-2.5 font-bold text-slate-700 w-24 text-center">สถานะรูป</th>
                         </tr>
                       </thead>
@@ -1175,6 +1278,7 @@ export default function Students() {
                             <td className="p-2.5 text-slate-600 font-mono">{s.student_code || '-'}</td>
                             <td className="p-2.5 text-slate-800 font-semibold">{s.name}</td>
                             <td className="p-2.5 text-slate-600">{s.grade_level || '-'}</td>
+                            <td className="p-2.5 text-slate-600">{s.branch || '-'}</td>
                             <td className="p-2 text-center">
                               {s.avatar ? (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">

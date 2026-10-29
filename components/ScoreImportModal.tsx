@@ -178,6 +178,11 @@ export default function ScoreImportModal({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('ขนาดไฟล์เกินกำหนด (สูงสุดไม่เกิน 5MB)');
+      e.target.value = '';
+      return;
+    }
     setFileName(file.name);
 
     const reader = new FileReader();

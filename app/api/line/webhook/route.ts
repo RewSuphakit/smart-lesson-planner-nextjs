@@ -36,29 +36,10 @@ import {
   LineEvent,
 } from '@/lib/line';
 
-// GET /api/line/webhook — Health and configuration check for Webhook
+// GET /api/line/webhook — Minimal health check (does not expose internal counts or secret metadata)
 export async function GET() {
-  const hasEnvSecret = !!(process.env.LINE_CHANNEL_SECRET || process.env.channel_secret);
-  const hasEnvToken = !!(process.env.LINE_CHANNEL_ACCESS_TOKEN || process.env.channel_access_token);
-  const hasEnvId = !!(process.env.LINE_CHANNEL_ID || process.env.channel_id);
-  const dbConfigsCount = await prisma.lineChannelConfig.count({ where: { isActive: true } });
-  const totalStudents = await prisma.student.count();
-  const totalBindings = await prisma.lineBinding.count();
-
   return NextResponse.json({
-    status: 'ready',
-    env: {
-      hasChannelSecret: hasEnvSecret,
-      hasChannelAccessToken: hasEnvToken,
-      hasChannelId: hasEnvId,
-      secretLength: process.env.LINE_CHANNEL_SECRET?.trim().length || 0,
-      tokenLength: process.env.LINE_CHANNEL_ACCESS_TOKEN?.trim().length || 0,
-    },
-    database: {
-      activeConfigsCount: dbConfigsCount,
-      totalStudents,
-      totalBindings,
-    },
+    status: 'ok',
     message: 'Webhook endpoint is running',
   });
 }

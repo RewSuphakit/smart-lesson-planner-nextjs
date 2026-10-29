@@ -1,6 +1,8 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
+import logoImg from '@/public/logo.png';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -321,8 +323,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 onClick={isCollapsed ? toggleSidebar : undefined}
                 title={isCollapsed ? 'คลิกเพื่อขยายเมนู' : 'Smart Planner'}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/logo.png" alt="Smart Planner Logo" className="w-full h-full object-cover" />
+                <Image
+                  src={logoImg}
+                  alt="Smart Planner Logo"
+                  width={40}
+                  height={40}
+                  loading="eager"
+                  className="w-full h-full object-cover"
+                />
               </div>
               <div className={`min-w-0 overflow-hidden transition-all duration-300 ease-in-out ${
                 isCollapsed

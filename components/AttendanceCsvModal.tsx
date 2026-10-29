@@ -2,14 +2,15 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { 
-  FileSpreadsheet, X, Download, Copy, Check, Search, 
-  Calendar as CalendarIcon, Filter, Eye, CheckSquare, Square, 
-  Sparkles, Loader2, FileText, TableProperties, AlertCircle, RefreshCw
+import {
+  FileSpreadsheet, X, Download, Copy, Check, Search,
+  Calendar as CalendarIcon, Eye, CheckSquare, Square,
+  Sparkles, Loader2, TableProperties, RefreshCw, GraduationCap, GitBranch
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import api from '@/services/api';
+import { toSafeExcelSheetName } from '@/lib/studentSections';
 
 export interface ClassroomData {
   id: string | number;
@@ -26,6 +27,18 @@ interface AttendanceCsvModalProps {
   classroom: ClassroomData | null;
   initialStartDate?: string;
   initialEndDate?: string;
+  initialSectionKey?: string;
+}
+
+interface SectionOption {
+  key: string;
+  label: string;
+  fullLabel: string;
+  shortSheetName: string;
+  branch: string | null;
+  gradeLevel: string | null;
+  isUnassigned: boolean;
+  count: number;
 }
 
 interface SummaryStudentRow {
@@ -33,6 +46,10 @@ interface SummaryStudentRow {
   id: number | string;
   student_code: string;
   name: string;
+  grade_level?: string;
+  branch?: string;
+  section_key?: string;
+  section_label?: string;
   present: number;
   late: number;
   absent: number;
@@ -49,6 +66,10 @@ interface DetailedRow {
   no: number;
   student_code: string;
   name: string;
+  grade_level?: string;
+  branch?: string;
+  section_key?: string;
+  section_label?: string;
   date: string;
   status: string;
 }
@@ -67,6 +88,7 @@ export default function AttendanceCsvModal({
   classroom,
   initialStartDate = '',
   initialEndDate = '',
+  initialSectionKey = 'all',
 }: AttendanceCsvModalProps) {
   const [mounted, setMounted] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -75,6 +97,13 @@ export default function AttendanceCsvModal({
   // Date range filter
   const [startDate, setStartDate] = useState(initialStartDate);
   const [endDate, setEndDate] = useState(initialEndDate);
+
+  // Section (sub-room) filter & multi-sheet Excel option
+  const [sections, setSections] = useState<SectionOption[]>([]);
+  const [hasMultipleSections, setHasMultipleSections] = useState(false);
+  const [sharedBranch, setSharedBranch] = useState<string | null>(null);
+  const [selectedSectionKey, setSelectedSectionKey] = useState<string>(initialSectionKey || 'all');
+  const [splitExcelBySection, setSplitExcelBySection] = useState<boolean>(true);
 
   // Active view mode: 'summary' | 'matrix' | 'detailed'
   const [viewMode, setViewMode] = useState<'summary' | 'matrix' | 'detailed'>('summary');
@@ -86,25 +115,20 @@ export default function AttendanceCsvModal({
   const [summaryList, setSummaryList] = useState<SummaryStudentRow[]>([]);
   const [detailedList, setDetailedList] = useState<DetailedRow[]>([]);
   const [uniqueDates, setUniqueDates] = useState<string[]>([]);
-  const [summaryStats, setSummaryStats] = useState<{
-    totalStudents: number;
-    recordsCount: number;
-    datesCount: number;
-    fCount: number;
-    avgPercent: string;
-  }>({
-    totalStudents: 0,
-    recordsCount: 0,
-    datesCount: 0,
-    fCount: 0,
-    avgPercent: '100.0',
-  });
 
   // Summary Column Definitions
   const summaryColumns: ColumnOption[] = useMemo(() => [
     { id: 'no', label: 'ลำดับ', defaultChecked: true, wch: 8, getValue: s => s.no },
     { id: 'student_code', label: 'รหัสประจำตัว', defaultChecked: true, wch: 16, getValue: s => s.student_code || '-' },
     { id: 'name', label: 'ชื่อ-นามสกุล', defaultChecked: true, wch: 28, getValue: s => s.name || '-' },
+    {
+      id: 'grade_level',
+      label: 'ระดับชั้น/ห้อง',
+      defaultChecked: true,
+      wch: 16,
+      getValue: s => (hasMultipleSections ? (s.section_label || s.grade_level || '-') : (s.grade_level || '-')),
+    },
+    { id: 'branch', label: 'สาขาวิชา', defaultChecked: false, wch: 20, getValue: s => s.branch || '-' },
     { id: 'present', label: 'มา (ครั้ง)', defaultChecked: true, wch: 12, getValue: s => s.present },
     { id: 'late', label: 'สาย (ครั้ง)', defaultChecked: true, wch: 12, getValue: s => s.late },
     { id: 'absent', label: 'ขาด (ครั้ง)', defaultChecked: true, wch: 12, getValue: s => s.absent },
@@ -112,11 +136,12 @@ export default function AttendanceCsvModal({
     { id: 'converted_absent', label: 'ขาดสุทธิ (แปลงสาย/ลา)', defaultChecked: true, wch: 22, getValue: s => s.converted_absent },
     { id: 'attendance_percent', label: 'ร้อยละเข้าเรียน (%)', defaultChecked: true, wch: 18, getValue: s => `${s.attendance_percent}%` },
     { id: 'status', label: 'สถานะสิทธิ์', defaultChecked: true, wch: 18, getValue: s => s.status },
-  ], []);
+  ], [hasMultipleSections]);
 
-  const [selectedColIds, setSelectedColIds] = useState<string[]>(
-    summaryColumns.filter(c => c.defaultChecked).map(c => c.id)
-  );
+  const [selectedColIds, setSelectedColIds] = useState<string[]>([
+    'no', 'student_code', 'name', 'grade_level', 'present', 'late', 'absent', 'leave',
+    'converted_absent', 'attendance_percent', 'status',
+  ]);
 
   const activeCols = useMemo(() => {
     return summaryColumns.filter(c => selectedColIds.includes(c.id));
@@ -139,6 +164,13 @@ export default function AttendanceCsvModal({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Sync initial section key when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedSectionKey(initialSectionKey || 'all');
+    }
+  }, [isOpen, initialSectionKey]);
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -179,7 +211,9 @@ export default function AttendanceCsvModal({
         setSummaryList(d.summaryList || []);
         setDetailedList(d.detailedList || []);
         setUniqueDates(d.uniqueDates || []);
-        if (d.summaryStats) setSummaryStats(d.summaryStats);
+        setSections(d.sections || []);
+        setHasMultipleSections(Boolean(d.hasMultipleSections));
+        setSharedBranch(d.sharedBranch || null);
       }
     } catch (err) {
       console.error('Fetch attendance preview error:', err);
@@ -194,6 +228,44 @@ export default function AttendanceCsvModal({
       fetchPreviewData();
     }
   }, [isOpen, classroom?.id, startDate, endDate]);
+
+  // Validate selectedSectionKey exists in fetched sections
+  useEffect(() => {
+    if (selectedSectionKey !== 'all' && sections.length > 0) {
+      const exists = sections.some(sec => sec.key === selectedSectionKey);
+      if (!exists) setSelectedSectionKey('all');
+    }
+  }, [sections, selectedSectionKey]);
+
+  const activeSection = useMemo(
+    () => (selectedSectionKey !== 'all' ? sections.find(s => s.key === selectedSectionKey) ?? null : null),
+    [sections, selectedSectionKey]
+  );
+
+  // Scoped datasets for the currently selected section (renumbered 1..N)
+  const sectionSummaryList = useMemo(() => {
+    const base =
+      selectedSectionKey === 'all'
+        ? summaryList
+        : summaryList.filter(s => s.section_key === selectedSectionKey);
+    return base.map((item, idx) => ({ ...item, no: idx + 1 }));
+  }, [summaryList, selectedSectionKey]);
+
+  const sectionDetailedList = useMemo(() => {
+    const base =
+      selectedSectionKey === 'all'
+        ? detailedList
+        : detailedList.filter(r => r.section_key === selectedSectionKey);
+    return base.map((item, idx) => ({ ...item, no: idx + 1 }));
+  }, [detailedList, selectedSectionKey]);
+
+  const scopedSummaryStats = useMemo(() => {
+    return {
+      totalStudents: sectionSummaryList.length,
+      recordsCount: sectionDetailedList.length,
+      datesCount: uniqueDates.length,
+    };
+  }, [sectionSummaryList.length, sectionDetailedList.length, uniqueDates.length]);
 
   // Quick Preset Handlers
   const applyPreset = (days: number | 'all' | 'month') => {
@@ -218,37 +290,43 @@ export default function AttendanceCsvModal({
 
   // Filtered lists for live search
   const filteredSummary = useMemo(() => {
-    if (!searchPreview.trim()) return summaryList;
+    if (!searchPreview.trim()) return sectionSummaryList;
     const q = searchPreview.toLowerCase();
-    return summaryList.filter(s => 
-      s.name.toLowerCase().includes(q) || 
+    return sectionSummaryList.filter(s =>
+      s.name.toLowerCase().includes(q) ||
       (s.student_code && s.student_code.toLowerCase().includes(q)) ||
+      (s.grade_level && s.grade_level.toLowerCase().includes(q)) ||
+      (s.section_label && s.section_label.toLowerCase().includes(q)) ||
       s.status.toLowerCase().includes(q)
     );
-  }, [summaryList, searchPreview]);
+  }, [sectionSummaryList, searchPreview]);
 
   const filteredDetailed = useMemo(() => {
-    if (!searchPreview.trim()) return detailedList;
+    if (!searchPreview.trim()) return sectionDetailedList;
     const q = searchPreview.toLowerCase();
-    return detailedList.filter(r => 
-      r.name.toLowerCase().includes(q) || 
+    return sectionDetailedList.filter(r =>
+      r.name.toLowerCase().includes(q) ||
       (r.student_code && r.student_code.toLowerCase().includes(q)) ||
+      (r.grade_level && r.grade_level.toLowerCase().includes(q)) ||
       r.status.toLowerCase().includes(q) ||
       r.date.includes(q)
     );
-  }, [detailedList, searchPreview]);
+  }, [sectionDetailedList, searchPreview]);
 
   // ─── Export Generators ───
   const getFileBaseName = () => {
     const today = new Date().toISOString().split('T')[0];
     const cName = (classroom?.name || 'ห้องเรียน').replace(/[^a-zA-Z0-9ก-๙_-]/g, '_');
+    const secPart = activeSection
+      ? `_${activeSection.shortSheetName.replace(/[^a-zA-Z0-9ก-๙_-]/g, '_')}`
+      : '';
     const range = (startDate || endDate) ? `_${startDate || 'start'}_ถึง_${endDate || 'now'}` : '_ทั้งเทอม';
-    return `รายงานเช็คชื่อ_${cName}${range}_${today}`;
+    return `รายงานเช็คชื่อ_${cName}${secPart}${range}_${today}`;
   };
 
   // 1. Download CSV
   const handleDownloadCsv = () => {
-    if (summaryList.length === 0) {
+    if (sectionSummaryList.length === 0) {
       toast.error('ไม่มีข้อมูลสำหรับส่งออก');
       return;
     }
@@ -259,16 +337,24 @@ export default function AttendanceCsvModal({
 
       if (viewMode === 'summary') {
         headers = activeCols.map(c => c.label);
-        rows = summaryList.map(s => activeCols.map(c => c.getValue(s)));
+        rows = sectionSummaryList.map(s => activeCols.map(c => c.getValue(s)));
       } else if (viewMode === 'detailed') {
-        headers = ['ลำดับ', 'รหัสนักเรียน', 'ชื่อ-นามสกุล', 'วันที่', 'สถานะ'];
-        rows = detailedList.map((r, i) => [i + 1, r.student_code, r.name, r.date, r.status]);
+        headers = ['ลำดับ', 'รหัสนักเรียน', 'ชื่อ-นามสกุล', 'ระดับชั้น/ห้อง', 'วันที่', 'สถานะ'];
+        rows = sectionDetailedList.map((r, i) => [
+          i + 1,
+          r.student_code,
+          r.name,
+          r.section_label || r.grade_level || '-',
+          r.date,
+          r.status,
+        ]);
       } else {
         // Matrix
-        headers = ['รหัสนักเรียน', 'ชื่อ-นามสกุล', ...uniqueDates, 'มา', 'สาย', 'ขาด', 'ลา', 'ขาดสุทธิ', 'ร้อยละ'];
-        rows = summaryList.map(s => [
+        headers = ['รหัสนักเรียน', 'ชื่อ-นามสกุล', 'ระดับชั้น/ห้อง', ...uniqueDates, 'มา', 'สาย', 'ขาด', 'ลา', 'ขาดสุทธิ', 'ร้อยละ'];
+        rows = sectionSummaryList.map(s => [
           s.student_code,
           s.name,
+          s.section_label || s.grade_level || '-',
           ...uniqueDates.map(d => s.date_records?.[d] || '-'),
           s.present,
           s.late,
@@ -297,7 +383,11 @@ export default function AttendanceCsvModal({
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      toast.success('ส่งออกไฟล์ CSV สำเร็จ (รองรับ Excel ภาษาไทยสมบูรณ์)');
+      toast.success(
+        activeSection
+          ? `ส่งออกไฟล์ CSV เฉพาะห้อง "${activeSection.label}" สำเร็จ`
+          : 'ส่งออกไฟล์ CSV สำเร็จ (รองรับ Excel ภาษาไทยสมบูรณ์)'
+      );
       onClose();
     } catch (err) {
       console.error('Download CSV error:', err);
@@ -307,41 +397,48 @@ export default function AttendanceCsvModal({
 
   // 2. Download Excel (.xlsx)
   const handleDownloadExcel = () => {
-    if (summaryList.length === 0) {
+    if (sectionSummaryList.length === 0) {
       toast.error('ไม่มีข้อมูลสำหรับส่งออก');
       return;
     }
 
     try {
       const wb = XLSX.utils.book_new();
+      const usedSheetNames = new Set<string>();
+      const registerSheetName = (rawName: string) => {
+        const base = toSafeExcelSheetName(rawName, 'Sheet');
+        let candidate = base;
+        let idx = 2;
+        while (usedSheetNames.has(candidate)) {
+          candidate = `${base.slice(0, 28)}_${idx++}`;
+        }
+        usedSheetNames.add(candidate);
+        return candidate;
+      };
 
-      // Sheet 1: Summary
-      const summaryHeaders = activeCols.map(c => c.label);
-      const summaryRows = summaryList.map(s => activeCols.map(c => c.getValue(s)));
-      const ws1 = XLSX.utils.aoa_to_sheet([
-        [`รายงานการเข้าเรียน — ${classroom?.name || 'ห้องเรียน'}`],
-        [`ช่วงเวลา: ${startDate || 'เริ่มต้น'} ถึง ${endDate || 'ปัจจุบัน'} | จำนวนนักเรียน: ${summaryList.length} คน`],
-        [],
-        summaryHeaders,
-        ...summaryRows
-      ]);
-      ws1['!cols'] = activeCols.map(c => ({ wch: c.wch }));
-      XLSX.utils.book_append_sheet(wb, ws1, 'สรุปสถิติรายคน');
+      const buildSummarySheet = (rowsList: SummaryStudentRow[], subtitleLabel?: string) => {
+        const renumbered = rowsList.map((item, idx) => ({ ...item, no: idx + 1 }));
+        const summaryHeaders = activeCols.map(c => c.label);
+        const summaryRows = renumbered.map(s => activeCols.map(c => c.getValue(s)));
+        const ws = XLSX.utils.aoa_to_sheet([
+          [`รายงานการเข้าเรียน — ${classroom?.name || 'ห้องเรียน'}${subtitleLabel ? ` (${subtitleLabel})` : ''}`],
+          [`ช่วงเวลา: ${startDate || 'เริ่มต้น'} ถึง ${endDate || 'ปัจจุบัน'} | จำนวนนักเรียน: ${renumbered.length} คน`],
+          [],
+          summaryHeaders,
+          ...summaryRows
+        ]);
+        ws['!cols'] = activeCols.map(c => ({ wch: c.wch }));
+        return ws;
+      };
 
-      // Sheet 2: Detailed Log
-      const detailedHeaders = ['ลำดับ', 'รหัสนักเรียน', 'ชื่อ-นามสกุล', 'วันที่', 'สถานะ'];
-      const detailedRows = detailedList.map((r, i) => [i + 1, r.student_code, r.name, r.date, r.status]);
-      const ws2 = XLSX.utils.aoa_to_sheet([detailedHeaders, ...detailedRows]);
-      ws2['!cols'] = [{ wch: 8 }, { wch: 16 }, { wch: 28 }, { wch: 14 }, { wch: 14 }];
-      XLSX.utils.book_append_sheet(wb, ws2, 'ประวัติเช็คชื่อละเอียด');
-
-      // Sheet 3: Matrix Grid (if dates exist)
-      if (uniqueDates.length > 0) {
-        const matrixHeaders = ['ลำดับ', 'รหัสนักเรียน', 'ชื่อ-นามสกุล', ...uniqueDates, 'มา', 'สาย', 'ขาด', 'ลา', 'ขาดสุทธิ', 'ร้อยละ'];
-        const matrixRows = summaryList.map(s => [
+      const buildMatrixSheet = (rowsList: SummaryStudentRow[], subtitleLabel?: string) => {
+        const renumbered = rowsList.map((item, idx) => ({ ...item, no: idx + 1 }));
+        const matrixHeaders = ['ลำดับ', 'รหัสนักเรียน', 'ชื่อ-นามสกุล', 'ระดับชั้น/ห้อง', ...uniqueDates, 'มา', 'สาย', 'ขาด', 'ลา', 'ขาดสุทธิ', 'ร้อยละ'];
+        const matrixRows = renumbered.map(s => [
           s.no,
           s.student_code,
           s.name,
+          s.section_label || s.grade_level || '-',
           ...uniqueDates.map(d => s.date_records?.[d] || '-'),
           s.present,
           s.late,
@@ -350,13 +447,97 @@ export default function AttendanceCsvModal({
           s.converted_absent,
           `${s.attendance_percent}%`
         ]);
-        const ws3 = XLSX.utils.aoa_to_sheet([matrixHeaders, ...matrixRows]);
-        ws3['!cols'] = [{ wch: 8 }, { wch: 16 }, { wch: 26 }, ...uniqueDates.map(() => ({ wch: 6 })), { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 10 }];
-        XLSX.utils.book_append_sheet(wb, ws3, 'ตารางรายวัน');
+        const ws = XLSX.utils.aoa_to_sheet([
+          [`ตารางเช็คชื่อรายวัน — ${classroom?.name || 'ห้องเรียน'}${subtitleLabel ? ` (${subtitleLabel})` : ''}`],
+          [],
+          matrixHeaders,
+          ...matrixRows,
+        ]);
+        ws['!cols'] = [
+          { wch: 8 },
+          { wch: 16 },
+          { wch: 26 },
+          { wch: 15 },
+          ...uniqueDates.map(() => ({ wch: 8 })),
+          { wch: 8 },
+          { wch: 8 },
+          { wch: 8 },
+          { wch: 8 },
+          { wch: 10 },
+          { wch: 10 },
+        ];
+        return ws;
+      };
+
+      // If exporting all sections AND splitExcelBySection is enabled, put individual section sheets first or alongside combined!
+      if (hasMultipleSections && selectedSectionKey === 'all' && splitExcelBySection) {
+        // 1) Separate sheets per sub-room (ปวช.1-1, ปวช.1-2, ...)
+        for (const sec of sections) {
+          const secRows = summaryList.filter(s => s.section_key === sec.key);
+          if (secRows.length === 0) continue;
+
+          if (uniqueDates.length > 0) {
+            const wsSecMatrix = buildMatrixSheet(secRows, sec.fullLabel);
+            XLSX.utils.book_append_sheet(wb, wsSecMatrix, registerSheetName(sec.shortSheetName));
+          } else {
+            const wsSecSummary = buildSummarySheet(secRows, sec.fullLabel);
+            XLSX.utils.book_append_sheet(wb, wsSecSummary, registerSheetName(sec.shortSheetName));
+          }
+        }
+
+        // 2) Combined overview sheets
+        XLSX.utils.book_append_sheet(
+          wb,
+          buildSummarySheet(sectionSummaryList, 'รวมทุกห้อง'),
+          registerSheetName('สรุปรวมทุกห้อง')
+        );
+        if (uniqueDates.length > 0) {
+          XLSX.utils.book_append_sheet(
+            wb,
+            buildMatrixSheet(sectionSummaryList, 'รวมทุกห้อง'),
+            registerSheetName('ตารางรายวันรวม')
+          );
+        }
+      } else {
+        // Single section or non-split export
+        const subTitle = activeSection?.fullLabel;
+        XLSX.utils.book_append_sheet(
+          wb,
+          buildSummarySheet(sectionSummaryList, subTitle),
+          registerSheetName(activeSection ? `สรุป_${activeSection.shortSheetName}` : 'สรุปสถิติรายคน')
+        );
+
+        if (uniqueDates.length > 0) {
+          XLSX.utils.book_append_sheet(
+            wb,
+            buildMatrixSheet(sectionSummaryList, subTitle),
+            registerSheetName(activeSection ? `รายวัน_${activeSection.shortSheetName}` : 'ตารางรายวัน')
+          );
+        }
       }
 
+      // Detailed Log sheet
+      const detailedHeaders = ['ลำดับ', 'รหัสนักเรียน', 'ชื่อ-นามสกุล', 'ระดับชั้น/ห้อง', 'วันที่', 'สถานะ'];
+      const detailedRows = sectionDetailedList.map((r, i) => [
+        i + 1,
+        r.student_code,
+        r.name,
+        r.section_label || r.grade_level || '-',
+        r.date,
+        r.status,
+      ]);
+      const wsDetailed = XLSX.utils.aoa_to_sheet([detailedHeaders, ...detailedRows]);
+      wsDetailed['!cols'] = [{ wch: 8 }, { wch: 16 }, { wch: 28 }, { wch: 16 }, { wch: 14 }, { wch: 14 }];
+      XLSX.utils.book_append_sheet(wb, wsDetailed, registerSheetName('ประวัติเช็คชื่อละเอียด'));
+
       XLSX.writeFile(wb, `${getFileBaseName()}.xlsx`);
-      toast.success('ส่งออกไฟล์ Excel (.xlsx) ครบทุกชีตสำเร็จ');
+      toast.success(
+        hasMultipleSections && selectedSectionKey === 'all' && splitExcelBySection
+          ? `ส่งออกไฟล์ Excel (.xlsx) แยกชีตตามห้องย่อย (${sections.length} ห้อง) สำเร็จ`
+          : activeSection
+            ? `ส่งออกไฟล์ Excel เฉพาะห้อง "${activeSection.label}" สำเร็จ`
+            : 'ส่งออกไฟล์ Excel (.xlsx) ครบทุกชีตสำเร็จ'
+      );
       onClose();
     } catch (err) {
       console.error('Download Excel error:', err);
@@ -366,7 +547,7 @@ export default function AttendanceCsvModal({
 
   // 3. Copy to Clipboard
   const handleCopyClipboard = async () => {
-    if (summaryList.length === 0) {
+    if (sectionSummaryList.length === 0) {
       toast.error('ไม่มีข้อมูลสำหรับคัดลอก');
       return;
     }
@@ -377,10 +558,17 @@ export default function AttendanceCsvModal({
 
       if (viewMode === 'summary') {
         headers = activeCols.map(c => c.label);
-        rows = summaryList.map(s => activeCols.map(c => c.getValue(s)));
+        rows = sectionSummaryList.map(s => activeCols.map(c => c.getValue(s)));
       } else {
-        headers = ['ลำดับ', 'รหัสนักเรียน', 'ชื่อ-นามสกุล', 'วันที่', 'สถานะ'];
-        rows = detailedList.map((r, i) => [i + 1, r.student_code, r.name, r.date, r.status]);
+        headers = ['ลำดับ', 'รหัสนักเรียน', 'ชื่อ-นามสกุล', 'ระดับชั้น/ห้อง', 'วันที่', 'สถานะ'];
+        rows = sectionDetailedList.map((r, i) => [
+          i + 1,
+          r.student_code,
+          r.name,
+          r.section_label || r.grade_level || '-',
+          r.date,
+          r.status,
+        ]);
       }
 
       const tsv = [
@@ -400,36 +588,41 @@ export default function AttendanceCsvModal({
   if (!isOpen || !mounted) return null;
 
   return createPortal(
-    <div 
+    <div
       className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-5 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200"
       onClick={e => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div 
+      <div
         className="bg-slate-50 rounded-2xl shadow-2xl border border-emerald-200 w-full max-w-7xl max-h-[95vh] flex flex-col overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="px-6 py-4 bg-white border-b border-slate-200 flex items-center justify-between shrink-0">
+        <div className="px-6 py-4 bg-white border-b border-slate-200 flex items-center justify-between shrink-0 gap-3 flex-wrap">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/20">
               <FileSpreadsheet className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
-                พรีวิวและกำหนดค่าส่งออกข้อมูลการเช็คชื่อ
+              <h2 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 flex-wrap">
+                <span>พรีวิวและกำหนดค่าส่งออกข้อมูลการเช็คชื่อ</span>
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                   {classroom?.name || 'ห้องเรียน'}
                 </span>
+                {activeSection && (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                    เฉพาะ {activeSection.label}
+                  </span>
+                )}
               </h2>
               <p className="text-xs text-slate-500">
-                ตรวจสอบข้อมูลก่อนส่งออก เลือกช่วงวันที่ ปรับแต่งคอลัมน์ และดาวน์โหลดเป็นไฟล์ CSV หรือ Excel
+                ตรวจสอบข้อมูลก่อนส่งออก เลือกห้องย่อย ช่วงวันที่ ปรับแต่งคอลัมน์ และดาวน์โหลดเป็นไฟล์ CSV หรือ Excel
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={handleCopyClipboard}
               className="btn bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all"
@@ -441,7 +634,7 @@ export default function AttendanceCsvModal({
             <button
               onClick={handleDownloadExcel}
               className="btn bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 text-xs font-semibold px-3 py-2 rounded-xl transition-all flex items-center gap-1.5"
-              title="ดาวน์โหลดเป็นไฟล์ Excel (.xlsx) ครบทุกชีต"
+              title="ดาวน์โหลดเป็นไฟล์ Excel (.xlsx)"
             >
               <FileSpreadsheet className="w-4 h-4 text-emerald-600" /> Excel (.xlsx)
             </button>
@@ -454,6 +647,7 @@ export default function AttendanceCsvModal({
             <button
               onClick={onClose}
               className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              aria-label="ปิดหน้าต่าง"
             >
               <X className="w-5 h-5" />
             </button>
@@ -462,6 +656,72 @@ export default function AttendanceCsvModal({
 
         {/* Filters & Preferences Bar */}
         <div className="p-4 bg-white border-b border-slate-200 shrink-0 space-y-3">
+          {/* Sub-room / Section Selector (shown automatically when combined classroom has >1 room) */}
+          {hasMultipleSections && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-xs font-bold text-slate-700 flex items-center gap-1 mr-1">
+                  <GraduationCap className="w-4 h-4 text-indigo-600" />
+                  <span>เลือกห้องย่อย:</span>
+                </span>
+                {sharedBranch && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-violet-50 text-violet-700 border border-violet-200 text-[11px] font-bold mr-1">
+                    <GitBranch className="w-3 h-3" />
+                    สาขา{sharedBranch}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setSelectedSectionKey('all')}
+                  className={`px-3 py-1 rounded-xl text-xs font-bold transition-all border ${
+                    selectedSectionKey === 'all'
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-indigo-50 hover:border-indigo-200'
+                  }`}
+                >
+                  รวมทุกห้อง ({summaryList.length})
+                </button>
+                {sections.map(sec => {
+                  const isActive = selectedSectionKey === sec.key;
+                  return (
+                    <button
+                      key={sec.key}
+                      type="button"
+                      onClick={() => setSelectedSectionKey(sec.key)}
+                      className={`px-3 py-1 rounded-xl text-xs font-bold transition-all border ${
+                        isActive
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-emerald-50 hover:border-emerald-300'
+                      }`}
+                    >
+                      {sec.label} ({sec.count})
+                    </button>
+                  );
+                })}
+              </div>
+
+              {selectedSectionKey === 'all' && (
+                <button
+                  type="button"
+                  onClick={() => setSplitExcelBySection(prev => !prev)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all shrink-0 ${
+                    splitExcelBySection
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                      : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                  }`}
+                  title="เมื่อกดดาวน์โหลด Excel (.xlsx) ระบบจะสร้างชีตแยกแต่ละห้องย่อยให้อัตโนมัติ"
+                >
+                  {splitExcelBySection ? (
+                    <CheckSquare className="w-3.5 h-3.5 text-emerald-600" />
+                  ) : (
+                    <Square className="w-3.5 h-3.5 text-slate-400" />
+                  )}
+                  <span>แยกชีต Excel ตามห้องย่อยอัตโนมัติ</span>
+                </button>
+              )}
+            </div>
+          )}
+
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
             {/* Date Range Picker */}
             <div className="flex items-center gap-2 flex-wrap">
@@ -488,7 +748,7 @@ export default function AttendanceCsvModal({
               </div>
 
               {/* Quick Presets */}
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 flex-wrap">
                 <button
                   type="button"
                   onClick={() => applyPreset('all')}
@@ -593,18 +853,18 @@ export default function AttendanceCsvModal({
 
         {/* Live Spreadsheet Preview Container */}
         <div className="flex-1 overflow-hidden flex flex-col p-4 bg-slate-100/70">
-          <div className="flex items-center justify-between mb-2.5">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between mb-2.5 gap-2 flex-wrap">
+            <div className="flex items-center gap-3 flex-wrap">
               <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                 <Eye className="w-4 h-4 text-emerald-600" />
                 ตัวอย่างหน้าตาตาราง CSV / Excel (Live Spreadsheet Preview)
               </span>
               <div className="flex items-center gap-2 text-[11px] font-medium text-slate-500">
-                <span>นักเรียน {summaryStats.totalStudents} คน</span>
+                <span>นักเรียน {scopedSummaryStats.totalStudents} คน</span>
                 <span>•</span>
-                <span>พบเช็คชื่อ {summaryStats.recordsCount} รายการ</span>
+                <span>พบเช็คชื่อ {scopedSummaryStats.recordsCount} รายการ</span>
                 <span>•</span>
-                <span>{summaryStats.datesCount} คาบเรียน</span>
+                <span>{scopedSummaryStats.datesCount} คาบเรียน</span>
               </div>
             </div>
 
@@ -678,8 +938,8 @@ export default function AttendanceCsvModal({
                           const isStatus = col.id === 'status';
 
                           return (
-                            <td 
-                              key={col.id} 
+                            <td
+                              key={col.id}
                               className={`p-2.5 border-r border-slate-200 ${
                                 isName ? 'font-semibold text-slate-800' :
                                 isPercent ? 'font-bold text-indigo-700' :
@@ -704,6 +964,7 @@ export default function AttendanceCsvModal({
                     <th className="p-2 w-12 text-center font-bold text-slate-700 border-r border-slate-200">#</th>
                     <th className="p-2.5 font-bold text-slate-700 border-r border-slate-200">รหัสนักเรียน</th>
                     <th className="p-2.5 font-bold text-slate-700 border-r border-slate-200">ชื่อ-นามสกุล</th>
+                    <th className="p-2.5 font-bold text-slate-700 border-r border-slate-200">ระดับชั้น/ห้อง</th>
                     <th className="p-2.5 font-bold text-slate-700 border-r border-slate-200">วันที่</th>
                     <th className="p-2.5 font-bold text-slate-700">สถานะ</th>
                   </tr>
@@ -711,7 +972,7 @@ export default function AttendanceCsvModal({
                 <tbody>
                   {filteredDetailed.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="p-8 text-center text-slate-400">
+                      <td colSpan={6} className="p-8 text-center text-slate-400">
                         ไม่พบประวัติการเช็คชื่อในเงื่อนไขที่เลือก
                       </td>
                     </tr>
@@ -723,6 +984,7 @@ export default function AttendanceCsvModal({
                         </td>
                         <td className="p-2.5 font-mono font-medium text-slate-700 border-r border-slate-200">{r.student_code || '-'}</td>
                         <td className="p-2.5 font-semibold text-slate-800 border-r border-slate-200">{r.name}</td>
+                        <td className="p-2.5 text-slate-600 border-r border-slate-200">{r.section_label || r.grade_level || '-'}</td>
                         <td className="p-2.5 font-mono text-slate-600 border-r border-slate-200">{r.date}</td>
                         <td className="p-2.5">
                           <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
@@ -746,6 +1008,9 @@ export default function AttendanceCsvModal({
                   <tr>
                     <th className="p-2 w-10 text-center font-bold text-slate-700 border-r border-slate-200">#</th>
                     <th className="p-2.5 font-bold text-slate-700 border-r border-slate-200 min-w-[140px]">ชื่อ-นามสกุล</th>
+                    {hasMultipleSections && (
+                      <th className="p-2.5 font-bold text-slate-700 border-r border-slate-200 min-w-[90px]">ห้องย่อย</th>
+                    )}
                     {uniqueDates.map(d => (
                       <th key={d} className="p-2 text-center font-bold text-slate-700 border-r border-slate-200 min-w-[50px]">
                         <div className="text-[10px] font-mono">{d.slice(5)}</div>
@@ -761,7 +1026,7 @@ export default function AttendanceCsvModal({
                 <tbody>
                   {filteredSummary.length === 0 ? (
                     <tr>
-                      <td colSpan={uniqueDates.length + 8} className="p-8 text-center text-slate-400">
+                      <td colSpan={uniqueDates.length + (hasMultipleSections ? 9 : 8)} className="p-8 text-center text-slate-400">
                         ไม่พบข้อมูลในตาราง Matrix
                       </td>
                     </tr>
@@ -770,6 +1035,11 @@ export default function AttendanceCsvModal({
                       <tr key={s.id} className={`border-b border-slate-200 hover:bg-emerald-50/40 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
                         <td className="p-2 text-center text-slate-400 font-mono text-[10px] bg-slate-50 border-r border-slate-300 select-none">{idx + 1}</td>
                         <td className="p-2.5 font-semibold text-slate-800 border-r border-slate-200 whitespace-nowrap">{s.name}</td>
+                        {hasMultipleSections && (
+                          <td className="p-2.5 text-slate-600 border-r border-slate-200 whitespace-nowrap">
+                            {s.section_label || s.grade_level || '-'}
+                          </td>
+                        )}
                         {uniqueDates.map(d => {
                           const st = s.date_records?.[d] || '-';
                           return (
@@ -798,7 +1068,7 @@ export default function AttendanceCsvModal({
             )}
           </div>
 
-          <div className="flex items-center justify-between text-xs text-slate-500 mt-2 px-1">
+          <div className="flex items-center justify-between text-xs text-slate-500 mt-2 px-1 flex-wrap gap-2">
             <span className="flex items-center gap-1 text-[11px]">
               <Sparkles className="w-3 h-3 text-emerald-600" />
               ไฟล์ CSV เข้ารหัส UTF-8 with BOM รองรับการเปิดอ่านภาษาไทยบน Excel 100%
@@ -812,13 +1082,18 @@ export default function AttendanceCsvModal({
         </div>
 
         {/* Modal Footer */}
-        <div className="px-6 py-3 bg-white border-t border-slate-200 flex items-center justify-between shrink-0">
+        <div className="px-6 py-3 bg-white border-t border-slate-200 flex items-center justify-between shrink-0 flex-wrap gap-2">
           <div className="text-xs text-slate-500">
             โหมดส่งออกปัจจุบัน: <strong className="text-slate-800">{
               viewMode === 'summary' ? 'สรุปสถิติการเข้าเรียนรายบุคคล' :
               viewMode === 'detailed' ? 'บันทึกประวัติเช็คชื่อรายวัน' :
               'ตารางเมทริกซ์สรุปรายวัน'
             }</strong>
+            {activeSection && (
+              <span className="ml-2 text-emerald-700 font-bold">
+                (เฉพาะกลุ่ม {activeSection.label})
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-2">

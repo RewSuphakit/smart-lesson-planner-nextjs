@@ -69,7 +69,7 @@ export const portalLimiter = arcjetKey
         slidingWindow({
           mode: process.env.NODE_ENV !== 'production' ? 'DRY_RUN' : 'LIVE',
           interval: '5m',
-          max: 120,
+          max: 30,
         }),
       ],
     })
@@ -206,18 +206,22 @@ export async function protectRequest(
   let maxRequests = isDev ? 1000 : 120;
   let windowMs = 60 * 1000; // 1 min
 
+  let bucketTag = 'default';
   if (limiterInstance === aiLimiter) {
+    bucketTag = 'ai';
     maxRequests = isDev ? 100 : 20;
     windowMs = 60 * 60 * 1000; // 1 hr
   } else if (limiterInstance === portalLimiter) {
-    maxRequests = isDev ? 1000 : 120;
+    bucketTag = 'portal';
+    maxRequests = isDev ? 1000 : 30;
     windowMs = 5 * 60 * 1000; // 5 mins
   } else if (limiterInstance === authLimiter) {
+    bucketTag = 'auth';
     maxRequests = isDev ? 300 : 40;
     windowMs = 60 * 1000; // 1 min
   }
 
-  const memoryResult = checkMemoryRateLimit(`${identifier}:${maxRequests}`, maxRequests, windowMs);
+  const memoryResult = checkMemoryRateLimit(`${identifier}:${bucketTag}`, maxRequests, windowMs);
   if (!memoryResult.allowed) {
     return {
       allowed: false,

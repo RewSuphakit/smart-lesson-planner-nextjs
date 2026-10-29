@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import * as XLSX from 'xlsx';
+import {
+  buildStudentSectionGroups,
+  compareStudentsBySectionAndCode,
+  normalizeGradeLevel,
+  normalizeBranchDisplay,
+} from '@/lib/studentSections';
 
 function getExcelColumnLetter(colIndex: number): string {
   let letter = '';
@@ -20,6 +26,8 @@ export async function GET(request: NextRequest) {
     const classroomId = searchParams.get('classroom_id');
     const startDate = searchParams.get('start_date');
     const endDate = searchParams.get('end_date');
+    const sectionKey = searchParams.get('section_key');
+    const splitSheets = searchParams.get('split_sheets') !== 'false';
     const fileFormat = searchParams.get('file_format') || searchParams.get('format') || 'xlsx';
 
     if (!classroomId) {
@@ -44,11 +52,11 @@ export async function GET(request: NextRequest) {
     if (endDate) where.date = { ...(where.date as Record<string, unknown> || {}), lte: new Date(endDate) };
 
     // Fetch students, range records, and overall grouped counts in parallel
-    const [students, records, overallCountsGrouped] = await Promise.all([
+    const [rawStudents, allRecords, overallCountsGrouped] = await Promise.all([
       prisma.student.findMany({
         where: { classroomId: Number(classroomId), userId: user.id },
-        select: { id: true, name: true, studentCode: true },
-        orderBy: [{ studentCode: 'asc' }, { name: 'asc' }]
+        select: { id: true, name: true, studentCode: true, gradeLevel: true, branch: true },
+        orderBy: [{ gradeLevel: 'asc' }, { studentCode: 'asc' }, { name: 'asc' }]
       }),
       prisma.attendance.findMany({
         where,
@@ -61,14 +69,47 @@ export async function GET(request: NextRequest) {
       })
     ]);
 
+    const sortedAllStudents = [...rawStudents].sort(compareStudentsBySectionAndCode);
+    const { groups: sectionGroups, hasMultipleSections, sharedBranch } = buildStudentSectionGroups(sortedAllStudents);
+
+    // Build lookup map of section metadata per student
+    const studentSectionMeta = new Map<
+      number,
+      { key: string; label: string; fullLabel: string; shortSheetName: string; gradeLevel: string; branch: string }
+    >();
+    for (const grp of sectionGroups) {
+      for (const stu of grp.students) {
+        studentSectionMeta.set(stu.id, {
+          key: grp.key,
+          label: grp.label,
+          fullLabel: grp.fullLabel,
+          shortSheetName: grp.shortSheetName,
+          gradeLevel: normalizeGradeLevel(stu.gradeLevel),
+          branch: normalizeBranchDisplay(stu.branch),
+        });
+      }
+    }
+
+    // Apply optional section_key filter
+    const activeSectionGroup =
+      sectionKey && sectionKey !== 'all'
+        ? sectionGroups.find(g => g.key === sectionKey) ?? null
+        : null;
+
+    const students = activeSectionGroup ? activeSectionGroup.students : sortedAllStudents;
+    const activeStudentIdSet = new Set(students.map(s => s.id));
+    const records = activeSectionGroup
+      ? allRecords.filter(r => activeStudentIdSet.has(r.studentId))
+      : allRecords;
+
     // Find unique dates in sorted order
     const uniqueDates = Array.from(
-      new Set(records.map(r => r.date.toISOString().split('T')[0]))
+      new Set(allRecords.map(r => r.date.toISOString().split('T')[0]))
     ).sort();
 
     // Map range records by student_id
     const rangeMap = new Map<number, { present: number; late: number; absent: number; leave: number }>();
-    records.forEach(r => {
+    allRecords.forEach(r => {
       if (!rangeMap.has(r.studentId)) {
         rangeMap.set(r.studentId, { present: 0, late: 0, absent: 0, leave: 0 });
       }
@@ -92,145 +133,194 @@ export async function GET(request: NextRequest) {
       else if (r.status === 'leave') s.leave += r._count;
     });
 
-    // Calculate initial dashboard stats
-    let totalPercentsSum = 0;
-    let fCount = 0;
-    students.forEach(student => {
-      const studentRangeRecords = records.filter(r => r.studentId === student.id);
-      const rPresent = rangeMap.get(student.id)?.present || 0;
-      const rLate = rangeMap.get(student.id)?.late || 0;
-      const rAbsent = rangeMap.get(student.id)?.absent || 0;
-      const rLeave = rangeMap.get(student.id)?.leave || 0;
-
-      const rangeConvertedAbsent = rAbsent + Math.floor(rLate / ratioLate) + Math.floor(rLeave / ratioLeave);
-      const rangeTotalChecked = studentRangeRecords.length;
-      const rangePercent = rangeTotalChecked > 0 
-        ? Math.max(0, Math.min(100, Math.round(((rangeTotalChecked - rangeConvertedAbsent) / rangeTotalChecked) * 10000) / 100)) 
-        : 100;
-      totalPercentsSum += rangePercent;
-
-      const oLate = overallMap.get(student.id)?.late || 0;
-      const oAbsent = overallMap.get(student.id)?.absent || 0;
-      const oLeave = overallMap.get(student.id)?.leave || 0;
-      const overallConvertedAbsent = oAbsent + Math.floor(oLate / ratioLate) + Math.floor(oLeave / ratioLeave);
-      if (overallConvertedAbsent > maxAllowedAbsences) {
-        fCount++;
-      }
-    });
-
-    const classAverageInit = students.length > 0 ? Math.round((totalPercentsSum / students.length) * 100) / 100 : 100;
-    const classFCountInit = fCount;
-
-    const filenameBase = `attendance_${classroom.name.replace(/[^a-zA-Z0-9ก-๙_-]/g, '_')}`;
-
-    if (fileFormat === 'xlsx') {
-      const filename = `${filenameBase}.xlsx`;
-
-      const lastDateColLetter = getExcelColumnLetter(uniqueDates.length + 1);
-      
-      const colPresentLetter = getExcelColumnLetter(uniqueDates.length + 2);
-      const colLateLetter = getExcelColumnLetter(uniqueDates.length + 3);
-      const colAbsentLetter = getExcelColumnLetter(uniqueDates.length + 4);
-      const colLeaveLetter = getExcelColumnLetter(uniqueDates.length + 5);
-      const colRangeConvertedLetter = getExcelColumnLetter(uniqueDates.length + 6);
-      const colRangePercentLetter = getExcelColumnLetter(uniqueDates.length + 7);
-      const colVisualChartLetter = getExcelColumnLetter(uniqueDates.length + 8);
-      const colOverallConvertedLetter = getExcelColumnLetter(uniqueDates.length + 9);
-      const colOverallStatusLetter = getExcelColumnLetter(uniqueDates.length + 10);
-
-      // Dashboard rows (Top 5 rows of the Excel sheet)
-      const dashboardRows = [
-        [`แดชบอร์ดสรุปสถิติเข้าเรียน: ห้องเรียน ${classroom.name}`, '', '', '', '', ''],
-        [`ช่วงวันที่: ${startDate || 'ทั้งหมด'} ถึง ${endDate || 'ปัจจุบัน'}`, '', '', '', '', ''],
-        [`จำนวนนักเรียนทั้งหมด: ${students.length} คน`, `จำนวนคาบเรียนที่เช็คชื่อ: ${uniqueDates.length} คาบ`, '', '', '', ''],
-        [`เปอร์เซ็นต์เข้าเรียนเฉลี่ยของห้อง:`, { t: 'n', f: `AVERAGE(${colRangePercentLetter}7:${colRangePercentLetter}${students.length+6})`, v: classAverageInit }, `นักเรียนติด มส. ทั้งห้อง:`, { t: 'n', f: `COUNTIF(${colOverallStatusLetter}7:${colOverallStatusLetter}${students.length+6},"หมดสิทธิ์สอบ (มส.)")`, v: classFCountInit }, '', ''],
-        ['', '', '', '', '', ''] // Padding row
-      ];
-
-      // Matrix sheet headers (row 6)
-      const headers = [
-        'รหัสนักเรียน',
-        'ชื่อ-นามสกุล',
-        ...uniqueDates,
-        'มา (ครั้ง)',
-        'สาย (ครั้ง)',
-        'ขาด (ครั้ง)',
-        'ลา (ครั้ง)',
-        'เทียบขาดสะสม (ช่วงนี้)',
-        'เปอร์เซ็นต์เข้าเรียน (ช่วงนี้)',
-        'แผนภูมิความสม่ำเสมอ (0-100%)',
-        'เทียบขาดสะสม (ทั้งเทอม)',
-        'สถานะ (ทั้งเทอม)'
-      ];
-
-      // Matrix sheet rows (starting at row 7)
-      const rows = students.map((student, idx) => {
-        const studentRangeRecords = records.filter(r => r.studentId === student.id);
-        const rPresent = rangeMap.get(student.id)?.present || 0;
+    const computeGroupStats = (targetList: typeof sortedAllStudents) => {
+      let percentsSum = 0;
+      let groupFCount = 0;
+      targetList.forEach(student => {
+        const studentRangeRecords = allRecords.filter(r => r.studentId === student.id);
         const rLate = rangeMap.get(student.id)?.late || 0;
         const rAbsent = rangeMap.get(student.id)?.absent || 0;
         const rLeave = rangeMap.get(student.id)?.leave || 0;
 
         const rangeConvertedAbsent = rAbsent + Math.floor(rLate / ratioLate) + Math.floor(rLeave / ratioLeave);
         const rangeTotalChecked = studentRangeRecords.length;
-        const rangePercent = rangeTotalChecked > 0 
-          ? Math.max(0, Math.min(100, Math.round(((rangeTotalChecked - rangeConvertedAbsent) / rangeTotalChecked) * 10000) / 100)) 
+        const rangePercent = rangeTotalChecked > 0
+          ? Math.max(0, Math.min(100, Math.round(((rangeTotalChecked - rangeConvertedAbsent) / rangeTotalChecked) * 10000) / 100))
           : 100;
+        percentsSum += rangePercent;
 
         const oLate = overallMap.get(student.id)?.late || 0;
         const oAbsent = overallMap.get(student.id)?.absent || 0;
         const oLeave = overallMap.get(student.id)?.leave || 0;
         const overallConvertedAbsent = oAbsent + Math.floor(oLate / ratioLate) + Math.floor(oLeave / ratioLeave);
-        const isF = overallConvertedAbsent > maxAllowedAbsences;
-        const statusLabel = isF ? 'หมดสิทธิ์สอบ (มส.)' : 'ปกติ';
+        if (overallConvertedAbsent > maxAllowedAbsences) {
+          groupFCount++;
+        }
+      });
+      const avg = targetList.length > 0 ? Math.round((percentsSum / targetList.length) * 100) / 100 : 100;
+      return { totalPercentsSum: percentsSum, fCount: groupFCount, classAverageInit: avg };
+    };
 
-        type ExcelCell = string | number | { t: string; f?: string; v: unknown };
-        const studentRow: ExcelCell[] = [
-          student.studentCode || '',
-          student.name
+    const { totalPercentsSum, fCount } = computeGroupStats(students);
+
+    const sectionSuffix = activeSectionGroup
+      ? `_${activeSectionGroup.shortSheetName.replace(/[^a-zA-Z0-9ก-๙_-]/g, '_')}`
+      : '';
+    const filenameBase = `attendance_${classroom.name.replace(/[^a-zA-Z0-9ก-๙_-]/g, '_')}${sectionSuffix}`;
+
+    if (fileFormat === 'xlsx') {
+      const filename = `${filenameBase}.xlsx`;
+
+      const buildMatrixWorksheet = (titleSuffix: string, targetStudents: typeof sortedAllStudents) => {
+        const { fCount: sheetFCount, classAverageInit: sheetAvgInit } = computeGroupStats(targetStudents);
+
+        // Columns: A=รหัสนักเรียน (0), B=ชื่อ-นามสกุล (1), C=ระดับชั้น/ห้อง (2), D..=dates (3..uniqueDates.length+2)
+        const firstDateColLetter = 'D';
+        const lastDateColLetter = getExcelColumnLetter(uniqueDates.length + 2);
+
+        const colPresentLetter = getExcelColumnLetter(uniqueDates.length + 3);
+        const colLateLetter = getExcelColumnLetter(uniqueDates.length + 4);
+        const colAbsentLetter = getExcelColumnLetter(uniqueDates.length + 5);
+        const colLeaveLetter = getExcelColumnLetter(uniqueDates.length + 6);
+        const colRangeConvertedLetter = getExcelColumnLetter(uniqueDates.length + 7);
+        const colRangePercentLetter = getExcelColumnLetter(uniqueDates.length + 8);
+        const colOverallConvertedLetter = getExcelColumnLetter(uniqueDates.length + 10);
+        const colOverallStatusLetter = getExcelColumnLetter(uniqueDates.length + 11);
+
+        const dashboardRows = [
+          [`แดชบอร์ดสรุปสถิติเข้าเรียน: ห้องเรียน ${classroom.name}${titleSuffix ? ` (${titleSuffix})` : ''}`, '', '', '', '', ''],
+          [`ช่วงวันที่: ${startDate || 'ทั้งหมด'} ถึง ${endDate || 'ปัจจุบัน'}`, '', '', '', '', ''],
+          [`จำนวนนักเรียน: ${targetStudents.length} คน`, `จำนวนคาบเรียนที่เช็คชื่อ: ${uniqueDates.length} คาบ`, '', '', '', ''],
+          [
+            `เปอร์เซ็นต์เข้าเรียนเฉลี่ย:`,
+            targetStudents.length > 0
+              ? { t: 'n', f: `AVERAGE(${colRangePercentLetter}7:${colRangePercentLetter}${targetStudents.length + 6})`, v: sheetAvgInit }
+              : 100,
+            `นักเรียนติด มส.:`,
+            targetStudents.length > 0
+              ? { t: 'n', f: `COUNTIF(${colOverallStatusLetter}7:${colOverallStatusLetter}${targetStudents.length + 6},"หมดสิทธิ์สอบ (มส.)")`, v: sheetFCount }
+              : 0,
+            '',
+            ''
+          ],
+          ['', '', '', '', '', '']
         ];
 
-        // Add status mapping per date
-        uniqueDates.forEach(dateStr => {
-          const rec = studentRangeRecords.find(r => r.date.toISOString().split('T')[0] === dateStr);
-          if (!rec) {
-            studentRow.push('-');
+        const headers = [
+          'รหัสนักเรียน',
+          'ชื่อ-นามสกุล',
+          'ระดับชั้น/ห้อง',
+          ...uniqueDates,
+          'มา (ครั้ง)',
+          'สาย (ครั้ง)',
+          'ขาด (ครั้ง)',
+          'ลา (ครั้ง)',
+          'เทียบขาดสะสม (ช่วงนี้)',
+          'เปอร์เซ็นต์เข้าเรียน (ช่วงนี้)',
+          'แผนภูมิความสม่ำเสมอ (0-100%)',
+          'เทียบขาดสะสม (ทั้งเทอม)',
+          'สถานะ (ทั้งเทอม)'
+        ];
+
+        const rows = targetStudents.map((student, idx) => {
+          const meta = studentSectionMeta.get(student.id);
+          const studentRangeRecords = allRecords.filter(r => r.studentId === student.id);
+          const rPresent = rangeMap.get(student.id)?.present || 0;
+          const rLate = rangeMap.get(student.id)?.late || 0;
+          const rAbsent = rangeMap.get(student.id)?.absent || 0;
+          const rLeave = rangeMap.get(student.id)?.leave || 0;
+
+          const rangeConvertedAbsent = rAbsent + Math.floor(rLate / ratioLate) + Math.floor(rLeave / ratioLeave);
+          const rangeTotalChecked = studentRangeRecords.length;
+          const rangePercent = rangeTotalChecked > 0
+            ? Math.max(0, Math.min(100, Math.round(((rangeTotalChecked - rangeConvertedAbsent) / rangeTotalChecked) * 10000) / 100))
+            : 100;
+
+          const oLate = overallMap.get(student.id)?.late || 0;
+          const oAbsent = overallMap.get(student.id)?.absent || 0;
+          const oLeave = overallMap.get(student.id)?.leave || 0;
+          const overallConvertedAbsent = oAbsent + Math.floor(oLate / ratioLate) + Math.floor(oLeave / ratioLeave);
+          const isF = overallConvertedAbsent > maxAllowedAbsences;
+          const statusLabel = isF ? 'หมดสิทธิ์สอบ (มส.)' : 'ปกติ';
+
+          type ExcelCell = string | number | { t: string; f?: string; v: unknown };
+          const studentRow: ExcelCell[] = [
+            student.studentCode || '',
+            student.name,
+            hasMultipleSections ? (meta?.label || '-') : (meta?.gradeLevel || '-')
+          ];
+
+          uniqueDates.forEach(dateStr => {
+            const rec = studentRangeRecords.find(r => r.date.toISOString().split('T')[0] === dateStr);
+            if (!rec) {
+              studentRow.push('-');
+            } else {
+              const thaiStatus = rec.status === 'present' ? 'มา' :
+                                 rec.status === 'late' ? 'สาย' :
+                                 rec.status === 'absent' ? 'ขาด' :
+                                 rec.status === 'leave' ? 'ลา' : '-';
+              studentRow.push(thaiStatus);
+            }
+          });
+
+          if (uniqueDates.length > 0) {
+            const R = idx + 7;
+            studentRow.push(
+              { t: 'n', f: `COUNTIF(${firstDateColLetter}${R}:${lastDateColLetter}${R},"มา")`, v: rPresent },
+              { t: 'n', f: `COUNTIF(${firstDateColLetter}${R}:${lastDateColLetter}${R},"สาย")`, v: rLate },
+              { t: 'n', f: `COUNTIF(${firstDateColLetter}${R}:${lastDateColLetter}${R},"ขาด")`, v: rAbsent },
+              { t: 'n', f: `COUNTIF(${firstDateColLetter}${R}:${lastDateColLetter}${R},"ลา")`, v: rLeave },
+              { t: 'n', f: `${colAbsentLetter}${R}+INT(${colLateLetter}${R}/${ratioLate})+INT(${colLeaveLetter}${R}/${ratioLeave})`, v: rangeConvertedAbsent },
+              { t: 'n', f: `IF((${colPresentLetter}${R}+${colLateLetter}${R}+${colAbsentLetter}${R}+${colLeaveLetter}${R})>0,ROUND(((${colPresentLetter}${R}+${colLateLetter}${R}+${colAbsentLetter}${R}+${colLeaveLetter}${R})-${colRangeConvertedLetter}${R})/(${colPresentLetter}${R}+${colLateLetter}${R}+${colAbsentLetter}${R}+${colLeaveLetter}${R})*100,2),100)`, v: rangePercent },
+              { t: 's', f: `REPT("🟢",ROUND(${colRangePercentLetter}${R}/10,0))&REPT("🔴",10-ROUND(${colRangePercentLetter}${R}/10,0))`, v: '🟢'.repeat(Math.round(rangePercent / 10)) + '🔴'.repeat(10 - Math.round(rangePercent / 10)) },
+              { t: 'n', v: overallConvertedAbsent },
+              { t: 's', f: `IF(${colOverallConvertedLetter}${R}>${maxAllowedAbsences},"หมดสิทธิ์สอบ (มส.)","ปกติ")`, v: statusLabel }
+            );
           } else {
-            const thaiStatus = rec.status === 'present' ? 'มา' :
-                               rec.status === 'late' ? 'สาย' :
-                               rec.status === 'absent' ? 'ขาด' :
-                               rec.status === 'leave' ? 'ลา' : '-';
-            studentRow.push(thaiStatus);
+            studentRow.push(0, 0, 0, 0, 0, 100, '🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢', overallConvertedAbsent, statusLabel);
           }
+
+          return studentRow;
         });
 
-        // Add summary columns (using formulas if there are dates checked)
-        if (uniqueDates.length > 0) {
-          const R = idx + 7; // Row number (1-based, student rows start at row 7)
+        const ws = XLSX.utils.aoa_to_sheet([...dashboardRows, headers, ...rows]);
+        ws['!merges'] = [
+          { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } },
+          { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } }
+        ];
 
-          studentRow.push(
-            { t: 'n', f: `COUNTIF(C${R}:${lastDateColLetter}${R},"มา")`, v: rPresent },
-            { t: 'n', f: `COUNTIF(C${R}:${lastDateColLetter}${R},"สาย")`, v: rLate },
-            { t: 'n', f: `COUNTIF(C${R}:${lastDateColLetter}${R},"ขาด")`, v: rAbsent },
-            { t: 'n', f: `COUNTIF(C${R}:${lastDateColLetter}${R},"ลา")`, v: rLeave },
-            { t: 'n', f: `${colAbsentLetter}${R}+INT(${colLateLetter}${R}/${ratioLate})+INT(${colLeaveLetter}${R}/${ratioLeave})`, v: rangeConvertedAbsent },
-            { t: 'n', f: `IF((${colPresentLetter}${R}+${colLateLetter}${R}+${colAbsentLetter}${R}+${colLeaveLetter}${R})>0,ROUND(((${colPresentLetter}${R}+${colLateLetter}${R}+${colAbsentLetter}${R}+${colLeaveLetter}${R})-${colRangeConvertedLetter}${R})/(${colPresentLetter}${R}+${colLateLetter}${R}+${colAbsentLetter}${R}+${colLeaveLetter}${R})*100,2),100)`, v: rangePercent },
-            { t: 's', f: `REPT("🟢",ROUND(${colRangePercentLetter}${R}/10,0))&REPT("🔴",10-ROUND(${colRangePercentLetter}${R}/10,0))`, v: '🟢'.repeat(Math.round(rangePercent/10)) + '🔴'.repeat(10 - Math.round(rangePercent/10)) },
-            { t: 'n', v: overallConvertedAbsent },
-            { t: 's', f: `IF(${colOverallConvertedLetter}${R}>${maxAllowedAbsences},"หมดสิทธิ์สอบ (มส.)","ปกติ")`, v: statusLabel }
-          );
-        } else {
-          // If no dates, output static default values
-          studentRow.push(0, 0, 0, 0, 0, 100, '🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢', overallConvertedAbsent, statusLabel);
+        const wsColWidths = headers.map(h => ({ wch: Math.max(h.length * 2, 10) }));
+        wsColWidths[0] = { wch: 15 };
+        wsColWidths[1] = { wch: 25 };
+        wsColWidths[2] = { wch: 18 };
+        wsColWidths[uniqueDates.length + 9] = { wch: 22 };
+        ws['!cols'] = wsColWidths;
+
+        return ws;
+      };
+
+      const wb = XLSX.utils.book_new();
+
+      // Main summary/matrix sheet
+      const mainSheetName = activeSectionGroup
+        ? activeSectionGroup.shortSheetName
+        : 'ตารางสรุปเข้าเรียน';
+      const wsMain = buildMatrixWorksheet(activeSectionGroup?.fullLabel || '', students);
+      XLSX.utils.book_append_sheet(wb, wsMain, mainSheetName);
+
+      // Separate sheets per sub-room when classroom has multiple sections and exporting all
+      if (splitSheets && hasMultipleSections && !activeSectionGroup) {
+        for (const grp of sectionGroups) {
+          const wsGroup = buildMatrixWorksheet(grp.fullLabel, grp.students);
+          XLSX.utils.book_append_sheet(wb, wsGroup, grp.shortSheetName);
         }
+      }
 
-        return studentRow;
-      });
-
-      // Sheet 2 headers and rows (Detailed Log)
-      const detailedHeaders = ['รหัสนักเรียน', 'ชื่อ-นามสกุล', 'วันที่', 'สถานะ'];
+      // Detailed sheet
+      const detailedHeaders = ['รหัสนักเรียน', 'ชื่อ-นามสกุล', 'ระดับชั้น/ห้อง', 'สาขาวิชา', 'วันที่', 'สถานะ'];
       const detailedRows = records.map(r => {
         const student = students.find(s => s.id === r.studentId);
+        const meta = student ? studentSectionMeta.get(student.id) : undefined;
         const thaiStatus = r.status === 'present' ? 'มาเรียน' :
                            r.status === 'late' ? 'สาย' :
                            r.status === 'absent' ? 'ขาด' :
@@ -238,39 +328,23 @@ export async function GET(request: NextRequest) {
         return [
           student?.studentCode || '',
           student?.name || '',
+          meta?.gradeLevel || '-',
+          meta?.branch || '-',
           r.date.toISOString().split('T')[0],
           thaiStatus
         ];
       });
 
-      // Build SheetJS Workbook
-      const wb = XLSX.utils.book_new();
-
-      // Matrix sheet
-      const ws1 = XLSX.utils.aoa_to_sheet([...dashboardRows, headers, ...rows]);
-      
-      // Merge dashboard cells (row 0 title, row 1 date range)
-      ws1['!merges'] = [
-        { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } }, // Title A1:F1
-        { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } }  // Dates A2:F2
+      const wsDetailed = XLSX.utils.aoa_to_sheet([detailedHeaders, ...detailedRows]);
+      wsDetailed['!cols'] = [
+        { wch: 15 },
+        { wch: 25 },
+        { wch: 16 },
+        { wch: 20 },
+        { wch: 15 },
+        { wch: 15 }
       ];
-
-      const ws1ColWidths = headers.map(h => ({ wch: Math.max(h.length * 2, 10) }));
-      ws1ColWidths[0] = { wch: 15 }; // studentCode
-      ws1ColWidths[1] = { wch: 25 }; // name
-      ws1ColWidths[uniqueDates.length + 8] = { wch: 22 }; // chart column width
-      ws1['!cols'] = ws1ColWidths;
-      XLSX.utils.book_append_sheet(wb, ws1, 'ตารางสรุปเข้าเรียน');
-
-      // Detailed sheet
-      const ws2 = XLSX.utils.aoa_to_sheet([detailedHeaders, ...detailedRows]);
-      ws2['!cols'] = [
-        { wch: 15 }, // studentCode
-        { wch: 25 }, // name
-        { wch: 15 }, // date
-        { wch: 15 }  // status
-      ];
-      XLSX.utils.book_append_sheet(wb, ws2, 'ประวัติแบบละเอียด');
+      XLSX.utils.book_append_sheet(wb, wsDetailed, 'ประวัติแบบละเอียด');
 
       const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 
@@ -282,15 +356,16 @@ export async function GET(request: NextRequest) {
       });
     } else if (fileFormat === 'json') {
       const summaryList = students.map((s, idx) => {
-        const studentRangeRecords = records.filter(r => r.studentId === s.id);
+        const meta = studentSectionMeta.get(s.id);
+        const studentRangeRecords = allRecords.filter(r => r.studentId === s.id);
         const rPresent = rangeMap.get(s.id)?.present || 0;
         const rLate = rangeMap.get(s.id)?.late || 0;
         const rAbsent = rangeMap.get(s.id)?.absent || 0;
         const rLeave = rangeMap.get(s.id)?.leave || 0;
         const rangeConvertedAbsent = rAbsent + Math.floor(rLate / ratioLate) + Math.floor(rLeave / ratioLeave);
         const rangeTotalChecked = studentRangeRecords.length;
-        const rangePercent = rangeTotalChecked > 0 
-          ? Math.max(0, Math.min(100, Math.round(((rangeTotalChecked - rangeConvertedAbsent) / rangeTotalChecked) * 10000) / 100)) 
+        const rangePercent = rangeTotalChecked > 0
+          ? Math.max(0, Math.min(100, Math.round(((rangeTotalChecked - rangeConvertedAbsent) / rangeTotalChecked) * 10000) / 100))
           : 100;
         const oLate = overallMap.get(s.id)?.late || 0;
         const oAbsent = overallMap.get(s.id)?.absent || 0;
@@ -309,6 +384,10 @@ export async function GET(request: NextRequest) {
           id: s.id,
           student_code: s.studentCode || '',
           name: s.name,
+          grade_level: meta?.gradeLevel || '',
+          branch: meta?.branch || '',
+          section_key: meta?.key || '__unassigned__',
+          section_label: meta?.label || 'ไม่ระบุห้องย่อย',
           present: rPresent,
           late: rLate,
           absent: rAbsent,
@@ -324,6 +403,7 @@ export async function GET(request: NextRequest) {
 
       const detailedList = records.map((r, idx) => {
         const student = students.find(s => s.id === r.studentId);
+        const meta = student ? studentSectionMeta.get(student.id) : undefined;
         const thaiStatus = r.status === 'present' ? 'มาเรียน' :
                            r.status === 'late' ? 'สาย' :
                            r.status === 'absent' ? 'ขาด' :
@@ -332,6 +412,10 @@ export async function GET(request: NextRequest) {
           no: idx + 1,
           student_code: student?.studentCode || '',
           name: student?.name || '',
+          grade_level: meta?.gradeLevel || '',
+          branch: meta?.branch || '',
+          section_key: meta?.key || '__unassigned__',
+          section_label: meta?.label || 'ไม่ระบุห้องย่อย',
           date: r.date.toISOString().split('T')[0],
           status: thaiStatus,
         };
@@ -348,6 +432,18 @@ export async function GET(request: NextRequest) {
             ratioLate,
             ratioLeave,
           },
+          hasMultipleSections,
+          sharedBranch,
+          sections: sectionGroups.map(g => ({
+            key: g.key,
+            label: g.label,
+            fullLabel: g.fullLabel,
+            shortSheetName: g.shortSheetName,
+            branch: g.branch,
+            gradeLevel: g.gradeLevel,
+            isUnassigned: g.isUnassigned,
+            count: g.students.length,
+          })),
           uniqueDates,
           summaryStats: {
             totalStudents: students.length,
@@ -364,9 +460,10 @@ export async function GET(request: NextRequest) {
       // Fallback: CSV
       const filename = `${filenameBase}.csv`;
       const BOM = '\uFEFF';
-      const csvHeaders = ['รหัสนักเรียน', 'ชื่อ-นามสกุล', 'วันที่', 'สถานะ'];
+      const csvHeaders = ['รหัสนักเรียน', 'ชื่อ-นามสกุล', 'ระดับชั้น/ห้อง', 'สาขาวิชา', 'วันที่', 'สถานะ'];
       const csvRows = records.map(r => {
         const student = students.find(s => s.id === r.studentId);
+        const meta = student ? studentSectionMeta.get(student.id) : undefined;
         const thaiStatus = r.status === 'present' ? 'มาเรียน' :
                            r.status === 'late' ? 'สาย' :
                            r.status === 'absent' ? 'ขาด' :
@@ -374,6 +471,8 @@ export async function GET(request: NextRequest) {
         return [
           student?.studentCode || '',
           student?.name || '',
+          meta?.gradeLevel || '',
+          meta?.branch || '',
           r.date.toISOString().split('T')[0],
           thaiStatus
         ];
@@ -388,7 +487,7 @@ export async function GET(request: NextRequest) {
       };
 
       const formattedHeaders = csvHeaders.map(sanitizeCsvCell).join(',');
-      const formattedRows = csvRows.map(row => 
+      const formattedRows = csvRows.map(row =>
         row.map(sanitizeCsvCell).join(',')
       ).join('\n');
 
@@ -405,5 +504,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: 'Failed to export' }, { status: 500 });
   }
 }
-
-

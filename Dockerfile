@@ -79,13 +79,15 @@ COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 RUN mkdir -p /app/public/uploads && \
     chown -R nextjs:nodejs /app
 
-# Entrypoint script: รัน migration ก่อนแล้วค่อยเริ่ม server
+# Entrypoint script: รัน migration ก่อนแล้วค่อยเริ่ม server (ข้ามได้ถ้า db-migrate รันให้แล้วผ่าน SKIP_DB_PUSH=true)
 COPY --chown=nextjs:nodejs <<'EOF' /app/entrypoint.sh
 #!/bin/sh
 set -e
-echo "🔄 Running Prisma schema sync (db push)..."
-npx prisma db push --skip-generate
-echo "✅ Database schema synced"
+if [ "${SKIP_DB_PUSH:-false}" != "true" ]; then
+  echo "🔄 Running Prisma schema sync (db push)..."
+  npx prisma db push --skip-generate
+  echo "✅ Database schema synced"
+fi
 echo "🚀 Starting Next.js server..."
 exec node server.js
 EOF

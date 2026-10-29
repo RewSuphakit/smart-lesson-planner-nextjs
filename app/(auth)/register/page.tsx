@@ -21,7 +21,7 @@ export default function RegisterPage() {
         />
       </div>
 
-      <div className="w-full max-w-4xl animate-fade-in-up">
+      <div className="w-full max-w-4xl">
         <Suspense
           fallback={
             <div className="min-h-[620px] bg-white/80 backdrop-blur-md rounded-3xl border border-slate-200/80 flex items-center justify-center">

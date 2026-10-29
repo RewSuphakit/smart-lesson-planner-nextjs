@@ -2,9 +2,6 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const nextConfig: NextConfig = {
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   output: 'standalone',
   outputFileTracingRoot: path.join(__dirname),
   compress: true,

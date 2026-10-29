@@ -86,6 +86,7 @@ export async function POST(
               name: true,
               studentCode: true,
               gradeLevel: true,
+              branch: true,
               email: true,
               avatar: true,
             },
@@ -166,6 +167,7 @@ export async function POST(
                 name: s.name,
                 studentCode: s.studentCode,
                 gradeLevel: s.gradeLevel,
+                branch: s.branch,
                 email: s.email,
                 avatar: s.avatar,
                 // midtermScore, finalScore, affectiveScore reset to defaults

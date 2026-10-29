@@ -71,7 +71,8 @@ export function proxy(request: NextRequest) {
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon.ico') ||
-    pathname.startsWith('/uploads')
+    pathname.startsWith('/uploads') ||
+    (!pathname.startsWith('/api/') && /\.(?:png|jpg|jpeg|gif|webp|avif|svg|ico)$/i.test(pathname))
   ) {
     return NextResponse.next();
   }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { invalidateCache, userCacheKey } from '@/lib/cache';
+import { normalizeGradeLevel, normalizeBranchDisplay } from '@/lib/studentSections';
 
 export async function POST(request: NextRequest) {
   try {
@@ -49,10 +50,10 @@ export async function POST(request: NextRequest) {
     const data = (students as StudentBulkInput[]).map((s) => ({
       userId: user.id,
       name: s.name,
-      studentCode: s.student_code || null,
-      gradeLevel: s.grade_level || null,
-      branch: s.branch || null,
-      email: s.email || null,
+      studentCode: s.student_code ? String(s.student_code).trim() : null,
+      gradeLevel: s.grade_level ? normalizeGradeLevel(s.grade_level) || null : null,
+      branch: s.branch ? normalizeBranchDisplay(s.branch) || null : null,
+      email: s.email ? String(s.email).trim() : null,
       classroomId: s.classroom_id ? Number(s.classroom_id) : null,
       avatar: s.avatar || null,
     }));

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { invalidateCache, userCacheKey } from '@/lib/cache';
+import { normalizeGradeLevel, normalizeBranchDisplay } from '@/lib/studentSections';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -124,7 +125,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             // Keep existing avatar if not explicitly set or removed
             continue;
           }
-        } else if (['studentCode', 'gradeLevel', 'branch', 'email'].includes(prismaKey)) {
+        } else if (prismaKey === 'gradeLevel') {
+          val = val ? normalizeGradeLevel(String(val)) || null : null;
+        } else if (prismaKey === 'branch') {
+          val = val ? normalizeBranchDisplay(String(val)) || null : null;
+        } else if (['studentCode', 'email'].includes(prismaKey)) {
           val = val ? String(val).trim() : null;
         }
         updateData[prismaKey] = val;

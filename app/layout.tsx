@@ -8,9 +8,10 @@ import QueryProvider from '@/components/QueryProvider';
 import { SemesterProvider } from '@/context/SemesterContext';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
+import { getServerSession } from '@/lib/server-session';
 
 const sarabun = Sarabun({
-  weight: ['300', '400', '500', '600', '700', '800'],
+  weight: ['400', '500', '600', '700'],
   subsets: ['thai', 'latin'],
   display: 'swap',
   variable: '--font-sarabun',
@@ -28,26 +29,28 @@ export const metadata: Metadata = {
   description: '',
   icons: {
     icon: [
-      { url: '/icon.png', sizes: '512x512', type: 'image/png' },
+      { url: '/icon.png', sizes: '192x192', type: 'image/png' },
       { url: '/favicon.ico', sizes: 'any' },
     ],
     apple: [
-      { url: '/apple-icon.png', sizes: '512x512', type: 'image/png' },
+      { url: '/apple-icon.png', sizes: '180x180', type: 'image/png' },
     ],
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { user: initialUser, semesters: initialSemesters } = await getServerSession();
+
   return (
     <html lang="th" className={`h-full antialiased ${sarabun.variable}`}>
       <body className="min-h-full flex flex-col">
         <QueryProvider>
-          <AuthProvider>
-            <SemesterProvider>
+          <AuthProvider initialUser={initialUser}>
+            <SemesterProvider initialSemesters={initialSemesters}>
               <HotToaster
                 position="top-right"
                 toastOptions={{
@@ -73,4 +76,3 @@ export default function RootLayout({
     </html>
   );
 }
-

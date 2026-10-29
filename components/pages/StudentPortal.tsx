@@ -132,6 +132,7 @@ interface PortalData {
 
 export default function StudentPortal() {
   const [studentCodeInput, setStudentCodeInput] = useState('');
+  const [verifyNameInput, setVerifyNameInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<PortalData | null>(null);
@@ -141,6 +142,7 @@ export default function StudentPortal() {
   const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'missing' | 'submitted'>('all');
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const verifyNameRef = React.useRef<HTMLInputElement>(null);
   const classroomCacheRef = React.useRef<Map<number, PortalData>>(new Map());
 
   // Load recently searched student codes
@@ -166,10 +168,15 @@ export default function StudentPortal() {
     }
   };
 
-  const fetchStudentData = async (code: string, classroomId?: number) => {
+  const fetchStudentData = async (code: string, classroomId?: number, verifyName?: string) => {
     const trimmed = code.trim();
+    const trimmedVerify = (verifyName ?? verifyNameInput).trim();
     if (!trimmed) {
       setError('กรุณากรอกรหัสประจำตัวนักเรียน');
+      return;
+    }
+    if (!classroomId && trimmedVerify.length < 2) {
+      setError('กรุณากรอกชื่อหรือนามสกุล (อย่างน้อย 2 ตัวอักษร) เพื่อยืนยันตัวตน');
       return;
     }
 
@@ -178,6 +185,9 @@ export default function StudentPortal() {
 
     try {
       let url = `/api/portal/student?code=${encodeURIComponent(trimmed)}`;
+      if (trimmedVerify) {
+        url += `&verify_name=${encodeURIComponent(trimmedVerify)}`;
+      }
       if (classroomId) {
         url += `&classroom_id=${classroomId}`;
       }
@@ -274,7 +284,7 @@ export default function StudentPortal() {
           ...prev,
           student: {
             ...prev.student,
-            avatar: compressed,
+            avatar: resData.avatar || compressed,
           },
         };
       });
@@ -389,36 +399,49 @@ export default function StudentPortal() {
               ค้นหาข้อมูลผลการเรียน
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 mt-2 max-w-md mx-auto">
-              กรอกรหัสประจำตัวนักเรียน เพื่อดูสถิติเวลาเรียน
-              และรายการงานที่ค้างส่ง
+              กรอกรหัสประจำตัวนักเรียน พร้อมชื่อหรือนามสกุลเพื่อยืนยันตัวตน
+              และดูสถิติเวลาเรียนกับรายการงานค้างส่ง
             </p>
 
-            <form onSubmit={handleSearch} className="mt-6 sm:mt-8">
-              <div className="relative flex items-center shadow-lg shadow-indigo-500/5 rounded-2xl bg-white border border-slate-200 focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/10 transition-all p-1.5">
-                <Search className="w-5 h-5 text-slate-400 ml-3 shrink-0" />
-                <input
-                  type="text"
-                  value={studentCodeInput}
-                  onChange={(e) => setStudentCodeInput(e.target.value)}
-                  placeholder="เช่น 6XXXXXX001"
-                  className="w-full bg-transparent px-3 py-2.5 text-sm sm:text-base text-slate-800 placeholder-slate-400 focus:outline-none font-mono"
-                  autoFocus
-                />
-                <button
-                  type="submit"
-                  disabled={loading || !studentCodeInput.trim()}
-                  className="btn btn-primary px-5 py-2.5 rounded-xl font-medium text-xs sm:text-sm shadow-md shadow-indigo-500/20 disabled:opacity-50 shrink-0 flex items-center gap-1.5"
-                >
-                  {loading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <>
-                      <span>ค้นหา</span>
-                      <ChevronRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
+            <form onSubmit={handleSearch} className="mt-6 sm:mt-8 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-left">
+                <div className="relative flex items-center shadow-sm rounded-2xl bg-white border border-slate-200 focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/10 transition-all px-3 py-1">
+                  <Search className="w-4 h-4 text-slate-400 shrink-0" />
+                  <input
+                    type="text"
+                    value={studentCodeInput}
+                    onChange={(e) => setStudentCodeInput(e.target.value)}
+                    placeholder="รหัสนักเรียน เช่น 68219090020"
+                    className="w-full bg-transparent px-2.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none font-mono"
+                    autoFocus
+                  />
+                </div>
+                <div className="relative flex items-center shadow-sm rounded-2xl bg-white border border-slate-200 focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/10 transition-all px-3 py-1">
+                  <ShieldCheck className="w-4 h-4 text-indigo-400 shrink-0" />
+                  <input
+                    ref={verifyNameRef}
+                    type="text"
+                    value={verifyNameInput}
+                    onChange={(e) => setVerifyNameInput(e.target.value)}
+                    placeholder="ชื่อ หรือ นามสกุล (ยืนยันตัวตน)"
+                    className="w-full bg-transparent px-2.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none"
+                  />
+                </div>
               </div>
+              <button
+                type="submit"
+                disabled={loading || !studentCodeInput.trim() || verifyNameInput.trim().length < 2}
+                className="btn btn-primary w-full py-3 rounded-2xl font-semibold text-sm shadow-md shadow-indigo-500/20 disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                {loading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <span>ตรวจสอบผลการเรียน</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
             </form>
 
             {/* Error Message */}
@@ -444,7 +467,12 @@ export default function StudentPortal() {
                         classroomCacheRef.current.clear();
                         setSelectedClassroomId(null);
                         setStudentCodeInput(code);
-                        fetchStudentData(code);
+                        if (verifyNameInput.trim().length >= 2) {
+                          fetchStudentData(code, undefined, verifyNameInput);
+                        } else {
+                          setError(null);
+                          verifyNameRef.current?.focus();
+                        }
                       }}
                       className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 text-xs font-mono text-slate-700 hover:text-indigo-600 transition-colors shadow-xs"
                     >

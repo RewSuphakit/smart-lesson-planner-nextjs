@@ -42,6 +42,13 @@ export const BulkCreateStudentSchema = z.object({
   students: z.array(CreateStudentSchema).min(1, 'At least one student is required'),
 });
 
+export const BulkUpdateStudentMetaSchema = z.object({
+  student_ids: z.array(z.coerce.number().int().positive()).min(1, 'At least one student is required'),
+  classroom_id: z.union([z.number().int().positive(), z.null()]).optional(),
+  grade_level: z.string().trim().max(100, 'Grade level is too long').nullable().optional(),
+  branch: z.string().trim().max(255, 'Branch is too long').nullable().optional(),
+});
+
 export const UpdateStudentExamScoresSchema = z.object({
   scores: z.array(
     z.object({

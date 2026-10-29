@@ -41,19 +41,34 @@ export function verifyToken(token: string): JwtPayload {
   return jwt.verify(token, getJwtSecret()) as JwtPayload;
 }
 
-export function generatePortalSession(studentCode: string): string {
+export interface PortalSessionPayload {
+  studentCode: string;
+  studentIds?: number[];
+}
+
+export function generatePortalSession(studentCode: string, studentIds?: number[]): string {
   return jwt.sign(
-    { studentCode, type: 'portal_session' },
+    { studentCode, studentIds, type: 'portal_session' },
     getJwtSecret(),
     { expiresIn: '1h' }
   );
 }
 
-export function verifyPortalSession(token: string): { studentCode: string } | null {
+export function verifyPortalSession(token: string): PortalSessionPayload | null {
   try {
-    const payload = jwt.verify(token, getJwtSecret()) as { studentCode?: string; type?: string };
+    const payload = jwt.verify(token, getJwtSecret()) as {
+      studentCode?: string;
+      studentIds?: unknown;
+      type?: string;
+    };
     if (payload?.type === 'portal_session' && payload.studentCode) {
-      return { studentCode: payload.studentCode };
+      const validIds = Array.isArray(payload.studentIds)
+        ? payload.studentIds.filter((n): n is number => typeof n === 'number' && Number.isInteger(n) && n > 0)
+        : undefined;
+      return {
+        studentCode: payload.studentCode,
+        studentIds: validIds && validIds.length > 0 ? validIds : undefined,
+      };
     }
     return null;
   } catch {

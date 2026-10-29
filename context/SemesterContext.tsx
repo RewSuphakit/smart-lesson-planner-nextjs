@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo, ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
@@ -48,12 +48,29 @@ const SEMESTER_SCOPED_QUERY_PREFIXES = new Set([
   'affective-students',
 ]);
 
-export function SemesterProvider({ children }: { children: ReactNode }) {
+export function SemesterProvider({
+  children,
+  initialSemesters,
+}: {
+  children: ReactNode;
+  initialSemesters?: Semester[];
+}) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [semesters, setSemesters] = useState<Semester[]>([]);
-  const [activeSemester, setActiveSemester] = useState<Semester | null>(null);
-  const [loading, setLoading] = useState(true);
+  const hasInitialSemesters = Boolean(user && initialSemesters !== undefined);
+  const hydratedForUserIdRef = useRef<number | null>(
+    hasInitialSemesters && user ? user.id : null
+  );
+  const [semesters, setSemesters] = useState<Semester[]>(() =>
+    hasInitialSemesters && initialSemesters ? initialSemesters : []
+  );
+  const [activeSemester, setActiveSemester] = useState<Semester | null>(() => {
+    if (!hasInitialSemesters || !initialSemesters || initialSemesters.length === 0) {
+      return null;
+    }
+    return initialSemesters.find((s) => s.is_active) || initialSemesters[0];
+  });
+  const [loading, setLoading] = useState<boolean>(() => Boolean(user && !hasInitialSemesters));
 
   // Batch-invalidate all semester-scoped React Query caches in one pass.
   // Only active (mounted) queries are refetched immediately; inactive ones are marked stale
@@ -90,8 +107,18 @@ export function SemesterProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   useEffect(() => {
+    if (!user) {
+      hydratedForUserIdRef.current = null;
+      setSemesters([]);
+      setActiveSemester(null);
+      setLoading(false);
+      return;
+    }
+    if (hydratedForUserIdRef.current === user.id) {
+      return;
+    }
     refreshSemesters();
-  }, [refreshSemesters]);
+  }, [user, refreshSemesters]);
 
   // Switch active semester
   const switchSemester = useCallback(async (id: number): Promise<boolean> => {
