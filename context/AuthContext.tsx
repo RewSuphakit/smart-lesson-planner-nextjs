@@ -19,7 +19,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string, rememberMe?: boolean, turnstileToken?: string) => Promise<{ token: string; user: User }>;
-  register: (name: string, email: string, password: string, role?: string) => Promise<{ message: string; email: string; requireVerification?: boolean; token?: string; user?: User }>;
+  register: (name: string, email: string, password: string, turnstileToken?: string) => Promise<{ message: string; email: string; requireVerification?: boolean; token?: string; user?: User }>;
   verifyEmail: (email: string, code: string) => Promise<{ token: string; user: User }>;
   resendCode: (email: string) => Promise<{ message: string }>;
   googleLogin: (credential: string) => Promise<{ token: string; user: User }>;
@@ -138,8 +138,8 @@ export function AuthProvider({
     return data;
   }, [notifyTabs]);
 
-  const register = useCallback(async (name: string, email: string, password: string, role?: string) => {
-    const { data } = await api.post('/auth/register', { name, email, password, role });
+  const register = useCallback(async (name: string, email: string, password: string, turnstileToken?: string) => {
+    const { data } = await api.post('/auth/register', { name, email, password, turnstileToken });
     if (data.user) {
       setUser(data.user);
       notifyTabs('LOGIN');

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useImperativeHandle, forwardRef, useCallback } from 'react';
+import { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 
 declare global {
   interface Window {
@@ -44,45 +44,71 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(
     const containerRef = useRef<HTMLDivElement>(null);
     const widgetIdRef = useRef<string | null>(null);
 
+    // Keep latest callbacks in refs so parent re-renders never destroy/re-mount the widget
+    const onSuccessRef = useRef(onSuccess);
+    const onErrorRef = useRef(onError);
+    const onExpireRef = useRef(onExpire);
+
+    useEffect(() => {
+      onSuccessRef.current = onSuccess;
+      onErrorRef.current = onError;
+      onExpireRef.current = onExpire;
+    }, [onSuccess, onError, onExpire]);
+
     const siteKey =
       process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || PROJECT_TURNSTILE_SITE_KEY;
 
-    const renderWidget = useCallback(() => {
-      if (!window.turnstile || !containerRef.current || widgetIdRef.current) return;
-      if (!siteKey) return;
-
-      try {
-        const id = window.turnstile.render(containerRef.current, {
-          sitekey: siteKey,
-          action,
-          theme,
-          size: 'normal',
-          callback: (token: string) => {
-            onSuccess(token);
-          },
-          'error-callback': (err?: string) => {
-            onError?.(err);
-          },
-          'expired-callback': () => {
-            onExpire?.();
-          },
-        });
-        widgetIdRef.current = id;
-      } catch (err) {
-        console.error('[Turnstile render error]:', err);
-      }
-    }, [siteKey, action, theme, onSuccess, onError, onExpire]);
-
     useImperativeHandle(ref, () => ({
       reset: () => {
-        if (widgetIdRef.current && window.turnstile) {
-          window.turnstile.reset(widgetIdRef.current);
+        if (widgetIdRef.current !== null && window.turnstile) {
+          try {
+            window.turnstile.reset(widgetIdRef.current);
+          } catch {
+            // Ignore reset errors if widget is not ready
+          }
         }
       },
     }));
 
     useEffect(() => {
       if (!siteKey) return;
+
+      let cancelled = false;
+      let intervalId: ReturnType<typeof setInterval> | null = null;
+
+      const mountWidget = () => {
+        if (cancelled || !window.turnstile || !containerRef.current || widgetIdRef.current !== null) {
+          return;
+        }
+
+        try {
+          containerRef.current.innerHTML = '';
+          const id = window.turnstile.render(containerRef.current, {
+            sitekey: siteKey,
+            action,
+            theme,
+            size: 'normal',
+            callback: (token: string) => {
+              if (!cancelled) {
+                onSuccessRef.current(token);
+              }
+            },
+            'error-callback': (err?: string) => {
+              if (!cancelled) {
+                onErrorRef.current?.(err);
+              }
+            },
+            'expired-callback': () => {
+              if (!cancelled) {
+                onExpireRef.current?.();
+              }
+            },
+          });
+          widgetIdRef.current = id;
+        } catch (err) {
+          console.error('[Turnstile render error]:', err);
+        }
+      };
 
       const scriptId = 'cf-turnstile-script';
       let script = document.getElementById(scriptId) as HTMLScriptElement | null;
@@ -93,24 +119,33 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(
         script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
         script.async = true;
         script.defer = true;
-        script.onload = () => {
-          renderWidget();
-        };
+        script.addEventListener('load', mountWidget);
         document.head.appendChild(script);
       } else if (window.turnstile) {
-        renderWidget();
+        mountWidget();
       } else {
-        const interval = setInterval(() => {
+        script.addEventListener('load', mountWidget);
+        intervalId = setInterval(() => {
           if (window.turnstile) {
-            clearInterval(interval);
-            renderWidget();
+            if (intervalId) {
+              clearInterval(intervalId);
+              intervalId = null;
+            }
+            mountWidget();
           }
         }, 100);
-        return () => clearInterval(interval);
       }
 
       return () => {
-        if (widgetIdRef.current && window.turnstile) {
+        cancelled = true;
+        if (script) {
+          script.removeEventListener('load', mountWidget);
+        }
+        if (intervalId) {
+          clearInterval(intervalId);
+          intervalId = null;
+        }
+        if (widgetIdRef.current !== null && window.turnstile) {
           try {
             window.turnstile.remove(widgetIdRef.current);
           } catch {
@@ -119,7 +154,7 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(
           widgetIdRef.current = null;
         }
       };
-    }, [siteKey, renderWidget]);
+    }, [siteKey, action, theme]);
 
     if (!siteKey) {
       return null;

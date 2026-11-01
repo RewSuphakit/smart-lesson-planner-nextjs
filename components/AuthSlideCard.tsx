@@ -48,6 +48,8 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
   const [regLoading, setRegLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [regTurnstileToken, setRegTurnstileToken] = useState<string | null>(null);
+  const regTurnstileRef = useRef<TurnstileRef>(null);
 
   // Load remembered email on mount
   useEffect(() => {
@@ -104,6 +106,8 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
   // Switch mode handler with smooth URL update
   const handleSwitchMode = (newMode: 'login' | 'register') => {
     if (mode === newMode) return;
+    setTurnstileToken(null);
+    setRegTurnstileToken(null);
     setMode(newMode);
     if (typeof window !== 'undefined') {
       window.history.pushState(null, '', newMode === 'login' ? '/login' : '/register');
@@ -160,7 +164,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
     }
     setRegLoading(true);
     try {
-      const res = (await register(regName, regEmail, regPassword)) as {
+      const res = (await register(regName, regEmail, regPassword, regTurnstileToken || undefined)) as {
         requireVerification?: boolean;
         message?: string;
         devCode?: string;
@@ -177,6 +181,8 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
         router.push('/');
       }
     } catch (error: unknown) {
+      regTurnstileRef.current?.reset();
+      setRegTurnstileToken(null);
       const err = error as { response?: { data?: { message?: string } } };
       toast.error(err.response?.data?.message || 'สมัครสมาชิกไม่สำเร็จ');
     } finally {
@@ -230,7 +236,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
   return (
     <div className="w-full max-w-4xl mx-auto">
       {/* ─── Main Card Container ─── */}
-      <div className="relative bg-white/95 backdrop-blur-2xl border border-slate-200/80 shadow-2xl shadow-indigo-950/5 rounded-3xl overflow-hidden min-h-[580px] flex flex-col md:flex-row transition-all duration-500">
+      <div className="relative bg-white/95 backdrop-blur-2xl border border-slate-200/80 shadow-2xl shadow-indigo-950/5 rounded-3xl overflow-hidden min-h-[630px] flex flex-col md:flex-row transition-all duration-500">
 
         {/* ─── Mobile Segmented Control Tab (Visible only on < md) ─── */}
         <div className="md:hidden p-4 pb-0 z-30">
@@ -353,13 +359,15 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
                 </div>
 
                 {/* Cloudflare Turnstile Verification */}
-                <Turnstile
-                  ref={turnstileRef}
-                  action="login"
-                  onSuccess={(token) => setTurnstileToken(token)}
-                  onError={() => setTurnstileToken(null)}
-                  onExpire={() => setTurnstileToken(null)}
-                />
+                {!isRegisterMode && (
+                  <Turnstile
+                    ref={turnstileRef}
+                    action="login"
+                    onSuccess={setTurnstileToken}
+                    onError={() => setTurnstileToken(null)}
+                    onExpire={() => setTurnstileToken(null)}
+                  />
+                )}
 
                 {/* Submit Button */}
                 <button
@@ -537,6 +545,17 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
                         <div className={`flex-1 rounded-full transition-colors ${passwordLevel >= 2 ? (passwordLevel === 2 ? 'bg-amber-400' : 'bg-emerald-500') : 'bg-slate-200'}`} />
                         <div className={`flex-1 rounded-full transition-colors ${passwordLevel >= 3 ? 'bg-emerald-500' : 'bg-slate-200'}`} />
                       </div>
+                    )}
+
+                    {/* Cloudflare Turnstile Verification */}
+                    {isRegisterMode && (
+                      <Turnstile
+                        ref={regTurnstileRef}
+                        action="register"
+                        onSuccess={setRegTurnstileToken}
+                        onError={() => setRegTurnstileToken(null)}
+                        onExpire={() => setRegTurnstileToken(null)}
+                      />
                     )}
 
                     {/* Submit Button */}
