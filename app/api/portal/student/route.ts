@@ -132,6 +132,7 @@ export async function GET(request: NextRequest) {
           description: s.classroom!.description,
           teacher_name: s.classroom!.user.name,
           grade_level: s.gradeLevel,
+          is_portal_enabled: s.classroom!.isPortalEnabled,
         })),
       });
 
@@ -152,13 +153,67 @@ export async function GET(request: NextRequest) {
     let targetStudent = validClassrooms[0];
     if (classroomIdParam) {
       const parsedId = Number(classroomIdParam);
-      const found = validClassrooms.find((s) => s.classroom!.id === parsedId);
-      if (found) {
-        targetStudent = found;
+      if (!Number.isInteger(parsedId) || parsedId <= 0) {
+        return NextResponse.json(
+          { message: 'รหัสห้องเรียนไม่ถูกต้อง' },
+          { status: 400 }
+        );
       }
+      const found = validClassrooms.find((s) => s.classroom!.id === parsedId);
+      if (!found) {
+        return NextResponse.json(
+          { message: 'ไม่พบรายวิชานี้ในข้อมูลของนักเรียน' },
+          { status: 404 }
+        );
+      }
+      targetStudent = found;
     }
 
     const classroom = targetStudent.classroom!;
+
+    // If subject teacher has disabled Student Portal for this classroom, return locked status without querying/exposing scores or attendance
+    if (!classroom.isPortalEnabled) {
+      const disabledResponse = NextResponse.json({
+        status: 'portal_disabled',
+        student: {
+          id: targetStudent.id,
+          name: targetStudent.name,
+          student_code: targetStudent.studentCode,
+          grade_level: targetStudent.gradeLevel,
+          avatar: toLightweightAvatarUrl(targetStudent),
+        },
+        classroom: {
+          id: classroom.id,
+          name: classroom.name,
+          description: classroom.description,
+          teacher_name: classroom.user.name,
+          curriculum_type: classroom.curriculumType,
+          is_portal_enabled: false,
+        },
+        all_classrooms: validClassrooms.map((s) => ({
+          student_id: s.id,
+          classroom_id: s.classroom!.id,
+          classroom_name: s.classroom!.name,
+          description: s.classroom!.description,
+          teacher_name: s.classroom!.user.name,
+          grade_level: s.gradeLevel,
+          is_portal_enabled: s.classroom!.isPortalEnabled,
+        })),
+      });
+
+      disabledResponse.cookies.set({
+        name: 'portal_session',
+        value: generatePortalSession(code!, verifiedStudentIds),
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 3600,
+      });
+
+      return disabledResponse;
+    }
+
     const numericClassroomId = classroom.id;
     const studentId = targetStudent.id;
 
@@ -355,6 +410,7 @@ export async function GET(request: NextRequest) {
         curriculum_type: classroom.curriculumType,
         total_weeks: targetWeeks,
         total_classes: totalClasses,
+        is_portal_enabled: true,
       },
       attendance_summary: {
         present_count: presentCount,
@@ -411,7 +467,10 @@ export async function GET(request: NextRequest) {
         student_id: s.id,
         classroom_id: s.classroom!.id,
         classroom_name: s.classroom!.name,
+        description: s.classroom!.description,
         teacher_name: s.classroom!.user.name,
+        grade_level: s.gradeLevel,
+        is_portal_enabled: s.classroom!.isPortalEnabled,
       })),
     });
 
@@ -461,7 +520,13 @@ async function handleAvatarUpdate(request: NextRequest) {
 
     const students = await prisma.student.findMany({
       where: { studentCode },
-      select: { id: true, userId: true },
+      select: {
+        id: true,
+        userId: true,
+        classroom: {
+          select: { isPortalEnabled: true },
+        },
+      },
     });
 
     if (students.length === 0) {
@@ -476,7 +541,8 @@ async function handleAvatarUpdate(request: NextRequest) {
     const verifiedSession = portalSessionCookie ? verifyPortalSession(portalSessionCookie) : null;
     const authUser = getAuthUser(request);
 
-    let authorizedStudents: Array<{ id: number; userId: number }> = [];
+    let authorizedStudents: typeof students = [];
+    let isTeacherAuthorized = false;
     if (
       verifiedSession &&
       verifiedSession.studentCode.trim().toLowerCase() === studentCode.toLowerCase() &&
@@ -487,11 +553,23 @@ async function handleAvatarUpdate(request: NextRequest) {
       authorizedStudents = students.filter((s) => allowedSet.has(s.id));
     } else if (authUser) {
       authorizedStudents = students.filter((s) => s.userId === authUser.id);
+      isTeacherAuthorized = authorizedStudents.length > 0;
     }
 
     if (authorizedStudents.length === 0) {
       return NextResponse.json(
         { message: 'ไม่ได้รับอนุญาตให้แก้ไขข้อมูลนักเรียน กรุณาเปิดดูข้อมูลผ่านพอร์ทัลก่อนทำรายการ' },
+        { status: 403 }
+      );
+    }
+
+    // Block student self-avatar updates if every single enrolled classroom currently has Portal disabled
+    if (
+      !isTeacherAuthorized &&
+      !authorizedStudents.some((s) => s.classroom?.isPortalEnabled === true)
+    ) {
+      return NextResponse.json(
+        { message: 'ครูผู้สอนปิดการเข้าดูชั่วคราว ไม่สามารถแก้ไขรูปโปรไฟล์ได้ในขณะนี้' },
         { status: 403 }
       );
     }

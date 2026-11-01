@@ -125,6 +125,7 @@ export async function POST(
             finalMaxScore: sourceClassroom.finalMaxScore,
             curriculumType: sourceClassroom.curriculumType,
             totalWeeks: sourceClassroom.totalWeeks,
+            isPortalEnabled: sourceClassroom.isPortalEnabled,
             // Note: semesterStartDate intentionally NOT copied — use target semester dates
           },
         });

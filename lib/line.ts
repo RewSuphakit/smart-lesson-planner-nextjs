@@ -322,14 +322,16 @@ export function buildScoreFlexMessage(data: {
  */
 export function buildClassroomSelectionFlex(
   studentName: string,
-  classrooms: { classroomId: number; classroomName: string; teacherName: string }[]
+  classrooms: { classroomId: number; classroomName: string; teacherName: string; isPortalEnabled?: boolean }[]
 ): Record<string, unknown> {
   const items = classrooms.map((c) => {
+    const isLocked = c.isPortalEnabled === false;
+    const prefix = isLocked ? '🔒 ' : '';
     const teacherShort = c.teacherName ? ` (${c.teacherName})` : '';
-    const fullTitle = `${c.classroomName}${teacherShort}`;
+    const fullTitle = `${prefix}${c.classroomName}${teacherShort}`;
     const buttonLabel = fullTitle.length > 20 ? fullTitle.substring(0, 17) + '...' : fullTitle;
 
-    return {
+    const button: Record<string, unknown> = {
       type: 'button',
       action: {
         type: 'postback',
@@ -337,20 +339,30 @@ export function buildClassroomSelectionFlex(
         data: `action=select_classroom&classroom_id=${c.classroomId}`,
         displayText: `เลือก ${c.classroomName}`,
       },
-      style: 'primary',
-      color: '#4a6cf7',
+      style: isLocked ? 'secondary' : 'primary',
       margin: 'sm',
       height: 'sm',
     };
+
+    if (!isLocked) {
+      button.color = '#4a6cf7';
+    }
+
+    return button;
   });
 
-  const classroomList = classrooms.map((c, idx) => ({
-    type: 'text',
-    text: `${idx + 1}. ${c.classroomName}${c.teacherName ? ` (ผู้สอน: ${c.teacherName})` : ''}`,
-    size: 'xs',
-    color: '#555555',
-    wrap: true,
-  }));
+  const classroomList = classrooms.map((c, idx) => {
+    const isLocked = c.isPortalEnabled === false;
+    const lockTag = isLocked ? ' — ปิดการเข้าดูชั่วคราว' : '';
+    const lockIcon = isLocked ? '🔒 ' : '';
+    return {
+      type: 'text',
+      text: `${idx + 1}. ${lockIcon}${c.classroomName}${c.teacherName ? ` (ผู้สอน: ${c.teacherName})` : ''}${lockTag}`,
+      size: 'xs',
+      color: isLocked ? '#94a3b8' : '#555555',
+      wrap: true,
+    };
+  });
 
   const bubble: FlexBubble = {
     type: 'bubble',

@@ -117,6 +117,7 @@ model Classroom {
   curriculumType       CurriculumType @default(pvch) @map("curriculum_type")
   totalWeeks           Int            @default(18) @map("total_weeks")
   semesterStartDate    DateTime?      @map("semester_start_date") @db.Date
+  isPortalEnabled      Boolean        @default(true) @map("is_portal_enabled")
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
 

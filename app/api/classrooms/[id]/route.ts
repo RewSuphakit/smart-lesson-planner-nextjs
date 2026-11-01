@@ -75,6 +75,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       total_weeks: 'totalWeeks',
       semester_start_date: 'semesterStartDate',
       semester_id: 'semesterId',
+      is_portal_enabled: 'isPortalEnabled',
     };
 
     if (body.semester_id !== undefined && body.semester_id !== null) {

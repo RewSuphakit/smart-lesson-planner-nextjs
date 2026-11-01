@@ -22,6 +22,7 @@ import {
   School,
   Camera,
   Trash2,
+  Lock,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import UserAvatar from '@/components/UserAvatar';
@@ -43,6 +44,7 @@ interface ClassroomInfo {
   curriculum_type: string;
   total_weeks: number;
   total_classes: number;
+  is_portal_enabled?: boolean;
 }
 
 interface AttendanceSummary {
@@ -116,10 +118,11 @@ interface ClassroomOption {
   description?: string;
   teacher_name: string;
   grade_level?: string;
+  is_portal_enabled?: boolean;
 }
 
 interface PortalData {
-  status: 'success' | 'multiple_classrooms';
+  status: 'success' | 'multiple_classrooms' | 'portal_disabled';
   student: StudentInfo;
   classroom?: ClassroomInfo;
   attendance_summary?: AttendanceSummary;
@@ -207,7 +210,10 @@ export default function StudentPortal() {
         saveRecentCode(trimmed);
         if (json.classroom?.id) {
           setSelectedClassroomId(json.classroom.id);
-          classroomCacheRef.current.set(json.classroom.id, json);
+          // Never cache locked classrooms so a re-opened subject is picked up immediately
+          if (json.status === 'success') {
+            classroomCacheRef.current.set(json.classroom.id, json);
+          }
         }
       }
     } catch {
@@ -350,6 +356,16 @@ export default function StudentPortal() {
     return true;
   });
 
+  // Avatar editing is only allowed while at least one of the student's classrooms is open
+  const portalClassroomList = data?.all_classrooms ?? data?.classrooms ?? [];
+  const canEditAvatar = data
+    ? data.status === 'success' ||
+      portalClassroomList.some((c) => c.is_portal_enabled !== false)
+    : false;
+  const hasOtherOpenClassroom = (data?.all_classrooms ?? []).some(
+    (c) => c.is_portal_enabled !== false && c.classroom_id !== data?.classroom?.id
+  );
+
   return (
     <div className="min-h-screen bg-slate-50/70 text-slate-800 pb-16">
       {/* ─── Top Brand Header ─── */}
@@ -373,7 +389,7 @@ export default function StudentPortal() {
           </div>
 
           <div className="flex items-center gap-2">
-            {data && (
+            {data && data.status === 'success' && (
               <button
                 onClick={() => window.print()}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
@@ -507,6 +523,7 @@ export default function StudentPortal() {
                     size="lg"
                     className="rounded-2xl border-2 border-indigo-200/80 shadow-md transition-all duration-200 group-hover:scale-105"
                   />
+                  {canEditAvatar && (
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
@@ -520,6 +537,7 @@ export default function StudentPortal() {
                       <Camera className="w-3.5 h-3.5" />
                     )}
                   </button>
+                  )}
                 </div>
 
                 <div>
@@ -548,6 +566,7 @@ export default function StudentPortal() {
                   )}
 
                   {/* Quick Profile Photo Actions */}
+                  {canEditAvatar && (
                   <div className="flex items-center gap-2 mt-2">
                     <button
                       type="button"
@@ -571,6 +590,7 @@ export default function StudentPortal() {
                       </button>
                     )}
                   </div>
+                  )}
                 </div>
               </div>
 
@@ -593,6 +613,7 @@ export default function StudentPortal() {
                   >
                     {data.all_classrooms!.map((c) => (
                       <option key={c.classroom_id} value={c.classroom_id}>
+                        {c.is_portal_enabled === false ? '🔒 ' : ''}
                         {c.classroom_name}
                       </option>
                     ))}
@@ -620,29 +641,87 @@ export default function StudentPortal() {
                   กรุณาคลิกเลือกวิชาที่ต้องการดูผลการเรียน
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {data.classrooms.map((c) => (
-                    <button
-                      key={c.classroom_id}
-                      onClick={() => handleSelectClassroom(c.classroom_id)}
-                      className="p-4 rounded-xl border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/40 text-left transition-all group flex items-center justify-between shadow-xs"
-                    >
-                      <div>
-                        <p className="text-sm font-semibold text-slate-800 group-hover:text-indigo-600">
-                          {c.classroom_name}
-                        </p>
-                        <p className="text-xs text-slate-500 mt-1">
-                          ครูผู้สอน: {c.teacher_name}
-                        </p>
-                        {c.grade_level && (
-                          <span className="inline-block mt-2 text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-600">
-                            {c.grade_level}
-                          </span>
+                  {data.classrooms.map((c) => {
+                    const isLocked = c.is_portal_enabled === false;
+                    return (
+                      <button
+                        key={c.classroom_id}
+                        onClick={() => handleSelectClassroom(c.classroom_id)}
+                        className={`p-4 rounded-xl border text-left transition-all group flex items-center justify-between shadow-xs ${
+                          isLocked
+                            ? 'border-slate-200 bg-slate-50 hover:border-slate-300'
+                            : 'border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/40'
+                        }`}
+                      >
+                        <div>
+                          <p
+                            className={`text-sm font-semibold ${
+                              isLocked ? 'text-slate-500' : 'text-slate-800 group-hover:text-indigo-600'
+                            }`}
+                          >
+                            {c.classroom_name}
+                          </p>
+                          <p className="text-xs text-slate-500 mt-1">
+                            ครูผู้สอน: {c.teacher_name}
+                          </p>
+                          <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                            {c.grade_level && (
+                              <span className="inline-block text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-600">
+                                {c.grade_level}
+                              </span>
+                            )}
+                            {isLocked && (
+                              <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded bg-slate-200 text-slate-600 font-semibold">
+                                <Lock className="w-3 h-3" />
+                                ครูผู้สอนปิดการเข้าดูชั่วคราว
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {isLocked ? (
+                          <Lock className="w-5 h-5 text-slate-400 shrink-0" />
+                        ) : (
+                          <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all" />
                         )}
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all" />
-                    </button>
-                  ))}
+                      </button>
+                    );
+                  })}
                 </div>
+              </div>
+            )}
+
+            {/* If the subject teacher has closed this classroom's Student Portal */}
+            {data.status === 'portal_disabled' && (
+              <div className="bg-white border border-slate-200 rounded-2xl p-8 sm:p-10 shadow-sm text-center animate-fade-in-up">
+                <div className="w-16 h-16 mx-auto rounded-3xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 mb-4">
+                  <Lock className="w-8 h-8" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-800">
+                  ครูผู้สอนปิดการเข้าดูชั่วคราว
+                </h3>
+                <p className="text-sm text-slate-500 mt-2 max-w-md mx-auto">
+                  รายวิชา <span className="font-semibold text-slate-700">{data.classroom?.name}</span>{' '}
+                  ยังไม่เปิดให้ตรวจสอบเวลาเรียนและคะแนนในขณะนี้
+                  หากต้องการทราบข้อมูล กรุณาติดต่อครูผู้สอน
+                  {data.classroom?.teacher_name ? ` (${data.classroom.teacher_name})` : ''}
+                </p>
+                {hasOtherOpenClassroom && (
+                  <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+                    <span className="text-xs text-slate-500 w-full">ดูข้อมูลรายวิชาอื่นที่เปิดอยู่:</span>
+                    {(data.all_classrooms ?? [])
+                      .filter((c) => c.is_portal_enabled !== false)
+                      .map((c) => (
+                        <button
+                          key={c.classroom_id}
+                          onClick={() => handleSelectClassroom(c.classroom_id)}
+                          className="px-3.5 py-2 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-xs font-semibold text-indigo-700 transition-colors inline-flex items-center gap-1.5"
+                        >
+                          <span>{c.classroom_name}</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                      ))}
+                  </div>
+                )}
               </div>
             )}
 

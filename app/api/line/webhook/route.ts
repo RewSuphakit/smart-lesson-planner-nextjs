@@ -299,20 +299,32 @@ async function handlePostback(
       return;
     }
 
-    await prisma.lineBinding.update({
-      where: { id: binding.id },
-      data: { classroomId },
-    });
-
     const classroom = await prisma.classroom.findUnique({
       where: { id: classroomId },
       select: {
         name: true,
+        isPortalEnabled: true,
         user: { select: { name: true } },
       },
     });
 
     const teacherInfo = classroom?.user?.name ? `\n👨‍🏫 ผู้สอน: ${classroom.user.name}` : '';
+
+    if (classroom && !classroom.isPortalEnabled) {
+      await replyMessage(event.replyToken!, [
+        textMessage(
+          `🔒 รายวิชา "${classroom.name}"${teacherInfo}\n` +
+          `ครูผู้สอนปิดการเข้าดูชั่วคราว ยังไม่สามารถตรวจสอบคะแนนหรือเวลาเรียนได้ในขณะนี้`
+        ),
+      ], accessToken);
+      return;
+    }
+
+    await prisma.lineBinding.update({
+      where: { id: binding.id },
+      data: { classroomId },
+    });
+
     await replyMessage(event.replyToken!, [
       textMessage(
         `✅ เลือกวิชา "${classroom?.name}" แล้ว${teacherInfo}\n\n` +
@@ -343,6 +355,7 @@ async function handleBind(
         select: {
           id: true,
           name: true,
+          isPortalEnabled: true,
           user: { select: { name: true } },
         },
       },
@@ -386,12 +399,16 @@ async function handleBind(
 
   if (students.length === 1) {
     const teacherName = students[0].classroom?.user?.name ? `\n👨‍🏫 ผู้สอน: ${students[0].classroom.user.name}` : '';
+    const isPortalOpen = students[0].classroom?.isPortalEnabled !== false;
+    const footerHint = isPortalOpen
+      ? `พิมพ์ "คะแนน" หรือ "เข้าเรียน" เพื่อดูข้อมูล`
+      : `🔒 หมายเหตุ: ขณะนี้ครูผู้สอนปิดการเข้าดูชั่วคราว คุณจะสามารถเช็คคะแนนและเวลาเรียนได้เมื่อครูเปิดระบบ`;
     await replyMessage(replyToken, [
       textMessage(
         `✅ ผูกบัญชีสำเร็จ!\n\n` +
         `👤 ${students[0].name}\n` +
         `📚 ${students[0].classroom?.name}${teacherName}\n\n` +
-        `พิมพ์ "คะแนน" หรือ "เข้าเรียน" เพื่อดูข้อมูล`
+        footerHint
       ),
     ], accessToken);
   } else {
@@ -402,6 +419,7 @@ async function handleBind(
         classroomId: s.classroom!.id,
         classroomName: s.classroom!.name,
         teacherName: s.classroom!.user?.name || '',
+        isPortalEnabled: s.classroom!.isPortalEnabled,
       }));
 
     await replyMessage(replyToken, [
@@ -472,6 +490,7 @@ async function handleSwitchClassroom(
         select: {
           id: true,
           name: true,
+          isPortalEnabled: true,
           user: { select: { name: true } },
         },
       },
@@ -479,6 +498,13 @@ async function handleSwitchClassroom(
   });
 
   if (students.length <= 1) {
+    const onlyClassroom = students[0]?.classroom;
+    if (onlyClassroom && !onlyClassroom.isPortalEnabled) {
+      await replyMessage(replyToken, [
+        textMessage(`🔒 คุณมีเพียงวิชาเดียวคือ "${onlyClassroom.name}" และขณะนี้ครูผู้สอนปิดการเข้าดูชั่วคราว`),
+      ], accessToken);
+      return;
+    }
     await replyMessage(replyToken, [
       textMessage('ℹ️ มีเพียงวิชาเดียว ไม่สามารถเปลี่ยนได้'),
     ], accessToken);
@@ -492,6 +518,7 @@ async function handleSwitchClassroom(
       classroomId: s.classroom!.id,
       classroomName: s.classroom!.name,
       teacherName: s.classroom!.user?.name || '',
+      isPortalEnabled: s.classroom!.isPortalEnabled,
     }));
 
   await replyMessage(replyToken, [
@@ -963,6 +990,19 @@ async function resolveStudentContext(lineUserId: string, _teacherUserId: number)
   if (binding.classroomId) {
     const matched = students.find((s) => s.classroomId === binding.classroomId);
     if (matched && matched.classroom) {
+      if (!matched.classroom.isPortalEnabled) {
+        const hasOtherOpen = students.some(
+          (s) => s.classroomId !== matched.classroomId && s.classroom?.isPortalEnabled
+        );
+        return {
+          binding,
+          student: null,
+          classroom: null,
+          errorMsg:
+            `🔒 รายวิชา "${matched.classroom.name}"\nครูผู้สอนปิดการเข้าดูชั่วคราวในขณะนี้` +
+            (hasOtherOpen ? `\n\n💡 พิมพ์ "เปลี่ยนวิชา" เพื่อดูรายวิชาอื่นที่เปิดอยู่` : ''),
+        };
+      }
       return { binding, student: matched, classroom: matched.classroom, errorMsg: null };
     }
   }
@@ -974,6 +1014,14 @@ async function resolveStudentContext(lineUserId: string, _teacherUserId: number)
       where: { id: binding.id },
       data: { classroomId: students[0].classroomId },
     });
+    if (!students[0].classroom.isPortalEnabled) {
+      return {
+        binding,
+        student: null,
+        classroom: null,
+        errorMsg: `🔒 รายวิชา "${students[0].classroom.name}"\nครูผู้สอนปิดการเข้าดูชั่วคราวในขณะนี้`,
+      };
+    }
     return { binding, student: students[0], classroom: students[0].classroom, errorMsg: null };
   }
 

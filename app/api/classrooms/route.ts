@@ -87,6 +87,7 @@ export async function POST(request: NextRequest) {
       total_weeks,
       semester_start_date,
       semester_id,
+      is_portal_enabled,
     } = validation.data;
 
     // Resolve semester: explicit > active > null
@@ -126,6 +127,7 @@ export async function POST(request: NextRequest) {
         curriculumType: (curriculum_type as CurriculumType) || CurriculumType.pvch,
         totalWeeks: resolvedWeeks,
         semesterStartDate: semester_start_date ? new Date(semester_start_date) : null,
+        isPortalEnabled: is_portal_enabled ?? true,
       },
     });
 

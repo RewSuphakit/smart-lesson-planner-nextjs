@@ -109,6 +109,7 @@ export async function GET(request: NextRequest) {
       assignmentWeight: unknown; postTestWeight: unknown; affectiveWeight: unknown;
       midtermWeight: unknown; finalWeight: unknown; midtermMaxScore: unknown;
       finalMaxScore: unknown; lateToAbsentRatio: number; leaveToAbsentRatio: number;
+      isPortalEnabled?: boolean;
     }>;
 
     // Fetch scores in bulk (not N+1)
@@ -194,6 +195,7 @@ export async function GET(request: NextRequest) {
         final_max_score: c.finalMaxScore !== null && c.finalMaxScore !== undefined ? Number(c.finalMaxScore) : null,
         late_to_absent_ratio: c.lateToAbsentRatio,
         leave_to_absent_ratio: c.leaveToAbsentRatio,
+        is_portal_enabled: c.isPortalEnabled ?? true,
       })) : undefined,
       students: sections.has('students') ? students.map(s => {
         const cId = s.classroomId || s.classroom?.id;

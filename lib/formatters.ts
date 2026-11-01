@@ -25,6 +25,7 @@ export interface FormattedClassroom {
   current_week: number | null;
   semester_id: number | null;
   semester_name: string | null;
+  is_portal_enabled: boolean;
 }
 
 /**
@@ -86,6 +87,7 @@ export function formatClassroomResponse(
     current_week: currentWeek,
     semester_id: classroom.semesterId ?? null,
     semester_name: classroom.semester?.name ?? null,
+    is_portal_enabled: classroom.isPortalEnabled ?? true,
   };
 
   if (classroom._count?.students !== undefined) {

@@ -80,6 +80,7 @@ export const ClassroomSchema = z.object({
   total_weeks: z.number().int().min(1).max(52).optional().default(18),
   semester_start_date: z.string().nullable().optional(),
   semester_id: z.number().int().positive().nullable().optional(),
+  is_portal_enabled: z.boolean().optional().default(true),
 });
 
 export const UpdateClassroomSchema = z.object({
@@ -101,6 +102,7 @@ export const UpdateClassroomSchema = z.object({
   total_weeks: z.number().int().min(1).max(52).optional(),
   semester_start_date: z.string().nullable().optional(),
   semester_id: z.number().int().positive().nullable().optional(),
+  is_portal_enabled: z.boolean().optional(),
 });
 
 // ==================== Semester Schemas ====================

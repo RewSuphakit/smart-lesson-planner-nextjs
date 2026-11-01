@@ -7,7 +7,8 @@ import api from '@/services/api';
 import {
   Plus, Edit, Trash2, X, Users as UsersIcon, Loader2, Search,
   GraduationCap, Upload, CheckCircle, FileSpreadsheet,
-  Camera, Sparkles, Image as ImageIcon, GitBranch
+  Camera, Sparkles, Image as ImageIcon, GitBranch,
+  Download, FileText, Info
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import dynamic from 'next/dynamic';
@@ -77,6 +78,7 @@ export default function Students() {
   const [importClassroomId, setImportClassroomId] = useState('');
   const [isMatchingPhotos, setIsMatchingPhotos] = useState(false);
   const bulkPhotoInputRef = useRef<HTMLInputElement>(null);
+  const [exampleFormatTab, setExampleFormatTab] = useState<'split' | 'single'>('split');
 
   // ─── Query: ดึงข้อมูลนักเรียน ───
   const { data: students = [], isLoading: loadingStudents } = useQuery<Student[]>({
@@ -452,6 +454,80 @@ export default function Students() {
     deleteAllMutation.mutate(isFiltered ? filterClassroomId : undefined);
   };
 
+  // ─── Download Sample Excel (.xlsx) Template ───
+  const handleDownloadExcelTemplate = async () => {
+    try {
+      const XLSX = await import('xlsx');
+      const headers = ['รหัสนักเรียน', 'คำนำหน้า', 'ชื่อ', 'นามสกุล', 'ระดับชั้น/ห้อง', 'สาขาวิชา', 'อีเมล'];
+      const rows = [
+        ['67209010001', 'นาย', 'สมชาย', 'ใจดี', 'ปวช.1/1', 'เทคโนโลยีสารสนเทศ', 'somchai.jai@example.com'],
+        ['67209010002', 'นางสาว', 'สมหญิง', 'รักเรียน', 'ปวช.1/1', 'เทคโนโลยีสารสนเทศ', 'somying.rak@example.com'],
+        ['67209010003', 'นาย', 'กิตติศักดิ์', 'พากเพียร', 'ปวช.1/2', 'ช่างอิเล็กทรอนิกส์', 'kittisak.pak@example.com'],
+        ['67209010004', 'นางสาว', 'กมลวรรณ', 'สดใส', 'ปวช.1/2', 'ช่างอิเล็กทรอนิกส์', 'kamonwan.sod@example.com'],
+        ['66309010005', 'นาย', 'ธนากร', 'มั่นคง', 'ปวส.1/1', 'เทคโนโลยีธุรกิจดิจิทัล', 'thanakorn.man@example.com'],
+      ];
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+      ws['!cols'] = [
+        { wch: 16 }, // รหัสนักเรียน
+        { wch: 10 }, // คำนำหน้า
+        { wch: 18 }, // ชื่อ
+        { wch: 18 }, // นามสกุล
+        { wch: 16 }, // ระดับชั้น/ห้อง
+        { wch: 24 }, // สาขาวิชา
+        { wch: 28 }, // อีเมล
+      ];
+      XLSX.utils.book_append_sheet(wb, ws, 'รายชื่อนักเรียน');
+      XLSX.writeFile(wb, 'เทมเพลต_รายชื่อนักเรียน.xlsx');
+      toast.success('ดาวน์โหลดไฟล์ตัวอย่าง Excel สำเร็จ');
+    } catch (err) {
+      console.error('Download template error:', err);
+      toast.error('ดาวน์โหลดไฟล์ตัวอย่าง Excel ไม่สำเร็จ');
+    }
+  };
+
+  // ─── Download Sample CSV (.csv) Template ───
+  const handleDownloadCsvTemplate = () => {
+    try {
+      const headers = ['รหัสนักเรียน', 'คำนำหน้า', 'ชื่อ', 'นามสกุล', 'ระดับชั้น/ห้อง', 'สาขาวิชา', 'อีเมล'];
+      const rows = [
+        ['67209010001', 'นาย', 'สมชาย', 'ใจดี', 'ปวช.1/1', 'เทคโนโลยีสารสนเทศ', 'somchai.jai@example.com'],
+        ['67209010002', 'นางสาว', 'สมหญิง', 'รักเรียน', 'ปวช.1/1', 'เทคโนโลยีสารสนเทศ', 'somying.rak@example.com'],
+        ['67209010003', 'นาย', 'กิตติศักดิ์', 'พากเพียร', 'ปวช.1/2', 'ช่างอิเล็กทรอนิกส์', 'kittisak.pak@example.com'],
+        ['67209010004', 'นางสาว', 'กมลวรรณ', 'สดใส', 'ปวช.1/2', 'ช่างอิเล็กทรอนิกส์', 'kamonwan.sod@example.com'],
+        ['66309010005', 'นาย', 'ธนากร', 'มั่นคง', 'ปวส.1/1', 'เทคโนโลยีธุรกิจดิจิทัล', 'thanakorn.man@example.com'],
+      ];
+
+      const escapeCsv = (val: string | number) => {
+        const str = String(val ?? '');
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+
+      const csvContent = '\uFEFF' + [
+        headers.map(escapeCsv).join(','),
+        ...rows.map(r => r.map(escapeCsv).join(','))
+      ].join('\r\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'เทมเพลต_รายชื่อนักเรียน.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('ดาวน์โหลดไฟล์ตัวอย่าง CSV สำเร็จ');
+    } catch (err) {
+      console.error('Download CSV template error:', err);
+      toast.error('ดาวน์โหลดไฟล์ตัวอย่าง CSV ไม่สำเร็จ');
+    }
+  };
+
   // --- Bulk Import ---
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -590,8 +666,12 @@ export default function Students() {
           >
             <FileSpreadsheet className="w-4 h-4" /> พรีวิว & ส่งออก Excel
           </button>
-          <button onClick={() => { setShowImportForm(true); setImportData([]); setImportClassroomId(''); }} className="btn bg-white hover:bg-indigo-100 text-slate-800 flex-1 sm:flex-none">
-            <Upload className="w-4 h-4" /> นำเข้าจาก Excel
+          <button
+            onClick={() => { setShowImportForm(true); setImportData([]); setImportClassroomId(''); }}
+            className="btn bg-white hover:bg-indigo-50 text-slate-800 border border-slate-200/80 flex-1 sm:flex-none flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all font-bold text-xs"
+            title="นำเข้ารายชื่อนักเรียนจากไฟล์ Excel / CSV และดาวน์โหลดเทมเพลตตัวอย่าง"
+          >
+            <Upload className="w-4 h-4 text-indigo-600" /> นำเข้าไฟล์ & ตัวอย่าง
           </button>
           <button onClick={() => { setForm(emptyForm); setEditing(null); setShowForm(true); }} className="btn btn-primary flex-1 sm:flex-none" id="add-student-btn">
             <Plus className="w-4 h-4" /> เพิ่มนักเรียน
@@ -868,7 +948,7 @@ export default function Students() {
             <p className="text-slate-500 text-sm font-medium">ยังไม่มีข้อมูลนักเรียน</p>
             <p className="text-slate-600 text-xs mt-1">เพิ่มนักเรียนเพื่อเริ่มบันทึกผลการเรียน</p>
           </div>
-        ) : paginatedStudents.map((student, i) => (
+        ) : paginatedStudents.map((student) => (
           <div
             key={student.id}
             className={`glass overflow-hidden transition-colors duration-200 ${selectedStudents.includes(student.id) ? 'border-indigo-500/50 bg-indigo-500/5' : ''}`}
@@ -1145,37 +1225,244 @@ export default function Students() {
       {/* Import Form Modal */}
       {showImportForm && createPortal(
         <div className="modal-overlay" onClick={() => setShowImportForm(false)}>
-          <div className="glass w-full max-w-3xl p-7 animate-fade-in-up max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-5">
+          <div className="glass w-full max-w-4xl p-6 sm:p-7 animate-fade-in-up max-h-[90vh] overflow-y-auto space-y-5" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-indigo-100/70 pb-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-lg border border-indigo-100">
-                  <Upload className="w-5 h-5 text-indigo-600" />
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm shrink-0">
+                  <Upload className="w-5 h-5" />
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-slate-800">นำเข้ารายชื่อและรูปภาพนักเรียน</h2>
-                  <p className="text-xs text-slate-500">รองรับไฟล์ Excel/CSV และคอลัมน์รูปภาพ หรือแนบไฟล์ภาพจับคู่อัตโนมัติ</p>
+                  <p className="text-xs text-slate-500">รองรับไฟล์ Excel (.xlsx, .xls) และ CSV พร้อมตัวอย่างรูปแบบไฟล์ที่ระบบตรวจจับได้ทันที</p>
                 </div>
               </div>
-              <button onClick={() => setShowImportForm(false)} className="p-2 hover:bg-indigo-50 rounded-xl"><X className="w-5 h-5 text-slate-500" /></button>
+              <button
+                onClick={() => setShowImportForm(false)}
+                className="p-2 hover:bg-indigo-50 rounded-xl text-slate-400 hover:text-slate-600 transition-colors"
+                aria-label="ปิดหน้าต่าง"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            <div className="space-y-4">
-              {/* Step 1: Select Excel/CSV File */}
-              <div className="border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-indigo-50/20 hover:bg-indigo-50/50 rounded-2xl p-6 text-center transition-colors cursor-pointer relative">
-                <input
-                  type="file"
-                  accept=".xlsx, .xls, .csv"
-                  onChange={handleFileUpload}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  id="import-file-input"
-                  aria-label="อัปโหลดไฟล์ Excel หรือ CSV"
-                />
-                <FileSpreadsheet className="w-8 h-8 text-indigo-500 mx-auto mb-2" />
-                <p className="text-slate-800 font-bold text-sm">คลิกเพื่อเลือกไฟล์ Excel / CSV หรือลากไฟล์มาวาง</p>
-                <p className="text-slate-500 text-xs mt-1">
-                  รองรับคอลัมน์: รหัสนักเรียน, ชื่อ-นามสกุล, ระดับชั้น/ห้อง (เช่น ปวช.1/1 หรือแยกคอลัมน์ ระดับชั้น + ห้อง/กลุ่ม), สาขา, อีเมล, รูปภาพ
-                </p>
+            {/* Template Download & Structure Example Section */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-indigo-50/70 via-blue-50/40 to-slate-50 border border-indigo-100/90 space-y-3.5 shadow-2xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <h3 className="text-sm font-bold text-indigo-950 flex items-center gap-2">
+                    <FileSpreadsheet className="w-4 h-4 text-indigo-600" />
+                    ตัวอย่างรูปแบบไฟล์ Excel / CSV ที่ระบบรองรับ
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    ดาวน์โหลดไฟล์เทมเพลตเพื่อนำไปกรอกข้อมูล หรือจัดรูปแบบคอลัมน์ตามตัวอย่างด้านล่าง
+                  </p>
+                </div>
+
+                {/* Template Download Buttons */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleDownloadExcelTemplate}
+                    className="btn bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 shadow-2xs transition-all hover:border-emerald-300"
+                    title="ดาวน์โหลดไฟล์ตัวอย่างรูปแบบ Excel (.xlsx)"
+                  >
+                    <Download className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>เทมเพลต Excel (.xlsx)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDownloadCsvTemplate}
+                    className="btn bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 shadow-2xs transition-all hover:border-slate-300"
+                    title="ดาวน์โหลดไฟล์ตัวอย่างรูปแบบ CSV (.csv)"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-slate-600" />
+                    <span>เทมเพลต CSV (.csv)</span>
+                  </button>
+                </div>
               </div>
+
+              {/* Format Tabs Switcher */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t border-indigo-100/60">
+                <span className="text-[11px] font-semibold text-slate-600">เลือกดูตัวอย่างคอลัมน์:</span>
+                <div className="inline-flex rounded-xl bg-slate-200/70 p-1 border border-slate-300/60 shadow-2xs">
+                  <button
+                    type="button"
+                    onClick={() => setExampleFormatTab('split')}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                      exampleFormatTab === 'split'
+                        ? 'bg-white text-indigo-700 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    แบบแยกคอลัมน์ (คำนำหน้า + ชื่อ + นามสกุล)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setExampleFormatTab('single')}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                      exampleFormatTab === 'single'
+                        ? 'bg-white text-indigo-700 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    แบบรวมคอลัมน์ (ชื่อ-นามสกุล)
+                  </button>
+                </div>
+              </div>
+
+              {/* Mockup Preview Table */}
+              <div className="overflow-x-auto rounded-xl border border-indigo-100/90 bg-white shadow-2xs">
+                <table className="w-full text-xs text-left border-collapse">
+                  <thead>
+                    <tr className="bg-indigo-50/80 text-indigo-950 font-bold border-b border-indigo-100">
+                      <th className="p-2 border-r border-indigo-100/80 font-mono w-28 text-center">รหัสนักเรียน</th>
+                      {exampleFormatTab === 'split' ? (
+                        <>
+                          <th className="p-2 border-r border-indigo-100/80 w-20 text-center">คำนำหน้า</th>
+                          <th className="p-2 border-r border-indigo-100/80 w-28">ชื่อ</th>
+                          <th className="p-2 border-r border-indigo-100/80 w-28">นามสกุล</th>
+                        </>
+                      ) : (
+                        <th className="p-2 border-r border-indigo-100/80 min-w-[150px]">ชื่อ-นามสกุล</th>
+                      )}
+                      <th className="p-2 border-r border-indigo-100/80 w-24 text-center">
+                        {exampleFormatTab === 'split' ? 'ระดับชั้น/ห้อง' : 'ระดับชั้น'}
+                      </th>
+                      {exampleFormatTab === 'single' && (
+                        <th className="p-2 border-r border-indigo-100/80 w-16 text-center">ห้อง</th>
+                      )}
+                      <th className="p-2 border-r border-indigo-100/80 min-w-[130px]">สาขาวิชา</th>
+                      <th className="p-2 text-slate-500 min-w-[140px]">อีเมล (ไม่บังคับ)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium">
+                    {exampleFormatTab === 'split' ? (
+                      <>
+                        <tr className="bg-white hover:bg-indigo-50/20">
+                          <td className="p-2 text-slate-700 border-r border-slate-100 font-mono text-center">67209010001</td>
+                          <td className="p-2 text-slate-600 border-r border-slate-100 text-center">นาย</td>
+                          <td className="p-2 text-slate-800 border-r border-slate-100 font-semibold">สมชาย</td>
+                          <td className="p-2 text-slate-800 border-r border-slate-100">ใจดี</td>
+                          <td className="p-2 text-slate-700 border-r border-slate-100 text-center font-mono">ปวช.1/1</td>
+                          <td className="p-2 text-slate-600 border-r border-slate-100">เทคโนโลยีสารสนเทศ</td>
+                          <td className="p-2 text-slate-500 font-mono text-[11px]">somchai@example.com</td>
+                        </tr>
+                        <tr className="bg-slate-50/40 hover:bg-indigo-50/20">
+                          <td className="p-2 text-slate-700 border-r border-slate-100 font-mono text-center">67209010002</td>
+                          <td className="p-2 text-slate-600 border-r border-slate-100 text-center">นางสาว</td>
+                          <td className="p-2 text-slate-800 border-r border-slate-100 font-semibold">สมหญิง</td>
+                          <td className="p-2 text-slate-800 border-r border-slate-100">รักเรียน</td>
+                          <td className="p-2 text-slate-700 border-r border-slate-100 text-center font-mono">ปวช.1/1</td>
+                          <td className="p-2 text-slate-600 border-r border-slate-100">เทคโนโลยีสารสนเทศ</td>
+                          <td className="p-2 text-slate-500 font-mono text-[11px]">somying@example.com</td>
+                        </tr>
+                        <tr className="bg-white hover:bg-indigo-50/20">
+                          <td className="p-2 text-slate-700 border-r border-slate-100 font-mono text-center">67209010003</td>
+                          <td className="p-2 text-slate-600 border-r border-slate-100 text-center">นาย</td>
+                          <td className="p-2 text-slate-800 border-r border-slate-100 font-semibold">กิตติศักดิ์</td>
+                          <td className="p-2 text-slate-800 border-r border-slate-100">พากเพียร</td>
+                          <td className="p-2 text-slate-700 border-r border-slate-100 text-center font-mono">ปวช.1/2</td>
+                          <td className="p-2 text-slate-600 border-r border-slate-100">ช่างอิเล็กทรอนิกส์</td>
+                          <td className="p-2 text-slate-500 font-mono text-[11px]">kittisak@example.com</td>
+                        </tr>
+                      </>
+                    ) : (
+                      <>
+                        <tr className="bg-white hover:bg-indigo-50/20">
+                          <td className="p-2 text-slate-700 border-r border-slate-100 font-mono text-center">67209010001</td>
+                          <td className="p-2 text-slate-800 border-r border-slate-100 font-semibold">นายสมชาย ใจดี</td>
+                          <td className="p-2 text-slate-700 border-r border-slate-100 text-center font-mono">ปวช.1</td>
+                          <td className="p-2 text-slate-700 border-r border-slate-100 text-center font-mono">1</td>
+                          <td className="p-2 text-slate-600 border-r border-slate-100">เทคโนโลยีสารสนเทศ</td>
+                          <td className="p-2 text-slate-500 font-mono text-[11px]">somchai@example.com</td>
+                        </tr>
+                        <tr className="bg-slate-50/40 hover:bg-indigo-50/20">
+                          <td className="p-2 text-slate-700 border-r border-slate-100 font-mono text-center">67209010002</td>
+                          <td className="p-2 text-slate-800 border-r border-slate-100 font-semibold">นางสาวสมหญิง รักเรียน</td>
+                          <td className="p-2 text-slate-700 border-r border-slate-100 text-center font-mono">ปวช.1</td>
+                          <td className="p-2 text-slate-700 border-r border-slate-100 text-center font-mono">1</td>
+                          <td className="p-2 text-slate-600 border-r border-slate-100">เทคโนโลยีสารสนเทศ</td>
+                          <td className="p-2 text-slate-500 font-mono text-[11px]">somying@example.com</td>
+                        </tr>
+                        <tr className="bg-white hover:bg-indigo-50/20">
+                          <td className="p-2 text-slate-700 border-r border-slate-100 font-mono text-center">67209010003</td>
+                          <td className="p-2 text-slate-800 border-r border-slate-100 font-semibold">นายกิตติศักดิ์ พากเพียร</td>
+                          <td className="p-2 text-slate-700 border-r border-slate-100 text-center font-mono">ปวช.1</td>
+                          <td className="p-2 text-slate-700 border-r border-slate-100 text-center font-mono">2</td>
+                          <td className="p-2 text-slate-600 border-r border-slate-100">ช่างอิเล็กทรอนิกส์</td>
+                          <td className="p-2 text-slate-500 font-mono text-[11px]">kittisak@example.com</td>
+                        </tr>
+                      </>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Supported column chips / tips */}
+              <div className="pt-1 space-y-1">
+                <p className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                  <Info className="w-3.5 h-3.5 text-indigo-600" />
+                  ชื่อหัวคอลัมน์ที่ระบบตรวจจับอัตโนมัติ:
+                </p>
+                <div className="flex flex-wrap gap-1.5 text-[10px]">
+                  <span className="px-2 py-0.5 rounded-md bg-white text-slate-700 border border-slate-200">
+                    <strong>รหัส:</strong> รหัสนักเรียน, รหัสนักศึกษา, student_code
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md bg-white text-slate-700 border border-slate-200">
+                    <strong>ชื่อ:</strong> ชื่อ-นามสกุล หรือแยก คำนำหน้า + ชื่อ + นามสกุล
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md bg-white text-slate-700 border border-slate-200">
+                    <strong>ระดับชั้น/ห้อง:</strong> ระดับชั้น/ห้อง (เช่น ปวช.1/1) หรือแยก ระดับชั้น + ห้อง/กลุ่ม
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md bg-white text-slate-700 border border-slate-200">
+                    <strong>สาขา:</strong> สาขาวิชา, สาขา, แผนกวิชา, แผนก
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md bg-white text-slate-700 border border-slate-200">
+                    <strong>รูปภาพ:</strong> URL ในคอลัมน์ รูปภาพ หรือเลือกไฟล์รูปด้านล่างเพื่อจับคู่อัตโนมัติ
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Step 1: Select / Drop Excel or CSV File */}
+            <div className="space-y-4">
+              {importData.length === 0 ? (
+                <div className="border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-indigo-50/20 hover:bg-indigo-50/50 rounded-2xl p-6 text-center transition-colors cursor-pointer relative">
+                  <input
+                    type="file"
+                    accept=".xlsx, .xls, .csv"
+                    onChange={handleFileUpload}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    id="import-file-input"
+                    aria-label="อัปโหลดไฟล์ Excel หรือ CSV"
+                  />
+                  <FileSpreadsheet className="w-8 h-8 text-indigo-500 mx-auto mb-2" />
+                  <p className="text-slate-800 font-bold text-sm">คลิกเพื่อเลือกไฟล์ Excel / CSV หรือลากไฟล์มาวางที่นี่</p>
+                  <p className="text-slate-500 text-xs mt-1">
+                    รองรับไฟล์ .xlsx, .xls, .csv (ขนาดไม่เกิน 5MB)
+                  </p>
+                </div>
+              ) : (
+                <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-2xl flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                      <CheckCircle className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-emerald-900">อ่านไฟล์สำเร็จ พร้อมนำเข้า</p>
+                      <p className="text-[11px] text-emerald-700">ตรวจพบข้อมูลนักเรียนทั้งหมด {importData.length} รายการ</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setImportData([])}
+                    className="btn bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs px-3 py-1.5 rounded-xl font-semibold shadow-2xs"
+                  >
+                    เลือกไฟล์ใหม่
+                  </button>
+                </div>
+              )}
 
               {importData.length > 0 && (
                 <div className="space-y-4 animate-fade-in-up">
