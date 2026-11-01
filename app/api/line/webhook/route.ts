@@ -23,6 +23,12 @@ import { calculateAffectiveScore } from '@/lib/affective';
 import { resolveTargetWeeks, getCurrentWeek } from '@/lib/semester';
 import { decryptIfPresent, encryptIfPresent } from '@/lib/encryption';
 import {
+  checkRateLimit,
+  recordSuccessfulQuery,
+  recordUserActivity,
+  getDailyQuotaStatus,
+} from '@/lib/lineRateLimit';
+import {
   verifyLineSignature,
   replyMessage,
   textMessage,
@@ -195,13 +201,32 @@ async function handleTextMessage(
 
   // --- Help / วิธีใช้ ---
   if (['วิธีใช้', 'help', 'ช่วยเหลือ', 'คำสั่ง', 'เมนู', 'menu'].includes(lowerText)) {
+    recordUserActivity(lineUserId);
     await replyMessage(replyToken, [buildHelpMessage()], accessToken);
+    return;
+  }
+
+  // --- Quota / Daily status: "โควต้า" / "สิทธิ์" / "สถานะ" ---
+  if (['โควต้า', 'quota', 'สิทธิ์', 'เช็คสิทธิ์', 'สถานะการเช็ค', 'สถานะโควต้า'].includes(lowerText)) {
+    recordUserActivity(lineUserId);
+    const { binding } = await resolveStudentContext(lineUserId, teacherUserId);
+    if (!binding) {
+      await replyMessage(
+        replyToken,
+        [textMessage('❌ ยังไม่ได้ผูกบัญชี กรุณาพิมพ์ "ผูก <รหัสนักเรียน>" ก่อนใช้งานครับ')],
+        accessToken
+      );
+      return;
+    }
+    const statusMsg = getDailyQuotaStatus(lineUserId, binding.studentCode, binding.classroomId);
+    await replyMessage(replyToken, [textMessage(statusMsg)], accessToken);
     return;
   }
 
   // --- Bind account: "ผูก 12345" ---
   const bindMatch = text.match(/^(?:ผูก|bind|register|ลงทะเบียน)\s+(.+)$/i);
   if (bindMatch) {
+    recordUserActivity(lineUserId);
     const studentCode = bindMatch[1].trim();
     await handleBind(replyToken, lineUserId, studentCode, accessToken, teacherUserId);
     return;
@@ -211,12 +236,14 @@ async function handleTextMessage(
   const isUnbind =
     /^(?:ยกเลิก|ลบ|ปลด|unbind|unlink|delete|remove|reset|รีเซ็ต|รีเซต)(?:\s*(?:การผูก|ผูก|บัญชี|เชื่อมต่อ)?(?:\s+\S+)?)?$/i.test(text);
   if (isUnbind) {
+    recordUserActivity(lineUserId);
     await handleUnbind(replyToken, lineUserId, accessToken);
     return;
   }
 
   // --- Change classroom: "เปลี่ยนวิชา" ---
   if (['เปลี่ยนวิชา', 'เปลี่ยน', 'switch', 'เลือกวิชา'].includes(lowerText)) {
+    recordUserActivity(lineUserId);
     await handleSwitchClassroom(replyToken, lineUserId, accessToken, teacherUserId);
     return;
   }
@@ -545,6 +572,23 @@ async function handleScoreQuery(
     return;
   }
 
+  // Rate limit check: 1 check per day per category
+  const rateLimit = checkRateLimit({
+    lineUserId,
+    studentCode: student.studentCode || binding.studentCode,
+    classroomId: classroom.id,
+    category: 'score',
+  });
+
+  if (!rateLimit.allowed) {
+    await replyMessage(
+      replyToken,
+      [textMessage(rateLimit.message || '⚠️ คุณได้ตรวจสอบข้อมูลของวันนี้ไปแล้วครับ')],
+      accessToken
+    );
+    return;
+  }
+
   const targetWeeks = resolveTargetWeeks(classroom);
 
   // Weights
@@ -694,6 +738,13 @@ async function handleScoreQuery(
       ),
     ], accessToken);
   }
+
+  recordSuccessfulQuery({
+    lineUserId,
+    studentCode: student.studentCode || binding.studentCode,
+    classroomId: classroom.id,
+    category: 'score',
+  });
 }
 
 async function handleAttendanceQuery(
@@ -712,6 +763,23 @@ async function handleAttendanceQuery(
     } else {
       await replyMessage(replyToken, [textMessage(errorMsg || '❌ เกิดข้อผิดพลาด')], accessToken);
     }
+    return;
+  }
+
+  // Rate limit check: 1 check per day per category
+  const rateLimit = checkRateLimit({
+    lineUserId,
+    studentCode: student.studentCode || binding.studentCode,
+    classroomId: classroom.id,
+    category: 'attendance',
+  });
+
+  if (!rateLimit.allowed) {
+    await replyMessage(
+      replyToken,
+      [textMessage(rateLimit.message || '⚠️ คุณได้ตรวจสอบข้อมูลของวันนี้ไปแล้วครับ')],
+      accessToken
+    );
     return;
   }
 
@@ -783,6 +851,13 @@ async function handleAttendanceQuery(
       ),
     ], accessToken);
   }
+
+  recordSuccessfulQuery({
+    lineUserId,
+    studentCode: student.studentCode || binding.studentCode,
+    classroomId: classroom.id,
+    category: 'attendance',
+  });
 }
 
 async function handleMissingTasksQuery(
@@ -801,6 +876,23 @@ async function handleMissingTasksQuery(
     } else {
       await replyMessage(replyToken, [textMessage(errorMsg || '❌ เกิดข้อผิดพลาด')], accessToken);
     }
+    return;
+  }
+
+  // Rate limit check: 1 check per day per category
+  const rateLimit = checkRateLimit({
+    lineUserId,
+    studentCode: student.studentCode || binding.studentCode,
+    classroomId: classroom.id,
+    category: 'tasks',
+  });
+
+  if (!rateLimit.allowed) {
+    await replyMessage(
+      replyToken,
+      [textMessage(rateLimit.message || '⚠️ คุณได้ตรวจสอบข้อมูลของวันนี้ไปแล้วครับ')],
+      accessToken
+    );
     return;
   }
 
@@ -946,6 +1038,13 @@ async function handleMissingTasksQuery(
       ], accessToken);
     }
   }
+
+  recordSuccessfulQuery({
+    lineUserId,
+    studentCode: student.studentCode || binding.studentCode,
+    classroomId: classroom.id,
+    category: 'tasks',
+  });
 }
 
 // ==================== Helpers ====================

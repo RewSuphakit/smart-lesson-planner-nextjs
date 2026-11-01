@@ -43,7 +43,7 @@ interface FlexBubble {
   styles?: Record<string, unknown>;
 }
 
-interface FlexCarousel {
+export interface FlexCarousel {
   type: 'carousel';
   contents: FlexBubble[];
 }
@@ -720,6 +720,21 @@ export function buildHelpMessage(): Record<string, unknown> {
             {
               type: 'text',
               text: 'พิมพ์ "เปลี่ยนวิชา"',
+              size: 'sm',
+              color: '#555555',
+              wrap: true,
+            },
+            { type: 'separator', margin: 'md' },
+            {
+              type: 'text',
+              text: '📊 ตรวจสอบสิทธิ์ประจำวัน',
+              weight: 'bold',
+              size: 'md',
+              color: '#16a085',
+            },
+            {
+              type: 'text',
+              text: 'พิมพ์ "โควต้า" หรือ "สิทธิ์"\n(ระบบจำกัดการเช็คข้อมูลประเภทละ 1 ครั้ง/วัน เพื่อป้องกันการเช็คซ้ำซ้อน)',
               size: 'sm',
               color: '#555555',
               wrap: true,
