@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
 import { createPortal } from 'react-dom';
@@ -12,7 +12,9 @@ import {
 import toast from 'react-hot-toast';
 import UserAvatar from '@/components/UserAvatar';
 import ClassroomCardPicker from '@/components/ClassroomCardPicker';
+import SectionSwitcher from '@/components/SectionSwitcher';
 import { parseClassroomName } from '@/lib/classroom';
+import { buildStudentSectionGroups } from '@/lib/studentSections';
 
 interface Classroom {
   id: string | number;
@@ -27,6 +29,8 @@ interface Student {
   id: string | number;
   name: string;
   student_code?: string;
+  grade_level?: string | null;
+  branch?: string | null;
   classroom_id?: string | number | null;
   affective_score: number;
   absent_count?: number;
@@ -93,12 +97,14 @@ export default function Affective() {
       const rawStudents = studRes.data.data || [];
       const gradesData: GradeReportStudent[] = gradesRes.data.data || [];
 
-      return rawStudents.map((s: { id: string | number; name: string; student_code?: string; classroom_id?: string | number | null; affective_score: number | null; avatar?: string | null }) => {
+      return rawStudents.map((s: { id: string | number; name: string; student_code?: string; classroom_id?: string | number | null; affective_score: number | null; avatar?: string | null; grade_level?: string | null; branch?: string | null }) => {
         const gradeInfo = gradesData.find(g => String(g.student_id) === String(s.id));
         return {
           id: s.id,
           name: s.name,
           student_code: s.student_code,
+          grade_level: s.grade_level,
+          branch: s.branch,
           classroom_id: s.classroom_id,
           avatar: s.avatar,
           affective_score: s.affective_score !== null && s.affective_score !== undefined
@@ -112,9 +118,39 @@ export default function Affective() {
     enabled: !!selectedClass,
   });
 
-  // ─── Class Analytics Summary ───
+  // ─── Sub-room / Section Grouping (แยกห้องย่อยเมื่อเรียนรวม เช่น ปวช.1/1 + ปวช.1/2) ───
+  const [selectedSectionKey, setSelectedSectionKey] = useState<string>('all');
+
+  // Reset section filter when switching classrooms
+  useEffect(() => {
+    setSelectedSectionKey('all');
+  }, [selectedClass]);
+
+  const { groups: sectionGroups, hasMultipleSections, sharedBranch } = useMemo(
+    () => buildStudentSectionGroups(students),
+    [students]
+  );
+
+  useEffect(() => {
+    if (selectedSectionKey !== 'all' && !sectionGroups.some(g => g.key === selectedSectionKey)) {
+      setSelectedSectionKey('all');
+    }
+  }, [selectedSectionKey, sectionGroups]);
+
+  const activeSectionGroup = useMemo(
+    () => (selectedSectionKey === 'all' ? null : sectionGroups.find(g => g.key === selectedSectionKey) || null),
+    [selectedSectionKey, sectionGroups]
+  );
+
+  const sectionScopedStudents = useMemo(() => {
+    if (activeSectionGroup) return activeSectionGroup.students;
+    if (sectionGroups.length > 0) return sectionGroups.flatMap(g => g.students);
+    return students;
+  }, [activeSectionGroup, sectionGroups, students]);
+
+  // ─── Class Analytics Summary (คำนวณตามขอบเขตห้องย่อยที่เลือก) ───
   const analytics = useMemo(() => {
-    if (!students || students.length === 0) {
+    if (!sectionScopedStudents || sectionScopedStudents.length === 0) {
       return { mean: '0.0', highConductCount: 0, atRiskCount: 0 };
     }
 
@@ -122,16 +158,16 @@ export default function Affective() {
     let highCount = 0;
     let riskCount = 0;
 
-    students.forEach(s => {
+    sectionScopedStudents.forEach(s => {
       sum += s.affective_score;
       const pct = maxAffectiveWeight > 0 ? (s.affective_score / maxAffectiveWeight) * 100 : 0;
       if (pct >= 80) highCount++;
       if (pct < 50) riskCount++;
     });
 
-    const mean = (sum / students.length).toFixed(1);
+    const mean = (sum / sectionScopedStudents.length).toFixed(1);
     return { mean, highConductCount: highCount, atRiskCount: riskCount };
-  }, [students, maxAffectiveWeight]);
+  }, [sectionScopedStudents, maxAffectiveWeight]);
 
   // ─── Mutation: อัปเดตคะแนนจิตพิสัยนักเรียนรายคน ───
   const updateScoreMutation = useMutation({
@@ -244,33 +280,34 @@ export default function Affective() {
     }
   };
 
-  // Global Action: Set all students to max score
+  // Global Action: Set all students to max score (เคารพขอบเขตห้องย่อยที่เลือก)
   const handleResetAllToMax = () => {
-    if (students.length === 0) return;
-    if (!window.confirm(`ยืนยันการตั้งค่าเริ่มต้นคะแนนจิตพิสัยของนักเรียนทุกคนในห้องนี้เป็นคะแนนเต็ม (${maxAffectiveWeight} คะแนน) หรือไม่?`)) return;
+    if (sectionScopedStudents.length === 0) return;
+    const targetScopeName = activeSectionGroup ? `ห้อง "${activeSectionGroup.label}" (${sectionScopedStudents.length} คน)` : `ทุกคน (${students.length} คน)`;
+    if (!window.confirm(`ยืนยันการตั้งค่าเริ่มต้นคะแนนจิตพิสัยของนักเรียน${targetScopeName} เป็นคะแนนเต็ม (${maxAffectiveWeight} คะแนน) หรือไม่?`)) return;
 
-    const batchScores = students.map(s => ({
+    const batchScores = sectionScopedStudents.map(s => ({
       student_id: s.id,
       affective_score: maxAffectiveWeight
     }));
 
     updateBatchScoresMutation.mutate(batchScores, {
       onSuccess: () => {
-        toast.success(`รีเซ็ตคะแนนจิตพิสัยทุกคนเป็น ${maxAffectiveWeight} คะแนนเต็มเรียบร้อยแล้ว`, { icon: '🔄' });
+        toast.success(`รีเซ็ตคะแนนจิตพิสัย${targetScopeName}เป็น ${maxAffectiveWeight} คะแนนเต็มเรียบร้อยแล้ว`, { icon: '🔄' });
       }
     });
   };
 
-  // Global Action: Calculate from attendance statistics & persist to DB
+  // Global Action: Calculate from attendance statistics & persist to DB (เคารพขอบเขตห้องย่อยที่เลือก)
   const handleAutoCalculateFromAttendance = () => {
-    if (students.length === 0) return;
+    if (sectionScopedStudents.length === 0) return;
     setShowCalcModal(true);
   };
 
   const executeAutoCalculate = () => {
-    if (students.length === 0) return;
+    if (sectionScopedStudents.length === 0) return;
 
-    const batchScores = students.map(s => {
+    const batchScores = sectionScopedStudents.map(s => {
       const absent = s.absent_count || 0;
       const late = s.late_count || 0;
       const penalty = (absent * 2) + (late * 1);
@@ -291,10 +328,11 @@ export default function Affective() {
     updateBatchScoresMutation.mutate(batchScores, {
       onSuccess: () => {
         setShowCalcModal(false);
+        const targetScopeName = activeSectionGroup ? `ห้อง "${activeSectionGroup.label}" (${sectionScopedStudents.length} คน)` : `ทุกคน (${students.length} คน)`;
         toast.success(
           calcMode === 'deductFromCurrent'
-            ? 'คำนวณหักคะแนนตามสถิติ ขาด/สาย เพิ่มเติมจากคะแนนปัจจุบันเรียบร้อยแล้ว!'
-            : 'คำนวณหักคะแนนตามสถิติ ขาด/สาย จากคะแนนเต็มเรียบร้อยแล้ว!',
+            ? `คำนวณหักคะแนนตามสถิติ ขาด/สาย เพิ่มเติมจากคะแนนปัจจุบันสำหรับ${targetScopeName} เรียบร้อยแล้ว!`
+            : `คำนวณหักคะแนนตามสถิติ ขาด/สาย จากคะแนนเต็มสำหรับ${targetScopeName} เรียบร้อยแล้ว!`,
           { icon: '⚡' }
         );
       }
@@ -303,13 +341,15 @@ export default function Affective() {
 
   // Filtering and sorting logic
   const processedStudents = useMemo(() => {
-    let result = [...students];
+    let result = [...sectionScopedStudents];
 
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(s =>
         s.name.toLowerCase().includes(q) ||
-        (s.student_code && s.student_code.toLowerCase().includes(q))
+        (s.student_code && s.student_code.toLowerCase().includes(q)) ||
+        (s.grade_level && s.grade_level.toLowerCase().includes(q)) ||
+        (s.branch && s.branch.toLowerCase().includes(q))
       );
     }
 
@@ -327,7 +367,7 @@ export default function Affective() {
     });
 
     return result;
-  }, [students, search, sortBy]);
+  }, [sectionScopedStudents, search, sortBy]);
 
   const getScoreBadgeStyle = (score: number) => {
     const percentage = maxAffectiveWeight > 0 ? (score / maxAffectiveWeight) * 100 : 0;
@@ -373,45 +413,48 @@ export default function Affective() {
 
       {/* Active Classroom Bar (เมื่อเลือกห้องแล้ว) */}
       {selectedClass && selectedClassData && activeParsed && (
-        <div className="glass p-4 sm:p-5 rounded-2xl flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between border border-pink-100 bg-white shadow-xl shadow-pink-100/20">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-pink-500 via-rose-500 to-purple-600 text-white flex items-center justify-center shadow-lg shadow-pink-500/25 shrink-0">
-              <HeartHandshake className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {activeParsed.code && (
-                  <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200/70">
-                    {activeParsed.code}
-                  </span>
-                )}
-                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${activeParsed.curriculumType === 'pvs'
-                  ? 'bg-purple-50 text-purple-700 border-purple-200'
-                  : 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                  }`}>
-                  {activeParsed.curriculumType === 'pvs' ? 'ปวส.' : 'ปวช.'}
-                </span>
-                {activeParsed.groupName && (
-                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200/70">
-                    {activeParsed.groupName}
-                  </span>
-                )}
-                <span className="text-xs font-medium text-slate-500 ml-1">
-                  (👥 {selectedClassData.student_count || students.length || 0} คน)
-                </span>
+        <div className="glass p-5 sm:p-6 rounded-3xl border border-pink-100/90 bg-white/95 shadow-xl shadow-pink-100/20 space-y-4">
+          {/* Top Row: Course Info & Quick Switcher */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-pink-500 via-rose-500 to-purple-600 text-white flex items-center justify-center shadow-lg shadow-pink-500/25 shrink-0">
+                <HeartHandshake className="w-6 h-6" />
               </div>
-              <h2 className="text-base sm:text-lg font-extrabold text-slate-800 leading-tight mt-1">
-                {activeParsed.subjectTitle}
-              </h2>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {activeParsed.code && (
+                    <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700 border border-slate-200/80 shadow-2xs">
+                      {activeParsed.code}
+                    </span>
+                  )}
+                  <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border shadow-2xs ${activeParsed.curriculumType === 'pvs'
+                    ? 'bg-purple-50 text-purple-700 border-purple-200'
+                    : 'bg-pink-50 text-pink-700 border-pink-200'
+                    }`}>
+                    {activeParsed.curriculumType === 'pvs' ? 'ปวส.' : 'ปวช.'}
+                  </span>
+                  {activeParsed.groupName && (
+                    <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-800 border border-amber-200/80 shadow-2xs">
+                      {activeParsed.groupName}
+                    </span>
+                  )}
+                  <span className="text-xs font-semibold text-slate-500 ml-1">
+                    (👥 {selectedClassData.student_count || students.length || 0} คน)
+                  </span>
+                </div>
+                <h2 className="text-base sm:text-xl font-black text-slate-800 leading-tight mt-1 truncate" title={activeParsed.subjectTitle}>
+                  {activeParsed.subjectTitle}
+                </h2>
+              </div>
             </div>
 
             {/* Quick Switch / เปลี่ยนห้อง */}
-            <div className="flex items-center gap-1.5 sm:ml-2">
+            <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
               <div className="relative">
                 <select
                   value={selectedClass}
                   onChange={e => setSelectedClass(e.target.value)}
-                  className="form-input text-xs font-bold py-1.5 pl-2.5 pr-7 bg-white hover:bg-slate-50 border-slate-200 rounded-xl focus:border-pink-400 focus:ring focus:ring-pink-200/50 transition-all text-slate-700 cursor-pointer shadow-xs"
+                  className="form-input text-xs font-bold py-2 pl-3 pr-8 bg-white/90 hover:bg-white border-slate-200 rounded-xl focus:border-pink-400 focus:ring focus:ring-pink-200/50 transition-all text-slate-700 cursor-pointer shadow-xs max-w-[200px] sm:max-w-[260px] truncate"
                   title="สลับห้องเรียนเร็ว"
                 >
                   {classrooms.map(c => (
@@ -424,7 +467,7 @@ export default function Affective() {
               <button
                 type="button"
                 onClick={() => setSelectedClass('')}
-                className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200/60 transition-all shadow-xs cursor-pointer"
+                className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-pink-50/80 hover:bg-pink-100 text-pink-700 border border-pink-200/70 transition-all shadow-xs cursor-pointer shrink-0"
                 title="ย้อนกลับไปดูการ์ดห้องเรียนทั้งหมด"
               >
                 <Grid className="w-3.5 h-3.5 text-pink-600" />
@@ -433,42 +476,85 @@ export default function Affective() {
             </div>
           </div>
 
-          {/* Action buttons */}
-          <div className="flex flex-wrap gap-2.5 items-center">
-            <button
-              onClick={() => {
-                setCustomWeightInput(maxAffectiveWeight);
-                setResetStudentsToNew(false);
-                setShowWeightModal(true);
-              }}
-              disabled={loadingStudents || updateClassroomWeightMutation.isPending}
-              className="btn bg-white hover:bg-pink-50/50 text-slate-700 hover:text-pink-700 border border-slate-200 hover:border-pink-200 flex-1 md:flex-none flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-xl shadow-xs transition-all"
-              title="ตั้งค่าคะแนนเต็มจิตพิสัยของห้องเรียนนี้"
-            >
-              <Sliders className="w-4 h-4 text-pink-600" />
-              <span>กำหนดคะแนนเต็ม</span>
-            </button>
+          {/* Divider */}
+          <div className="border-t border-slate-100/90" />
 
-            <button
-              onClick={handleAutoCalculateFromAttendance}
-              disabled={loadingStudents || updateBatchScoresMutation.isPending || students.length === 0}
-              className="btn bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 flex-1 md:flex-none flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-xl shadow-xs"
-              title="คำนวณหักคะแนนจิตพิสัยตามสถิติ ขาด (หัก 2) / สาย (หัก 1) แล้วบันทึกลงฐานข้อมูล"
-            >
-              {updateBatchScoresMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4 text-amber-600" />}
-              <span>คำนวณตามประวัติเข้าเรียน</span>
-            </button>
+          {/* Action buttons Toolbar */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => {
+                  setCustomWeightInput(maxAffectiveWeight);
+                  setResetStudentsToNew(false);
+                  setShowWeightModal(true);
+                }}
+                disabled={loadingStudents || updateClassroomWeightMutation.isPending}
+                className="btn bg-white hover:bg-pink-50/60 text-slate-700 hover:text-pink-700 border border-slate-200 hover:border-pink-200 flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
+                title="ตั้งค่าคะแนนเต็มจิตพิสัยของห้องเรียนนี้"
+              >
+                <Sliders className="w-4 h-4 text-pink-600" />
+                <span>กำหนดคะแนนเต็ม</span>
+              </button>
 
-            <button
-              onClick={handleResetAllToMax}
-              disabled={loadingStudents || updateBatchScoresMutation.isPending || students.length === 0}
-              className="btn bg-pink-50 hover:bg-pink-100 text-pink-800 border border-pink-200 flex-1 md:flex-none flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-xl shadow-xs"
-              title="รีเซ็ตคะแนนจิตพิสัยทุกคนเป็นคะแนนเต็มห้อง"
-            >
-              {updateBatchScoresMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4 text-pink-600" />}
-              <span>ให้คะแนนเต็มทุกคน ({maxAffectiveWeight})</span>
-            </button>
+              <button
+                onClick={handleAutoCalculateFromAttendance}
+                disabled={loadingStudents || updateBatchScoresMutation.isPending || sectionScopedStudents.length === 0}
+                className="btn bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200/80 flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
+                title="คำนวณหักคะแนนจิตพิสัยตามสถิติ ขาด (หัก 2) / สาย (หัก 1) แล้วบันทึกลงฐานข้อมูล"
+              >
+                {updateBatchScoresMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin text-amber-600" /> : <Zap className="w-4 h-4 text-amber-600" />}
+                <span>คำนวณตามประวัติเข้าเรียน</span>
+              </button>
+
+              <button
+                onClick={handleResetAllToMax}
+                disabled={loadingStudents || updateBatchScoresMutation.isPending || sectionScopedStudents.length === 0}
+                className="btn bg-pink-50 hover:bg-pink-100 text-pink-800 border border-pink-200/80 flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
+                title="รีเซ็ตคะแนนจิตพิสัยเป็นคะแนนเต็มห้อง"
+              >
+                {updateBatchScoresMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin text-pink-600" /> : <RotateCcw className="w-4 h-4 text-pink-600" />}
+                <span>{activeSectionGroup ? `ให้คะแนนเต็มห้องนี้ (${maxAffectiveWeight})` : `ให้คะแนนเต็มทุกคน (${maxAffectiveWeight})`}</span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 self-start sm:self-auto text-xs font-semibold text-slate-500">
+              <span className="bg-slate-50 border border-slate-200/80 px-2.5 py-1.5 rounded-xl text-slate-600 flex items-center gap-1.5 shadow-2xs">
+                <span>คะแนนเต็ม:</span>
+                <strong className="text-pink-600 font-extrabold">{maxAffectiveWeight}</strong>
+                <span className="text-slate-400">คะแนน</span>
+              </span>
+            </div>
           </div>
+
+          {/* Sub-room / Section Switcher Bar */}
+          {hasMultipleSections && (
+            <>
+              <div className="border-t border-slate-100/90" />
+              <div className="pt-0.5">
+                <SectionSwitcher
+                  sectionGroups={sectionGroups}
+                  selectedSectionKey={selectedSectionKey}
+                  onSelectSection={setSelectedSectionKey}
+                  totalStudentsCount={students.length}
+                  sharedBranch={sharedBranch}
+                  themeColor="pink"
+                  label="แยกห้องจิตพิสัย:"
+                  rightContent={
+                    activeSectionGroup ? (
+                      <span className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
+                        กำลังจัดการห้อง: <span className="text-pink-700 font-extrabold bg-pink-50 px-2.5 py-0.5 rounded-lg border border-pink-200/70">{activeSectionGroup.label}</span>
+                        <span className="text-slate-400">({activeSectionGroup.students.length} คน)</span>
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-400 font-medium">
+                        (แสดงนักเรียนทุกห้องย่อยรวมกัน)
+                      </span>
+                    )
+                  }
+                />
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -541,34 +627,21 @@ export default function Affective() {
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="form-input pl-10 text-xs bg-white border-indigo-100 rounded-xl focus:border-indigo-500"
-                placeholder="ค้นหารหัสนักเรียน หรือ ชื่อ..."
+                className="form-input pl-10 text-xs bg-white border-pink-100 rounded-xl focus:border-pink-500 shadow-2xs w-full"
+                placeholder="ค้นหาชื่อ, รหัส หรือห้องย่อย..."
                 id="affective-search"
                 aria-label="ค้นหารหัสนักเรียน หรือชื่อ"
               />
             </div>
 
-            <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-between sm:justify-end shrink-0">
-              <div className="flex items-center gap-1.5 text-xs text-slate-600 bg-indigo-50/80 border border-indigo-100 px-3 py-1.5 rounded-xl font-medium">
-                <span>คะแนนเต็มจิตพิสัยห้องนี้: <span className="font-bold text-indigo-700">{maxAffectiveWeight} คะแนน</span></span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCustomWeightInput(maxAffectiveWeight);
-                    setResetStudentsToNew(false);
-                    setShowWeightModal(true);
-                  }}
-                  className="p-1 hover:bg-indigo-100 rounded-lg text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer"
-                  title="แก้ไขคะแนนเต็มจิตพิสัย"
-                  aria-label="แก้ไขคะแนนเต็มจิตพิสัย"
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
-              </div>
+            <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end shrink-0">
+              <span className="text-xs font-semibold text-slate-500">
+                แสดง <strong className="text-pink-700 font-extrabold">{processedStudents.length}</strong> จาก {sectionScopedStudents.length} คน
+              </span>
               <select
                 value={sortBy}
                 onChange={e => setSortBy(e.target.value as 'name' | 'score-desc' | 'score-asc')}
-                className="form-input text-xs w-44 py-1.5 bg-white border-indigo-100 rounded-xl"
+                className="form-input text-xs w-48 py-2 bg-white border-slate-200 rounded-xl shadow-2xs font-medium cursor-pointer"
                 aria-label="เรียงลำดับรายการ"
               >
                 <option value="name">เรียงตาม: ชื่อนักเรียน</option>
@@ -612,7 +685,14 @@ export default function Affective() {
 
                     <div className="flex-1 md:flex-none text-left md:text-center min-w-0">
                       <p className="font-bold text-slate-800 text-sm truncate">{s.name}</p>
-                      {s.student_code && <p className="text-[10px] text-slate-500 mt-0.5">รหัส: {s.student_code}</p>}
+                      <div className="flex items-center gap-1 justify-start md:justify-center flex-wrap mt-0.5">
+                        {s.student_code && <span className="text-[10px] text-slate-500">รหัส: {s.student_code}</span>}
+                        {s.grade_level && (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100/80">
+                            {s.grade_level}
+                          </span>
+                        )}
+                      </div>
 
                       {/* Attendance Badges */}
                       <div className="flex items-center gap-1.5 md:justify-center mt-1 text-[10px]">
@@ -892,8 +972,8 @@ export default function Affective() {
                       type="button"
                       onClick={() => setCustomWeightInput(val)}
                       className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition-all cursor-pointer ${customWeightInput === val
-                          ? 'bg-pink-600 text-white border-pink-600 shadow-sm'
-                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                        ? 'bg-pink-600 text-white border-pink-600 shadow-sm'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
                         }`}
                     >
                       {val} คะแนน

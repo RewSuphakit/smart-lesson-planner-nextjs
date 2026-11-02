@@ -15,7 +15,9 @@ import { checkThaiHoliday } from '@/lib/thaiHolidays';
 const ScoreExcelModal = dynamic(() => import('@/components/ScoreExcelModal'), { ssr: false });
 const ScoreImportModal = dynamic(() => import('@/components/ScoreImportModal'), { ssr: false });
 import ClassroomCardPicker from '@/components/ClassroomCardPicker';
+import SectionSwitcher from '@/components/SectionSwitcher';
 import { parseClassroomName } from '@/lib/classroom';
+import { buildStudentSectionGroups } from '@/lib/studentSections';
 
 interface MemoizedScoreInputProps {
   value: number | string;
@@ -87,6 +89,8 @@ interface Student {
   student_code?: string;
   name: string;
   classroom_id?: string | number;
+  grade_level?: string | null;
+  branch?: string | null;
   midterm_score?: number | null;
   final_score?: number | null;
   affective_score?: number | null;
@@ -166,7 +170,14 @@ const MatrixStudentRow = memo(function MatrixStudentRow({
         style={{ left: 120, width: 200, minWidth: 200, maxWidth: 200, backgroundColor: cellBg, backfaceVisibility: 'hidden' }}
         title={student.name}
       >
-        {student.name}
+        <div className="flex items-center justify-between gap-1.5">
+          <span className="truncate">{student.name}</span>
+          {student.grade_level && (
+            <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100/80">
+              {student.grade_level}
+            </span>
+          )}
+        </div>
       </td>
       {structures.map(struct => {
         const key = `${student.id}_${struct.lesson_number}`;
@@ -471,6 +482,36 @@ export default function Scores() {
 
   const students: Student[] = useMemo(() => matrixData?.students || [], [matrixData?.students]);
 
+  // ─── Sub-room / Section Grouping (แยกห้องย่อยเมื่อเรียนรวม เช่น ปวช.1/1 + ปวช.1/2) ───
+  const [selectedSectionKey, setSelectedSectionKey] = useState<string>('all');
+
+  // Reset section filter when switching classrooms
+  useEffect(() => {
+    setSelectedSectionKey('all');
+  }, [selectedClass]);
+
+  const { groups: sectionGroups, hasMultipleSections, sharedBranch } = useMemo(
+    () => buildStudentSectionGroups(students),
+    [students]
+  );
+
+  useEffect(() => {
+    if (selectedSectionKey !== 'all' && !sectionGroups.some(g => g.key === selectedSectionKey)) {
+      setSelectedSectionKey('all');
+    }
+  }, [selectedSectionKey, sectionGroups]);
+
+  const activeSectionGroup = useMemo(
+    () => (selectedSectionKey === 'all' ? null : sectionGroups.find(g => g.key === selectedSectionKey) || null),
+    [selectedSectionKey, sectionGroups]
+  );
+
+  const sectionScopedStudents = useMemo(() => {
+    if (activeSectionGroup) return activeSectionGroup.students;
+    if (sectionGroups.length > 0) return sectionGroups.flatMap(g => g.students);
+    return students;
+  }, [activeSectionGroup, sectionGroups, students]);
+
   // Sync Class Data and Structure
   useEffect(() => {
     if (matrixData) {
@@ -567,9 +608,9 @@ export default function Scores() {
     }
   }, [selectedLesson, calculatedWeekDates, weekDateMap, attendanceDate]);
 
-  // ─── Analytics Summary Computations ───
+  // ─── Analytics Summary Computations (ตามขอบเขตห้องย่อยที่เลือก) ───
   const analyticsSummary = useMemo(() => {
-    if (!students.length || !structures.length) {
+    if (!sectionScopedStudents.length || !structures.length) {
       return { avgScore: 0, completionRate: 0, highestScore: 0, lowestScore: 0, totalMaxScore: 100 };
     }
 
@@ -584,9 +625,9 @@ export default function Scores() {
     let maxStudentScore = 0;
     let minStudentScore = Infinity;
     let gradedCount = 0;
-    const totalPossibleCells = students.length * structures.length * 2;
+    const totalPossibleCells = sectionScopedStudents.length * structures.length * 2;
 
-    students.forEach(student => {
+    sectionScopedStudents.forEach(student => {
       let currentStudentTotal = 0;
       structures.forEach(struct => {
         const key = `${student.id}_${struct.lesson_number}`;
@@ -609,7 +650,7 @@ export default function Scores() {
       if (currentStudentTotal < minStudentScore) minStudentScore = currentStudentTotal;
     });
 
-    const avgScore = students.length ? (totalStudentScoresSum / students.length) : 0;
+    const avgScore = sectionScopedStudents.length ? (totalStudentScoresSum / sectionScopedStudents.length) : 0;
     const completionRate = totalPossibleCells > 0 ? Math.round((gradedCount / totalPossibleCells) * 100) : 0;
 
     return {
@@ -619,7 +660,7 @@ export default function Scores() {
       lowestScore: minStudentScore === Infinity ? 0 : Math.round(minStudentScore * 10) / 10,
       totalMaxScore: totalPossibleAcademicScore
     };
-  }, [students, structures, matrixScores, classroomObj]);
+  }, [sectionScopedStudents, structures, matrixScores, classroomObj]);
 
   // Index of `${studentId}_${YYYY-MM-DD}` -> status (first match wins, same as the previous Array.find)
   const attendanceStatusIndex = useMemo(() => {
@@ -662,30 +703,30 @@ export default function Scores() {
     return '';
   }, [attendanceRecords, attendanceStatusIndex, weekAttendanceMap, calculatedWeekDates, weekDateMap, attendanceDate, selectedLesson]);
 
-  // Weekly displayed students: hide absent students when in weekly focus
+  // Weekly displayed students: hide absent students when in weekly focus (ตามขอบเขตห้องย่อยที่เลือก)
   const weeklyDisplayedStudents = useMemo(() => {
     const weekNum = parseInt(selectedLesson);
-    if (isNaN(weekNum) || weekNum <= 0) return students;
+    if (isNaN(weekNum) || weekNum <= 0) return sectionScopedStudents;
 
-    return students.filter(student => {
+    return sectionScopedStudents.filter(student => {
       const status = getStudentAttendanceStatus(student.id, weekNum);
       if (hideAbsentInWeekly && (status === 'absent' || status === 'leave')) {
         return false;
       }
       return true;
     });
-  }, [students, selectedLesson, hideAbsentInWeekly, getStudentAttendanceStatus]);
+  }, [sectionScopedStudents, selectedLesson, hideAbsentInWeekly, getStudentAttendanceStatus]);
 
-  // Attendance stats for the active weekly lesson
+  // Attendance stats for the active weekly lesson (ตามขอบเขตห้องย่อยที่เลือก)
   const weeklyAttendanceCounts = useMemo(() => {
     if (!selectedLesson) {
-      return { absent: 0, leave: 0, present: 0, late: 0, noData: 0, total: students.length };
+      return { absent: 0, leave: 0, present: 0, late: 0, noData: 0, total: sectionScopedStudents.length };
     }
     const weekNum = parseInt(selectedLesson);
-    if (isNaN(weekNum)) return { absent: 0, leave: 0, present: 0, late: 0, noData: 0, total: students.length };
+    if (isNaN(weekNum)) return { absent: 0, leave: 0, present: 0, late: 0, noData: 0, total: sectionScopedStudents.length };
 
     let absent = 0, leave = 0, present = 0, late = 0, noData = 0;
-    students.forEach(student => {
+    sectionScopedStudents.forEach(student => {
       const status = getStudentAttendanceStatus(student.id, weekNum);
       if (status === 'absent') absent++;
       else if (status === 'leave') leave++;
@@ -694,8 +735,8 @@ export default function Scores() {
       else noData++;
     });
 
-    return { absent, leave, present, late, noData, total: students.length };
-  }, [students, selectedLesson, getStudentAttendanceStatus]);
+    return { absent, leave, present, late, noData, total: sectionScopedStudents.length };
+  }, [sectionScopedStudents, selectedLesson, getStudentAttendanceStatus]);
 
   // Auto-fill 0 in score fields for absent and leave students for the active week
   useEffect(() => {
@@ -762,14 +803,14 @@ export default function Scores() {
     }
   };
 
-  // ─── Quick Fill 0 for Absent & Leave Students ───
+  // ─── Quick Fill 0 for Absent & Leave Students (ตามขอบเขตห้องย่อยที่เลือก) ───
   const handleFillZeroForAbsentees = (targetWeekNum?: number) => {
     const targetWeek = targetWeekNum || (Number(selectedLesson) ? Number(selectedLesson) : null);
     let fillCount = 0;
 
     setMatrixScores(prev => {
       const next = { ...prev };
-      students.forEach(student => {
+      sectionScopedStudents.forEach(student => {
         const weekNums = targetWeek ? [targetWeek] : structures.map(s => s.lesson_number);
         weekNums.forEach(wNum => {
           const status = getStudentAttendanceStatus(student.id, wNum);
@@ -791,7 +832,7 @@ export default function Scores() {
       if (!isNaN(weekNum) && weekNum > 0) {
         setScores(prev => {
           const next = { ...prev };
-          students.forEach(student => {
+          sectionScopedStudents.forEach(student => {
             const status = getStudentAttendanceStatus(student.id, weekNum);
             if (status === 'absent' || status === 'leave') {
               next[String(student.id)] = { assignment_score: 0, post_test_score: 0 };
@@ -803,7 +844,8 @@ export default function Scores() {
     }
 
     setHasPendingChanges(true);
-    toast.success(`เติมคะแนน 0 ให้ผู้เรียนที่ขาด/ลา (${fillCount} ช่อง) เรียบร้อยแล้ว`);
+    const scopeLabel = activeSectionGroup ? `ห้อง "${activeSectionGroup.label}"` : '';
+    toast.success(`เติมคะแนน 0 ให้ผู้เรียนที่ขาด/ลา ${scopeLabel} (${fillCount} ช่อง) เรียบร้อยแล้ว`);
   };
 
   const handleFillSingleStudentZero = (studentId: string | number, lessonNum?: number) => {
@@ -1178,45 +1220,48 @@ export default function Scores() {
 
       {/* Active Classroom Bar (เมื่อเลือกห้องแล้ว) */}
       {selectedClass && selectedClassData && activeParsed && (
-        <div className="glass p-4 sm:p-5 rounded-2xl flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between border border-white/40 shadow-xl shadow-indigo-100/20">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/25 shrink-0">
-              <BookOpen className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {activeParsed.code && (
-                  <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200/70">
-                    {activeParsed.code}
-                  </span>
-                )}
-                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${activeParsed.curriculumType === 'pvs'
-                  ? 'bg-purple-50 text-purple-700 border-purple-200'
-                  : 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                  }`}>
-                  {activeParsed.curriculumType === 'pvs' ? 'ปวส.' : 'ปวช.'}
-                </span>
-                {activeParsed.groupName && (
-                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200/70">
-                    {activeParsed.groupName}
-                  </span>
-                )}
-                <span className="text-xs font-medium text-slate-500 ml-1">
-                  (👥 {selectedClassData.student_count || students.length || 0} คน)
-                </span>
+        <div className="glass p-5 sm:p-6 rounded-3xl border border-indigo-100/80 bg-white/95 shadow-xl shadow-indigo-100/20 space-y-4">
+          {/* Top Row: Course Info & Quick Switcher */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/25 shrink-0">
+                <BookOpen className="w-6 h-6" />
               </div>
-              <h2 className="text-base sm:text-lg font-extrabold text-slate-800 leading-tight mt-1">
-                {activeParsed.subjectTitle}
-              </h2>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {activeParsed.code && (
+                    <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700 border border-slate-200/80 shadow-2xs">
+                      {activeParsed.code}
+                    </span>
+                  )}
+                  <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border shadow-2xs ${activeParsed.curriculumType === 'pvs'
+                    ? 'bg-purple-50 text-purple-700 border-purple-200'
+                    : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                    }`}>
+                    {activeParsed.curriculumType === 'pvs' ? 'ปวส.' : 'ปวช.'}
+                  </span>
+                  {activeParsed.groupName && (
+                    <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-800 border border-amber-200/80 shadow-2xs">
+                      {activeParsed.groupName}
+                    </span>
+                  )}
+                  <span className="text-xs font-semibold text-slate-500 ml-1">
+                    (👥 {selectedClassData.student_count || students.length || 0} คน)
+                  </span>
+                </div>
+                <h2 className="text-base sm:text-xl font-black text-slate-800 leading-tight mt-1 truncate" title={activeParsed.subjectTitle}>
+                  {activeParsed.subjectTitle}
+                </h2>
+              </div>
             </div>
 
             {/* Quick Switch / เปลี่ยนห้อง */}
-            <div className="flex items-center gap-1.5 sm:ml-2">
+            <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
               <div className="relative">
                 <select
                   value={selectedClass}
                   onChange={e => handleClassroomSelectChange(e.target.value)}
-                  className="form-input text-xs font-bold py-1.5 pl-2.5 pr-7 bg-white hover:bg-slate-50 border-slate-200 rounded-xl focus:border-indigo-400 focus:ring focus:ring-indigo-200/50 transition-all text-slate-700 cursor-pointer shadow-xs"
+                  className="form-input text-xs font-bold py-2 pl-3 pr-8 bg-white/90 hover:bg-white border-slate-200 rounded-xl focus:border-indigo-400 focus:ring focus:ring-indigo-200/50 transition-all text-slate-700 cursor-pointer shadow-xs max-w-[200px] sm:max-w-[260px] truncate"
                   title="สลับห้องเรียนเร็ว"
                 >
                   {classrooms.map(c => (
@@ -1229,7 +1274,7 @@ export default function Scores() {
               <button
                 type="button"
                 onClick={() => setSelectedClass('')}
-                className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/60 transition-all shadow-xs cursor-pointer"
+                className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/70 transition-all shadow-xs cursor-pointer shrink-0"
                 title="ย้อนกลับไปดูการ์ดห้องเรียนทั้งหมด"
               >
                 <Grid className="w-3.5 h-3.5 text-indigo-600" />
@@ -1237,6 +1282,36 @@ export default function Scores() {
               </button>
             </div>
           </div>
+
+          {/* Sub-room / Section Switcher Bar */}
+          {hasMultipleSections && (
+            <>
+              <div className="border-t border-slate-100/90" />
+              <div className="pt-0.5">
+                <SectionSwitcher
+                  sectionGroups={sectionGroups}
+                  selectedSectionKey={selectedSectionKey}
+                  onSelectSection={setSelectedSectionKey}
+                  totalStudentsCount={students.length}
+                  sharedBranch={sharedBranch}
+                  themeColor="indigo"
+                  label="แยกห้องบันทึกคะแนน:"
+                  rightContent={
+                    activeSectionGroup ? (
+                      <span className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
+                        กำลังบันทึกคะแนนห้อง: <span className="text-indigo-700 font-extrabold bg-indigo-50 px-2.5 py-0.5 rounded-lg border border-indigo-200/70">{activeSectionGroup.label}</span>
+                        <span className="text-slate-400">({activeSectionGroup.students.length} คน)</span>
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-400 font-medium">
+                        (แสดงนักเรียนทุกห้องย่อยรวมกัน)
+                      </span>
+                    )
+                  }
+                />
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -1296,8 +1371,8 @@ export default function Scores() {
                 <Users className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-xs font-semibold text-slate-500">จำนวนนักเรียนทั้งหมด</p>
-                <p className="text-xl font-extrabold text-slate-800">{students.length} คน</p>
+                <p className="text-xs font-semibold text-slate-500">จำนวนนักเรียน{activeSectionGroup ? ` (${activeSectionGroup.label})` : 'ทั้งหมด'}</p>
+                <p className="text-xl font-extrabold text-slate-800">{sectionScopedStudents.length} คน</p>
               </div>
             </div>
           </div>
@@ -1719,7 +1794,7 @@ export default function Scores() {
                           </tr>
                         </thead>
                         <tbody>
-                          {students.map((student, idx) => (
+                          {sectionScopedStudents.map((student, idx) => (
                             <MatrixStudentRow
                               key={student.id}
                               student={student}
@@ -1927,8 +2002,13 @@ export default function Scores() {
                             {/* Student Info & Quick Zero Button */}
                             <div className="flex items-center justify-between gap-2">
                               <div className="min-w-0">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1.5 flex-wrap">
                                   <span className="font-bold text-slate-800 text-sm truncate">{student.name}</span>
+                                  {student.grade_level && (
+                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100/80">
+                                      {student.grade_level}
+                                    </span>
+                                  )}
                                   {getAttendanceBadge(attStatus)}
                                 </div>
                                 <p className="text-[11px] text-slate-400 font-mono">รหัส: {student.student_code || '-'}</p>
@@ -2031,8 +2111,13 @@ export default function Scores() {
                                 <td className="p-3 text-slate-500 font-medium">{student.student_code || '-'}</td>
                                 <td className="p-3 font-semibold text-slate-800">
                                   <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
                                       <span>{student.name}</span>
+                                      {student.grade_level && (
+                                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100/80">
+                                          {student.grade_level}
+                                        </span>
+                                      )}
                                       {getAttendanceBadge(attStatus)}
                                     </div>
                                     <button
@@ -2366,7 +2451,7 @@ export default function Scores() {
             isOpen={showExportModal}
             onClose={() => setShowExportModal(false)}
             classroom={classroomObj || null}
-            students={students}
+            students={sectionScopedStudents}
             structures={structures}
             matrixScores={matrixScores}
             calculatedWeekDates={calculatedWeekDates}

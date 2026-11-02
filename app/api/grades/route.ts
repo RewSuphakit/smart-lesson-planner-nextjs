@@ -87,11 +87,13 @@ export async function GET(request: NextRequest) {
           id: true,
           name: true,
           studentCode: true,
+          gradeLevel: true,
+          branch: true,
           midtermScore: true,
           finalScore: true,
           affectiveScore: true,
         },
-        orderBy: [{ studentCode: 'asc' }, { name: 'asc' }],
+        orderBy: [{ gradeLevel: 'asc' }, { studentCode: 'asc' }, { name: 'asc' }],
       }),
       prisma.gradeCriteria.findMany({
         where: { classroomId: numericClassroomId },
@@ -202,9 +204,12 @@ export async function GET(request: NextRequest) {
       }
 
       return {
+        id: s.id,
         student_id: s.id,
         name: s.name,
         student_code: s.studentCode,
+        grade_level: s.gradeLevel,
+        branch: s.branch,
         avatar: null,
         midterm_score: midtermScore,
         final_score: rawFinalScore,
