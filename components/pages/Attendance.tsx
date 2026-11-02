@@ -1233,13 +1233,14 @@ export default function Attendance() {
     const isActive = attendance[id] === status;
     return (
       <button
+        type="button"
         onClick={() => handleStatusChange(id, status)}
-        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${isActive
-          ? `${activeClass} shadow-md scale-[1.03]`
-          : 'bg-white/50 border border-indigo-50/50 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-100'
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer select-none ${isActive
+          ? `${activeClass} shadow-xs scale-[1.02]`
+          : 'bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 border border-slate-200/80 shadow-2xs'
           }`}
       >
-        {icon} {label}
+        {icon} <span>{label}</span>
       </button>
     );
   };
@@ -1541,66 +1542,73 @@ export default function Attendance() {
     return (
       <tr
         key={student.id}
-        className={`border-b border-indigo-50/50 transition-colors duration-150 hover:bg-indigo-50/30 ${idx % 2 === 0 ? 'bg-white/20' : 'bg-transparent'
+        className={`border-b border-indigo-50/70 transition-colors duration-150 hover:bg-indigo-50/20 ${idx % 2 === 0 ? 'bg-white/40' : 'bg-transparent'
           }`}
       >
-        <td className="p-4 text-slate-600 text-sm font-semibold">{student.student_code || '-'}</td>
-        <td className="p-4">
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-600 font-bold text-xs flex items-center justify-center shrink-0">
+        <td className="p-3.5 text-slate-500 font-mono text-xs font-semibold">{student.student_code || '-'}</td>
+        <td className="p-3.5">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500 to-violet-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
               {student.name.charAt(0)}
             </div>
-            <span className="font-semibold text-slate-800">{student.name}</span>
-            {showRoomPill && student.grade_level && (
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/70">
-                {student.grade_level}
-              </span>
-            )}
+            <div className="min-w-0">
+              <span className="font-bold text-slate-800 text-sm">{student.name}</span>
+              {showRoomPill && student.grade_level && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/70 ml-2">
+                  {student.grade_level}
+                </span>
+              )}
+            </div>
             <button
+              type="button"
               onClick={() => setHistoryStudent(student)}
-              className="p-1 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-100/50 transition-all"
+              className="p-1 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer ml-1"
               title="ดูประวัติการมาเรียนอย่างละเอียด"
             >
-              <History className="w-4 h-4" />
+              <History className="w-3.5 h-3.5" />
             </button>
           </div>
         </td>
-        <td className="p-4">
-          <div className="flex items-center gap-2.5">
-            {statusBtn(student.id, 'present', <CheckCircle className="w-4 h-4" />, 'มาเรียน', 'bg-emerald-500 text-white border border-emerald-600')}
-            {statusBtn(student.id, 'late', <Clock className="w-4 h-4" />, 'สาย', 'bg-amber-500 text-white border border-amber-600')}
-            {statusBtn(student.id, 'absent', <XCircle className="w-4 h-4" />, 'ขาด', 'bg-red-500 text-white border border-red-600')}
-            {statusBtn(student.id, 'leave', <FileText className="w-4 h-4" />, 'ลา', 'bg-blue-500 text-white border border-blue-600')}
+        <td className="p-3.5">
+          <div className="inline-flex items-center p-1 bg-slate-100/90 rounded-2xl border border-slate-200/70 gap-1 shadow-2xs">
+            {statusBtn(student.id, 'present', <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />, 'มาเรียน', 'bg-emerald-600 text-white border-emerald-600 ring-1 ring-emerald-500/30')}
+            {statusBtn(student.id, 'late', <Clock className="w-3.5 h-3.5 text-amber-600" />, 'สาย', 'bg-amber-500 text-white border-amber-500 ring-1 ring-amber-400/30')}
+            {statusBtn(student.id, 'absent', <XCircle className="w-3.5 h-3.5 text-rose-500" />, 'ขาด', 'bg-rose-600 text-white border-rose-600 ring-1 ring-rose-500/30')}
+            {statusBtn(student.id, 'leave', <FileText className="w-3.5 h-3.5 text-sky-600" />, 'ลา', 'bg-sky-600 text-white border-sky-600 ring-1 ring-sky-500/30')}
           </div>
         </td>
-        <td className="p-4 text-center">
+        <td className="p-3.5 text-center">
           <div className="flex flex-col items-center">
             {sStats.is_f ? (
-              <span className="text-[10px] font-extrabold text-white bg-red-600 px-2 py-0.5 rounded-full animate-pulse border border-red-700">
-                หมดสิทธิ์เรียน
+              <span className="text-[10px] font-extrabold text-white bg-rose-600 px-2.5 py-1 rounded-full animate-pulse border border-rose-700 shadow-xs">
+                หมดสิทธิ์สอบ (มส.)
               </span>
             ) : (
-              <div className="flex flex-col items-center w-full">
-                <div className="flex justify-between w-full max-w-[90px] text-xs font-semibold mb-1">
-                  <span className={sStats.converted_absent_count > 0 ? 'text-red-500' : 'text-slate-600'}>
+              <div className="flex flex-col items-center w-full max-w-[110px]">
+                <div className="flex justify-between w-full text-[11px] font-bold mb-1">
+                  <span className={sStats.converted_absent_count > 0 ? 'text-rose-600' : 'text-slate-600'}>
                     ขาด {sStats.converted_absent_count}
                   </span>
-                  <span className="text-slate-600">/ {maxAllowedAbsences}</span>
+                  <span className="text-slate-400">/ {maxAllowedAbsences} คาบ</span>
                 </div>
-                <div className="w-full max-w-[90px] bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                <div className="w-full bg-slate-200/80 h-2 rounded-full overflow-hidden">
                   <div
-                    className={`h-full rounded-full ${isCloseToFRisk ? 'bg-red-500 animate-pulse' : 'bg-indigo-500'
+                    className={`h-full rounded-full transition-all duration-300 ${isCloseToFRisk
+                      ? 'bg-rose-500 animate-pulse'
+                      : sStats.converted_absent_count >= maxAllowedAbsences * 0.5
+                        ? 'bg-amber-500'
+                        : 'bg-indigo-500'
                       }`}
                     style={{ width: `${Math.min((sStats.converted_absent_count / (maxAllowedAbsences || 1)) * 100, 100)}%` }}
-                  ></div>
+                  />
                 </div>
               </div>
             )}
 
             {(sStats.remaining_late_count > 0 || sStats.remaining_leave_count > 0) && (
-              <div className="flex gap-1 text-[9px] mt-1 font-semibold opacity-70">
-                {sStats.remaining_late_count > 0 && <span className="text-amber-600 bg-amber-50 px-1 py-0.5 rounded border border-amber-100">สายสะสม {sStats.remaining_late_count}</span>}
-                {sStats.remaining_leave_count > 0 && <span className="text-blue-500 bg-blue-50 px-1 py-0.5 rounded border border-blue-100 font-semibold">ลาสะสม {sStats.remaining_leave_count}</span>}
+              <div className="flex gap-1 text-[9px] mt-1.5 font-bold flex-wrap justify-center">
+                {sStats.remaining_late_count > 0 && <span className="text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-md border border-amber-200/60">สายสะสม {sStats.remaining_late_count}</span>}
+                {sStats.remaining_leave_count > 0 && <span className="text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded-md border border-sky-200/60 font-semibold">ลาสะสม {sStats.remaining_leave_count}</span>}
               </div>
             )}
           </div>
@@ -1660,37 +1668,10 @@ export default function Attendance() {
 
   return (
     <div className="space-y-6 animate-fade-in-up">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-
-        {/* Global Action Tools */}
-        {selectedClass && students.length > 0 && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={() => { setExportStartDate(''); setExportEndDate(''); setShowExportModal(true); }}
-              className="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/70 font-bold text-xs transition-all flex items-center gap-1.5 shadow-2xs hover:shadow-xs cursor-pointer"
-              title="พรีวิวและส่งออกข้อมูลการเช็คชื่อเป็น CSV / Excel"
-            >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-              <span>พรีวิว & ส่งออก CSV</span>
-            </button>
-
-            <button
-              onClick={() => setShowImportModal(true)}
-              className="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/70 font-bold text-xs transition-all flex items-center gap-1.5 shadow-2xs hover:shadow-xs cursor-pointer"
-              title="นำเข้าข้อมูลการเช็คชื่อจากไฟล์ Excel พร้อมดูตัวอย่างรูปแบบและดาวน์โหลดเทมเพลต"
-            >
-              <Upload className="w-4 h-4 text-indigo-600" />
-              <span>นำเข้าจาก Excel & ตัวอย่างไฟล์</span>
-            </button>
-          </div>
-        )}
-      </div>
-
       {/* Active Classroom Bar (เมื่อเลือกห้องแล้ว) */}
       {selectedClass && selectedClassData && activeParsed && (
         <div className="glass p-5 sm:p-6 rounded-3xl border border-white/60 shadow-xl shadow-indigo-100/30 space-y-4 backdrop-blur-xl">
-          {/* Top Row: Course Info & Quick Switcher */}
+          {/* Top Row: Course Info & Quick Switcher + Tools */}
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="flex items-start sm:items-center gap-3.5 min-w-0">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/25 shrink-0">
@@ -1724,13 +1705,33 @@ export default function Attendance() {
               </div>
             </div>
 
-            {/* Quick Switch / เปลี่ยนห้อง */}
-            <div className="flex items-center gap-2 shrink-0">
+            {/* Quick Switch / เปลี่ยนห้อง & Action Tools */}
+            <div className="flex items-center gap-2 shrink-0 self-start lg:self-center flex-wrap">
+              <button
+                type="button"
+                onClick={() => { setExportStartDate(''); setExportEndDate(''); setShowExportModal(true); }}
+                className="px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/70 font-bold text-xs transition-all flex items-center gap-1.5 shadow-2xs hover:shadow-xs cursor-pointer"
+                title="พรีวิวและส่งออกข้อมูลการเช็คชื่อเป็น CSV / Excel"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                <span>ส่งออก CSV</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowImportModal(true)}
+                className="px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/70 font-bold text-xs transition-all flex items-center gap-1.5 shadow-2xs hover:shadow-xs cursor-pointer"
+                title="นำเข้าข้อมูลการเช็คชื่อจากไฟล์ Excel พร้อมดูตัวอย่างรูปแบบและดาวน์โหลดเทมเพลต"
+              >
+                <Upload className="w-3.5 h-3.5 text-indigo-600" />
+                <span>นำเข้า Excel</span>
+              </button>
+
               <div className="relative">
                 <select
                   value={selectedClass}
                   onChange={e => setSelectedClass(e.target.value)}
-                  className="form-input text-xs font-bold py-2 pl-3 pr-8 bg-white/90 hover:bg-white border-slate-200 rounded-xl focus:border-indigo-400 focus:ring focus:ring-indigo-200/50 transition-all text-slate-700 cursor-pointer shadow-xs max-w-[200px] sm:max-w-[260px] truncate"
+                  className="form-input text-xs font-bold py-2 pl-3 pr-8 bg-white/90 hover:bg-white border-slate-200 rounded-xl focus:border-indigo-400 focus:ring focus:ring-indigo-200/50 transition-all text-slate-700 cursor-pointer shadow-xs max-w-[200px] sm:max-w-[240px] truncate"
                   title="สลับห้องเรียนเร็ว"
                 >
                   {classrooms.map(c => (
@@ -1740,13 +1741,14 @@ export default function Attendance() {
                   ))}
                 </select>
               </div>
+
               <button
                 type="button"
                 onClick={() => setSelectedClass('')}
-                className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/70 transition-all shadow-xs cursor-pointer shrink-0"
+                className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-slate-100/90 hover:bg-slate-200 text-slate-700 border border-slate-200/80 transition-all shadow-xs cursor-pointer shrink-0"
                 title="ย้อนกลับไปดูการ์ดห้องเรียนทั้งหมด"
               >
-                <Grid className="w-3.5 h-3.5 text-indigo-600" />
+                <Grid className="w-3.5 h-3.5 text-slate-600" />
                 <span>การ์ดทั้งหมด</span>
               </button>
             </div>
@@ -1900,7 +1902,7 @@ export default function Attendance() {
       {!selectedClass ? (
         <div className="space-y-5 animate-fade-in">
           {/* Header & Filters */}
-          <div className="glass p-5 rounded-2xl border border-white/40 shadow-xl shadow-indigo-100/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="glass p-5 sm:p-6 rounded-3xl border border-white/60 bg-white/95 shadow-xl shadow-indigo-100/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-3.5">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500 via-indigo-600 to-purple-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/25 shrink-0">
                 <BookOpen className="w-6 h-6" />
@@ -1908,21 +1910,22 @@ export default function Attendance() {
               <div>
                 <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
                   <span>เลือกห้องเรียนเพื่อบันทึกเวลาเรียน</span>
-                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
+                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/80 shadow-2xs">
                     {classrooms.length} ห้อง
                   </span>
                 </h3>
+                <p className="text-xs text-slate-500 mt-0.5">เลือกห้องเรียนเพื่อเริ่มเช็คชื่อรายวันหรือดูตารางเวลาเรียนสะสม</p>
               </div>
             </div>
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
               {/* Category Filter Pills */}
-              <div className="flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 flex-wrap gap-1">
+              <div className="flex items-center bg-slate-100/80 p-1 rounded-2xl border border-slate-200/60 flex-wrap gap-1">
                 <button
                   type="button"
                   onClick={() => setClassFilter('all')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${classFilter === 'all'
-                    ? 'bg-white text-indigo-600 shadow-sm'
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${classFilter === 'all'
+                    ? 'bg-white text-indigo-600 shadow-2xs'
                     : 'text-slate-600 hover:text-slate-900'
                     }`}
                 >
@@ -1932,8 +1935,8 @@ export default function Attendance() {
                   <button
                     type="button"
                     onClick={() => setClassFilter('today')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${classFilter === 'today'
-                      ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-400'
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${classFilter === 'today'
+                      ? 'bg-emerald-600 text-white shadow-2xs ring-1 ring-emerald-400'
                       : 'text-emerald-700 bg-emerald-50/80 hover:bg-emerald-100/90'
                       }`}
                   >
@@ -1944,8 +1947,8 @@ export default function Attendance() {
                 <button
                   type="button"
                   onClick={() => setClassFilter('pvch')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${classFilter === 'pvch'
-                    ? 'bg-white text-indigo-600 shadow-sm'
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${classFilter === 'pvch'
+                    ? 'bg-white text-indigo-600 shadow-2xs'
                     : 'text-slate-600 hover:text-slate-900'
                     }`}
                 >
@@ -1954,8 +1957,8 @@ export default function Attendance() {
                 <button
                   type="button"
                   onClick={() => setClassFilter('pvs')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${classFilter === 'pvs'
-                    ? 'bg-white text-indigo-600 shadow-sm'
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${classFilter === 'pvs'
+                    ? 'bg-white text-indigo-600 shadow-2xs'
                     : 'text-slate-600 hover:text-slate-900'
                     }`}
                 >
@@ -1964,20 +1967,20 @@ export default function Attendance() {
               </div>
 
               {/* Search Box */}
-              <div className="relative min-w-[200px]">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <div className="relative min-w-[220px]">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   value={classSearch}
                   onChange={e => setClassSearch(e.target.value)}
                   placeholder="ค้นหารหัสวิชา, ชื่อวิชา..."
-                  className="w-full pl-9 pr-3 py-2 text-xs font-medium rounded-xl border border-slate-200 bg-white/90 focus:outline-none focus:ring-2 focus:ring-indigo-400/50 focus:border-indigo-500 shadow-xs"
+                  className="w-full pl-9 pr-8 py-2 text-xs font-medium rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400/50 focus:border-indigo-500 shadow-2xs"
                 />
                 {classSearch && (
                   <button
                     type="button"
                     onClick={() => setClassSearch('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -2020,9 +2023,9 @@ export default function Attendance() {
                       setSelectedClass(String(c.id));
                       setActiveTab('daily');
                     }}
-                    className={`group relative bg-white/85 hover:bg-white backdrop-blur-xl rounded-2xl p-5 border text-left flex flex-col justify-between transition-all duration-200 hover:-translate-y-1 hover:shadow-xl hover:shadow-indigo-500/10 cursor-pointer overflow-hidden ${hasToday
+                    className={`group relative bg-white/90 hover:bg-white backdrop-blur-xl rounded-3xl p-5 sm:p-6 border text-left flex flex-col justify-between transition-all duration-200 hover:-translate-y-1 hover:shadow-xl hover:shadow-indigo-500/15 cursor-pointer overflow-hidden ${hasToday
                       ? 'border-emerald-300 shadow-md shadow-emerald-500/5 ring-1 ring-emerald-400/40'
-                      : 'border-indigo-100/80 hover:border-indigo-300 shadow-sm'
+                      : 'border-indigo-100/90 hover:border-indigo-300 shadow-xs'
                       }`}
                   >
                     {/* Top Accent Gradient Bar */}
@@ -2133,20 +2136,22 @@ export default function Attendance() {
             <div className="space-y-6">
 
               {/* Date Control Panel */}
-              <div className="glass p-5 rounded-2xl border border-white/50 shadow-md">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="flex items-center gap-2 bg-indigo-50/50 p-1.5 rounded-xl border border-indigo-100/50">
+              <div className="glass p-4 sm:p-5 rounded-3xl border border-indigo-100/80 bg-white/95 shadow-xl shadow-indigo-100/20">
+                <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3.5">
+                  {/* Left: Date Stepper & Picker */}
+                  <div className="flex items-center gap-2 bg-slate-100/80 p-1.5 rounded-2xl border border-slate-200/70 shadow-2xs">
                     <button
+                      type="button"
                       onClick={() => adjustDate(-1)}
-                      className="p-2 text-indigo-600 hover:bg-white rounded-lg transition-colors"
+                      className="p-2 text-slate-600 hover:text-indigo-600 hover:bg-white rounded-xl transition-all shadow-2xs cursor-pointer"
                       title="วันก่อนหน้า"
                     >
                       <ChevronLeft className="w-5 h-5" />
                     </button>
 
-                    <div className="relative flex items-center gap-2 px-3 font-semibold text-slate-800 cursor-pointer group">
-                      <CalendarIcon className="w-4 h-4 text-indigo-500" />
-                      <span>{formattedSelectedDate}</span>
+                    <div className="relative flex items-center gap-2 px-3 py-1 font-extrabold text-slate-800 cursor-pointer group bg-white rounded-xl border border-slate-200/60 shadow-xs hover:border-indigo-300 transition-all">
+                      <CalendarIcon className="w-4 h-4 text-indigo-600 group-hover:scale-110 transition-transform" />
+                      <span className="text-xs sm:text-sm font-black text-slate-800">{formattedSelectedDate}</span>
                       <input
                         type="date"
                         value={date}
@@ -2156,36 +2161,43 @@ export default function Attendance() {
                     </div>
 
                     <button
+                      type="button"
                       onClick={() => adjustDate(1)}
-                      className="p-2 text-indigo-600 hover:bg-white rounded-lg transition-colors"
+                      className="p-2 text-slate-600 hover:text-indigo-600 hover:bg-white rounded-xl transition-all shadow-2xs cursor-pointer"
                       title="วันถัดไป"
                     >
                       <ChevronRight className="w-5 h-5" />
                     </button>
                   </div>
 
-                  <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-end">
-                    <button
-                      onClick={setToday}
-                      className={`px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-xl border transition-all cursor-pointer ${isToday
-                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
-                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                        }`}
-                    >
-                      วันนี้
-                    </button>
-                    <button
-                      onClick={setYesterday}
-                      className="px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-xl bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition-all cursor-pointer"
-                    >
-                      เมื่อวาน
-                    </button>
+                  {/* Right: Quick Date Filters & Actions */}
+                  <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-between lg:justify-end">
+                    <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-2xl border border-slate-200/60">
+                      <button
+                        type="button"
+                        onClick={setToday}
+                        className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${isToday
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-white/70'
+                          }`}
+                      >
+                        {isToday && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
+                        <span>วันนี้</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={setYesterday}
+                        className="px-3.5 py-1.5 text-xs font-bold rounded-xl bg-transparent text-slate-600 hover:text-slate-900 hover:bg-white/70 transition-all cursor-pointer"
+                      >
+                        เมื่อวาน
+                      </button>
+                    </div>
 
                     {/* ปุ่มเช็คชื่อย้อนหลัง */}
                     <button
                       type="button"
                       onClick={() => setShowRetroactiveModal(true)}
-                      className="px-4 py-2 text-xs sm:text-sm font-bold rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/30 transition-all flex items-center gap-1.5 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                      className="px-3.5 py-2 text-xs font-bold rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/30 transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
                       title="เปิดหน้าต่างเลือกสัปดาห์หรือวันย้อนหลังเพื่อเช็คชื่อ"
                     >
                       <History className="w-4 h-4" />
@@ -2197,17 +2209,17 @@ export default function Attendance() {
                       type="button"
                       onClick={handleClearData}
                       disabled={saving}
-                      className="px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-200/70 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      className="px-3 py-2 text-xs font-bold rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/70 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
                       title={activeSectionGroup
                         ? `ลบข้อมูลการเช็คชื่อเฉพาะห้อง ${activeSectionGroup.label} สำหรับวันที่เลือกอยู่`
                         : 'ลบข้อมูลการเช็คชื่อทั้งห้องสำหรับวันที่เลือกอยู่'}
                     >
-                      <Trash2 className="w-4 h-4 text-red-500" />
+                      <Trash2 className="w-3.5 h-3.5 text-rose-600" />
                       <span className="hidden sm:inline">
-                        ลบข้อมูล{activeSectionGroup ? ` (${activeSectionGroup.label})` : 'วันที่เลือก'} ({new Date(date).getDate()} {THAI_MONTHS_SHORT[new Date(date).getMonth()]})
+                        ลบข้อมูล{activeSectionGroup ? ` (${activeSectionGroup.label})` : ''} ({new Date(date).getDate()} {THAI_MONTHS_SHORT[new Date(date).getMonth()]})
                       </span>
                       <span className="sm:hidden">
-                        ลบ{activeSectionGroup ? ` ${activeSectionGroup.label}` : 'ข้อมูล'} ({new Date(date).getDate()} {THAI_MONTHS_SHORT[new Date(date).getMonth()]})
+                        ลบข้อมูล
                       </span>
                     </button>
                   </div>
@@ -2216,9 +2228,9 @@ export default function Attendance() {
 
               {/* Retroactive Alert Banner (เมื่อเลือกวันในอดีต) */}
               {isPastDate && (
-                <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-amber-100/70 p-4 rounded-2xl border border-amber-200/90 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fade-in-up">
+                <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-amber-100/70 p-4 rounded-3xl border border-amber-200/90 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fade-in-up">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-500/20 shrink-0">
+                    <div className="w-9 h-9 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-500/20 shrink-0">
                       <History className="w-5 h-5" />
                     </div>
                     <div>
@@ -2248,7 +2260,7 @@ export default function Attendance() {
                     <button
                       type="button"
                       onClick={() => setShowRetroactiveModal(true)}
-                      className="px-3 py-1.5 rounded-xl bg-white hover:bg-amber-50 text-amber-900 border border-amber-300 text-xs font-bold transition-all shadow-xs flex items-center gap-1"
+                      className="px-3 py-1.5 rounded-xl bg-white hover:bg-amber-50 text-amber-900 border border-amber-300 text-xs font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer"
                     >
                       <Clock className="w-3.5 h-3.5 text-amber-600" />
                       <span>เปลี่ยนวันย้อนหลัง</span>
@@ -2256,7 +2268,7 @@ export default function Attendance() {
                     <button
                       type="button"
                       onClick={setToday}
-                      className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs font-bold transition-all shadow-md shadow-indigo-500/20 hover:scale-105 flex items-center gap-1.5"
+                      className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs font-bold transition-all shadow-md shadow-indigo-500/20 hover:scale-105 flex items-center gap-1.5 cursor-pointer"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
                       <span>กลับไปวันนี้</span>
@@ -2266,98 +2278,124 @@ export default function Attendance() {
               )}
 
               {/* Dynamic Counters Card */}
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
-                <div className="glass p-4 rounded-2xl border-l-4 border-l-emerald-500 flex items-center justify-between shadow-sm">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+                <div className="glass p-4 rounded-3xl border border-emerald-100/80 bg-gradient-to-br from-emerald-50/70 via-white to-teal-50/30 flex items-center justify-between shadow-xs hover:shadow-md transition-all">
                   <div>
-                    <p className="text-xs font-semibold text-slate-600 mb-0.5">มาเรียน</p>
-                    <p className="text-2xl font-black text-slate-800">{dailyStats.present}</p>
+                    <p className="text-xs font-bold text-emerald-800 mb-0.5">มาเรียน</p>
+                    <p className="text-2xl sm:text-3xl font-black text-emerald-700 tracking-tight tabular-nums">{dailyStats.present}</p>
+                    <span className="text-[11px] font-semibold text-slate-400">คน</span>
                   </div>
-                  <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center">
-                    <CheckCircle className="w-5 h-5 text-emerald-600" />
+                  <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shadow-2xs">
+                    <CheckCircle className="w-6 h-6" />
                   </div>
                 </div>
 
-                <div className="glass p-4 rounded-2xl border-l-4 border-l-amber-500 flex items-center justify-between shadow-sm">
+                <div className="glass p-4 rounded-3xl border border-amber-100/80 bg-gradient-to-br from-amber-50/70 via-white to-orange-50/30 flex items-center justify-between shadow-xs hover:shadow-md transition-all">
                   <div>
-                    <p className="text-xs font-semibold text-slate-600 mb-0.5">สาย</p>
-                    <p className="text-2xl font-black text-slate-800">{dailyStats.late}</p>
+                    <p className="text-xs font-bold text-amber-800 mb-0.5">สาย</p>
+                    <p className="text-2xl sm:text-3xl font-black text-amber-700 tracking-tight tabular-nums">{dailyStats.late}</p>
+                    <span className="text-[11px] font-semibold text-slate-400">คน</span>
                   </div>
-                  <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center">
-                    <Clock className="w-5 h-5 text-amber-600" />
+                  <div className="w-11 h-11 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center shadow-2xs">
+                    <Clock className="w-6 h-6" />
                   </div>
                 </div>
 
-                <div className="glass p-4 rounded-2xl border-l-4 border-l-red-500 flex items-center justify-between shadow-sm">
+                <div className="glass p-4 rounded-3xl border border-rose-100/80 bg-gradient-to-br from-rose-50/70 via-white to-red-50/30 flex items-center justify-between shadow-xs hover:shadow-md transition-all">
                   <div>
-                    <p className="text-xs font-semibold text-slate-600 mb-0.5">ขาด</p>
-                    <p className="text-2xl font-black text-slate-800">{dailyStats.absent}</p>
+                    <p className="text-xs font-bold text-rose-800 mb-0.5">ขาด</p>
+                    <p className="text-2xl sm:text-3xl font-black text-rose-700 tracking-tight tabular-nums">{dailyStats.absent}</p>
+                    <span className="text-[11px] font-semibold text-slate-400">คน</span>
                   </div>
-                  <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center">
-                    <XCircle className="w-5 h-5 text-red-500" />
+                  <div className="w-11 h-11 rounded-2xl bg-rose-500/10 text-rose-600 flex items-center justify-center shadow-2xs">
+                    <XCircle className="w-6 h-6" />
                   </div>
                 </div>
 
-                <div className="glass p-4 rounded-2xl border-l-4 border-l-blue-500 flex items-center justify-between shadow-sm">
+                <div className="glass p-4 rounded-3xl border border-sky-100/80 bg-gradient-to-br from-sky-50/70 via-white to-blue-50/30 flex items-center justify-between shadow-xs hover:shadow-md transition-all">
                   <div>
-                    <p className="text-xs font-semibold text-slate-600 mb-0.5">ลา</p>
-                    <p className="text-2xl font-black text-slate-800">{dailyStats.leave}</p>
+                    <p className="text-xs font-bold text-sky-800 mb-0.5">ลา</p>
+                    <p className="text-2xl sm:text-3xl font-black text-sky-700 tracking-tight tabular-nums">{dailyStats.leave}</p>
+                    <span className="text-[11px] font-semibold text-slate-400">คน</span>
                   </div>
-                  <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center">
-                    <FileText className="w-5 h-5 text-blue-500" />
+                  <div className="w-11 h-11 rounded-2xl bg-sky-500/10 text-sky-600 flex items-center justify-center shadow-2xs">
+                    <FileText className="w-6 h-6" />
                   </div>
                 </div>
 
-                <div className="glass p-4 rounded-2xl border-l-4 border-l-indigo-600 flex items-center justify-between col-span-2 md:col-span-1 shadow-sm">
-                  <div>
-                    <p className="text-xs font-semibold text-slate-600 mb-0.5">บันทึกผล</p>
-                    <p className="text-2xl font-black text-slate-800">
-                      {dailyStats.marked} <span className="text-sm font-semibold text-slate-500">/ {dailyStats.total}</span>
-                    </p>
-                  </div>
-                  <div className="w-9 h-9 rounded-xl bg-indigo-100 flex items-center justify-center">
-                    <span className="text-xs font-bold text-indigo-700">
+                <div className="glass p-4 rounded-3xl border border-indigo-100/80 bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/30 col-span-2 sm:col-span-1 flex flex-col justify-between shadow-xs hover:shadow-md transition-all">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-indigo-900 mb-0.5">บันทึกผลแล้ว</p>
+                      <p className="text-2xl sm:text-3xl font-black text-indigo-800 tracking-tight tabular-nums">
+                        {dailyStats.marked}
+                        <span className="text-xs font-semibold text-slate-400 ml-1">/ {dailyStats.total}</span>
+                      </p>
+                    </div>
+                    <div className="w-11 h-11 rounded-2xl bg-indigo-500/10 text-indigo-700 flex items-center justify-center font-black text-xs shadow-2xs">
                       {Math.round((dailyStats.marked / (dailyStats.total || 1)) * 100)}%
-                    </span>
+                    </div>
+                  </div>
+                  <div className="w-full bg-indigo-100/70 h-2 rounded-full overflow-hidden mt-2.5">
+                    <div
+                      className="h-full bg-gradient-to-r from-indigo-500 to-violet-600 rounded-full transition-all duration-300"
+                      style={{ width: `${Math.min(100, Math.round((dailyStats.marked / (dailyStats.total || 1)) * 100))}%` }}
+                    />
                   </div>
                 </div>
               </div>
 
               {/* Student List View */}
-              <div className="glass overflow-hidden rounded-2xl border border-white/50 shadow-xl pb-16 md:pb-0">
+              <div className="glass overflow-hidden rounded-3xl border border-indigo-100/80 shadow-xl shadow-indigo-100/20 pb-16 md:pb-0 bg-white/95">
                 {/* Search and Bulk Operations Bar */}
-                <div className="p-4 border-b border-indigo-50/50 bg-white/40 flex flex-col md:flex-row items-center justify-between gap-4">
-                  <div className="relative w-full md:w-72">
-                    <Search className="w-4 h-4 text-slate-500 absolute left-3 top-3.5" />
+                <div className="p-4 sm:p-5 border-b border-indigo-50/80 bg-white/50 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3.5">
+                  <div className="relative w-full sm:w-80">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
-                      placeholder="ค้นหาชื่อหรือรหัส..."
+                      placeholder="ค้นหาชื่อหรือรหัสประจำตัว..."
                       value={searchQuery}
                       onChange={e => setSearchQuery(e.target.value)}
-                      className="form-input pl-9 py-2 text-sm bg-white/70 border-indigo-100/50 rounded-xl"
+                      className="form-input pl-10 pr-8 py-2 text-xs bg-white border-slate-200/90 rounded-xl focus:border-indigo-500 shadow-2xs w-full"
                     />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
 
-                  <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
-                    <span className="text-xs text-slate-600 font-semibold mr-1">
+                  <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto justify-between sm:justify-end">
+                    <span className="text-xs text-slate-500 font-bold mr-1">
                       กำหนดเร็ว{activeSectionGroup ? ` (${activeSectionGroup.label})` : ''}:
                     </span>
                     <button
+                      type="button"
                       onClick={() => handleMarkAll('present')}
-                      className="px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-600 text-xs font-semibold border border-emerald-200/40 transition-colors"
+                      className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold border border-emerald-200/70 transition-all shadow-2xs cursor-pointer flex items-center gap-1"
                     >
-                      มาเรียนทุกคน{activeSectionGroup ? ` (${activeSectionGroup.label})` : ''}
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>มาทุกคน{activeSectionGroup ? ` (${activeSectionGroup.label})` : ''}</span>
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleMarkAll('absent')}
-                      className="px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 text-xs font-semibold border border-red-200/40 transition-colors"
+                      className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold border border-rose-200/70 transition-all shadow-2xs cursor-pointer flex items-center gap-1"
                     >
-                      ขาดทุกคน{activeSectionGroup ? ` (${activeSectionGroup.label})` : ''}
+                      <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                      <span>ขาดทุกคน{activeSectionGroup ? ` (${activeSectionGroup.label})` : ''}</span>
                     </button>
                     <button
+                      type="button"
                       onClick={handleResetDraft}
-                      className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold border border-slate-300/40 transition-colors flex items-center gap-1.5"
+                      className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold border border-slate-200 transition-all shadow-2xs cursor-pointer flex items-center gap-1"
                     >
-                      <RefreshCw className="w-3.5 h-3.5" /> คืนค่า
+                      <RefreshCw className="w-3.5 h-3.5 text-slate-600" />
+                      <span>คืนค่า</span>
                     </button>
                   </div>
                 </div>
@@ -2465,11 +2503,11 @@ export default function Attendance() {
                 <div className="hidden md:block overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="bg-indigo-50/70 border-b border-indigo-100/80">
-                        <th className="p-4 font-bold text-slate-700 w-24">รหัส</th>
-                        <th className="p-4 font-bold text-slate-700">ชื่อ-นามสกุล</th>
-                        <th className="p-4 font-bold text-slate-700 min-w-[340px]">สถานะการมาเรียน</th>
-                        <th className="p-4 font-bold text-slate-700 text-center w-40">สถิติสะสม</th>
+                      <tr className="bg-slate-50/80 border-b border-indigo-100 text-xs font-black text-slate-600 uppercase tracking-wider">
+                        <th className="p-4 w-28">รหัส</th>
+                        <th className="p-4">ชื่อ-นามสกุล</th>
+                        <th className="p-4 min-w-[340px]">สถานะการมาเรียน</th>
+                        <th className="p-4 text-center w-44">สถิติสะสม & ความเสี่ยง</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2563,7 +2601,7 @@ export default function Attendance() {
                 </div>
 
                 {/* Sticky Save Bar */}
-                <div className="p-4 border-t border-indigo-50/50 bg-indigo-50/30 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="p-4 sm:p-5 border-t border-indigo-100/70 bg-gradient-to-r from-slate-50/90 via-white to-indigo-50/40 flex flex-col sm:flex-row items-center justify-between gap-4">
                   {/* Left: Auto Save Toggle */}
                   <div className="flex items-center gap-4">
                     <label className="relative inline-flex items-center cursor-pointer select-none">
@@ -2578,8 +2616,8 @@ export default function Attendance() {
                         }}
                         className="sr-only peer"
                       />
-                      <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
-                      <span className="ml-2.5 text-sm font-bold text-slate-700">บันทึกอัตโนมัติ</span>
+                      <div className="w-10 h-5.5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      <span className="ml-2.5 text-xs sm:text-sm font-extrabold text-slate-700">บันทึกอัตโนมัติ</span>
                     </label>
 
                     {autoSave && renderAutoSaveStatus()}
@@ -2590,22 +2628,26 @@ export default function Attendance() {
                     {!autoSave ? (
                       <>
                         <button
+                          type="button"
                           onClick={handleResetDraft}
-                          className="px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold hover:bg-slate-50 transition-all duration-200 text-sm"
+                          className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold hover:bg-slate-50 transition-all text-xs cursor-pointer shadow-2xs"
                         >
                           ยกเลิกการแก้ไข
                         </button>
                         <button
+                          type="button"
                           onClick={handleSave}
                           disabled={saving}
-                          className="btn btn-primary px-8 py-2.5 shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2 text-sm"
+                          className="btn btn-primary px-6 py-2.5 shadow-md shadow-indigo-500/20 flex items-center justify-center gap-2 text-xs font-bold rounded-xl cursor-pointer"
                         >
                           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                           <span>บันทึกประวัติการเช็คชื่อ</span>
                         </button>
                       </>
                     ) : (
-                      <span className="text-xs text-slate-500 font-medium">ทุกการเปลี่ยนแปลงจะถูกบันทึกลงระบบทันที</span>
+                      <span className="text-xs text-slate-500 font-semibold bg-white/80 px-3 py-1.5 rounded-xl border border-slate-200/60 shadow-2xs">
+                        ⚡ บันทึกข้อมูลอัตโนมัติเมื่อกดเลือกสถานะ
+                      </span>
                     )}
                   </div>
                 </div>
