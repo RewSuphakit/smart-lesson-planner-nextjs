@@ -121,10 +121,21 @@ export default function Students() {
   // ─── Mutation: สร้าง/แก้ไขนักเรียน ───
   const saveMutation = useMutation({
     mutationFn: async (payload: typeof form) => {
+      const formattedPayload = {
+        name: payload.name.trim(),
+        student_code: payload.student_code?.trim() || null,
+        grade_level: payload.grade_level?.trim() || null,
+        branch: payload.branch?.trim() || null,
+        email: payload.email?.trim() || null,
+        classroom_id: payload.classroom_id ? Number(payload.classroom_id) : null,
+        avatar: payload.remove_avatar ? null : (payload.avatar || null),
+        remove_avatar: payload.remove_avatar,
+      };
+
       if (editing) {
-        return api.put('/students/' + editing, payload);
+        return api.put('/students/' + editing, formattedPayload);
       } else {
-        return api.post('/students', payload);
+        return api.post('/students', formattedPayload);
       }
     },
     onSuccess: () => {
@@ -140,16 +151,17 @@ export default function Students() {
       queryClient.invalidateQueries({ queryKey: ['scores-matrix'] });
       queryClient.invalidateQueries({ queryKey: ['attendance-data'] });
     },
-    onError: (err: { response?: { data?: { message?: string } } }) => {
-      toast.error(err.response?.data?.message || 'บันทึกไม่สำเร็จ');
+    onError: (err: { response?: { data?: { message?: string; errors?: Array<{ message: string }> } } }) => {
+      const firstError = err.response?.data?.errors?.[0]?.message;
+      toast.error(firstError || err.response?.data?.message || 'บันทึกไม่สำเร็จ');
     },
   });
 
   // ─── Mutation: ลบนักเรียนรายคน ───
   const deleteMutation = useMutation({
     mutationFn: (id: string | number) => api.delete('/students/' + id),
-    onSuccess: () => {
-      toast.success('ลบนักเรียนแล้ว');
+    onSuccess: (res) => {
+      toast.success(res.data?.message || 'ลบนักเรียนเรียบร้อยแล้ว');
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['student-branches'] });
       queryClient.invalidateQueries({ queryKey: ['student-grade-levels'] });
@@ -158,8 +170,8 @@ export default function Students() {
       queryClient.invalidateQueries({ queryKey: ['scores-matrix'] });
       queryClient.invalidateQueries({ queryKey: ['attendance-data'] });
     },
-    onError: () => {
-      toast.error('ลบไม่สำเร็จ');
+    onError: (err: { response?: { data?: { message?: string } } }) => {
+      toast.error(err.response?.data?.message || 'ลบไม่สำเร็จ');
     },
   });
 
@@ -208,8 +220,8 @@ export default function Students() {
   // ─── Mutation: ลบนักเรียนที่เลือก (bulk) ───
   const bulkDeleteMutation = useMutation({
     mutationFn: () => api.delete(`/students?ids=${selectedStudents.join(',')}`),
-    onSuccess: () => {
-      toast.success('ลบนักเรียนที่เลือกเรียบร้อยแล้ว');
+    onSuccess: (res) => {
+      toast.success(res.data?.message || 'ลบนักเรียนที่เลือกเรียบร้อยแล้ว');
       setSelectedStudents([]);
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['student-branches'] });
@@ -219,19 +231,19 @@ export default function Students() {
       queryClient.invalidateQueries({ queryKey: ['scores-matrix'] });
       queryClient.invalidateQueries({ queryKey: ['attendance-data'] });
     },
-    onError: () => {
-      toast.error('ลบไม่สำเร็จ');
+    onError: (err: { response?: { data?: { message?: string } } }) => {
+      toast.error(err.response?.data?.message || 'ลบไม่สำเร็จ');
     },
   });
 
   // ─── Mutation: ลบทั้งหมด ───
   const deleteAllMutation = useMutation({
     mutationFn: (classroomId?: string) => {
-      const url = classroomId ? `/students?classroom_id=${classroomId}` : '/students';
+      const url = classroomId ? `/students?classroom_id=${classroomId}` : '/students?all=true';
       return api.delete(url);
     },
-    onSuccess: () => {
-      toast.success('ลบนักเรียนเรียบร้อยแล้ว');
+    onSuccess: (res) => {
+      toast.success(res.data?.message || 'ลบนักเรียนเรียบร้อยแล้ว');
       setSelectedStudents([]);
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['student-branches'] });
@@ -241,8 +253,8 @@ export default function Students() {
       queryClient.invalidateQueries({ queryKey: ['scores-matrix'] });
       queryClient.invalidateQueries({ queryKey: ['attendance-data'] });
     },
-    onError: () => {
-      toast.error('ลบไม่สำเร็จ');
+    onError: (err: { response?: { data?: { message?: string } } }) => {
+      toast.error(err.response?.data?.message || 'ลบไม่สำเร็จ');
     },
   });
 
@@ -393,7 +405,7 @@ export default function Students() {
   };
 
   const handleDelete = (id: string | number) => {
-    if (!confirm('ต้องการลบนักเรียนคนนี้หรือไม่?')) return;
+    if (!window.confirm('ต้องการลบนักเรียนคนนี้หรือไม่?')) return;
     deleteMutation.mutate(id);
   };
 

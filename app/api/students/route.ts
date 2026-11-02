@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
-import { CreateStudentSchema, BulkCreateStudentSchema, BulkUpdateStudentMetaSchema, UpdateStudentExamScoresSchema, validateRequestBody, validateData } from '@/lib/validation';
+import { CreateStudentSchema, BulkCreateStudentSchema, BulkUpdateStudentMetaSchema, UpdateStudentExamScoresSchema, validateData } from '@/lib/validation';
 import { invalidateCache, userCacheKey, getOrSetCache } from '@/lib/cache';
 import { formatStudentListItem } from '@/lib/formatters';
 import { sanitizeExamScore } from '@/lib/sanitize';
@@ -132,11 +132,15 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const user = requireAuth(request);
-    const body = await request.clone().json().catch(() => null);
+    const body = await request.json().catch(() => null);
+
+    if (!body || typeof body !== 'object') {
+      return NextResponse.json({ message: 'Invalid JSON request payload' }, { status: 400 });
+    }
 
     // Bulk create
-    if (body && Array.isArray(body.students)) {
-      const validation = await validateRequestBody(request, BulkCreateStudentSchema);
+    if (Array.isArray(body.students)) {
+      const validation = validateData(body, BulkCreateStudentSchema);
       if (!validation.success) {
         return validation.response;
       }
@@ -172,11 +176,13 @@ export async function POST(request: NextRequest) {
       invalidateCache(userCacheKey(user.id, 'students'));
       invalidateCache(userCacheKey(user.id, 'classrooms'));
       invalidateCache(userCacheKey(user.id, 'dashboard'));
+      invalidateCache(userCacheKey(user.id, 'grades'));
+      invalidateCache(userCacheKey(user.id, 'scores'));
       return NextResponse.json({ message: `Created ${result.count} students` }, { status: 201 });
     }
 
     // Single create
-    const validation = await validateRequestBody(request, CreateStudentSchema);
+    const validation = validateData(body, CreateStudentSchema);
     if (!validation.success) {
       return validation.response;
     }
@@ -202,13 +208,18 @@ export async function POST(request: NextRequest) {
         classroomId: validation.data.classroom_id ? Number(validation.data.classroom_id) : null,
         avatar: validation.data.avatar || null,
       },
+      include: {
+        classroom: { select: { name: true } },
+      },
     });
 
     invalidateCache(userCacheKey(user.id, 'students'));
     invalidateCache(userCacheKey(user.id, 'classrooms'));
     invalidateCache(userCacheKey(user.id, 'dashboard'));
+    invalidateCache(userCacheKey(user.id, 'grades'));
+    invalidateCache(userCacheKey(user.id, 'scores'));
 
-    return NextResponse.json({ data: student }, { status: 201 });
+    return NextResponse.json({ data: formatStudentListItem(student) }, { status: 201 });
   } catch (error) {
     if (error instanceof AuthError) return handleAuthError();
     console.error('Create student error:', error);
@@ -337,51 +348,84 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const classroomId = searchParams.get('classroom_id');
     const idsParam = searchParams.get('ids');
+    const all = searchParams.get('all');
 
-    // Prevent accidental full database wipe
-    if (!idsParam && !classroomId) {
-      return NextResponse.json(
-        { message: 'Must specify classroom_id or ids parameter to delete students' },
-        { status: 400 }
-      );
+    // Case 1: Delete all students of this user (explicit all=true)
+    if (all === 'true') {
+      const result = await prisma.student.deleteMany({
+        where: { userId: user.id },
+      });
+      invalidateCache(userCacheKey(user.id, 'students'));
+      invalidateCache(userCacheKey(user.id, 'classrooms'));
+      invalidateCache(userCacheKey(user.id, 'dashboard'));
+      invalidateCache(userCacheKey(user.id, 'grades'));
+      invalidateCache(userCacheKey(user.id, 'scores'));
+      return NextResponse.json({
+        message: `ลบนักเรียนทั้งหมดสำเร็จ ${result.count} คน`,
+        count: result.count,
+      });
     }
 
-    // Case 1: Delete specific students by IDs list
+    // Case 2: Delete specific students by IDs list
     if (idsParam) {
-      const ids = idsParam.split(',').map(Number).filter(id => !isNaN(id));
+      const ids = idsParam.split(',').map(Number).filter((id) => !isNaN(id) && id > 0);
+      if (ids.length === 0) {
+        return NextResponse.json({ message: 'กรุณาระบุรหัสนักเรียนที่ต้องการลบ' }, { status: 400 });
+      }
       const result = await prisma.student.deleteMany({
         where: {
           id: { in: ids },
           userId: user.id,
         },
       });
+      invalidateCache(userCacheKey(user.id, 'students'));
       invalidateCache(userCacheKey(user.id, 'classrooms'));
       invalidateCache(userCacheKey(user.id, 'dashboard'));
-      return NextResponse.json({ message: `Deleted ${result.count} students`, count: result.count });
+      invalidateCache(userCacheKey(user.id, 'grades'));
+      invalidateCache(userCacheKey(user.id, 'scores'));
+      return NextResponse.json({
+        message: `ลบนักเรียนสำเร็จ ${result.count} คน`,
+        count: result.count,
+      });
     }
 
-    // Case 2: Delete students in a specific classroom
-    const cid = Number(classroomId);
-    const ownedClassroom = await prisma.classroom.findFirst({
-      where: { id: cid, userId: user.id },
-    });
-    if (!ownedClassroom) {
-      return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
+    // Case 3: Delete students in a specific classroom
+    if (classroomId) {
+      const cid = Number(classroomId);
+      if (isNaN(cid) || cid <= 0) {
+        return NextResponse.json({ message: 'รหัสห้องเรียนไม่ถูกต้อง' }, { status: 400 });
+      }
+      const ownedClassroom = await prisma.classroom.findFirst({
+        where: { id: cid, userId: user.id },
+      });
+      if (!ownedClassroom) {
+        return NextResponse.json({ message: 'ไม่พบห้องเรียนหรือไม่มีสิทธิ์เข้าถึง' }, { status: 404 });
+      }
+
+      const result = await prisma.student.deleteMany({
+        where: {
+          userId: user.id,
+          classroomId: cid,
+        },
+      });
+      invalidateCache(userCacheKey(user.id, 'students'));
+      invalidateCache(userCacheKey(user.id, 'classrooms'));
+      invalidateCache(userCacheKey(user.id, 'dashboard'));
+      invalidateCache(userCacheKey(user.id, 'grades'));
+      invalidateCache(userCacheKey(user.id, 'scores'));
+      return NextResponse.json({
+        message: `ลบนักเรียนในห้องเรียนสำเร็จ ${result.count} คน`,
+        count: result.count,
+      });
     }
 
-    const result = await prisma.student.deleteMany({
-      where: {
-        userId: user.id,
-        classroomId: cid,
-      },
-    });
-    invalidateCache(userCacheKey(user.id, 'students'));
-    invalidateCache(userCacheKey(user.id, 'classrooms'));
-    invalidateCache(userCacheKey(user.id, 'dashboard'));
-    return NextResponse.json({ message: `Deleted ${result.count} students`, count: result.count });
+    return NextResponse.json(
+      { message: 'กรุณาระบุ classroom_id, ids หรือ all=true ในการลบนักเรียน' },
+      { status: 400 }
+    );
   } catch (error) {
     if (error instanceof AuthError) return handleAuthError();
     console.error('Delete students error:', error);
-    return NextResponse.json({ message: 'Failed to delete students' }, { status: 500 });
+    return NextResponse.json({ message: 'เกิดข้อผิดพลาดในการลบนักเรียน' }, { status: 500 });
   }
 }

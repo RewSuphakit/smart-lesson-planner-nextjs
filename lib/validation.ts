@@ -28,25 +28,60 @@ export const ResetPasswordSchema = z.object({
 
 // ==================== Student Schemas ====================
 export const CreateStudentSchema = z.object({
-  name: z.string().trim().min(1, 'Student name is required'),
-  student_code: z.string().trim().nullable().optional(),
-  grade_level: z.string().trim().nullable().optional(),
-  branch: z.string().trim().nullable().optional(),
-  email: z.string().trim().email('Invalid email address').nullable().optional().or(z.literal('')),
-  classroom_id: z.number().nullable().optional(),
+  name: z.string().trim().min(1, 'กรุณาระบุชื่อ-นามสกุล'),
+  student_code: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? null : val),
+    z.string().trim().nullable().optional()
+  ),
+  grade_level: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? null : val),
+    z.string().trim().nullable().optional()
+  ),
+  branch: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? null : val),
+    z.string().trim().nullable().optional()
+  ),
+  email: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? null : val),
+    z.string().trim().email('รูปแบบอีเมลไม่ถูกต้อง').nullable().optional()
+  ),
+  classroom_id: z.preprocess(
+    (val) => {
+      if (val === '' || val === null || val === undefined || val === 0 || val === 'null' || val === 'undefined') return null;
+      const num = Number(val);
+      return isNaN(num) ? val : num;
+    },
+    z.number({ message: 'รหัสห้องเรียนต้องเป็นตัวเลข' }).int().positive('รหัสห้องเรียนต้องเป็นตัวเลขจำนวนเต็มบวก').nullable().optional()
+  ),
   // Cap avatar payload (client compresses to ~3-8 KB WebP; 150k chars leaves generous headroom)
-  avatar: z.string().max(150_000, 'Avatar is too large').nullable().optional(),
+  avatar: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? null : val),
+    z.string().max(150_000, 'ขนาดรูปภาพเกินกำหนด (สูงสุด 150KB)').nullable().optional()
+  ),
 });
 
 export const BulkCreateStudentSchema = z.object({
-  students: z.array(CreateStudentSchema).min(1, 'At least one student is required'),
+  students: z.array(CreateStudentSchema).min(1, 'ต้องมีข้อมูลนักเรียนอย่างน้อย 1 คน'),
 });
 
 export const BulkUpdateStudentMetaSchema = z.object({
-  student_ids: z.array(z.coerce.number().int().positive()).min(1, 'At least one student is required'),
-  classroom_id: z.union([z.number().int().positive(), z.null()]).optional(),
-  grade_level: z.string().trim().max(100, 'Grade level is too long').nullable().optional(),
-  branch: z.string().trim().max(255, 'Branch is too long').nullable().optional(),
+  student_ids: z.array(z.coerce.number().int().positive()).min(1, 'ต้องเลือกนักเรียนอย่างน้อย 1 คน'),
+  classroom_id: z.preprocess(
+    (val) => {
+      if (val === '' || val === null || val === undefined || val === 0 || val === 'null' || val === 'undefined') return null;
+      const num = Number(val);
+      return isNaN(num) ? val : num;
+    },
+    z.number({ message: 'รหัสห้องเรียนต้องเป็นตัวเลข' }).int().positive('รหัสห้องเรียนต้องเป็นตัวเลขจำนวนเต็มบวก').nullable().optional()
+  ),
+  grade_level: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? null : val),
+    z.string().trim().max(100, 'ระดับชั้นต้องไม่เกิน 100 ตัวอักษร').nullable().optional()
+  ),
+  branch: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? null : val),
+    z.string().trim().max(255, 'สาขาต้องไม่เกิน 255 ตัวอักษร').nullable().optional()
+  ),
 });
 
 export const UpdateStudentExamScoresSchema = z.object({

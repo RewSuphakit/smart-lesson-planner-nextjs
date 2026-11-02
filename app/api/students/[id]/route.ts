@@ -156,14 +156,14 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const { id } = await params;
     const numericId = Number(id);
     if (isNaN(numericId) || numericId <= 0) {
-      return NextResponse.json({ message: 'Invalid student ID' }, { status: 400 });
+      return NextResponse.json({ message: 'รหัสนักเรียนไม่ถูกต้อง' }, { status: 400 });
     }
 
     // Check ownership
     const student = await prisma.student.findFirst({
       where: { id: numericId, userId: user.id },
     });
-    if (!student) return NextResponse.json({ message: 'Student not found' }, { status: 404 });
+    if (!student) return NextResponse.json({ message: 'ไม่พบข้อมูลนักเรียนหรือไม่มีสิทธิ์เข้าถึง' }, { status: 404 });
 
     await prisma.student.delete({ where: { id: numericId } });
     invalidateCache(userCacheKey(user.id, 'students'));
@@ -171,9 +171,10 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     invalidateCache(userCacheKey(user.id, 'scores'));
     invalidateCache(userCacheKey(user.id, 'classrooms'));
     invalidateCache(userCacheKey(user.id, 'dashboard'));
-    return NextResponse.json({ message: 'Student deleted' });
+    return NextResponse.json({ message: 'ลบนักเรียนเรียบร้อยแล้ว' });
   } catch (error) {
     if (error instanceof AuthError) return handleAuthError();
-    return NextResponse.json({ message: 'Failed to delete student' }, { status: 500 });
+    console.error('Delete single student error:', error);
+    return NextResponse.json({ message: 'เกิดข้อผิดพลาดในการลบนักเรียน' }, { status: 500 });
   }
 }

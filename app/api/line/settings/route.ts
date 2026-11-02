@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   try {
     const user = requireAuth(request);
 
-    let config = await prisma.lineChannelConfig.findUnique({
+    const config = await prisma.lineChannelConfig.findUnique({
       where: { userId: user.id },
       select: {
         id: true,
