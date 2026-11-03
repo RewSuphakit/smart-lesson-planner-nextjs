@@ -9,6 +9,11 @@ const PUBLIC_PATHS = [
   '/forgot-password',
   '/portal',
   '/404',
+  '/manifest.webmanifest',
+  '/manifest.json',
+  '/sw.js',
+  '/robots.txt',
+  '/sitemap.xml',
   '/api/portal',
   '/api/auth/login',
   '/api/auth/register',
@@ -67,12 +72,17 @@ function isValidJwt(token: string): boolean {
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Allow public static assets and next internal requests
+  // Allow public static assets, PWA manifest, service worker, and next internal requests
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon.ico') ||
     pathname.startsWith('/uploads') ||
-    (!pathname.startsWith('/api/') && /\.(?:png|jpg|jpeg|gif|webp|avif|svg|ico)$/i.test(pathname))
+    pathname === '/manifest.webmanifest' ||
+    pathname === '/manifest.json' ||
+    pathname === '/sw.js' ||
+    pathname === '/robots.txt' ||
+    pathname === '/sitemap.xml' ||
+    (!pathname.startsWith('/api/') && /\.(?:png|jpg|jpeg|gif|webp|avif|svg|ico|webmanifest|json|js|map)$/i.test(pathname))
   ) {
     return NextResponse.next();
   }
@@ -110,8 +120,8 @@ export const config = {
      * Match all request paths except for the ones starting with:
      * - _next/static (static files)
      * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
+     * - favicon.ico, manifest.webmanifest, manifest.json, sw.js, robots.txt, sitemap.xml
      */
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|manifest.json|sw.js|robots.txt|sitemap.xml).*)',
   ],
 };

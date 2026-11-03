@@ -13,7 +13,6 @@ import toast from 'react-hot-toast';
 import UserAvatar from '@/components/UserAvatar';
 import ClassroomCardPicker from '@/components/ClassroomCardPicker';
 import SectionSwitcher from '@/components/SectionSwitcher';
-import VirtualList from '@/components/VirtualList';
 import { parseClassroomName } from '@/lib/classroom';
 import { buildStudentSectionGroups } from '@/lib/studentSections';
 
@@ -652,20 +651,14 @@ export default function Affective() {
             </div>
           </div>
 
-          {/* Student Grid (Virtualized) */}
+          {/* Student Grid */}
           {processedStudents.length === 0 ? (
             <div className="glass p-10 text-center text-slate-500 rounded-2xl border border-indigo-100 bg-white">
               ไม่พบนักเรียนตรงตามเงื่อนไขค้นหา
             </div>
           ) : (
-            <VirtualList
-              items={processedStudents}
-              columns={{ default: 1, xl: 2 }}
-              gap={16}
-              estimateSize={220}
-              useWindowScroll={true}
-              getItemKey={(s) => s.id}
-              renderItem={(s) => {
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              {processedStudents.map((s) => {
                 const absent = s.absent_count || 0;
                 const late = s.late_count || 0;
                 const attendancePenalty = (absent * 2) + (late * 1);
@@ -675,7 +668,7 @@ export default function Affective() {
                 return (
                   <div
                     key={s.id}
-                    className={`glass dark:bg-slate-900/85 overflow-hidden rounded-2xl transition-all duration-300 p-5 border flex flex-col md:flex-row gap-4 bg-white dark:border-slate-800 ${s.affective_score < (maxAffectiveWeight * 0.5)
+                    className={`bg-white dark:bg-slate-900 overflow-hidden rounded-2xl transition-colors duration-150 p-5 border flex flex-col md:flex-row gap-4 shadow-xs dark:border-slate-800 ${s.affective_score < (maxAffectiveWeight * 0.5)
                       ? 'border-rose-200 dark:border-rose-900/60 bg-rose-50/30 dark:bg-rose-950/20'
                       : 'border-indigo-100 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-500/50'
                       }`}
@@ -822,8 +815,8 @@ export default function Affective() {
                     </div>
                   </div>
                 );
-              }}
-            />
+              })}
+            </div>
           )}
         </div>
       )}

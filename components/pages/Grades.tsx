@@ -22,7 +22,6 @@ const GradePdfModal = dynamic(() => import('@/components/GradePdfModal'), { ssr:
 const GradeCsvModal = dynamic(() => import('@/components/GradeCsvModal'), { ssr: false });
 import { useAuth } from '@/context/AuthContext';
 import UserAvatar from '@/components/UserAvatar';
-import VirtualList, { useVirtualTable } from '@/components/VirtualList';
 
 export interface Classroom {
   id: string;
@@ -404,17 +403,6 @@ export default function Grades() {
     const start = (currentPage - 1) * itemsPerPage;
     return filteredReport.slice(start, start + itemsPerPage);
   }, [filteredReport, currentPage, itemsPerPage]);
-
-  // Virtualization for Grades Desktop Table
-  const {
-    virtualItems: virtualGradeStudents,
-    paddingTop: gradePaddingTop,
-    paddingBottom: gradePaddingBottom,
-  } = useVirtualTable({
-    items: paginatedReport,
-    estimateSize: 56,
-    overscan: 8,
-  });
 
   const handleExamScoreChange = (studentId: string, field: 'midterm_score' | 'final_score' | 'affective_score', value: string) => {
     setHasUnsavedChanges(true);
@@ -1102,12 +1090,7 @@ export default function Grades() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
-                    {gradePaddingTop > 0 && (
-                      <tr>
-                        <td style={{ height: `${gradePaddingTop}px` }} colSpan={9} />
-                      </tr>
-                    )}
-                    {virtualGradeStudents.map(({ item: student, index: idx }) => {
+                    {paginatedReport.map((student, idx) => {
                       const totalScore = Number(student.total_score_precise ?? student.total_score ?? 0);
                       const isKr = student.is_f || student.grade === 'ข.ร.' || student.grade === 'ขร';
                       const isKs = student.grade === 'ข.ส.' || student.is_absent_final || student.final_score === -1;
@@ -1315,25 +1298,14 @@ export default function Grades() {
                         </tr>
                       );
                     })}
-                    {gradePaddingBottom > 0 && (
-                      <tr>
-                        <td style={{ height: `${gradePaddingBottom}px` }} colSpan={9} />
-                      </tr>
-                    )}
                   </tbody>
                 </table>
               </div>
             ) : (
               /* ==================== VIEW MODE 2: MOBILE-FIRST CARD VIEW ==================== */
               <div className="p-4">
-                <VirtualList
-                  items={paginatedReport}
-                  columns={{ default: 1, md: 2 }}
-                  gap={14}
-                  estimateSize={320}
-                  useWindowScroll={true}
-                  getItemKey={(student) => student.student_id}
-                  renderItem={(student) => {
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                  {paginatedReport.map((student) => {
                     const totalScore = Number(student.total_score_precise ?? student.total_score ?? 0);
                     const isKr = student.is_f || student.grade === 'ข.ร.' || student.grade === 'ขร';
                     const isKs = student.grade === 'ข.ส.' || student.is_absent_final || student.final_score === -1;
@@ -1501,10 +1473,10 @@ export default function Grades() {
                       </div>
                     </div>
                   );
-                }}
-              />
-            </div>
-          )}
+                })}
+                </div>
+              </div>
+            )}
 
             {/* Pagination Footer */}
             {filteredReport.length > 0 && (

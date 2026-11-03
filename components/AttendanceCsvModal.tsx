@@ -595,28 +595,28 @@ export default function AttendanceCsvModal({
       }}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl border border-emerald-200 w-full max-w-7xl max-h-[95vh] flex flex-col overflow-hidden"
+        className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-emerald-200 dark:border-slate-800 w-full max-w-7xl max-h-[95vh] flex flex-col overflow-hidden text-slate-800 dark:text-slate-100"
         onClick={e => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="px-6 py-4 bg-white border-b border-slate-200 flex items-center justify-between shrink-0 gap-3 flex-wrap">
+        <div className="px-6 py-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0 gap-3 flex-wrap">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/20">
               <FileSpreadsheet className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 flex-wrap">
+              <h2 className="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 flex-wrap">
                 <span>พรีวิวและกำหนดค่าส่งออกข้อมูลการเช็คชื่อ</span>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                   {classroom?.name || 'ห้องเรียน'}
                 </span>
                 {activeSection && (
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
                     เฉพาะ {activeSection.label}
                   </span>
                 )}
               </h2>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 ตรวจสอบข้อมูลก่อนส่งออก เลือกห้องย่อย ช่วงวันที่ ปรับแต่งคอลัมน์ และดาวน์โหลดเป็นไฟล์ CSV หรือ Excel
               </p>
             </div>
@@ -625,28 +625,28 @@ export default function AttendanceCsvModal({
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={handleCopyClipboard}
-              className="btn bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all"
+              className="btn bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-semibold flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all cursor-pointer"
               title="คัดลอกข้อมูลไปวางใน Excel หรือ Google Sheets"
             >
-              {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-slate-500" />}
+              {copied ? <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-4 h-4 text-slate-500 dark:text-slate-400" />}
               {copied ? 'คัดลอกแล้ว' : 'คัดลอกลง Excel'}
             </button>
             <button
               onClick={handleDownloadExcel}
-              className="btn bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 text-xs font-semibold px-3 py-2 rounded-xl transition-all flex items-center gap-1.5"
+              className="btn bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
               title="ดาวน์โหลดเป็นไฟล์ Excel (.xlsx)"
             >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-600" /> Excel (.xlsx)
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Excel (.xlsx)
             </button>
             <button
               onClick={handleDownloadCsv}
-              className="btn bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl shadow-md shadow-emerald-500/25 transition-all"
+              className="btn bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl shadow-md shadow-emerald-500/25 transition-all cursor-pointer"
             >
               <Download className="w-4 h-4" /> ดาวน์โหลด CSV
             </button>
             <button
               onClick={onClose}
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               aria-label="ปิดหน้าต่าง"
             >
               <X className="w-5 h-5" />
@@ -655,7 +655,7 @@ export default function AttendanceCsvModal({
         </div>
 
         {/* Filters & Preferences Bar */}
-        <div className="p-4 bg-white border-b border-slate-200 shrink-0 space-y-3">
+        <div className="p-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shrink-0 space-y-3">
           {/* Sub-room / Section Selector (shown automatically when combined classroom has >1 room) */}
           {hasMultipleSections && (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-slate-100">

@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname),
   compress: true,
   poweredByHeader: false,
+  devIndicators: {
+    position: 'bottom-right',
+  },
   allowedDevOrigins: ['192.168.56.1'],
   serverExternalPackages: ['bcryptjs', 'jsonwebtoken', 'pdfkit', 'pdf-parse', 'nodemailer'],
   experimental: {

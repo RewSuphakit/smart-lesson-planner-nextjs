@@ -963,7 +963,7 @@ export default function Students() {
         ) : paginatedStudents.map((student) => (
           <div
             key={student.id}
-            className={`glass overflow-hidden transition-colors duration-200 ${selectedStudents.includes(student.id) ? 'border-indigo-500/50 bg-indigo-500/5' : ''}`}
+            className={`bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs hover:border-indigo-300 dark:hover:border-slate-700 overflow-hidden transition-colors duration-150 ${selectedStudents.includes(student.id) ? 'border-indigo-500/60 bg-indigo-50/40 dark:bg-indigo-950/20' : ''}`}
           >
             <div className="p-4 flex items-center gap-4">
               <label className="cursor-pointer group flex-shrink-0">

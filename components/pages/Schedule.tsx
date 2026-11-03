@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
@@ -96,6 +96,13 @@ export default function Schedule() {
     classroom_id: '' as string | number
   });
 
+  const isFormHomeroom =
+    timetableForm.entry_type === 'homeroom' ||
+    Number(timetableForm.start_period) === 0 ||
+    timetableForm.subject_name?.includes('เสาธง') ||
+    timetableForm.subject_name?.includes('โฮมรูม') ||
+    timetableForm.subject_name?.includes('เข้าแถว');
+
   const [showUpload, setShowUpload] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [exampleTab, setExampleTab] = useState<'csv' | 'ai'>('csv');
@@ -105,6 +112,25 @@ export default function Schedule() {
   const [dragType, setDragType] = useState<string | null>(null);
   const [dragOverCell, setDragOverCell] = useState<string | null>(null);
   const [hoverTooltip, setHoverTooltip] = useState<HoverTooltip | null>(null);
+  const [isScrolling, setIsScrolling] = useState(false);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setHoverTooltip(null);
+      setIsScrolling(true);
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+      scrollTimeoutRef.current = setTimeout(() => {
+        setIsScrolling(false);
+      }, 150);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    };
+  }, []);
 
   // ─── Query: ดึงข้อมูลห้องเรียน ───
   const { data: classroomsList = [] } = useQuery<Array<{
@@ -181,12 +207,12 @@ export default function Schedule() {
       start_time: defaultTime.start,
       end_time: defaultTime.end,
       subject_code: '',
-      subject_name: '',
+      subject_name: period === 0 ? 'กิจกรรมหน้าเสาธง' : '',
       room: '',
       group_name: '',
       instructor: '',
-      entry_type: 'lecture',
-      color: '#3b82f6',
+      entry_type: period === 0 ? 'homeroom' : 'lecture',
+      color: period === 0 ? '#f43f5e' : '#3b82f6',
       classroom_id: ''
     });
     setShowTimetableModal(true);
@@ -256,10 +282,6 @@ export default function Schedule() {
 
   const handleTimetableSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!timetableForm.subject_code.trim()) return toast.error('กรุณากรอกรหัสวิชา');
-    if (Number(timetableForm.start_period) > Number(timetableForm.end_period)) return toast.error('คาบเรียนสิ้นสุดต้องไม่น้อยกว่าคาบเรียนเริ่มต้น');
-    if (timetableForm.start_time >= timetableForm.end_time) return toast.error('เวลาสิ้นสุดต้องมากกว่าเวลาเริ่มต้น');
-
     const isHomeroomOrFlagpole =
       timetableForm.entry_type === 'homeroom' ||
       Number(timetableForm.start_period) === 0 ||
@@ -267,13 +289,28 @@ export default function Schedule() {
       timetableForm.subject_name?.includes('โฮมรูม') ||
       timetableForm.subject_name?.includes('เข้าแถว');
 
+    if (!isHomeroomOrFlagpole && !timetableForm.subject_code.trim()) {
+      return toast.error('กรุณากรอกรหัสวิชา');
+    }
+    if (!timetableForm.subject_code.trim() && !timetableForm.subject_name.trim()) {
+      if (editTimetableTarget) {
+        if (window.confirm('คุณลบชื่อวิชา/กิจกรรมออก ต้องการลบคาบนี้ออกจากตารางสอนใช่หรือไม่?')) {
+          deleteTimetableMutation.mutate(editTimetableTarget.id);
+          return;
+        }
+      }
+      return toast.error('กรุณากรอกรหัสวิชา หรือชื่อกิจกรรม');
+    }
+    if (Number(timetableForm.start_period) > Number(timetableForm.end_period)) return toast.error('คาบเรียนสิ้นสุดต้องไม่น้อยกว่าคาบเรียนเริ่มต้น');
+    if (timetableForm.start_time >= timetableForm.end_time) return toast.error('เวลาสิ้นสุดต้องมากกว่าเวลาเริ่มต้น');
+
     const payload = {
       day_of_week: Number(timetableForm.day_of_week),
       start_period: Number(timetableForm.start_period),
       end_period: Number(timetableForm.end_period),
       start_time: timetableForm.start_time,
       end_time: timetableForm.end_time,
-      subject_code: timetableForm.subject_code.trim(),
+      subject_code: timetableForm.subject_code.trim() || null,
       subject_name: timetableForm.subject_name.trim() || null,
       room: timetableForm.room.trim() || null,
       group_name: timetableForm.group_name.trim() || null,
@@ -562,7 +599,7 @@ export default function Schedule() {
     ];
 
     const slotIndex = (slotId: number | string) => TIME_SLOTS.findIndex(s => s.id === slotId);
-    const gridCols = `100px repeat(${TIME_SLOTS.length}, 1fr)`;
+    const gridCols = `90px repeat(${TIME_SLOTS.length}, minmax(0, 1fr))`;
 
     return (
       <div className="animate-fade-in-up">
@@ -579,15 +616,15 @@ export default function Schedule() {
           </div>
         ) : (
           <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-6">
-            <div className="glass p-1 overflow-x-auto rounded-2xl">
-              <div className="min-w-[800px]">
+            <div className="glass dark:bg-slate-900/85 dark:border-slate-800 p-1 overflow-x-auto rounded-2xl">
+              <div className="w-full min-w-[950px]">
                 {/* Header row */}
                 <div className="grid" style={{ gridTemplateColumns: gridCols }}>
-                  <div className="border border-slate-200 bg-slate-50 p-2 text-xs font-bold text-slate-600 flex items-center justify-center">วัน / คาบ</div>
+                  <div className="min-w-0 overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/90 p-2 text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center justify-center text-center">วัน / คาบ</div>
                   {TIME_SLOTS.map(slot => (
-                    <div key={slot.id} className="border border-slate-200 bg-slate-50 p-1 text-center">
-                      <div className="text-[0.65rem] font-bold text-slate-700">{slot.label}</div>
-                      <div className="text-[0.55rem] text-slate-500 font-normal mt-0.5">
+                    <div key={slot.id} className="min-w-0 overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/90 p-1 text-center">
+                      <div className="text-[0.65rem] font-bold text-slate-700 dark:text-slate-200 truncate">{slot.label}</div>
+                      <div className="text-[0.55rem] text-slate-500 dark:text-slate-400 font-normal mt-0.5 truncate">
                         {slot.start} - {slot.end}
                       </div>
                     </div>
@@ -607,10 +644,10 @@ export default function Schedule() {
                     >
                       {/* Day name label — explicit column 1 */}
                       <div
-                        className="border border-slate-200 bg-slate-50 p-2 text-sm font-bold text-slate-700 text-center flex items-center justify-center"
+                        className="min-w-0 overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/90 p-2 text-sm font-bold text-slate-700 dark:text-slate-200 text-center flex items-center justify-center"
                         style={{ gridRow: 1, gridColumn: 1 }}
                       >
-                        {dayName}
+                        <span className="truncate">{dayName}</span>
                       </div>
 
                       {/* Background cells — every cell has explicit gridRow AND gridColumn */}
@@ -622,10 +659,10 @@ export default function Schedule() {
                           return (
                             <div
                               key={`bg-${slot.id}`}
-                              className="border border-slate-200 bg-slate-50/50 p-1 text-center flex items-center justify-center min-h-[60px]"
+                              className="min-w-0 overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/60 p-0 text-center flex items-center justify-center min-h-[60px]"
                               style={{ gridRow: 1, gridColumn: colPos }}
                             >
-                              <span className="text-[0.65rem] text-slate-400 font-medium opacity-50 whitespace-nowrap -rotate-90 origin-center">พักกลางวัน</span>
+                              <span className="text-[0.65rem] text-slate-400 dark:text-slate-500 font-medium opacity-50 whitespace-nowrap -rotate-90 origin-center select-none block">พักกลางวัน</span>
                             </div>
                           );
                         }
@@ -633,7 +670,7 @@ export default function Schedule() {
                         return (
                           <div
                             key={`bg-${slot.id}`}
-                            className={`border border-slate-200 min-h-[60px] transition-colors cursor-pointer hover:bg-indigo-50/30 ${isDragOver ? 'bg-indigo-50 border-indigo-300 ring-2 ring-indigo-200 ring-inset z-[5]' : ''}`}
+                            className={`min-w-0 overflow-hidden border border-slate-200 dark:border-slate-800/80 min-h-[60px] transition-colors cursor-pointer hover:bg-indigo-50/30 dark:hover:bg-slate-800/40 ${isDragOver ? 'bg-indigo-50 dark:bg-indigo-950/50 border-indigo-300 dark:border-indigo-600 ring-2 ring-indigo-200 dark:ring-indigo-500/50 ring-inset z-[5]' : ''}`}
                             style={{ gridRow: 1, gridColumn: colPos }}
                             onDragOver={(e) => handleDragOver(e, dayIdx, slot.id)}
                             onDragLeave={handleDragLeave}
@@ -664,7 +701,7 @@ export default function Schedule() {
                         return (
                           <div
                             key={entry.id}
-                            className={`border rounded-md m-[2px] relative group transition-transform hover:scale-[1.03] z-10 hover:z-50 cursor-pointer ${entry.color ? '' : getBgColor(entry.entry_type)}`}
+                            className={`min-w-0 overflow-hidden border rounded-md m-[2px] relative group transition-transform hover:scale-[1.03] z-10 hover:z-50 cursor-pointer ${entry.color ? '' : getBgColor(entry.entry_type)}`}
                             style={{
                               gridColumn: `${gridColStart} / ${gridColEnd}`,
                               gridRow: 1,
@@ -701,17 +738,17 @@ export default function Schedule() {
                             }}
                           >
                             <div
-                              className="w-full h-full p-2 text-center cursor-grab active:cursor-grabbing flex flex-col justify-center min-h-[56px]"
+                              className="w-full h-full p-2 text-center cursor-grab active:cursor-grabbing flex flex-col justify-center min-h-[56px] select-none"
                               draggable={true}
                               onDragStart={(e) => handleDragStart(e, entry, 'move')}
                               onDragEnd={handleDragEnd}
                             >
                               <div
                                 className="text-[0.7rem] font-bold truncate"
-                                title={entry.subject_code}
+                                title={entry.subject_code || entry.subject_name || (entry.start_period === 0 ? '' : 'กิจกรรม')}
                                 style={{ color: entry.color ? entry.color : undefined }}
                               >
-                                {entry.subject_code}
+                                {entry.subject_code || entry.subject_name || (entry.start_period === 0 ? '' : 'กิจกรรม')}
                               </div>
                               {entry.room && (
                                 <div
@@ -745,18 +782,18 @@ export default function Schedule() {
               </div>
             </div>
 
-            <div className="glass p-5 flex flex-col h-full rounded-2xl">
-              <h3 className="text-sm font-bold text-slate-800 mb-4 pb-3 border-b border-slate-100">สรุปชั่วโมงสอน</h3>
+            <div className="glass dark:bg-slate-900/85 dark:border-slate-800 p-5 flex flex-col h-full rounded-2xl">
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">สรุปชั่วโมงสอน</h3>
               <div className="space-y-4 overflow-y-auto flex-1 pr-1">
                 {(Array.isArray(timetableSummary) ? timetableSummary : []).map((sum, i) => (
-                  <div key={i} className="flex gap-3 items-start p-2 rounded-xl hover:bg-slate-50 transition-colors">
+                  <div key={i} className="flex gap-3 items-start p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
                     <div className="w-2 h-2 rounded-full mt-1.5 bg-indigo-500 shrink-0"></div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start">
-                        <p className="text-xs font-bold text-slate-800 truncate">{sum.subject_code}</p>
-                        <span className="text-xs font-bold text-emerald-600">{sum.total_hours} ชม.</span>
+                        <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">{sum.subject_code || sum.subject_name || 'กิจกรรม'}</p>
+                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{sum.total_hours} ชม.</span>
                       </div>
-                      <p className="text-[0.65rem] text-slate-500 line-clamp-2 mt-0.5">{sum.subject_name}</p>
+                      <p className="text-[0.65rem] text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5">{sum.subject_name}</p>
                     </div>
                   </div>
                 ))}
@@ -772,14 +809,14 @@ export default function Schedule() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 mb-1">ตารางสอนประจำสัปดาห์</h1>
+          <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-1">ตารางสอนประจำสัปดาห์</h1>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={() => setShowUpload(true)} className="btn btn-primary flex items-center gap-2">
             <UploadCloud className="w-4 h-4" /> อัพโหลดไฟล์ตาราง (รูปภาพ/CSV/PDF)
           </button>
           {timetableEntries.length > 0 && (
-            <button onClick={clearTimetable} className="btn btn-ghost text-red-500 hover:bg-red-50 hover:border-red-200">
+            <button onClick={clearTimetable} className="btn btn-ghost text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 hover:border-red-200 dark:hover:border-red-900/60">
               ล้างข้อมูล
             </button>
           )}
@@ -790,17 +827,17 @@ export default function Schedule() {
 
       {hoverTooltip && !draggedEntry && !showTimetableModal && createPortal(
         <div
-          className="fixed z-[9999] w-48 bg-white shadow-xl rounded-lg p-3 border border-slate-100 text-left pointer-events-none"
+          className="fixed z-[9999] w-48 bg-white dark:bg-slate-800 shadow-xl rounded-lg p-3 border border-slate-100 dark:border-slate-750 text-left pointer-events-none"
           style={{
             top: hoverTooltip.rect.top - 8,
             left: hoverTooltip.rect.left + hoverTooltip.rect.width / 2,
             transform: 'translate(-50%, -100%)'
           }}
         >
-          <p className="text-xs font-bold text-slate-800">{hoverTooltip.entry.subject_name}</p>
-          <p className="text-[0.65rem] text-slate-500 mt-1">{hoverTooltip.entry.subject_code}</p>
-          <p className="text-[0.65rem] text-slate-500">ห้อง: {hoverTooltip.entry.room || '-'}</p>
-          <p className="text-[0.65rem] text-slate-500">กลุ่ม: {hoverTooltip.entry.group_name || '-'}</p>
+          <p className="text-xs font-bold text-slate-800 dark:text-slate-100">{hoverTooltip.entry.subject_name}</p>
+          <p className="text-[0.65rem] text-slate-500 dark:text-slate-400 mt-1">{hoverTooltip.entry.subject_code}</p>
+          <p className="text-[0.65rem] text-slate-500 dark:text-slate-400">ห้อง: {hoverTooltip.entry.room || '-'}</p>
+          <p className="text-[0.65rem] text-slate-500 dark:text-slate-400">กลุ่ม: {hoverTooltip.entry.group_name || '-'}</p>
           <p className="text-[0.65rem] text-slate-500">คาบ: {hoverTooltip.entry.start_period} - {hoverTooltip.entry.end_period} ({hoverTooltip.entry.hours || (hoverTooltip.entry.end_period - hoverTooltip.entry.start_period + 1)} ชม.)</p>
           <p className="text-[0.6rem] text-indigo-500 mt-1">คลิกเพื่อแก้ไข/ลบคาบเรียน</p>
         </div>,
@@ -1117,24 +1154,31 @@ export default function Schedule() {
             <form onSubmit={handleTimetableSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="form-label text-slate-700 font-bold mb-1.5 block">รหัสวิชา *</label>
+                  <label className="form-label text-slate-700 dark:text-slate-200 font-bold mb-1.5 block">
+                    รหัสวิชา {!isFormHomeroom && '*'}
+                    {isFormHomeroom && (
+                      <span className="text-[11px] font-normal text-slate-400 ml-1">(ไม่บังคับสำหรับกิจกรรม)</span>
+                    )}
+                  </label>
                   <input
                     type="text"
                     value={timetableForm.subject_code}
                     onChange={e => setTimetableForm(f => ({ ...f, subject_code: e.target.value }))}
                     className="form-input"
-                    placeholder="เช่น ค21101"
-                    required
+                    placeholder={isFormHomeroom ? 'เว้นว่างได้' : 'เช่น ค21101'}
+                    required={!isFormHomeroom}
                   />
                 </div>
                 <div>
-                  <label className="form-label text-slate-700 font-bold mb-1.5 block">ชื่อวิชา</label>
+                  <label className="form-label text-slate-700 dark:text-slate-200 font-bold mb-1.5 block">
+                    ชื่อวิชา / กิจกรรม
+                  </label>
                   <input
                     type="text"
                     value={timetableForm.subject_name}
                     onChange={e => setTimetableForm(f => ({ ...f, subject_name: e.target.value }))}
                     className="form-input"
-                    placeholder="เช่น คณิตศาสตร์"
+                    placeholder={isFormHomeroom ? 'เช่น กิจกรรมหน้าเสาธง, โฮมรูม' : 'เช่น คณิตศาสตร์'}
                   />
                 </div>
               </div>
@@ -1301,10 +1345,11 @@ export default function Schedule() {
                   <button
                     type="button"
                     onClick={handleDeleteTimetableEntry}
-                    className="btn border border-red-200 text-red-500 hover:bg-red-50 px-4"
-                    title="ลบคาบเรียนนี้"
+                    className="btn border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 px-3.5 flex items-center gap-1.5 font-medium transition-colors"
+                    title="ลบคาบเรียนนี้ออกจากตาราง"
                   >
                     <Trash2 className="w-4 h-4" />
+                    <span>ลบคาบนี้</span>
                   </button>
                 )}
                 <button

@@ -10,6 +10,7 @@ import { ThemeProvider } from '@/context/ThemeContext';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { getServerSession } from '@/lib/server-session';
+import PwaRegister from '@/components/PwaRegister';
 
 const sarabun = Sarabun({
   weight: ['400', '500', '600', '700'],
@@ -27,7 +28,13 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: 'Smart Lesson Planner — ระบบวางแผนการสอนอัจฉริยะ',
-  description: '',
+  description: 'ระบบวางแผนการสอน เช็คชื่อ ตัดเกรด และรายงานผลการเรียนรู้สำหรับครูไทย',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'SmartPlanner',
+  },
   icons: {
     icon: [
       { url: '/icon.png', sizes: '192x192', type: 'image/png' },
@@ -48,8 +55,9 @@ export default async function RootLayout({
 
   return (
     <html lang="th" className={`h-full antialiased ${sarabun.variable}`} suppressHydrationWarning>
-      <head>
+      <head suppressHydrationWarning>
         <script
+          suppressHydrationWarning
           dangerouslySetInnerHTML={{
             __html: `(function() {
               try {
@@ -67,7 +75,7 @@ export default async function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <QueryProvider>
           <AuthProvider initialUser={initialUser}>
             <SemesterProvider initialSemesters={initialSemesters}>
@@ -87,6 +95,7 @@ export default async function RootLayout({
                   }}
                 />
                 <SonnerToaster richColors position="top-right" closeButton />
+                <PwaRegister />
                 {children}
                 <Analytics />
                 <SpeedInsights />

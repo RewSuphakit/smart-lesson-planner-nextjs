@@ -145,12 +145,12 @@ export default function SemesterSwitcher({ className = '', isCompact = false, is
   const dropdownBody = (
     <>
       {/* Header */}
-      <div className="px-3 py-1.5 border-b border-slate-100 flex items-center justify-between gap-1.5">
-        <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider shrink-0">
+      <div className="px-3 py-1.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-1.5">
+        <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider shrink-0">
           เลือกภาคเรียน
         </span>
         {activeSemester && (
-          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 shrink-0">
+          <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800 shrink-0">
             ปัจจุบัน: เทอม {activeSemester.term_number}/{activeSemester.academic_year}
           </span>
         )}
@@ -163,16 +163,16 @@ export default function SemesterSwitcher({ className = '', isCompact = false, is
             type="button"
             onClick={() => handleSelect(counterpartTerm.id)}
             disabled={isSwitchingId === counterpartTerm.id}
-            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-50 via-purple-50 to-indigo-50 hover:from-indigo-100 hover:to-purple-100 border border-indigo-200/80 text-indigo-900 transition-all text-xs font-bold group/flip shadow-xs"
+            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-50 via-purple-50 to-indigo-50 hover:from-indigo-100 hover:to-purple-100 dark:from-slate-800 dark:via-slate-800 dark:to-slate-800 dark:hover:from-slate-750 dark:hover:to-slate-750 border border-indigo-200/80 dark:border-slate-700 text-indigo-900 dark:text-indigo-300 transition-all text-xs font-bold group/flip shadow-xs cursor-pointer"
           >
             <div className="flex items-center gap-1.5 min-w-0">
-              <ArrowRightLeft className="w-3.5 h-3.5 text-indigo-600 shrink-0 group-hover/flip:rotate-180 transition-transform duration-300" />
+              <ArrowRightLeft className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0 group-hover/flip:rotate-180 transition-transform duration-300" />
               <span className="truncate">สลับไป <strong>เทอม {counterpartTerm.term_number}/{counterpartTerm.academic_year}</strong></span>
             </div>
             {isSwitchingId === counterpartTerm.id ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600 shrink-0" />
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600 dark:text-indigo-400 shrink-0" />
             ) : (
-              <span className="text-[10px] text-indigo-600 font-semibold underline shrink-0 ml-1">สลับ</span>
+              <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold underline shrink-0 ml-1">สลับ</span>
             )}
           </button>
         </div>
@@ -186,13 +186,13 @@ export default function SemesterSwitcher({ className = '', isCompact = false, is
           </div>
         ) : (
           groupedByYear.map(([year, { term1, term2, term3 }]) => (
-            <div key={year} className="p-2 rounded-xl bg-slate-50/80 border border-slate-200/70 space-y-1.5">
+            <div key={year} className="p-2 rounded-xl bg-slate-50/80 dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700 space-y-1.5">
               <div className="flex items-center justify-between text-xs px-0.5">
-                <span className="font-extrabold text-slate-700 flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                <span className="font-extrabold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400 shrink-0" />
                   <span>ปีการศึกษา {year}</span>
                 </span>
-                <span className="text-[10px] text-slate-500 font-medium">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
                   {term1 && term2 ? 'ครบ 2 เทอม' : term1 ? 'มีเทอม 1' : 'มีเทอม 2'}
                 </span>
               </div>
@@ -205,17 +205,17 @@ export default function SemesterSwitcher({ className = '', isCompact = false, is
                     type="button"
                     onClick={() => handleSelect(term1.id)}
                     disabled={isSwitchingId === term1.id}
-                    className={`flex items-center justify-between px-2 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    className={`flex items-center justify-between px-2 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                       term1.is_active
                         ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20'
-                        : 'bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 border border-slate-200/80'
+                        : 'bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-300 border border-slate-200/80 dark:border-slate-700'
                     }`}
                   >
                     <div className="flex items-center gap-1 min-w-0">
                       {term1.is_active && <Check className="w-3 h-3 text-white shrink-0" />}
                       <span className="truncate">เทอม 1</span>
                     </div>
-                    <span className={`text-[10px] font-mono shrink-0 ${term1.is_active ? 'text-indigo-200' : 'text-slate-500'}`}>
+                    <span className={`text-[10px] font-mono shrink-0 ${term1.is_active ? 'text-indigo-200' : 'text-slate-500 dark:text-slate-400'}`}>
                       {term1.classroom_count ?? 0} ห้อง
                     </span>
                   </button>
@@ -223,7 +223,7 @@ export default function SemesterSwitcher({ className = '', isCompact = false, is
                   <Link
                     href="/semesters"
                     onClick={() => setIsOpen(false)}
-                    className="flex items-center justify-center gap-1 py-1.5 px-1.5 rounded-xl text-[11px] font-medium text-slate-600 hover:text-indigo-600 border border-dashed border-slate-300 hover:border-indigo-300 bg-white/50 transition-colors"
+                    className="flex items-center justify-center gap-1 py-1.5 px-1.5 rounded-xl text-[11px] font-medium text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 border border-dashed border-slate-300 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-500 bg-white/50 dark:bg-slate-800/50 transition-colors"
                   >
                     <Plus className="w-3 h-3 shrink-0" />
                     <span className="truncate">สร้างเทอม 1</span>
@@ -236,17 +236,17 @@ export default function SemesterSwitcher({ className = '', isCompact = false, is
                     type="button"
                     onClick={() => handleSelect(term2.id)}
                     disabled={isSwitchingId === term2.id}
-                    className={`flex items-center justify-between px-2 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    className={`flex items-center justify-between px-2 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                       term2.is_active
                         ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20'
-                        : 'bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 border border-slate-200/80'
+                        : 'bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-300 border border-slate-200/80 dark:border-slate-700'
                     }`}
                   >
                     <div className="flex items-center gap-1 min-w-0">
                       {term2.is_active && <Check className="w-3 h-3 text-white shrink-0" />}
                       <span className="truncate">เทอม 2</span>
                     </div>
-                    <span className={`text-[10px] font-mono shrink-0 ${term2.is_active ? 'text-indigo-200' : 'text-slate-500'}`}>
+                    <span className={`text-[10px] font-mono shrink-0 ${term2.is_active ? 'text-indigo-200' : 'text-slate-500 dark:text-slate-400'}`}>
                       {term2.classroom_count ?? 0} ห้อง
                     </span>
                   </button>
@@ -254,7 +254,7 @@ export default function SemesterSwitcher({ className = '', isCompact = false, is
                   <Link
                     href="/semesters"
                     onClick={() => setIsOpen(false)}
-                    className="flex items-center justify-center gap-1 py-1.5 px-1.5 rounded-xl text-[11px] font-medium text-slate-600 hover:text-indigo-600 border border-dashed border-slate-300 hover:border-indigo-300 bg-white/50 transition-colors"
+                    className="flex items-center justify-center gap-1 py-1.5 px-1.5 rounded-xl text-[11px] font-medium text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 border border-dashed border-slate-300 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-500 bg-white/50 dark:bg-slate-800/50 transition-colors"
                   >
                     <Plus className="w-3 h-3 shrink-0" />
                     <span className="truncate">สร้างเทอม 2</span>
@@ -268,17 +268,17 @@ export default function SemesterSwitcher({ className = '', isCompact = false, is
                   type="button"
                   onClick={() => handleSelect(term3.id)}
                   disabled={isSwitchingId === term3.id}
-                  className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     term3.is_active
                       ? 'bg-indigo-600 text-white shadow-xs'
-                      : 'bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 border border-slate-200'
+                      : 'bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-300 border border-slate-200 dark:border-slate-700'
                   }`}
                 >
                   <div className="flex items-center gap-1 min-w-0">
                     {term3.is_active && <Check className="w-3 h-3 shrink-0" />}
                     <span className="truncate">ภาคฤดูร้อน (Summer)</span>
                   </div>
-                  <span className={`text-[10px] shrink-0 ${term3.is_active ? 'text-indigo-200' : 'text-slate-500'}`}>
+                  <span className={`text-[10px] shrink-0 ${term3.is_active ? 'text-indigo-200' : 'text-slate-500 dark:text-slate-400'}`}>
                     {term3.classroom_count ?? 0} ห้อง
                   </span>
                 </button>
@@ -289,11 +289,11 @@ export default function SemesterSwitcher({ className = '', isCompact = false, is
       </div>
 
       {/* Footer Action */}
-      <div className="pt-2 mt-0.5 border-t border-slate-100 px-2.5">
+      <div className="pt-2 mt-0.5 border-t border-slate-100 dark:border-slate-800 px-2.5">
         <Link
           href="/semesters"
           onClick={() => setIsOpen(false)}
-          className="flex items-center justify-center gap-1.5 w-full py-2 px-2.5 rounded-xl bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-colors"
+          className="flex items-center justify-center gap-1.5 w-full py-2 px-2.5 rounded-xl bg-indigo-50/80 hover:bg-indigo-100 dark:bg-slate-800 dark:hover:bg-slate-700 border border-indigo-100/50 dark:border-slate-700 text-indigo-700 dark:text-indigo-300 text-xs font-bold transition-colors"
         >
           <Settings className="w-3.5 h-3.5 shrink-0" />
           <span className="truncate">จัดการและคัดลอกข้อมูลภาคเรียน</span>
@@ -309,11 +309,13 @@ export default function SemesterSwitcher({ className = '', isCompact = false, is
         type="button"
         ref={collapsedButtonRef}
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full flex items-center rounded-xl transition-all duration-300 group text-left relative overflow-hidden ${
+        className={`w-full flex items-center rounded-xl transition-all duration-300 group text-left relative ${
+          isCollapsed ? 'overflow-hidden lg:overflow-visible' : 'overflow-hidden'
+        } ${
           isCompact
             ? 'px-3 py-2 justify-between gap-2 bg-indigo-50/80 hover:bg-indigo-100/70 dark:bg-slate-800 dark:hover:bg-slate-700/80 border border-indigo-200/60 dark:border-slate-700 shadow-xs'
             : isCollapsed
-              ? 'px-3 py-2 justify-between gap-2 bg-white/80 hover:bg-white dark:bg-slate-800/80 dark:hover:bg-slate-800 border border-indigo-200/50 hover:border-indigo-300 dark:border-slate-700 shadow-xs lg:h-10 lg:px-2.5 lg:justify-center lg:bg-indigo-50/80 lg:hover:bg-indigo-100 lg:dark:bg-slate-800/90 lg:dark:hover:bg-slate-700 lg:border-indigo-200/60 lg:dark:border-slate-700 lg:text-indigo-700 lg:dark:text-indigo-300 lg:shadow-2xs'
+              ? 'px-3 py-2 justify-between gap-2 bg-white/80 hover:bg-white dark:bg-slate-800/80 dark:hover:bg-slate-800 border border-indigo-200/50 hover:border-indigo-300 dark:border-slate-700 shadow-xs lg:h-9 lg:w-9 lg:mx-auto lg:p-0 lg:justify-center lg:bg-transparent lg:hover:bg-transparent lg:dark:bg-transparent lg:dark:hover:bg-transparent lg:border-0 lg:dark:border-0 lg:shadow-none cursor-pointer'
               : 'px-3 py-2 justify-between gap-2 bg-white/80 hover:bg-white dark:bg-slate-800/80 dark:hover:bg-slate-800 border border-indigo-200/50 hover:border-indigo-300 dark:border-slate-700 shadow-xs hover:shadow-sm'
         }`}
         aria-expanded={isOpen}
@@ -324,11 +326,13 @@ export default function SemesterSwitcher({ className = '', isCompact = false, is
             : 'สลับปีการศึกษา / เทอม 1 หรือ เทอม 2'
         }
       >
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shrink-0 shadow-xs group-hover:scale-105 transition-transform relative">
-            <Layers className="w-3.5 h-3.5" />
+        <div className={`flex items-center min-w-0 ${isCollapsed ? 'gap-2.5 lg:gap-0 lg:justify-center' : 'gap-2.5'}`}>
+          <div className="relative shrink-0">
+            <div className={`${isCollapsed ? 'w-8 h-8 rounded-xl' : 'w-7 h-7 rounded-lg'} bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shrink-0 shadow-sm shadow-indigo-500/20 group-hover:scale-105 transition-transform`}>
+              <Layers className={`${isCollapsed ? 'w-4 h-4' : 'w-3.5 h-3.5'}`} />
+            </div>
             {activeSemester && (
-              <span className={`absolute -top-1.5 -right-1.5 text-[9px] font-black px-1.5 py-0.2 rounded-full bg-indigo-600 text-white border border-white dark:border-slate-900 shadow-2xs transition-all duration-300 ${
+              <span className={`absolute -top-1.5 -right-1.5 text-[9px] font-black w-4 h-4 flex items-center justify-center rounded-full bg-indigo-600 text-white border-2 border-white dark:border-slate-900 shadow-md transition-all duration-300 z-10 ${
                 isCollapsed ? 'opacity-0 lg:opacity-100 scale-100' : 'opacity-0 scale-75 pointer-events-none'
               }`}>
                 {activeSemester.term_number}
@@ -338,7 +342,7 @@ export default function SemesterSwitcher({ className = '', isCompact = false, is
           <div
             className={`min-w-0 overflow-hidden transition-all duration-300 ease-in-out ${
               isCollapsed
-                ? 'max-w-[160px] opacity-100 lg:max-w-0 lg:opacity-0 lg:-translate-x-2'
+                ? 'max-w-[160px] opacity-100 lg:max-w-0 lg:w-0 lg:min-w-0 lg:opacity-0 lg:-translate-x-2'
                 : 'max-w-[160px] opacity-100 translate-x-0'
             }`}
           >
@@ -360,7 +364,7 @@ export default function SemesterSwitcher({ className = '', isCompact = false, is
 
         <div
           className={`transition-all duration-300 ease-in-out shrink-0 overflow-hidden ${
-            isCollapsed ? 'max-w-6 opacity-100 lg:max-w-0 lg:opacity-0 lg:scale-75' : 'max-w-6 opacity-100 scale-100'
+            isCollapsed ? 'max-w-6 opacity-100 lg:max-w-0 lg:w-0 lg:min-w-0 lg:opacity-0 lg:scale-75' : 'max-w-6 opacity-100 scale-100'
           }`}
         >
           <ChevronDown
@@ -421,7 +425,7 @@ export default function SemesterSwitcher({ className = '', isCompact = false, is
             <button
               type="button"
               onClick={handleCancelSwitch}
-              className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               aria-label="ปิด"
             >
               <X className="w-4 h-4" />
@@ -430,19 +434,19 @@ export default function SemesterSwitcher({ className = '', isCompact = false, is
             <div className="px-6 py-5">
               {/* Icon + Title */}
               <div className="flex items-start gap-3 mb-3">
-                <div className="shrink-0 w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center">
+                <div className="shrink-0 w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 flex items-center justify-center">
                   <AlertTriangle className="w-5 h-5 text-amber-500" />
                 </div>
                 <div>
                   <h3
                     id="confirm-semester-title"
-                    className="text-sm font-extrabold text-slate-800"
+                    className="text-sm font-extrabold text-slate-800 dark:text-slate-100"
                   >
                     เปลี่ยนภาคเรียน?
                   </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                     กำลังจะสลับไปยัง{' '}
-                    <span className="font-bold text-indigo-600">
+                    <span className="font-bold text-indigo-600 dark:text-indigo-400">
                       {pendingSemester.name}
                     </span>
                   </p>
@@ -450,7 +454,7 @@ export default function SemesterSwitcher({ className = '', isCompact = false, is
               </div>
 
               {/* Warning message */}
-              <div className="bg-amber-50 border border-amber-200/80 rounded-xl px-4 py-3 text-xs text-amber-800 leading-relaxed mb-5">
+              <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/80 rounded-xl px-4 py-3 text-xs text-amber-800 dark:text-amber-200 leading-relaxed mb-5">
                 ข้อมูลทุกหน้าจะถูกโหลดใหม่ตามภาคเรียนที่เลือก<br />
                 หากมีการแก้ไขที่ยังไม่ได้บันทึก ข้อมูลอาจสูญหาย
               </div>
@@ -460,7 +464,7 @@ export default function SemesterSwitcher({ className = '', isCompact = false, is
                 <button
                   type="button"
                   onClick={handleCancelSwitch}
-                  className="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 transition-colors"
+                  className="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                 >
                   ยกเลิก
                 </button>
