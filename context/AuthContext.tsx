@@ -2,6 +2,40 @@
 
 import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback, useMemo } from 'react';
 import api from '@/services/api';
+import { clearAllAttendanceCaches } from '@/lib/offlineAttendance';
+
+/**
+ * ล้างข้อมูลและแคชของผู้ใช้ทั้งหมดใน localStorage เมื่อออกจากระบบ หรือเมื่อ Session หมดอายุ
+ * เก็บไว้เฉพาะค่าที่ไม่เป็นข้อมูลส่วนตัว (เช่น ธีมสี, สถานะ Sidebar, อีเมลที่กดจำไว้)
+ */
+export function clearUserSessionData(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('attendance_autosave');
+    localStorage.removeItem('slp_recent_student_codes');
+
+    // ล้างแคชออฟไลน์ทั้งหมด (รายชื่อนักเรียนและสถานะการเช็คชื่อ)
+    clearAllAttendanceCaches();
+
+    // ล้างแคชที่อาจตกค้างอื่นๆ ของผู้ใช้
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+      if (
+        key.startsWith('grades_pdf_') ||
+        key.startsWith('scores_start_date_')
+      ) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((k) => localStorage.removeItem(k));
+  } catch (err) {
+    console.warn('[AuthContext] Failed to clear user session data:', err);
+  }
+}
 
 export interface User {
   id: number;
@@ -52,6 +86,7 @@ export function AuthProvider({
         setUser(data.user);
         return data.user;
       } else {
+        clearUserSessionData();
         setUser(null);
         if (typeof document !== 'undefined') {
           document.cookie = 'logged_in=; Max-Age=0; path=/;';
@@ -59,6 +94,7 @@ export function AuthProvider({
         return null;
       }
     } catch {
+      clearUserSessionData();
       setUser(null);
       if (typeof document !== 'undefined') {
         document.cookie = 'logged_in=; Max-Age=0; path=/;';
@@ -68,12 +104,9 @@ export function AuthProvider({
   }, []);
 
   useEffect(() => {
-    // Purge any legacy token/user remnants from localStorage for privacy & security
-    try {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-    } catch {
-      // Ignore in restricted environments
+    // Purge any legacy token/user remnants and session data if unauthenticated
+    if (!hasInitialSessionRef.current) {
+      clearUserSessionData();
     }
 
     if (!hasInitialUserRef.current) {
@@ -88,6 +121,7 @@ export function AuthProvider({
 
     // Listen for global 401 Unauthorized event
     const handleUnauthorized = () => {
+      clearUserSessionData();
       setUser(null);
     };
 
@@ -98,6 +132,7 @@ export function AuthProvider({
         authChannel = new BroadcastChannel(AUTH_CHANNEL_NAME);
         authChannel.onmessage = (event) => {
           if (event.data?.type === 'LOGOUT') {
+            clearUserSessionData();
             setUser(null);
           } else if (event.data?.type === 'LOGIN') {
             fetchProfile();
@@ -174,14 +209,9 @@ export function AuthProvider({
     } catch {
       // Ignore network errors during logout
     } finally {
-      try {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        if (typeof document !== 'undefined') {
-          document.cookie = 'logged_in=; Max-Age=0; path=/;';
-        }
-      } catch {
-        // Ignore
+      clearUserSessionData();
+      if (typeof document !== 'undefined') {
+        document.cookie = 'logged_in=; Max-Age=0; path=/;';
       }
       setUser(null);
       notifyTabs('LOGOUT');

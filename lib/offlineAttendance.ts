@@ -151,6 +151,32 @@ export function clearOfflineQueue(): void {
 }
 
 /**
+ * ล้างข้อมูลแคชการเช็คชื่อ รายชื่อนักเรียน และคิวออฟไลน์ทั้งหมดในเครื่อง (เช่น ตอนออกจากระบบ)
+ */
+export function clearAllAttendanceCaches(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+      if (
+        key.startsWith(ROSTER_CACHE_PREFIX) ||
+        key.startsWith(ATT_STATE_CACHE_PREFIX) ||
+        key === QUEUE_STORAGE_KEY ||
+        key === 'attendance_autosave'
+      ) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
+    notifyQueueUpdated(0);
+  } catch (err) {
+    console.error('[OfflineAttendance] Failed to clear all attendance caches:', err);
+  }
+}
+
+/**
  * แคชรายชื่อนักเรียนในห้องเรียนไว้ในเครื่อง (เพื่อให้เปิดดูได้แม้ออฟไลน์)
  */
 export function cacheClassroomRoster(classroomId: string | number, students: unknown[]): void {
