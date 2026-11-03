@@ -1,5 +1,5 @@
 // Smart Lesson Planner — Service Worker (PWA & Offline Support)
-const CACHE_NAME = 'smart-planner-v1';
+const CACHE_NAME = 'smart-planner-v2';
 const STATIC_ASSETS = [
   '/',
   '/favicon.ico',
@@ -18,7 +18,7 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Activate: Clean up older cache versions
+// Activate: Clean up older cache versions and claim clients
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -38,12 +38,19 @@ self.addEventListener('fetch', (event) => {
   const request = event.request;
   const url = new URL(request.url);
 
-  // Skip non-GET requests (e.g. POST/PUT to API) — handled by offline queue in frontend
+  // 1. Skip non-GET requests (e.g. POST/PUT to API) — handled by offline queue in frontend
   if (request.method !== 'GET') {
     return;
   }
 
-  // API Requests: Network first, never aggressively cache to avoid stale student data
+  // 2. Only intercept same-origin requests
+  // Do NOT intercept cross-origin requests (e.g. Google avatars on lh3.googleusercontent.com,
+  // Google Sign-In, Cloudflare Turnstile, Vercel scripts). Let the browser fetch them natively.
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
+  // 3. API Requests: Network first, never aggressively cache to avoid stale student data
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(request).catch(async () => {
@@ -65,64 +72,88 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static Assets (_next/static, images, fonts): Stale-While-Revalidate
+  // 4. Static Assets (_next/static, images, fonts): Stale-While-Revalidate
   if (
     url.pathname.startsWith('/_next/static/') ||
     url.pathname.endsWith('.png') ||
     url.pathname.endsWith('.jpg') ||
+    url.pathname.endsWith('.jpeg') ||
+    url.pathname.endsWith('.webp') ||
     url.pathname.endsWith('.svg') ||
     url.pathname.endsWith('.ico') ||
     url.pathname.includes('/fonts/')
   ) {
     event.respondWith(
-      caches.match(request).then((cachedResponse) => {
-        const fetchPromise = fetch(request)
-          .then((networkResponse) => {
-            if (networkResponse && networkResponse.status === 200) {
-              const responseToCache = networkResponse.clone();
-              caches.open(CACHE_NAME).then((cache) => {
-                cache.put(request, responseToCache);
-              });
-            }
-            return networkResponse;
-          })
-          .catch(() => cachedResponse);
+      (async () => {
+        const cachedResponse = await caches.match(request);
+        if (cachedResponse) {
+          // Serve from cache immediately and revalidate in background
+          fetch(request)
+            .then((networkResponse) => {
+              if (networkResponse && networkResponse.status === 200) {
+                const responseToCache = networkResponse.clone();
+                caches.open(CACHE_NAME).then((cache) => {
+                  cache.put(request, responseToCache);
+                });
+              }
+            })
+            .catch(() => {});
+          return cachedResponse;
+        }
 
-        return cachedResponse || fetchPromise;
-      })
+        try {
+          const networkResponse = await fetch(request);
+          if (networkResponse && networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            const cache = await caches.open(CACHE_NAME);
+            cache.put(request, responseToCache);
+          }
+          return networkResponse;
+        } catch {
+          // Return a valid Response if network fails and cache is empty
+          return new Response('Asset not available offline', {
+            status: 503,
+            statusText: 'Service Unavailable',
+          });
+        }
+      })()
     );
     return;
   }
 
-  // HTML Page Navigation: Network First with Cache Fallback
+  // 5. HTML Page Navigation: Network First with Cache Fallback
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
-        .then((networkResponse) => {
+      (async () => {
+        try {
+          const networkResponse = await fetch(request);
           if (networkResponse && networkResponse.status === 200) {
             const responseToCache = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, responseToCache);
-            });
+            const cache = await caches.open(CACHE_NAME);
+            cache.put(request, responseToCache);
           }
           return networkResponse;
-        })
-        .catch(async () => {
+        } catch {
           const cachedResponse = await caches.match(request);
           if (cachedResponse) {
             return cachedResponse;
           }
-          // Fallback to cached root shell
-          return caches.match('/');
-        })
+          const rootCache = await caches.match('/');
+          if (rootCache) {
+            return rootCache;
+          }
+          return new Response('Offline', {
+            status: 503,
+            statusText: 'Service Unavailable',
+            headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+          });
+        }
+      })()
     );
     return;
   }
 
-  // Default fallback
-  event.respondWith(
-    fetch(request).catch(() => caches.match(request))
-  );
+  // For any other requests, do not call event.respondWith(); let the browser handle natively.
 });
 
 // Listen for skipWaiting message from client
@@ -131,4 +162,3 @@ self.addEventListener('message', (event) => {
     self.skipWaiting();
   }
 });
-
