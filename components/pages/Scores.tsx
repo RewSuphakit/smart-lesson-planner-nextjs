@@ -16,6 +16,7 @@ const ScoreExcelModal = dynamic(() => import('@/components/ScoreExcelModal'), { 
 const ScoreImportModal = dynamic(() => import('@/components/ScoreImportModal'), { ssr: false });
 import ClassroomCardPicker from '@/components/ClassroomCardPicker';
 import SectionSwitcher from '@/components/SectionSwitcher';
+import BlueprintCalculatorModal from '@/components/BlueprintCalculatorModal';
 import { parseClassroomName } from '@/lib/classroom';
 import { buildStudentSectionGroups } from '@/lib/studentSections';
 
@@ -82,6 +83,7 @@ interface Classroom {
   final_max_score?: number;
   total_weeks?: number;
   curriculum_type?: 'pvch' | 'pvs' | 'custom' | string;
+  semester_start_date?: string | null;
 }
 
 interface Student {
@@ -127,6 +129,7 @@ interface MatrixStudentRowProps {
   structures: ScoreStructure[];
   matrixScores: FullMatrixScoresMap;
   onScoreChange: (studentId: string | number, lessonNum: number, field: 'assignment_score' | 'post_test_score', value: string) => void;
+  hasMidterm?: boolean;
 }
 
 const MatrixStudentRow = memo(function MatrixStudentRow({
@@ -135,6 +138,7 @@ const MatrixStudentRow = memo(function MatrixStudentRow({
   structures,
   matrixScores,
   onScoreChange,
+  hasMidterm = true,
 }: MatrixStudentRowProps) {
   let totalStudentScore = 0;
   for (let i = 0; i < structures.length; i++) {
@@ -150,7 +154,7 @@ const MatrixStudentRow = memo(function MatrixStudentRow({
       }
     }
   }
-  totalStudentScore += Number(student.midterm_score || 0) + Number(student.final_score || 0) + Number(student.affective_score || 0);
+  totalStudentScore += (hasMidterm ? Number(student.midterm_score || 0) : 0) + Number(student.final_score || 0) + Number(student.affective_score || 0);
 
   const roundedTotal = Math.round(totalStudentScore * 10) / 10;
   const isEven = idx % 2 === 0;
@@ -203,13 +207,15 @@ const MatrixStudentRow = memo(function MatrixStudentRow({
           </Fragment>
         );
       })}
-      <td className="p-1 border-l border-indigo-100 bg-cyan-50/30 text-center font-bold text-cyan-800 text-xs h-9">
-        {student.midterm_score ?? '-'}
-      </td>
-      <td className="p-1 border-l border-indigo-50 bg-blue-50/30 text-center font-bold text-blue-800 text-xs h-9">
+      {hasMidterm && (
+        <td className="p-1 border-l border-indigo-100 bg-cyan-50/30 text-center font-bold text-cyan-800 text-xs h-9" title="คะแนนสอบกลางภาค (W9)">
+          {student.midterm_score ?? '-'}
+        </td>
+      )}
+      <td className="p-1 border-l border-indigo-50 bg-blue-50/30 text-center font-bold text-blue-800 text-xs h-9" title="คะแนนสอบปลายภาค">
         {student.final_score ?? '-'}
       </td>
-      <td className="p-1 border-l border-indigo-50 bg-pink-50/30 text-center font-bold text-pink-800 text-xs h-9">
+      <td className="p-1 border-l border-indigo-50 bg-pink-50/30 text-center font-bold text-pink-800 text-xs h-9" title="คะแนนจิตพิสัย">
         {student.affective_score ?? '-'}
       </td>
       <td className="p-2 border-l border-indigo-100 bg-indigo-50 text-center font-black text-indigo-700 text-sm h-9">
@@ -221,6 +227,7 @@ const MatrixStudentRow = memo(function MatrixStudentRow({
   if (prev.student !== next.student) return false;
   if (prev.idx !== next.idx) return false;
   if (prev.structures !== next.structures) return false;
+  if (prev.hasMidterm !== next.hasMidterm) return false;
   if (prev.onScoreChange !== next.onScoreChange) return false;
 
   for (let i = 0; i < next.structures.length; i++) {
@@ -271,6 +278,7 @@ export default function Scores() {
   const [theoryHoursPerWeek, setTheoryHoursPerWeek] = useState(2);
   const [practiceHoursPerWeek, setPracticeHoursPerWeek] = useState(2);
   const [curriculumWeeks, setCurriculumWeeks] = useState<number>(18);
+  const [hasMidtermCalculator, setHasMidtermCalculator] = useState(true);
   const [scoreScaleMode, setScoreScaleMode] = useState<'standard_10' | 'direct_weight'>('standard_10');
   const [standardWeeklyBaseScore, setStandardWeeklyBaseScore] = useState<number>(10);
 
@@ -363,36 +371,6 @@ export default function Scores() {
     }
   });
 
-  // Auto-set semesterStartDate per classroom
-  useEffect(() => {
-    if (!selectedClass) return;
-    const stored = localStorage.getItem(`scores_start_date_${selectedClass}`);
-    if (stored) {
-      setSemesterStartDate(stored);
-    } else if (allClassAttendance && allClassAttendance.length > 0) {
-      const validDates = allClassAttendance
-        .map(r => parseSafeDateStr(r.date))
-        .filter(d => d !== '')
-        .sort();
-      if (validDates.length > 0) {
-        setSemesterStartDate(validDates[0]);
-      } else {
-        const d = new Date();
-        setSemesterStartDate(`${d.getFullYear()}-05-18`);
-      }
-    } else {
-      const d = new Date();
-      setSemesterStartDate(`${d.getFullYear()}-05-18`);
-    }
-  }, [selectedClass, allClassAttendance]);
-
-  const handleStartDateChange = (newDate: string) => {
-    setSemesterStartDate(newDate);
-    if (selectedClass) {
-      localStorage.setItem(`scores_start_date_${selectedClass}`, newDate);
-    }
-  };
-
   // ─── Query: ดึงข้อมูลห้องเรียน (shared cache) ───
   const { data: classrooms = [], isLoading: loadingClassrooms } = useQuery<Classroom[]>({
     queryKey: ['classrooms'],
@@ -405,6 +383,68 @@ export default function Scores() {
   const classroomObj = useMemo(() => {
     return classrooms.find(c => String(c.id) === String(selectedClass));
   }, [classrooms, selectedClass]);
+
+  // Auto-set semesterStartDate per classroom (DB First -> Attendance Fallback -> Default)
+  useEffect(() => {
+    if (!selectedClass) return;
+
+    // 1. ถ้ามีข้อมูลใน DB (classroom.semester_start_date) ให้ใช้ค่าจาก DB เสมอ
+    if (classroomObj?.semester_start_date) {
+      setSemesterStartDate(classroomObj.semester_start_date);
+      try {
+        localStorage.removeItem(`scores_start_date_${selectedClass}`);
+      } catch {}
+      return;
+    }
+
+    // 2. ตรวจสอบ legacy localStorage (ถ้ามีค่าเก่า ให้ซิงก์ขึ้น DB ให้ด้วย)
+    const stored = typeof window !== 'undefined' ? localStorage.getItem(`scores_start_date_${selectedClass}`) : null;
+    if (stored) {
+      setSemesterStartDate(stored);
+      api.put(`/classrooms/${selectedClass}`, { semester_start_date: stored })
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ['classrooms'] });
+          try {
+            localStorage.removeItem(`scores_start_date_${selectedClass}`);
+          } catch {}
+        })
+        .catch((err) => console.warn('Failed to migrate semesterStartDate to DB:', err));
+      return;
+    }
+
+    // 3. Fallback: ดูจากวันแรกที่มีการเช็คชื่อ
+    if (allClassAttendance && allClassAttendance.length > 0) {
+      const validDates = allClassAttendance
+        .map(r => parseSafeDateStr(r.date))
+        .filter(d => d !== '')
+        .sort();
+      if (validDates.length > 0) {
+        setSemesterStartDate(validDates[0]);
+        return;
+      }
+    }
+
+    // 4. Default: วันที่ 18 พฤษภาคม ของปีปัจจุบัน
+    const d = new Date();
+    setSemesterStartDate(`${d.getFullYear()}-05-18`);
+  }, [selectedClass, classroomObj?.semester_start_date, allClassAttendance, queryClient]);
+
+  const handleStartDateChange = async (newDate: string) => {
+    setSemesterStartDate(newDate);
+    if (!selectedClass) return;
+
+    try {
+      await api.put(`/classrooms/${selectedClass}`, { semester_start_date: newDate });
+      queryClient.invalidateQueries({ queryKey: ['classrooms'] });
+      try {
+        localStorage.removeItem(`scores_start_date_${selectedClass}`);
+      } catch {}
+      toast.success('บันทึกวันเริ่มต้นภาคเรียนเรียบร้อย');
+    } catch (err) {
+      console.error('Failed to update semester_start_date in DB:', err);
+      toast.error('ไม่สามารถบันทึกวันเริ่มต้นภาคเรียนลงฐานข้อมูลได้');
+    }
+  };
 
   // Calculate Teaching Days of this Classroom (0=Mon .. 6=Sun)
   const classTeachingDays = useMemo(() => {
@@ -512,11 +552,28 @@ export default function Scores() {
     return students;
   }, [activeSectionGroup, sectionGroups, students]);
 
+  const isPws = useMemo(() => {
+    const nameOrDesc = `${classroomObj?.name || ''} ${classroomObj?.description || ''}`;
+    return classroomObj?.curriculum_type === 'pvs' || Boolean(nameOrDesc.includes('ปวส') || nameOrDesc.includes('ปวส.'));
+  }, [classroomObj]);
+
+  const hasMidterm = useMemo(() => {
+    // ปวส. ไม่มีสอบกลางภาคเสมอ
+    if (isPws) return false;
+    // ปวช. สามารถมีหรือไม่มีกลางภาคได้ โดยอิงตามค่าน้ำหนักกลางภาค (> 0)
+    return Number(classroomObj?.midterm_weight ?? 0) > 0;
+  }, [isPws, classroomObj]);
+
+  // สัปดาห์เก็บงานย่อย: ปวส = 14 สัปดาห์ (W1–W14), ปวช = 17 สัปดาห์ (W1–W17) เพราะสัปดาห์สุดท้ายเป็นปลายภาค
+  const targetTeachingWeeks = useMemo(() => {
+    return isPws ? 14 : 17;
+  }, [isPws]);
+
   // Sync Class Data and Structure
   useEffect(() => {
     if (matrixData) {
       const fetchedStructs = matrixData.structures || [];
-      const targetWeeks = classroomObj?.total_weeks || (classroomObj?.curriculum_type === 'pvs' ? 15 : 18);
+      const targetWeeks = targetTeachingWeeks;
 
       let finalStructs: ScoreStructure[];
       let savedInDB = false;
@@ -1048,9 +1105,10 @@ export default function Scores() {
   const handleOpenCalculator = () => {
     // 1. Auto-detect curriculum (ปวช. 18 สัปดาห์ vs ปวส. 15 สัปดาห์)
     const nameOrDesc = `${classroomObj?.name || ''} ${classroomObj?.description || ''}`;
-    const isPws = Boolean(nameOrDesc.includes('ปวส') || nameOrDesc.includes('ปวส.'));
-    const detectedWeeks = isPws ? 15 : (structures.length === 15 ? 15 : 18);
+    const isPwsClass = Boolean(nameOrDesc.includes('ปวส') || nameOrDesc.includes('ปวส.') || classroomObj?.curriculum_type === 'pvs');
+    const detectedWeeks = isPwsClass ? 15 : 18;
     setCurriculumWeeks(detectedWeeks);
+    setHasMidtermCalculator(!isPwsClass && Number(classroomObj?.midterm_weight ?? 0) > 0);
 
     // 2. Auto-prefill total academic score from classroom settings
     const assignWeight = Number(classroomObj?.assignment_weight) || 0;
@@ -1097,20 +1155,22 @@ export default function Scores() {
   };
 
   // --- Test Blueprint Calculator with Smart Fallback & Curriculum (ปวช./ปวส.) ---
-  const calculateBlueprint = () => {
+  const calculateBlueprint = (customTeachingWeeks?: number) => {
     const totalContactHours = (Number(theoryHoursPerWeek) || 0) + (Number(practiceHoursPerWeek) || 0);
     if (totalContactHours === 0) {
       toast.error('กรุณาระบุชั่วโมงทฤษฎีและปฏิบัติ (ต้องรวมกันมากกว่า 0)');
       return;
     }
 
-    // 1. Adjust structures length to match curriculumWeeks (15 for ปวส., 18 for ปวช.)
+    const weeksCount = customTeachingWeeks || targetTeachingWeeks;
+
+    // 1. Adjust structures length to match teaching weeks (14 for ปวส., 17 for ปวช.)
     let effectiveStructures = structures;
-    if (effectiveStructures.length !== curriculumWeeks) {
-      if (effectiveStructures.length > curriculumWeeks) {
-        effectiveStructures = effectiveStructures.slice(0, curriculumWeeks);
+    if (effectiveStructures.length !== weeksCount) {
+      if (effectiveStructures.length > weeksCount) {
+        effectiveStructures = effectiveStructures.slice(0, weeksCount);
       } else {
-        const diff = curriculumWeeks - effectiveStructures.length;
+        const diff = weeksCount - effectiveStructures.length;
         const startNum = effectiveStructures.length + 1;
         const padding = Array.from({ length: diff }, (_, i) => ({
           lesson_number: startNum + i,
@@ -1427,7 +1487,7 @@ export default function Scores() {
                 <div>
                   <h2 className="text-lg font-bold text-slate-800">ตารางน้ำหนักคะแนนเต็ม (Test Blueprint)</h2>
                   <p className="text-sm text-slate-600">
-                    กำหนดคะแนนเต็มของงานเก็บและสอบย่อยในแต่ละบทเรียน ({structures.length} สัปดาห์ — {structures.length === 15 ? 'หลักสูตร ปวส.' : 'หลักสูตร ปวช.'})
+                    กำหนดคะแนนเต็มของงานเก็บและสอบย่อยในแต่ละบทเรียน ({structures.length} สัปดาห์เรียน — {isPws ? 'หลักสูตร ปวส. (W1-W14 + ปลายภาค)' : 'หลักสูตร ปวช. (W1-W17 + ปลายภาค)'})
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -1435,8 +1495,8 @@ export default function Scores() {
                     <button
                       type="button"
                       onClick={() => {
-                        if (structures.length !== 18) {
-                          const diff = 18 - structures.length;
+                        if (structures.length !== 17) {
+                          const diff = 17 - structures.length;
                           if (diff > 0) {
                             const padding = Array.from({ length: diff }, (_, i) => ({
                               lesson_number: structures.length + 1 + i,
@@ -1447,28 +1507,28 @@ export default function Scores() {
                             }));
                             setStructures([...structures, ...padding]);
                           } else {
-                            setStructures(structures.slice(0, 18));
+                            setStructures(structures.slice(0, 17));
                           }
                           setCurriculumWeeks(18);
                         }
                       }}
-                      className={`px-2.5 py-1 rounded-md font-medium transition-all ${structures.length >= 18 ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-indigo-600'
+                      className={`px-2.5 py-1 rounded-md font-medium transition-all ${structures.length === 17 ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-indigo-600'
                         }`}
                     >
-                      ปวช. (18 สัปดาห์)
+                      ปวช. (17 สัปดาห์เรียน)
                     </button>
                     <button
                       type="button"
                       onClick={() => {
-                        if (structures.length !== 15) {
-                          setStructures(structures.slice(0, 15));
+                        if (structures.length !== 14) {
+                          setStructures(structures.slice(0, 14));
                           setCurriculumWeeks(15);
                         }
                       }}
-                      className={`px-2.5 py-1 rounded-md font-medium transition-all ${structures.length === 15 ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-indigo-600'
+                      className={`px-2.5 py-1 rounded-md font-medium transition-all ${structures.length === 14 ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-indigo-600'
                         }`}
                     >
-                      ปวส. (15 สัปดาห์)
+                      ปวส. (14 สัปดาห์เรียน)
                     </button>
                   </div>
                   <button onClick={handleOpenCalculator} className="btn bg-indigo-500/10 text-indigo-600 hover:bg-indigo-500/20 border border-indigo-200 flex items-center gap-2 text-xs">
@@ -1742,21 +1802,29 @@ export default function Scores() {
                                 </th>
                               );
                             })}
-                            <th
-                              rowSpan={2}
-                              className="p-3 text-center border-l border-indigo-200 bg-cyan-100 font-bold sticky top-0 z-20 text-cyan-950"
-                              style={{ top: 0, width: 65, minWidth: 65, maxWidth: 65, backgroundColor: '#cffafe', backfaceVisibility: 'hidden' }}
-                              title="กรอกและแก้ไขคะแนนสอบกลางภาคได้ที่เมนู ตัดเกรด"
-                            >
-                              กลางภาค
-                            </th>
+                            {hasMidterm && (
+                              <th
+                                rowSpan={2}
+                                className="p-3 text-center border-l border-indigo-200 bg-cyan-100 font-bold sticky top-0 z-20 text-cyan-950"
+                                style={{ top: 0, width: 75, minWidth: 75, maxWidth: 75, backgroundColor: '#cffafe', backfaceVisibility: 'hidden' }}
+                                title="คะแนนสอบกลางภาค (สัปดาห์ที่ 9 สำหรับ ปวช.)"
+                              >
+                                <div className="flex flex-col items-center">
+                                  <span>กลางภาค</span>
+                                  <span className="text-[10px] font-normal text-cyan-800">(W9)</span>
+                                </div>
+                              </th>
+                            )}
                             <th
                               rowSpan={2}
                               className="p-3 text-center bg-blue-100 font-bold sticky top-0 z-20 text-blue-950"
-                              style={{ top: 0, width: 65, minWidth: 65, maxWidth: 65, backgroundColor: '#dbeafe', backfaceVisibility: 'hidden' }}
-                              title="กรอกและแก้ไขคะแนนสอบปลายภาคได้ที่เมนู ตัดเกรด"
+                              style={{ top: 0, width: 75, minWidth: 75, maxWidth: 75, backgroundColor: '#dbeafe', backfaceVisibility: 'hidden' }}
+                              title={`คะแนนสอบปลายภาค (${isPws ? 'สัปดาห์ที่ 15' : 'สัปดาห์ที่ 18'})`}
                             >
-                              ปลายภาค
+                              <div className="flex flex-col items-center">
+                                <span>ปลายภาค</span>
+                                <span className="text-[10px] font-normal text-blue-800">({isPws ? 'W15' : 'W18'})</span>
+                              </div>
                             </th>
                             <th
                               rowSpan={2}
@@ -1802,6 +1870,7 @@ export default function Scores() {
                               structures={structures}
                               matrixScores={matrixScores}
                               onScoreChange={handleMatrixScoreChange}
+                              hasMidterm={hasMidterm}
                             />
                           ))}
                         </tbody>
@@ -2169,282 +2238,37 @@ export default function Scores() {
           )}
 
           {/* Calculator Modal */}
-          {showCalculator && (() => {
-            const contactHours = (Number(theoryHoursPerWeek) || 0) + (Number(practiceHoursPerWeek) || 0);
-            const tRatio = contactHours > 0 ? (Number(theoryHoursPerWeek) || 0) / contactHours : 0;
-            const pRatio = contactHours > 0 ? (Number(practiceHoursPerWeek) || 0) / contactHours : 0;
-            const tPct = Math.round(tRatio * 1000) / 10;
-            const pPct = Math.round(pRatio * 1000) / 10;
-
-            // Preview values based on scoreScaleMode
-            let previewAssign = 10;
-            let previewPostTest = 10;
-            if (pRatio > tRatio) {
-              previewAssign = standardWeeklyBaseScore;
-              previewPostTest = Math.max(1, Math.round(standardWeeklyBaseScore * (tRatio / pRatio)));
-            } else if (tRatio > pRatio) {
-              previewPostTest = standardWeeklyBaseScore;
-              previewAssign = Math.max(1, Math.round(standardWeeklyBaseScore * (pRatio / tRatio)));
-            }
-            const totalWeeklyStandard = previewAssign + previewPostTest;
-            const totalTermRawStandard = totalWeeklyStandard * curriculumWeeks;
-
-            const directSkillTotal = Math.round((Number(totalAcademicScore) || 0) * pRatio);
-            const directTestTotal = (Number(totalAcademicScore) || 0) - directSkillTotal;
-            const directAvgAssign = Math.round((directSkillTotal / curriculumWeeks) * 10) / 10;
-            const directAvgTest = Math.round((directTestTotal / curriculumWeeks) * 10) / 10;
-
-            return (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                <div className="bg-white border border-indigo-200 rounded-2xl p-6 max-w-lg w-full shadow-2xl">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                      <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
-                        <Calculator className="w-5 h-5" />
-                      </div>
-                      คำนวณสัดส่วนคะแนนอัตโนมัติ
-                    </h3>
-                  </div>
-                  <p className="text-slate-600 mb-4 text-xs">
-                    กำหนดสัดส่วนชั่วโมงและคำนวณคะแนนเต็มของงานเก็บและสอบย่อยให้เหมาะสมกับหลักสูตร ปวช. และ ปวส.
-                  </p>
-
-                  <div className="space-y-4 mb-5">
-                    {/* 1. เลือกระดับหลักสูตร (ปวช. 18 สัปดาห์ vs ปวส. 15 สัปดาห์) */}
-                    <div className="p-3 bg-indigo-50/80 border border-indigo-100 rounded-xl">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-800">เลือกระดับหลักสูตร:</span>
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setCurriculumWeeks(18)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${curriculumWeeks === 18
-                              ? 'bg-indigo-600 text-white shadow-sm'
-                              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                              }`}
-                          >
-                            ปวช. (18 สัปดาห์)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setCurriculumWeeks(15)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${curriculumWeeks === 15
-                              ? 'bg-indigo-600 text-white shadow-sm'
-                              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                              }`}
-                          >
-                            ปวส. (15 สัปดาห์)
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* 2. เลือกรูปแบบคะแนนเต็ม (แก้ปัญหาได้ 1 คะแนน) */}
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">รูปแบบคะแนนเต็มรายสัปดาห์</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setScoreScaleMode('standard_10')}
-                          className={`p-2.5 rounded-xl border text-left transition-all ${scoreScaleMode === 'standard_10'
-                            ? 'bg-indigo-50/90 border-indigo-500 ring-2 ring-indigo-500/20'
-                            : 'bg-white border-slate-200 hover:bg-slate-50'
-                            }`}
-                        >
-                          <div className="text-xs font-bold text-slate-800 flex items-center justify-between">
-                            <span>คะแนนเต็มมาตรฐาน</span>
-                            <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">แนะนำ</span>
-                          </div>
-                          <p className="text-[11px] text-slate-500 mt-1">
-                            เต็ม 5-10 ตรวจง่าย ระบบจะทอนคะแนนตามน้ำหนัก {totalAcademicScore} คะแนนในหน้าตัดเกรดอัตโนมัติ
-                          </p>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setScoreScaleMode('direct_weight')}
-                          className={`p-2.5 rounded-xl border text-left transition-all ${scoreScaleMode === 'direct_weight'
-                            ? 'bg-indigo-50/90 border-indigo-500 ring-2 ring-indigo-500/20'
-                            : 'bg-white border-slate-200 hover:bg-slate-50'
-                            }`}
-                        >
-                          <div className="text-xs font-bold text-slate-800">เกลี่ยตามค่าน้ำหนักรวม</div>
-                          <p className="text-[11px] text-slate-500 mt-1">
-                            หารคะแนนรวม {totalAcademicScore} เฉลี่ย {curriculumWeeks} สัปดาห์ (คะแนนต่อช่องจะเฉลี่ย ~1-2 คะแนน)
-                          </p>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* ถ้าเลือกโหมดมาตรฐาน สามารถเลือกฐานคะแนนเต็มได้ (เช่น เต็ม 10 หรือ 5) */}
-                    {scoreScaleMode === 'standard_10' ? (
-                      <div className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
-                        <span className="text-xs font-semibold text-slate-700">ฐานคะแนนเต็มต่อช่องงานเก็บ:</span>
-                        <div className="flex gap-1.5">
-                          {[5, 10, 20].map(pts => (
-                            <button
-                              key={pts}
-                              type="button"
-                              onClick={() => setStandardWeeklyBaseScore(pts)}
-                              className={`px-2.5 py-1 text-xs rounded-lg font-bold border transition-all ${standardWeeklyBaseScore === pts
-                                ? 'bg-indigo-600 text-white border-indigo-600'
-                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                                }`}
-                            >
-                              เต็ม {pts}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <label className="form-label text-slate-800 text-xs font-semibold mb-0">คะแนนวิชาการรวม (งานเก็บ + สอบย่อย)</label>
-                          <span className="text-[11px] text-indigo-600 font-medium bg-indigo-50 px-2 py-0.5 rounded-md">
-                            ค่าน้ำหนักวิชา: {totalAcademicScore} คะแนน
-                          </span>
-                        </div>
-                        <input
-                          type="number"
-                          value={totalAcademicScore}
-                          onChange={e => setTotalAcademicScore(parseFloat(e.target.value) || 0)}
-                          className="form-input text-lg font-bold text-slate-800"
-                        />
-                      </div>
-                    )}
-
-                    {/* 3. สัดส่วนชั่วโมงเรียน (ท-ป-น) */}
-                    <div>
-                      <div className="flex justify-between items-center mb-1.5">
-                        <span className="text-xs font-semibold text-slate-700">สัดส่วนชั่วโมงเรียนตามหลักสูตร (ท-ป-น)</span>
-                        <span className="text-[11px] text-slate-500">พรีเซ็ตด่วน:</span>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5 mb-2.5">
-                        {[
-                          { label: '1-2-2 (3 ชม.)', t: 1, p: 2 },
-                          { label: '2-2-3 (4 ชม.)', t: 2, p: 2 },
-                          { label: '2-0-2 (2 ชม.)', t: 2, p: 0 },
-                          { label: '1-4-3 (5 ชม.)', t: 1, p: 4 },
-                          { label: '3-0-3 (3 ชม.)', t: 3, p: 0 },
-                        ].map(preset => (
-                          <button
-                            key={preset.label}
-                            type="button"
-                            onClick={() => {
-                              setTheoryHoursPerWeek(preset.t);
-                              setPracticeHoursPerWeek(preset.p);
-                            }}
-                            className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all ${theoryHoursPerWeek === preset.t && practiceHoursPerWeek === preset.p
-                              ? 'bg-indigo-600 text-white border-indigo-600 font-semibold shadow-sm'
-                              : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200'
-                              }`}
-                          >
-                            {preset.label}
-                          </button>
-                        ))}
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="p-3 rounded-xl border border-amber-200 bg-amber-50/50">
-                          <label className="block text-xs font-semibold text-amber-800 mb-1">ทฤษฎี ชม./สัปดาห์</label>
-                          <input
-                            type="number" min="0" step="1"
-                            value={theoryHoursPerWeek}
-                            onChange={e => setTheoryHoursPerWeek(parseFloat(e.target.value) || 0)}
-                            className="form-input text-lg text-center font-bold text-amber-700 bg-white border-amber-300"
-                          />
-                        </div>
-                        <div className="p-3 rounded-xl border border-emerald-200 bg-emerald-50/50">
-                          <label className="block text-xs font-semibold text-emerald-800 mb-1">ปฏิบัติ ชม./สัปดาห์</label>
-                          <input
-                            type="number" min="0" step="1"
-                            value={practiceHoursPerWeek}
-                            onChange={e => setPracticeHoursPerWeek(parseFloat(e.target.value) || 0)}
-                            className="form-input text-lg text-center font-bold text-emerald-700 bg-white border-emerald-300"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Real-time Preview Card */}
-                    <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
-                      <div className="flex justify-between items-center text-xs font-semibold text-slate-700 mb-2">
-                        <span>ผลลัพธ์ที่จะบันทึกลงตาราง ({curriculumWeeks === 15 ? 'ปวส. 15 สัปดาห์' : 'ปวช. 18 สัปดาห์'})</span>
-                        <span className="text-slate-500 font-normal">รวม {contactHours} ชม./สัปดาห์</span>
-                      </div>
-
-                      {/* Dual color progress bar */}
-                      <div className="h-2.5 w-full bg-slate-200 rounded-full overflow-hidden flex mb-2.5 shadow-inner">
-                        <div
-                          style={{ width: `${tPct}%` }}
-                          className="bg-amber-500 h-full transition-all duration-300"
-                          title={`ทฤษฎี ${tPct}%`}
-                        />
-                        <div
-                          style={{ width: `${pPct}%` }}
-                          className="bg-emerald-500 h-full transition-all duration-300"
-                          title={`ปฏิบัติ ${pPct}%`}
-                        />
-                      </div>
-
-                      {scoreScaleMode === 'standard_10' ? (
-                        <div>
-                          <div className="grid grid-cols-2 gap-2 text-xs">
-                            <div className="p-2 rounded-lg bg-amber-100/70 border border-amber-200">
-                              <div className="text-amber-800 font-medium">สอบย่อย (ทฤษฎี)</div>
-                              <div className="text-sm font-bold text-amber-900 mt-0.5">เต็ม {previewPostTest} คะแนน/สัปดาห์</div>
-                            </div>
-                            <div className="p-2 rounded-lg bg-emerald-100/70 border border-emerald-200">
-                              <div className="text-emerald-800 font-medium">งานเก็บ (ปฏิบัติ)</div>
-                              <div className="text-sm font-bold text-emerald-900 mt-0.5">เต็ม {previewAssign} คะแนน/สัปดาห์</div>
-                            </div>
-                          </div>
-                          <p className="mt-2 text-[11px] text-indigo-700 bg-indigo-50 p-2 rounded-lg border border-indigo-100 flex items-center gap-1.5">
-                            <span>✨</span>
-                            <span>คะแนนดิบรวมทั้งเทอม {totalTermRawStandard} คะแนน — ในหน้าตัดเกรด ระบบจะทอนสัดส่วนให้ตรงกับค่าน้ำหนัก {totalAcademicScore} คะแนนให้อัตโนมัติ</span>
-                          </p>
-                        </div>
-                      ) : (
-                        <div>
-                          <div className="grid grid-cols-2 gap-2 text-xs">
-                            <div className="p-2 rounded-lg bg-amber-100/70 border border-amber-200">
-                              <div className="text-amber-800 font-medium">สอบย่อย (ทฤษฎี)</div>
-                              <div className="text-sm font-bold text-amber-900 mt-0.5">รวม {directTestTotal} คะแนน (~{directAvgTest}/สัปดาห์)</div>
-                            </div>
-                            <div className="p-2 rounded-lg bg-emerald-100/70 border border-emerald-200">
-                              <div className="text-emerald-800 font-medium">งานเก็บ (ปฏิบัติ)</div>
-                              <div className="text-sm font-bold text-emerald-900 mt-0.5">รวม {directSkillTotal} คะแนน (~{directAvgAssign}/สัปดาห์)</div>
-                            </div>
-                          </div>
-                          <p className="mt-2 text-[11px] text-slate-500">
-                            * คะแนนเฉลี่ยต่อสัปดาห์จะได้ประมาณ 1-2 คะแนน เพื่อให้ยอดรวมทั้ง {curriculumWeeks} สัปดาห์เท่ากับ {totalAcademicScore} คะแนนพอดี
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2.5 justify-end">
-                    <button
-                      type="button"
-                      onClick={() => setShowCalculator(false)}
-                      className="btn bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-4"
-                    >
-                      ยกเลิก
-                    </button>
-                    <button
-                      type="button"
-                      onClick={calculateBlueprint}
-                      className="btn btn-primary text-xs px-5 flex items-center gap-1.5 shadow-md shadow-indigo-500/20"
-                    >
-                      <Calculator className="w-4 h-4" />
-                      คำนวณและนำลงตาราง ({curriculumWeeks} สัปดาห์)
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
+          <BlueprintCalculatorModal
+            isOpen={showCalculator}
+            onClose={() => setShowCalculator(false)}
+            curriculumWeeks={curriculumWeeks}
+            setCurriculumWeeks={setCurriculumWeeks}
+            hasMidterm={hasMidtermCalculator}
+            setHasMidterm={setHasMidtermCalculator}
+            scoreScaleMode={scoreScaleMode}
+            setScoreScaleMode={setScoreScaleMode}
+            standardWeeklyBaseScore={standardWeeklyBaseScore}
+            setStandardWeeklyBaseScore={setStandardWeeklyBaseScore}
+            totalAcademicScore={totalAcademicScore}
+            setTotalAcademicScore={setTotalAcademicScore}
+            theoryHoursPerWeek={theoryHoursPerWeek}
+            setTheoryHoursPerWeek={setTheoryHoursPerWeek}
+            practiceHoursPerWeek={practiceHoursPerWeek}
+            setPracticeHoursPerWeek={setPracticeHoursPerWeek}
+            onCalculate={(tWeeks, midExam) => {
+              calculateBlueprint(tWeeks);
+              if (!isPws && selectedClass) {
+                const currentWeight = Number(classroomObj?.midterm_weight ?? 0);
+                if (midExam && currentWeight === 0) {
+                  api.put(`/classrooms/${selectedClass}`, { midterm_weight: 15 })
+                    .then(() => queryClient.invalidateQueries({ queryKey: ['classrooms'] }));
+                } else if (!midExam && currentWeight > 0) {
+                  api.put(`/classrooms/${selectedClass}`, { midterm_weight: 0 })
+                    .then(() => queryClient.invalidateQueries({ queryKey: ['classrooms'] }));
+                }
+              }
+            }}
+          />
 
           {/* Excel Live Preview & Export Modal */}
           <ScoreExcelModal

@@ -16,6 +16,8 @@ import ClassroomCardPicker from '@/components/ClassroomCardPicker';
 import SectionSwitcher from '@/components/SectionSwitcher';
 import { parseClassroomName } from '@/lib/classroom';
 import { buildStudentSectionGroups } from '@/lib/studentSections';
+import GradesSettingsDrawer from '@/components/GradesSettingsDrawer';
+import GradesAnalyticsHeader from '@/components/GradesAnalyticsHeader';
 const GradePdfModal = dynamic(() => import('@/components/GradePdfModal'), { ssr: false });
 const GradeCsvModal = dynamic(() => import('@/components/GradeCsvModal'), { ssr: false });
 import { useAuth } from '@/context/AuthContext';
@@ -692,19 +694,6 @@ export default function Grades() {
     },
   });
 
-  const handleCriteriaChange = (index: number, field: keyof Criterion, value: string | number) => {
-    const newCriteria = [...criteria];
-    newCriteria[index] = { ...newCriteria[index], [field]: value };
-    setCriteria(newCriteria);
-  };
-
-  const addCriteriaRow = () => {
-    setCriteria([...criteria, { grade: '', min_score: 0 }]);
-  };
-
-  const removeCriteriaRow = (index: number) => {
-    setCriteria(criteria.filter((_, i) => i !== index));
-  };
 
   const getGradeStyle = (grade?: string) => {
     if (grade === 'ข.ร.' || grade === 'ขร' || grade === 'F') return 'bg-rose-600 text-white shadow-sm shadow-rose-500/20';
@@ -860,218 +849,17 @@ export default function Grades() {
           <p className="text-xs text-slate-500">กำลังประมวลผลข้อมูลเกรดและคะแนน...</p>
         </div>
       ) : showSettings ? (
-        /* ==================== SETTINGS DRAWER / PANEL ==================== */
-        <div className="glass p-6 sm:p-7 rounded-3xl border border-indigo-100 bg-white space-y-6 animate-fade-in-up">
-          <div className="flex items-center justify-between border-b border-indigo-100 pb-4">
-            <div>
-              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <Settings className="w-5 h-5 text-indigo-600" />
-                ตั้งค่าน้ำหนักคะแนน & เกณฑ์ตัดเกรด
-              </h3>
-              <p className="text-xs text-slate-500">กำหนดสัดส่วนคะแนนรวม 100% และเกณฑ์ช่วงคะแนนตามระเบียบ สอศ.</p>
-            </div>
-            <button
-              onClick={() => setShowSettings(false)}
-              className="btn bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs rounded-xl px-3.5 py-1.5"
-            >
-              ปิด
-            </button>
-          </div>
-
-          {/* Real-Time Weight Balance Bar Section */}
-          <div className="p-5 bg-gradient-to-br from-indigo-50/70 to-purple-50/40 rounded-2xl border border-indigo-100 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div>
-                <h4 className="font-bold text-slate-800 text-sm">
-                  สัดส่วนน้ำหนักคะแนน (รวม 5 ส่วนต้องเท่ากับ 100%)
-                </h4>
-                <p className="text-xs text-slate-500">ระบบจะแปลงคะแนนดิบสะสมเข้าสู่น้ำหนักเปอร์เซ็นต์อัตโนมัติ</p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-slate-600">ผลรวม:</span>
-                <span className={`px-3 py-1 rounded-full text-xs font-extrabold flex items-center gap-1.5 ${totalWeightSum === 100
-                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                  : 'bg-rose-100 text-rose-800 border border-rose-300'
-                  }`}>
-                  {totalWeightSum === 100 ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <XCircle className="w-3.5 h-3.5 text-rose-600" />}
-                  {totalWeightSum}% / 100%
-                </span>
-              </div>
-            </div>
-
-            {/* Visual Weight Distribution Progress Bar */}
-            <div className="w-full h-3.5 bg-slate-200 rounded-full overflow-hidden flex shadow-inner">
-              <div style={{ width: `${Math.min(100, (weights.affective_weight / 100) * 100)}%` }} className="bg-pink-500 transition-all" title={`จิตพิสัย ${weights.affective_weight}%`} />
-              <div style={{ width: `${Math.min(100, (weights.post_test_weight / 100) * 100)}%` }} className="bg-amber-500 transition-all" title={`สอบย่อย ${weights.post_test_weight}%`} />
-              <div style={{ width: `${Math.min(100, (weights.assignment_weight / 100) * 100)}%` }} className="bg-emerald-500 transition-all" title={`งานเก็บ ${weights.assignment_weight}%`} />
-              <div style={{ width: `${Math.min(100, (weights.midterm_weight / 100) * 100)}%` }} className="bg-cyan-500 transition-all" title={`กลางภาค ${weights.midterm_weight}%`} />
-              <div style={{ width: `${Math.min(100, (weights.final_weight / 100) * 100)}%` }} className="bg-blue-500 transition-all" title={`ปลายภาค ${weights.final_weight}%`} />
-            </div>
-
-            {/* Weight inputs */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2">
-              <div className="bg-white p-3 rounded-2xl border border-pink-100 shadow-xs">
-                <label className="block text-[11px] font-bold text-pink-700 uppercase mb-1">จิตพิสัย (%)</label>
-                <input
-                  type="number" min="0" max="100"
-                  value={weights.affective_weight}
-                  onChange={e => setWeights({ ...weights, affective_weight: parseFloat(e.target.value) || 0 })}
-                  className="form-input text-center font-bold text-pink-800 text-sm py-1.5"
-                  placeholder="10"
-                />
-              </div>
-              <div className="bg-white p-3 rounded-2xl border border-amber-100 shadow-xs">
-                <label className="block text-[11px] font-bold text-amber-700 uppercase mb-1">สอบย่อย (%)</label>
-                <input
-                  type="number" min="0" max="100"
-                  value={weights.post_test_weight}
-                  onChange={e => setWeights({ ...weights, post_test_weight: parseFloat(e.target.value) || 0 })}
-                  className="form-input text-center font-bold text-amber-800 text-sm py-1.5"
-                  placeholder="30"
-                />
-              </div>
-              <div className="bg-white p-3 rounded-2xl border border-emerald-100 shadow-xs">
-                <label className="block text-[11px] font-bold text-emerald-700 uppercase mb-1">งานเก็บ (%)</label>
-                <input
-                  type="number" min="0" max="100"
-                  value={weights.assignment_weight}
-                  onChange={e => setWeights({ ...weights, assignment_weight: parseFloat(e.target.value) || 0 })}
-                  className="form-input text-center font-bold text-emerald-800 text-sm py-1.5"
-                  placeholder="20"
-                />
-              </div>
-              <div className="bg-white p-3 rounded-2xl border border-cyan-100 shadow-xs">
-                <label className="block text-[11px] font-bold text-cyan-700 uppercase mb-1">กลางภาค (%)</label>
-                <input
-                  type="number" min="0" max="100"
-                  value={weights.midterm_weight}
-                  onChange={e => setWeights({ ...weights, midterm_weight: parseFloat(e.target.value) || 0 })}
-                  className="form-input text-center font-bold text-cyan-800 text-sm py-1.5"
-                  placeholder="20"
-                />
-              </div>
-              <div className="bg-white p-3 rounded-2xl border border-blue-100 shadow-xs">
-                <label className="block text-[11px] font-bold text-blue-700 uppercase mb-1">ปลายภาค (%)</label>
-                <input
-                  type="number" min="0" max="100"
-                  value={weights.final_weight}
-                  onChange={e => setWeights({ ...weights, final_weight: parseFloat(e.target.value) || 0 })}
-                  className="form-input text-center font-bold text-blue-800 text-sm py-1.5"
-                  placeholder="20"
-                />
-              </div>
-            </div>
-
-            {/* Max Scores for Exams */}
-            <div className="pt-3 border-t border-indigo-100/60">
-              <h5 className="font-bold text-slate-700 mb-2 text-xs">กำหนดคะแนนเต็มสำหรับข้อสอบ (เพื่อใช้แปลงอัตราส่วน)</h5>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg">
-                <div className="flex items-center gap-3 bg-white p-2.5 rounded-2xl border border-indigo-100">
-                  <label className="text-xs font-semibold text-cyan-800 w-28 shrink-0">เต็ม กลางภาค:</label>
-                  <input
-                    type="number" min="1"
-                    value={weights.midterm_max_score}
-                    onChange={e => setWeights({ ...weights, midterm_max_score: parseFloat(e.target.value) || 0 })}
-                    className="form-input text-center font-bold text-slate-800 flex-1 py-1 text-xs"
-                    placeholder="100"
-                  />
-                </div>
-                <div className="flex items-center gap-3 bg-white p-2.5 rounded-2xl border border-indigo-100">
-                  <label className="text-xs font-semibold text-blue-800 w-28 shrink-0">เต็ม ปลายภาค:</label>
-                  <input
-                    type="number" min="1"
-                    value={weights.final_max_score}
-                    onChange={e => setWeights({ ...weights, final_max_score: parseFloat(e.target.value) || 0 })}
-                    className="form-input text-center font-bold text-slate-800 flex-1 py-1 text-xs"
-                    placeholder="100"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Criteria Settings Section */}
-          <div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-              <div>
-                <h4 className="font-bold text-slate-800 text-sm">เกณฑ์คะแนนขั้นต่ำ (%) สำหรับแต่ละระดับเกรด</h4>
-                <p className="text-xs text-slate-500">เรียงจากคะแนนสูงลงมาต่ำ</p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setCriteria([
-                    { grade: 'A', min_score: 80 },
-                    { grade: 'B+', min_score: 75 },
-                    { grade: 'B', min_score: 70 },
-                    { grade: 'C+', min_score: 65 },
-                    { grade: 'C', min_score: 60 },
-                    { grade: 'D+', min_score: 55 },
-                    { grade: 'D', min_score: 50 },
-                    { grade: 'F', min_score: 0 },
-                  ])}
-                  className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors border border-indigo-200"
-                >
-                  ใช้เกรดอักษร (A-F)
-                </button>
-                <button
-                  onClick={() => setCriteria([...DEFAULT_CRITERIA])}
-                  className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors border border-emerald-200"
-                >
-                  ใช้เกรดตัวเลข (4-0)
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-2 max-w-lg mb-6">
-              {criteria.map((c, i) => (
-                <div key={i} className="grid grid-cols-12 gap-2.5 items-center bg-slate-50 p-2 rounded-2xl border border-slate-200/80">
-                  <div className="col-span-5">
-                    <input
-                      type="text"
-                      value={c.grade}
-                      onChange={e => handleCriteriaChange(i, 'grade', e.target.value)}
-                      className="form-input py-1.5 text-center font-bold text-slate-800 text-xs rounded-xl"
-                      placeholder="เช่น 4, A"
-                    />
-                  </div>
-                  <div className="col-span-5 flex items-center gap-2">
-                    <span className="text-slate-500 text-xs shrink-0 font-bold">≥</span>
-                    <input
-                      type="number"
-                      value={c.min_score}
-                      onChange={e => handleCriteriaChange(i, 'min_score', e.target.value)}
-                      className="form-input py-1.5 font-semibold text-slate-800 text-xs rounded-xl"
-                      min="0"
-                      max="100"
-                    />
-                  </div>
-                  <div className="col-span-2 flex justify-center">
-                    <button onClick={() => removeCriteriaRow(i)} className="p-1.5 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-              <button
-                onClick={addCriteriaRow}
-                className="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-800 text-xs font-bold p-2 rounded-xl hover:bg-indigo-50 transition-all"
-              >
-                <Plus className="w-4 h-4" /> เพิ่มระดับเกรด
-              </button>
-            </div>
-
-            <div className="flex gap-3">
-              <button onClick={() => saveCriteriaMutation.mutate()} disabled={saveCriteriaMutation.isPending} className="btn btn-primary rounded-xl text-xs flex items-center gap-2 shadow-md shadow-indigo-500/20">
-                {saveCriteriaMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                บันทึกการตั้งค่า
-              </button>
-              <button onClick={() => setShowSettings(false)} className="btn bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl text-xs">
-                ยกเลิก
-              </button>
-            </div>
-          </div>
-        </div>
+        <GradesSettingsDrawer
+          isOpen={showSettings}
+          onClose={() => setShowSettings(false)}
+          weights={weights}
+          setWeights={setWeights}
+          criteria={criteria}
+          setCriteria={setCriteria}
+          defaultCriteria={DEFAULT_CRITERIA}
+          onSave={() => saveCriteriaMutation.mutate()}
+          isSaving={saveCriteriaMutation.isPending}
+        />
       ) : report.length === 0 ? (
         <div className="glass p-12 text-center rounded-3xl border border-indigo-100 bg-white">
           <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
@@ -1080,99 +868,13 @@ export default function Grades() {
         </div>
       ) : (
         <div className="space-y-6">
-          {/* ==================== ANALYTICS SUMMARY CARDS ==================== */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
-            <div className="glass p-4 sm:p-5 rounded-3xl border border-indigo-100/80 bg-white shadow-xs hover:shadow-md transition-all flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0 font-black text-sm border border-indigo-100">
-                GPA
-              </div>
-              <div className="min-w-0">
-                <p className="text-[0.7rem] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider truncate">เกรดเฉลี่ยห้อง</p>
-                <div className="text-xl sm:text-2xl font-black text-indigo-700 tracking-tight">{analytics.gpa}</div>
-              </div>
-            </div>
-
-            <div className="glass p-4 sm:p-5 rounded-3xl border border-emerald-100/80 bg-white shadow-xs hover:shadow-md transition-all flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-100">
-                <CheckCircle2 className="w-5 h-5" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[0.7rem] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider truncate">อัตราผ่านเกณฑ์</p>
-                <div className="text-xl sm:text-2xl font-black text-emerald-700 tracking-tight">
-                  {analytics.passRate}%
-                  <span className="text-[10px] font-normal text-slate-500 ml-1.5 hidden sm:inline">({analytics.passCount}/{report.length})</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="glass p-4 sm:p-5 rounded-3xl border border-rose-100/80 bg-white shadow-xs hover:shadow-md transition-all flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-rose-50 text-rose-700 flex items-center justify-center shrink-0 border border-rose-100">
-                <AlertTriangle className="w-5 h-5" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[0.7rem] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider truncate">ขาดเรียนเกิน (ข.ร.)</p>
-                <div className="text-xl sm:text-2xl font-black text-rose-700 tracking-tight">
-                  {analytics.krCount} <span className="text-xs font-medium text-slate-500">คน</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="glass p-4 sm:p-5 rounded-3xl border border-amber-100/80 bg-white shadow-xs hover:shadow-md transition-all flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0 font-bold text-xs border border-amber-100">
-                ขส/มส
-              </div>
-              <div className="min-w-0">
-                <p className="text-[0.7rem] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider truncate">ขาดสอบ / ไม่สมบูรณ์</p>
-                <div className="text-xl sm:text-2xl font-black text-amber-700 tracking-tight">
-                  {analytics.ksCount + analytics.msCount}
-                  <span className="text-[10px] font-normal text-slate-500 ml-1.5 hidden sm:inline">(ข.ส. {analytics.ksCount} | ม.ส. {analytics.msCount})</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* ==================== GRADE DISTRIBUTION BAR (RESPONSIVE SCROLL) ==================== */}
-          <div className="glass p-4 sm:p-5 rounded-3xl border border-indigo-100/80 bg-white">
-            <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-              <Award className="w-4 h-4 text-indigo-600" />
-              สถิติการกระจายเกรด (คลิกเพื่อกรองรายชื่อ)
-            </h4>
-            <div className="flex items-center gap-2 overflow-x-auto pb-1.5 no-scrollbar">
-              {['4', '3.5', '3', '2.5', '2', '1.5', '1', '0', 'ข.ร.', 'ข.ส.', 'ม.ส.'].map(gKey => {
-                const count = analytics.distribution[gKey] || (gKey === 'ข.ร.' ? (analytics.distribution['ขร'] || 0) : 0);
-                const isSelected = (gradeFilter === gKey) || (gradeFilter === 'KR' && (gKey === 'ข.ร.' || gKey === 'ขร')) || (gradeFilter === 'KS' && gKey === 'ข.ส.') || (gradeFilter === 'MS' && gKey === 'ม.ส.');
-                return (
-                  <button
-                    key={gKey}
-                    onClick={() => {
-                      if (gKey === 'ข.ร.') setGradeFilter(isSelected ? 'ALL' : 'KR');
-                      else if (gKey === 'ข.ส.') setGradeFilter(isSelected ? 'ALL' : 'KS');
-                      else if (gKey === 'ม.ส.') setGradeFilter(isSelected ? 'ALL' : 'MS');
-                      else setGradeFilter(isSelected ? 'ALL' : gKey);
-                    }}
-                    className={`px-3 py-1.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-1.5 border shrink-0 ${isSelected
-                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-500/20 scale-105'
-                      : 'bg-slate-50 text-slate-700 border-slate-200/80 hover:bg-indigo-50 hover:text-indigo-700'
-                      }`}
-                  >
-                    <span>{gKey}:</span>
-                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${isSelected ? 'bg-white text-indigo-700' : 'bg-white text-slate-800 font-extrabold shadow-xs'}`}>
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
-
-              {gradeFilter !== 'ALL' && (
-                <button
-                  onClick={() => setGradeFilter('ALL')}
-                  className="px-3 py-1.5 rounded-2xl text-xs font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-all shrink-0"
-                >
-                  แสดงทั้งหมด
-                </button>
-              )}
-            </div>
-          </div>
+          {/* ==================== ANALYTICS SUMMARY CARDS & DISTRIBUTION ==================== */}
+          <GradesAnalyticsHeader
+            analytics={analytics}
+            totalStudents={report.length}
+            gradeFilter={gradeFilter}
+            setGradeFilter={setGradeFilter}
+          />
 
           {/* ==================== MAIN GRADEBOOK TOOLBAR & ACTIONS ==================== */}
           <div className="glass overflow-hidden rounded-3xl border border-indigo-100/80 bg-white shadow-sm">

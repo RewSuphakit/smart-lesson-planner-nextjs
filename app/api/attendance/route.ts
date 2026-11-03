@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
-import { formatAttendanceRecord, calculateAttendanceStatsFromGrouped } from '@/lib/formatters';
+import { formatAttendanceRecord, calculateAttendanceStatsFromGrouped, normalizeAttendanceDate } from '@/lib/formatters';
 import { getOrSetCache, invalidateCache, userCacheKey } from '@/lib/cache';
 import { validateData, BulkRecordAttendanceSchema, RecordAttendanceSchema } from '@/lib/validation';
 
@@ -51,8 +52,8 @@ export async function GET(request: NextRequest) {
               where: {
                 classroomId: numericClassroomId,
                 date: {
-                  gte: new Date(startDate),
-                  lte: new Date(endDate),
+                  gte: normalizeAttendanceDate(startDate),
+                  lte: normalizeAttendanceDate(endDate),
                 },
               },
               orderBy: { date: 'asc' },
@@ -80,7 +81,7 @@ export async function GET(request: NextRequest) {
               select: { id: true },
             }),
             prisma.attendance.findMany({
-              where: { classroomId: numericClassroomId, date: new Date(date) },
+              where: { classroomId: numericClassroomId, date: normalizeAttendanceDate(date) },
             }),
           ]);
           if (!classroom) return null;
@@ -209,7 +210,7 @@ export async function POST(request: NextRequest) {
       // Deduplicate incoming records by (student_id, classroom_id, date)
       const dedupedMap = new Map<string, { studentId: number; classroomId: number; date: Date; status: (typeof records)[0]['status'] }>();
       for (const r of records) {
-        const parsedDate = new Date(r.date);
+        const parsedDate = normalizeAttendanceDate(r.date);
         const dateIso = parsedDate.toISOString().split('T')[0];
         const key = `${r.student_id}_${r.classroom_id}_${dateIso}`;
         dedupedMap.set(key, {
@@ -295,7 +296,7 @@ export async function POST(request: NextRequest) {
       return singleValidation.response;
     }
     const record = singleValidation.data;
-    const parsedDate = new Date(record.date);
+    const parsedDate = normalizeAttendanceDate(record.date);
 
     // Verify classroom and student ownership
     const [classroom, student] = await Promise.all([
@@ -309,22 +310,44 @@ export async function POST(request: NextRequest) {
     if (!classroom) return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
     if (!student) return NextResponse.json({ message: 'Student not found or unauthorized' }, { status: 404 });
 
-    await prisma.attendance.upsert({
-      where: {
-        studentId_classroomId_date: {
+    try {
+      await prisma.attendance.upsert({
+        where: {
+          studentId_classroomId_date: {
+            studentId: record.student_id,
+            classroomId: record.classroom_id,
+            date: parsedDate,
+          },
+        },
+        update: { status: record.status },
+        create: {
           studentId: record.student_id,
           classroomId: record.classroom_id,
           date: parsedDate,
+          status: record.status,
         },
-      },
-      update: { status: record.status },
-      create: {
-        studentId: record.student_id,
-        classroomId: record.classroom_id,
-        date: parsedDate,
-        status: record.status,
-      },
-    });
+      });
+    } catch (upsertError: unknown) {
+      const isUniqueConstraint =
+        (upsertError instanceof Prisma.PrismaClientKnownRequestError && upsertError.code === 'P2002') ||
+        (upsertError as { code?: string })?.code === 'P2002';
+
+      if (isUniqueConstraint) {
+        // Fallback for concurrent upserts (race condition):
+        // A parallel request inserted the record right after the where check.
+        // Safely update the existing record.
+        await prisma.attendance.updateMany({
+          where: {
+            studentId: record.student_id,
+            classroomId: record.classroom_id,
+            date: parsedDate,
+          },
+          data: { status: record.status },
+        });
+      } else {
+        throw upsertError;
+      }
+    }
 
     invalidateCache(userCacheKey(user.id, 'attendance'));
     invalidateCache(userCacheKey(user.id, 'grades'));
@@ -379,8 +402,10 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ message: 'Date is required when deleting by classroom' }, { status: 400 });
     }
 
-    const parsedDate = new Date(date);
-    if (isNaN(parsedDate.getTime())) {
+    let parsedDate: Date;
+    try {
+      parsedDate = normalizeAttendanceDate(date);
+    } catch {
       return NextResponse.json({ message: 'Invalid date format' }, { status: 400 });
     }
 

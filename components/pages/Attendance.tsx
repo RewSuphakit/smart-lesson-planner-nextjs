@@ -1098,27 +1098,25 @@ export default function Attendance() {
   });
 
   const handleStatusChange = useCallback((studentId: string, status: string) => {
-    setAttendance(prev => {
-      const current = prev[studentId];
-      // Toggle off if clicking the active status
-      const newStatus = current === status ? '' : status;
+    const current = attendance[studentId];
+    // Toggle off if clicking the active status
+    const newStatus = current === status ? '' : status;
 
-      if (newStatus === '') {
-        api.delete(`/attendance?student_id=${studentId}&classroom_id=${selectedClass}&date=${date}`)
-          .then(() => {
-            queryClient.invalidateQueries({ queryKey: ['attendance-data', selectedClass, date] });
-            toast.success('ลบข้อมูลการเช็คชื่อรายบุคคลเรียบร้อยแล้ว');
-          })
-          .catch(() => {
-            toast.error('ลบข้อมูลไม่สำเร็จ');
-          });
-      } else if (autoSave) {
-        singleStatusMutation.mutate({ studentId, status: newStatus });
-      }
+    setAttendance(prev => ({ ...prev, [studentId]: newStatus }));
 
-      return { ...prev, [studentId]: newStatus };
-    });
-  }, [selectedClass, date, autoSave, singleStatusMutation, queryClient]);
+    if (newStatus === '') {
+      api.delete(`/attendance?student_id=${studentId}&classroom_id=${selectedClass}&date=${date}`)
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ['attendance-data', selectedClass, date] });
+          toast.success('ลบข้อมูลการเช็คชื่อรายบุคคลเรียบร้อยแล้ว');
+        })
+        .catch(() => {
+          toast.error('ลบข้อมูลไม่สำเร็จ');
+        });
+    } else if (autoSave) {
+      singleStatusMutation.mutate({ studentId, status: newStatus });
+    }
+  }, [attendance, selectedClass, date, autoSave, singleStatusMutation, queryClient]);
 
   // ─── Mutation: บันทึกข้อมูลการเข้าเรียนด้วยตนเอง (Manual Save) ───
   const saveMutation = useMutation({

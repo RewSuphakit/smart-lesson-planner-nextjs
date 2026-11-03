@@ -112,6 +112,41 @@ export function formatAttendanceRecord(record: Attendance) {
   };
 }
 
+/**
+ * Normalize an attendance date to UTC midnight (00:00:00.000Z).
+ * Ensures exact match with MySQL `@db.Date` fields and prevents timezone/time offsets
+ * from failing Prisma unique constraints (`unique_attendance`).
+ */
+export function normalizeAttendanceDate(dateInput: string | Date): Date {
+  if (dateInput instanceof Date) {
+    if (isNaN(dateInput.getTime())) {
+      throw new Error('Invalid date');
+    }
+    const y = dateInput.getUTCFullYear();
+    const m = String(dateInput.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(dateInput.getUTCDate()).padStart(2, '0');
+    return new Date(`${y}-${m}-${d}T00:00:00.000Z`);
+  }
+
+  const str = String(dateInput).trim();
+  const match = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (match) {
+    const y = match[1];
+    const m = match[2].padStart(2, '0');
+    const d = match[3].padStart(2, '0');
+    return new Date(`${y}-${m}-${d}T00:00:00.000Z`);
+  }
+
+  const parsed = new Date(str);
+  if (isNaN(parsed.getTime())) {
+    throw new Error('Invalid date format');
+  }
+  const y = parsed.getUTCFullYear();
+  const m = String(parsed.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(parsed.getUTCDate()).padStart(2, '0');
+  return new Date(`${y}-${m}-${d}T00:00:00.000Z`);
+}
+
 // ==================== Attendance Conversion Helpers ====================
 
 export interface AttendanceConfig {
