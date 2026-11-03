@@ -10,6 +10,7 @@ import {
   LogOut, Menu, GraduationCap,
   Presentation, CheckCircle, Award, CheckSquare,
   Smile, UserCog, Mail, Layers, ChevronsLeft,
+  Sun, Moon,
   type LucideIcon
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
@@ -18,6 +19,7 @@ import { Loader2 } from 'lucide-react';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import UserAvatar from '@/components/UserAvatar';
 import SemesterSwitcher from '@/components/SemesterSwitcher';
+import { useTheme } from '@/context/ThemeContext';
 
 interface NavSection {
   title?: string;
@@ -119,14 +121,14 @@ function NavItem({
             : 'px-3 justify-start gap-3'
         } ${
           isActive
-            ? 'bg-indigo-100/80 text-indigo-700 font-bold shadow-xs border border-indigo-200/60'
-            : 'text-slate-600 hover:bg-indigo-50/70 hover:text-indigo-600 border border-transparent'
+            ? 'bg-indigo-100/80 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 font-bold shadow-xs border border-indigo-200/60 dark:border-indigo-800/70'
+            : 'text-slate-600 dark:text-slate-400 hover:bg-indigo-50/70 dark:hover:bg-slate-800/80 hover:text-indigo-600 dark:hover:text-indigo-300 border border-transparent'
         }`}
       >
         <div className="w-5 h-5 flex items-center justify-center shrink-0">
           <Icon
             className={`w-[18px] h-[18px] transition-transform duration-200 group-hover:scale-110 shrink-0 ${
-              isActive ? 'text-indigo-600' : 'text-slate-400 group-hover:text-indigo-600'
+              isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500 group-hover:text-indigo-600 dark:group-hover:text-indigo-400'
             }`}
           />
         </div>
@@ -226,6 +228,7 @@ function CollapsedTooltip<T extends HTMLElement>({
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -307,11 +310,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <aside className={`
         fixed lg:sticky lg:top-0 h-screen h-[100dvh] max-h-screen inset-y-0 left-0 z-50 shrink-0
         ${isCollapsed ? 'w-[270px] lg:w-[76px]' : 'w-[270px]'}
-        bg-white lg:bg-white/80 lg:backdrop-blur-2xl
-        border-r border-indigo-200/40
+        bg-white lg:bg-white/80 lg:backdrop-blur-2xl dark:bg-slate-900 lg:dark:bg-slate-900/90 lg:dark:backdrop-blur-2xl
+        border-r border-indigo-200/40 dark:border-slate-800
         flex flex-col justify-between overflow-x-hidden
         ${mounted ? 'transition-[width,transform] duration-300 ease-in-out' : ''}
-        shadow-2xl shadow-indigo-950/20 lg:shadow-lg lg:shadow-indigo-100/30
+        shadow-2xl shadow-indigo-950/20 lg:shadow-lg lg:shadow-indigo-100/30 dark:shadow-black/50
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         {/* Logo and Collapse Toggle */}
@@ -319,7 +322,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className={`flex items-center transition-all duration-300 ${isCollapsed ? 'justify-between lg:flex-col lg:gap-2' : 'justify-between'}`}>
             <div className="flex items-center gap-3 min-w-0 overflow-hidden">
               <div
-                className="w-10 h-10 rounded-2xl overflow-hidden flex items-center justify-center shadow-md shadow-indigo-300/30 animate-pulse-glow shrink-0 border border-indigo-200/50 cursor-pointer hover:scale-105 transition-transform"
+                className="w-10 h-10 rounded-2xl overflow-hidden flex items-center justify-center shadow-md shadow-indigo-300/30 animate-pulse-glow shrink-0 border border-indigo-200/50 dark:border-slate-700 cursor-pointer hover:scale-105 transition-transform"
                 onClick={isCollapsed ? toggleSidebar : undefined}
                 title={isCollapsed ? 'คลิกเพื่อขยายเมนู' : 'Smart Planner'}
               >
@@ -351,11 +354,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               aria-label={isCollapsed ? 'ขยายเมนู' : 'ย่อเมนู'}
               className={`hidden lg:flex items-center justify-center w-8 h-8 rounded-xl transition-all duration-300 shrink-0 ${
                 isCollapsed
-                  ? 'bg-indigo-50/80 hover:bg-indigo-100 text-indigo-600 shadow-2xs'
-                  : 'hover:bg-indigo-50 text-slate-400 hover:text-indigo-600'
+                  ? 'bg-indigo-50/80 hover:bg-indigo-100 text-indigo-600 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-indigo-400 shadow-2xs'
+                  : 'hover:bg-indigo-50 dark:hover:bg-slate-800 text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400'
               }`}
             >
-              <ChevronsLeft className={`w-4 h-4 transition-transform duration-300 ${isCollapsed ? 'rotate-180 text-indigo-600' : ''}`} />
+              <ChevronsLeft className={`w-4 h-4 transition-transform duration-300 ${isCollapsed ? 'rotate-180 text-indigo-600 dark:text-indigo-400' : ''}`} />
             </button>
           </div>
         </div>
@@ -380,7 +383,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       ? 'max-h-8 opacity-100 my-1 lg:max-h-0 lg:opacity-0 lg:-translate-y-1 lg:my-0'
                       : 'max-h-8 opacity-100 translate-y-0 my-1'
                   }`}>
-                    <p className="text-[0.62rem] font-bold text-slate-400 uppercase tracking-wider px-3.5 pt-1.5 pb-0.5">
+                    <p className="text-[0.62rem] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider px-3.5 pt-1.5 pb-0.5">
                       {section.title}
                     </p>
                   </div>
@@ -390,7 +393,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       ? 'max-h-4 opacity-100 my-2'
                       : 'max-h-0 opacity-0 my-0 pointer-events-none'
                   }`}>
-                    <div className="w-7 h-[1px] bg-slate-200/80 shrink-0" />
+                    <div className="w-7 h-[1px] bg-slate-200/80 dark:bg-slate-800 shrink-0" />
                   </div>
                 </div>
               )}
@@ -411,14 +414,69 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           ))}
         </nav>
 
-        {/* User Profile */}
-        <div className={`pt-2 shrink-0 border-t border-indigo-100/60 bg-white/95 transition-all duration-300 ${
+        {/* User Profile & Theme Toggle */}
+        <div className={`pt-2 shrink-0 border-t border-indigo-100/60 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 transition-all duration-300 ${
           isCollapsed ? 'p-3 lg:p-2' : 'p-3'
         }`}>
+          {/* Theme Toggle Button */}
+          {isCollapsed ? (
+            <div className="hidden lg:flex justify-center mb-2">
+              <CollapsedTooltip<HTMLButtonElement>
+                label={theme === 'dark' ? 'เปลี่ยนเป็นโหมดสว่าง' : 'เปลี่ยนเป็นโหมดมืด'}
+                enabled={isCollapsed}
+              >
+                {({ onMouseEnter, onMouseLeave, ref }) => (
+                  <button
+                    ref={ref}
+                    type="button"
+                    onClick={toggleTheme}
+                    onMouseEnter={onMouseEnter}
+                    onMouseLeave={onMouseLeave}
+                    className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors border border-slate-200/60 dark:border-slate-700 shadow-2xs cursor-pointer"
+                    title={theme === 'dark' ? 'เปลี่ยนเป็นโหมดสว่าง' : 'เปลี่ยนเป็นโหมดมืด'}
+                    aria-label="สลับโหมดมืด/สว่าง"
+                  >
+                    {theme === 'dark' ? (
+                      <Sun className="w-4 h-4 text-amber-400" />
+                    ) : (
+                      <Moon className="w-4 h-4 text-indigo-600" />
+                    )}
+                  </button>
+                )}
+              </CollapsedTooltip>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="w-full mb-2 flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold bg-slate-100/80 hover:bg-slate-200/80 dark:bg-slate-800/80 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 transition-all cursor-pointer border border-slate-200/60 dark:border-slate-700/80 shadow-2xs group"
+              title={theme === 'dark' ? 'คลิกเพื่อสลับเป็นโหมดสว่าง' : 'คลิกเพื่อสลับเป็นโหมดมืด'}
+            >
+              <div className="flex items-center gap-2.5">
+                <div className={`w-6 h-6 rounded-lg flex items-center justify-center transition-colors ${
+                  theme === 'dark' ? 'bg-indigo-500/20 text-indigo-400' : 'bg-amber-500/20 text-amber-600'
+                }`}>
+                  {theme === 'dark' ? (
+                    <Moon className="w-3.5 h-3.5 text-indigo-400" />
+                  ) : (
+                    <Sun className="w-3.5 h-3.5 text-amber-500" />
+                  )}
+                </div>
+                <span className="font-semibold">{theme === 'dark' ? 'โหมดมืด (Dark)' : 'โหมดสว่าง (Light)'}</span>
+              </div>
+              <div className={`w-8 h-4.5 rounded-full p-0.5 transition-colors flex items-center ${
+                theme === 'dark' ? 'bg-indigo-600 justify-end' : 'bg-slate-300 justify-start'
+              }`}>
+                <div className="w-3.5 h-3.5 rounded-full bg-white shadow-xs" />
+              </div>
+            </button>
+          )}
+
+          {/* User Card */}
           <div className={`rounded-2xl transition-all duration-300 ${
             isCollapsed
-              ? 'bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-200/40 p-2.5 shadow-2xs lg:bg-transparent lg:border-transparent lg:p-0 lg:shadow-none'
-              : 'bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-200/40 p-2.5 shadow-2xs'
+              ? 'bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-slate-800/90 dark:to-slate-800/60 border border-indigo-200/40 dark:border-slate-700/60 p-2.5 shadow-2xs lg:bg-transparent lg:border-transparent lg:p-0 lg:shadow-none'
+              : 'bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-slate-800/90 dark:to-slate-800/60 border border-indigo-200/40 dark:border-slate-700/60 p-2.5 shadow-2xs'
           }`}>
             <div className={`flex items-center transition-all duration-300 ${
               isCollapsed ? 'justify-between gap-2.5 lg:flex-col lg:gap-2' : 'justify-between gap-2.5'
@@ -434,7 +492,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     onMouseEnter={onMouseEnter}
                     onMouseLeave={onMouseLeave}
                     className={`flex items-center rounded-xl transition-all duration-300 min-w-0 group ${
-                      isCollapsed ? 'gap-2.5 flex-1 lg:p-1 lg:hover:bg-indigo-50 lg:justify-center lg:flex-initial' : 'gap-2.5 flex-1'
+                      isCollapsed ? 'gap-2.5 flex-1 lg:p-1 lg:hover:bg-indigo-50 lg:dark:hover:bg-slate-800 lg:justify-center lg:flex-initial' : 'gap-2.5 flex-1'
                     }`}
                     title="แก้ไขข้อมูลส่วนตัว"
                   >
@@ -450,10 +508,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         ? 'max-w-[130px] opacity-100 lg:max-w-0 lg:opacity-0 lg:-translate-x-2'
                         : 'max-w-[130px] opacity-100 translate-x-0'
                     }`}>
-                      <p className="text-xs font-bold text-slate-700 truncate group-hover:text-indigo-600 transition-colors whitespace-nowrap">
+                      <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors whitespace-nowrap">
                         {user?.name}
                       </p>
-                      <p className="text-[0.65rem] text-indigo-700 font-semibold truncate whitespace-nowrap">
+                      <p className="text-[0.65rem] text-indigo-700 dark:text-indigo-400 font-semibold truncate whitespace-nowrap">
                         {user?.role === 'admin' ? 'ผู้ดูแลระบบ' : 'ครูผู้สอน'}
                       </p>
                     </div>
@@ -473,8 +531,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     onMouseLeave={onMouseLeave}
                     className={`rounded-xl flex items-center justify-center transition-all duration-300 shrink-0 ${
                       isCollapsed
-                        ? 'p-2 hover:bg-rose-100 text-slate-400 hover:text-rose-600 lg:w-9 lg:h-9 lg:p-0 lg:hover:bg-rose-50 lg:hover:text-rose-500'
-                        : 'p-2 hover:bg-rose-100 text-slate-400 hover:text-rose-600'
+                        ? 'p-2 hover:bg-rose-100 dark:hover:bg-rose-950/40 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 lg:w-9 lg:h-9 lg:p-0 lg:hover:bg-rose-50 lg:dark:hover:bg-rose-950/40 lg:hover:text-rose-500'
+                        : 'p-2 hover:bg-rose-100 dark:hover:bg-rose-950/40 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400'
                     }`}
                     title="ออกจากระบบ"
                     aria-label="ออกจากระบบ"
@@ -491,13 +549,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-h-screen min-w-0">
         {/* Mobile Header */}
-        <header className="sticky top-0 z-40 lg:hidden bg-white/95 border-b border-indigo-200/40 px-3 py-2.5 flex items-center justify-between gap-2 shadow-xs">
+        <header className="sticky top-0 z-40 lg:hidden bg-white/95 dark:bg-slate-900/95 border-b border-indigo-200/40 dark:border-slate-800 px-3 py-2.5 flex items-center justify-between gap-2 shadow-xs">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="p-1.5 rounded-xl hover:bg-indigo-50 transition-colors"
+              className="p-1.5 rounded-xl hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors"
             >
-              <Menu className="w-5 h-5 text-slate-500" />
+              <Menu className="w-5 h-5 text-slate-500 dark:text-slate-400" />
             </button>
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center">
@@ -510,9 +568,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="flex-1 min-w-0">
               <SemesterSwitcher isCompact />
             </div>
+            {/* Mobile Theme Toggle Button */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors shrink-0"
+              title={theme === 'dark' ? 'สลับเป็นโหมดสว่าง' : 'สลับเป็นโหมดมืด'}
+              aria-label="สลับโหมดมืด/สว่าง"
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-4 h-4 text-amber-400" />
+              ) : (
+                <Moon className="w-4 h-4 text-slate-600" />
+              )}
+            </button>
             <button
               onClick={handleLogout}
-              className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0"
+              className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors shrink-0"
               title="ออกจากระบบ"
             >
               <LogOut className="w-4 h-4 text-rose-500" />

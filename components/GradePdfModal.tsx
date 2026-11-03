@@ -679,7 +679,7 @@ export default function GradePdfModal({
       className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-5 bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-200"
     >
       <div
-        className="bg-slate-50 rounded-2xl shadow-2xl border border-indigo-200 w-full max-w-7xl max-h-[95vh] flex flex-col overflow-hidden"
+        className="bg-white rounded-2xl shadow-2xl border border-indigo-200 w-full max-w-7xl max-h-[95vh] flex flex-col overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
 

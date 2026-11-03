@@ -149,34 +149,34 @@ export default function GradesSettingsDrawer({
   };
 
   return (
-    <div className="glass p-6 sm:p-7 rounded-3xl border border-indigo-100 bg-white space-y-6 animate-fade-in-up shadow-sm">
+    <div className="glass dark:bg-slate-900/90 p-6 sm:p-7 rounded-3xl border border-indigo-100 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-6 animate-fade-in-up shadow-sm">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-indigo-100 pb-4">
+      <div className="flex items-center justify-between border-b border-indigo-100 dark:border-slate-800 pb-4">
         <div>
-          <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <Settings className="w-5 h-5 text-indigo-600" />
+          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            <Settings className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
             ตั้งค่าน้ำหนักคะแนน & เกณฑ์ตัดเกรด
           </h3>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             กำหนดสัดส่วนคะแนนรวม 100% และกำหนดช่วงคะแนนสำหรับระดับผลการเรียน
           </p>
         </div>
         <button
           onClick={onClose}
-          className="btn bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs rounded-xl px-3.5 py-1.5"
+          className="btn bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700 text-xs rounded-xl px-3.5 py-1.5"
         >
           ปิด
         </button>
       </div>
 
       {/* Real-Time Weight Balance Bar Section */}
-      <div className="p-5 bg-gradient-to-br from-indigo-50/70 to-purple-50/40 rounded-2xl border border-indigo-100 space-y-4">
+      <div className="p-5 bg-gradient-to-br from-indigo-50/70 to-purple-50/40 dark:from-slate-800 dark:to-slate-900 rounded-2xl border border-indigo-100 dark:border-slate-800 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
-            <h4 className="font-bold text-slate-800 text-sm">
+            <h4 className="font-bold text-slate-800 dark:text-slate-100 text-sm">
               สัดส่วนน้ำหนักคะแนน (รวม 5 ส่วนต้องเท่ากับ 100%)
             </h4>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               ระบบจะแปลงคะแนนดิบสะสมเข้าสู่น้ำหนักเปอร์เซ็นต์อัตโนมัติ
             </p>
           </div>

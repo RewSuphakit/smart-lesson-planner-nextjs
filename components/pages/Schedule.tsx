@@ -809,7 +809,7 @@ export default function Schedule() {
 
       {showUpload && createPortal(
         <div className="modal-overlay" onClick={() => setShowUpload(false)}>
-          <div className="glass w-full max-w-3xl p-6 sm:p-7 animate-fade-in-up max-h-[90vh] overflow-y-auto space-y-5 rounded-3xl" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-3xl p-6 sm:p-7 animate-fade-in-up max-h-[90vh] overflow-y-auto space-y-5" onClick={e => e.stopPropagation()}>
             {/* Modal Header */}
             <div className="flex items-start justify-between gap-4 pb-4 border-b border-indigo-50/80">
               <div className="flex items-center gap-3.5">
@@ -1096,7 +1096,7 @@ export default function Schedule() {
       {/* Timetable Entry Modal */}
       {showTimetableModal && createPortal(
         <div className="modal-overlay" onClick={() => { setShowTimetableModal(false); setEditTimetableTarget(null); }}>
-          <div className="glass w-full max-w-lg p-7 animate-fade-in-up max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-lg p-7 animate-fade-in-up max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-200">

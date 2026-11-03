@@ -1043,7 +1043,7 @@ export default function Students() {
       {/* Student Form Modal */}
       {showForm && createPortal(
         <div className="modal-overlay" onClick={() => setShowForm(false)}>
-          <div className="glass w-full max-w-md p-7 animate-fade-in-up max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-md p-7 animate-fade-in-up max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
@@ -1237,7 +1237,7 @@ export default function Students() {
       {/* Import Form Modal */}
       {showImportForm && createPortal(
         <div className="modal-overlay" onClick={() => setShowImportForm(false)}>
-          <div className="glass w-full max-w-4xl p-6 sm:p-7 animate-fade-in-up max-h-[90vh] overflow-y-auto space-y-5" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-4xl p-6 sm:p-7 animate-fade-in-up max-h-[90vh] overflow-y-auto space-y-5" onClick={e => e.stopPropagation()}>
             {/* Header */}
             <div className="flex items-center justify-between border-b border-indigo-100/70 pb-4">
               <div className="flex items-center gap-3">

@@ -13,6 +13,7 @@ import toast from 'react-hot-toast';
 import UserAvatar from '@/components/UserAvatar';
 import ClassroomCardPicker from '@/components/ClassroomCardPicker';
 import SectionSwitcher from '@/components/SectionSwitcher';
+import VirtualList from '@/components/VirtualList';
 import { parseClassroomName } from '@/lib/classroom';
 import { buildStudentSectionGroups } from '@/lib/studentSections';
 
@@ -90,7 +91,7 @@ export default function Affective() {
     queryKey: ['affective-students', selectedClass, maxAffectiveWeight],
     queryFn: async () => {
       const [studRes, gradesRes] = await Promise.all([
-        api.get(`/students?classroom_id=${selectedClass}`),
+        api.get(`/students?classroom_id=${selectedClass}&include_avatar=true`),
         api.get(`/grades?classroom_id=${selectedClass}`)
       ]);
 
@@ -106,7 +107,7 @@ export default function Affective() {
           grade_level: s.grade_level,
           branch: s.branch,
           classroom_id: s.classroom_id,
-          avatar: s.avatar,
+          avatar: s.avatar || (gradeInfo as any)?.avatar || null,
           affective_score: s.affective_score !== null && s.affective_score !== undefined
             ? Number(s.affective_score)
             : Math.max(0, maxAffectiveWeight - ((gradeInfo?.absent_count || 0) * 2 + (gradeInfo?.late_count || 0) * 1)),
@@ -651,178 +652,186 @@ export default function Affective() {
             </div>
           </div>
 
-          {/* Student Grid */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            {processedStudents.length === 0 ? (
-              <div className="col-span-full glass p-10 text-center text-slate-500 rounded-2xl border border-indigo-100 bg-white">
-                ไม่พบนักเรียนตรงตามเงื่อนไขค้นหา
-              </div>
-            ) : processedStudents.map((s) => {
-              const absent = s.absent_count || 0;
-              const late = s.late_count || 0;
-              const attendancePenalty = (absent * 2) + (late * 1);
-              const scorePercent = maxAffectiveWeight > 0 ? (s.affective_score / maxAffectiveWeight) * 100 : 0;
-              const isUpdating = updatingStudentIds[s.id];
+          {/* Student Grid (Virtualized) */}
+          {processedStudents.length === 0 ? (
+            <div className="glass p-10 text-center text-slate-500 rounded-2xl border border-indigo-100 bg-white">
+              ไม่พบนักเรียนตรงตามเงื่อนไขค้นหา
+            </div>
+          ) : (
+            <VirtualList
+              items={processedStudents}
+              columns={{ default: 1, xl: 2 }}
+              gap={16}
+              estimateSize={220}
+              useWindowScroll={true}
+              getItemKey={(s) => s.id}
+              renderItem={(s) => {
+                const absent = s.absent_count || 0;
+                const late = s.late_count || 0;
+                const attendancePenalty = (absent * 2) + (late * 1);
+                const scorePercent = maxAffectiveWeight > 0 ? (s.affective_score / maxAffectiveWeight) * 100 : 0;
+                const isUpdating = updatingStudentIds[s.id];
 
-              return (
-                <div
-                  key={s.id}
-                  className={`glass overflow-hidden rounded-2xl transition-all duration-300 p-5 border flex flex-col md:flex-row gap-4 bg-white ${s.affective_score < (maxAffectiveWeight * 0.5)
-                    ? 'border-rose-200 bg-rose-50/30'
-                    : 'border-indigo-100 hover:border-indigo-300'
-                    }`}
-                >
-                  {/* Left Side: Avatar, Name and Attendance Stats */}
-                  <div className="flex flex-row md:flex-col items-center gap-3 shrink-0 md:w-36 text-center md:border-r border-indigo-100/70 md:pr-3">
-                    {/* Avatar */}
-                    <UserAvatar
-                      avatar={s.avatar}
-                      name={s.name}
-                      userId={s.id}
-                      size="lg"
-                      className="rounded-2xl border border-indigo-100 shadow-sm shrink-0"
-                    />
+                return (
+                  <div
+                    key={s.id}
+                    className={`glass dark:bg-slate-900/85 overflow-hidden rounded-2xl transition-all duration-300 p-5 border flex flex-col md:flex-row gap-4 bg-white dark:border-slate-800 ${s.affective_score < (maxAffectiveWeight * 0.5)
+                      ? 'border-rose-200 dark:border-rose-900/60 bg-rose-50/30 dark:bg-rose-950/20'
+                      : 'border-indigo-100 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-500/50'
+                      }`}
+                  >
+                    {/* Left Side: Avatar, Name and Attendance Stats */}
+                    <div className="flex flex-row md:flex-col items-center gap-3 shrink-0 md:w-36 text-center md:border-r border-indigo-100/70 dark:border-slate-800 md:pr-3">
+                      {/* Avatar */}
+                      <UserAvatar
+                        avatar={s.avatar}
+                        name={s.name}
+                        userId={s.id}
+                        size="lg"
+                        className="rounded-2xl border border-indigo-100 dark:border-slate-700 shadow-sm shrink-0"
+                      />
 
-                    <div className="flex-1 md:flex-none text-left md:text-center min-w-0">
-                      <p className="font-bold text-slate-800 text-sm truncate">{s.name}</p>
-                      <div className="flex items-center gap-1 justify-start md:justify-center flex-wrap mt-0.5">
-                        {s.student_code && <span className="text-[10px] text-slate-500">รหัส: {s.student_code}</span>}
-                        {s.grade_level && (
-                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100/80">
-                            {s.grade_level}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Attendance Badges */}
-                      <div className="flex items-center gap-1.5 md:justify-center mt-1 text-[10px]">
-                        <span className={`px-1.5 py-0.5 rounded ${absent > 0 ? 'bg-rose-100 text-rose-700 font-bold' : 'bg-slate-100 text-slate-500'}`}>
-                          ขาด {absent}
-                        </span>
-                        <span className={`px-1.5 py-0.5 rounded ${late > 0 ? 'bg-amber-100 text-amber-700 font-bold' : 'bg-slate-100 text-slate-500'}`}>
-                          สาย {late}
-                        </span>
-                      </div>
-                      {attendancePenalty > 0 && (
-                        <p className="text-[9px] text-rose-500 font-semibold mt-1">หักเวลาเรียน -{attendancePenalty} คะแนน</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Right Side: Score Adjust Panel and Presets */}
-                  <div className="flex-1 flex flex-col justify-between gap-3">
-                    {/* Score Control Area */}
-                    <div className="flex items-center justify-between gap-4">
-                      {/* Plus / Minus Stepper */}
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleScoreAdjust(s.id, s.affective_score, -1, 'ลบ 1 คะแนน')}
-                          disabled={isUpdating}
-                          className="w-8 h-8 rounded-xl border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95 disabled:opacity-40"
-                          title="หัก 1 คะแนน"
-                          aria-label="หัก 1 คะแนน"
-                        >
-                          <Minus className="w-3.5 h-3.5" />
-                        </button>
-
-                        {/* Score Input Display */}
-                        <div className="flex items-center gap-1 text-center">
-                          {isUpdating ? (
-                            <Loader2 className="w-5 h-5 animate-spin text-indigo-500 shrink-0 mx-2" />
-                          ) : (
-                            <input
-                              type="number"
-                              step="0.5"
-                              value={s.affective_score}
-                              onChange={(e) => {
-                                const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                                if (!isNaN(val)) updateStudentScore(s.id, val);
-                              }}
-                              className="form-input text-center font-black text-lg py-0.5 px-1 w-16 h-8 bg-indigo-50/50 border-indigo-200 text-indigo-900 rounded-lg"
-                              min="0"
-                              max={maxAffectiveWeight}
-                              aria-label="คะแนนจิตพิสัยนักเรียนคนนี้"
-                            />
+                      <div className="flex-1 md:flex-none text-left md:text-center min-w-0">
+                        <p className="font-bold text-slate-800 dark:text-slate-100 text-sm truncate">{s.name}</p>
+                        <div className="flex items-center gap-1 justify-start md:justify-center flex-wrap mt-0.5">
+                          {s.student_code && <span className="text-[10px] text-slate-500 dark:text-slate-400">รหัส: {s.student_code}</span>}
+                          {s.grade_level && (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-100/80 dark:border-indigo-800">
+                              {s.grade_level}
+                            </span>
                           )}
-                          <span className="text-xs text-slate-500 font-semibold">/ {maxAffectiveWeight}</span>
                         </div>
 
-                        <button
-                          onClick={() => handleScoreAdjust(s.id, s.affective_score, 1, 'บวก 1 คะแนน')}
-                          disabled={isUpdating}
-                          className="w-8 h-8 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95 disabled:opacity-40"
-                          title="บวก 1 คะแนน"
-                          aria-label="บวก 1 คะแนน"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      {/* Status Color Badge */}
-                      <div className={`px-2.5 py-1 rounded-xl text-xs font-bold border shadow-sm ${getScoreBadgeStyle(s.affective_score)}`}>
-                        {s.affective_score.toFixed(1)} / {maxAffectiveWeight} ({scorePercent.toFixed(0)}%)
+                        {/* Attendance Badges */}
+                        <div className="flex items-center gap-1.5 md:justify-center mt-1 text-[10px]">
+                          <span className={`px-1.5 py-0.5 rounded ${absent > 0 ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 font-bold' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'}`}>
+                            ขาด {absent}
+                          </span>
+                          <span className={`px-1.5 py-0.5 rounded ${late > 0 ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 font-bold' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'}`}>
+                            สาย {late}
+                          </span>
+                        </div>
+                        {attendancePenalty > 0 && (
+                          <p className="text-[9px] text-rose-500 dark:text-rose-400 font-semibold mt-1">หักเวลาเรียน -{attendancePenalty} คะแนน</p>
+                        )}
                       </div>
                     </div>
 
-                    {/* Progress Bar */}
-                    <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden shadow-inner">
-                      <div
-                        className={`h-full transition-all duration-500 rounded-full ${scorePercent >= 80 ? 'bg-emerald-500' : scorePercent >= 50 ? 'bg-amber-500' : 'bg-rose-500'
-                          }`}
-                        style={{ width: `${Math.min(100, Math.max(0, scorePercent))}%` }}
-                      />
-                    </div>
-
-                    {/* Behavior Presets Buttons */}
-                    <div className="space-y-1.5 pt-1">
-                      {/* Positive Presets */}
-                      <div className="flex flex-wrap gap-1 items-center">
-                        <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider shrink-0 flex items-center gap-0.5 mr-1">
-                          <ThumbsUp className="w-3 h-3 text-emerald-600" /> ชมเชย:
-                        </span>
-                        {positivePresets.map((p, idx) => (
+                    {/* Right Side: Score Adjust Panel and Presets */}
+                    <div className="flex-1 flex flex-col justify-between gap-3">
+                      {/* Score Control Area */}
+                      <div className="flex items-center justify-between gap-4">
+                        {/* Plus / Minus Stepper */}
+                        <div className="flex items-center gap-2">
                           <button
-                            key={idx}
-                            onClick={() => handleScoreAdjust(s.id, s.affective_score, p.value, p.label)}
+                            onClick={() => handleScoreAdjust(s.id, s.affective_score, -1, 'ลบ 1 คะแนน')}
                             disabled={isUpdating}
-                            className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[10px] font-semibold transition-all active:scale-95 disabled:opacity-40 flex items-center gap-1"
+                            className="w-8 h-8 rounded-xl border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 hover:bg-rose-500 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95 disabled:opacity-40"
+                            title="หัก 1 คะแนน"
+                            aria-label="หัก 1 คะแนน"
                           >
-                            <span>{p.icon}</span>
-                            <span>{p.label} (+{p.value})</span>
+                            <Minus className="w-3.5 h-3.5" />
                           </button>
-                        ))}
+
+                          {/* Score Input Display */}
+                          <div className="flex items-center gap-1 text-center">
+                            {isUpdating ? (
+                              <Loader2 className="w-5 h-5 animate-spin text-indigo-500 shrink-0 mx-2" />
+                            ) : (
+                              <input
+                                type="number"
+                                step="0.5"
+                                value={s.affective_score}
+                                onChange={(e) => {
+                                  const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                                  if (!isNaN(val)) updateStudentScore(s.id, val);
+                                }}
+                                className="form-input text-center font-black text-lg py-0.5 px-1 w-16 h-8 bg-indigo-50/50 dark:bg-slate-800 border-indigo-200 dark:border-slate-700 text-indigo-900 dark:text-indigo-200 rounded-lg"
+                                min="0"
+                                max={maxAffectiveWeight}
+                                aria-label="คะแนนจิตพิสัยนักเรียนคนนี้"
+                              />
+                            )}
+                            <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">/ {maxAffectiveWeight}</span>
+                          </div>
+
+                          <button
+                            onClick={() => handleScoreAdjust(s.id, s.affective_score, 1, 'บวก 1 คะแนน')}
+                            disabled={isUpdating}
+                            className="w-8 h-8 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95 disabled:opacity-40"
+                            title="บวก 1 คะแนน"
+                            aria-label="บวก 1 คะแนน"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {/* Status Color Badge */}
+                        <div className={`px-2.5 py-1 rounded-xl text-xs font-bold border shadow-sm ${getScoreBadgeStyle(s.affective_score)}`}>
+                          {s.affective_score.toFixed(1)} / {maxAffectiveWeight} ({scorePercent.toFixed(0)}%)
+                        </div>
                       </div>
 
-                      {/* Negative Presets */}
-                      <div className="flex flex-wrap gap-1 items-center pt-0.5">
-                        <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider shrink-0 flex items-center gap-0.5 mr-1">
-                          <ThumbsDown className="w-3 h-3 text-rose-600" /> ตักเตือน:
-                        </span>
-                        {negativePresets.map((p, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => handleScoreAdjust(s.id, s.affective_score, p.value, p.label)}
-                            disabled={isUpdating}
-                            className="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[10px] font-semibold transition-all active:scale-95 disabled:opacity-40 flex items-center gap-1"
-                          >
-                            <span>{p.icon}</span>
-                            <span>{p.label} ({p.value})</span>
-                          </button>
-                        ))}
+                      {/* Progress Bar */}
+                      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden shadow-inner">
+                        <div
+                          className={`h-full transition-all duration-500 rounded-full ${scorePercent >= 80 ? 'bg-emerald-500' : scorePercent >= 50 ? 'bg-amber-500' : 'bg-rose-500'
+                            }`}
+                          style={{ width: `${Math.min(100, Math.max(0, scorePercent))}%` }}
+                        />
+                      </div>
+
+                      {/* Behavior Presets Buttons */}
+                      <div className="space-y-1.5 pt-1">
+                        {/* Positive Presets */}
+                        <div className="flex flex-wrap gap-1 items-center">
+                          <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider shrink-0 flex items-center gap-0.5 mr-1">
+                            <ThumbsUp className="w-3 h-3 text-emerald-600 dark:text-emerald-400" /> ชมเชย:
+                          </span>
+                          {positivePresets.map((p, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => handleScoreAdjust(s.id, s.affective_score, p.value, p.label)}
+                              disabled={isUpdating}
+                              className="px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[10px] font-semibold transition-all active:scale-95 disabled:opacity-40 flex items-center gap-1 cursor-pointer"
+                            >
+                              <span>{p.icon}</span>
+                              <span>{p.label} (+{p.value})</span>
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Negative Presets */}
+                        <div className="flex flex-wrap gap-1 items-center pt-0.5">
+                          <span className="text-[10px] font-bold text-rose-700 dark:text-rose-400 uppercase tracking-wider shrink-0 flex items-center gap-0.5 mr-1">
+                            <ThumbsDown className="w-3 h-3 text-rose-600 dark:text-rose-400" /> ตักเตือน:
+                          </span>
+                          {negativePresets.map((p, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => handleScoreAdjust(s.id, s.affective_score, p.value, p.label)}
+                              disabled={isUpdating}
+                              className="px-2 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-[10px] font-semibold transition-all active:scale-95 disabled:opacity-40 flex items-center gap-1 cursor-pointer"
+                            >
+                              <span>{p.icon}</span>
+                              <span>{p.label} ({p.value})</span>
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              }}
+            />
+          )}
         </div>
       )}
 
       {/* ================= CALCULATION MODAL ================= */}
       {showCalcModal && createPortal(
         <div className="modal-overlay" onClick={() => setShowCalcModal(false)}>
-          <div className="glass w-full max-w-lg p-6 animate-scale-up" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-lg p-6 animate-scale-up" onClick={e => e.stopPropagation()}>
             {/* Header */}
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-indigo-50">
               <div className="flex items-center gap-3">
@@ -919,7 +928,7 @@ export default function Affective() {
       {/* ================= MAX SCORE MODAL ================= */}
       {showWeightModal && createPortal(
         <div className="modal-overlay" onClick={() => setShowWeightModal(false)}>
-          <div className="glass w-full max-w-md p-6 animate-scale-up" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-md p-6 animate-scale-up" onClick={e => e.stopPropagation()}>
             {/* Header */}
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-indigo-50">
               <div className="flex items-center gap-3">

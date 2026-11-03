@@ -311,10 +311,10 @@ export default function SemesterSwitcher({ className = '', isCompact = false, is
         onClick={() => setIsOpen(!isOpen)}
         className={`w-full flex items-center rounded-xl transition-all duration-300 group text-left relative overflow-hidden ${
           isCompact
-            ? 'px-3 py-2 justify-between gap-2 bg-indigo-50/80 hover:bg-indigo-100/70 border border-indigo-200/60 shadow-xs'
+            ? 'px-3 py-2 justify-between gap-2 bg-indigo-50/80 hover:bg-indigo-100/70 dark:bg-slate-800 dark:hover:bg-slate-700/80 border border-indigo-200/60 dark:border-slate-700 shadow-xs'
             : isCollapsed
-              ? 'px-3 py-2 justify-between gap-2 bg-white/80 hover:bg-white border border-indigo-200/50 hover:border-indigo-300 shadow-xs lg:h-10 lg:px-2.5 lg:justify-center lg:bg-indigo-50/80 lg:hover:bg-indigo-100 lg:border-indigo-200/60 lg:text-indigo-700 lg:shadow-2xs'
-              : 'px-3 py-2 justify-between gap-2 bg-white/80 hover:bg-white border border-indigo-200/50 hover:border-indigo-300 shadow-xs hover:shadow-sm'
+              ? 'px-3 py-2 justify-between gap-2 bg-white/80 hover:bg-white dark:bg-slate-800/80 dark:hover:bg-slate-800 border border-indigo-200/50 hover:border-indigo-300 dark:border-slate-700 shadow-xs lg:h-10 lg:px-2.5 lg:justify-center lg:bg-indigo-50/80 lg:hover:bg-indigo-100 lg:dark:bg-slate-800/90 lg:dark:hover:bg-slate-700 lg:border-indigo-200/60 lg:dark:border-slate-700 lg:text-indigo-700 lg:dark:text-indigo-300 lg:shadow-2xs'
+              : 'px-3 py-2 justify-between gap-2 bg-white/80 hover:bg-white dark:bg-slate-800/80 dark:hover:bg-slate-800 border border-indigo-200/50 hover:border-indigo-300 dark:border-slate-700 shadow-xs hover:shadow-sm'
         }`}
         aria-expanded={isOpen}
         aria-haspopup="listbox"
@@ -328,7 +328,7 @@ export default function SemesterSwitcher({ className = '', isCompact = false, is
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shrink-0 shadow-xs group-hover:scale-105 transition-transform relative">
             <Layers className="w-3.5 h-3.5" />
             {activeSemester && (
-              <span className={`absolute -top-1.5 -right-1.5 text-[9px] font-black px-1.5 py-0.2 rounded-full bg-indigo-600 text-white border border-white shadow-2xs transition-all duration-300 ${
+              <span className={`absolute -top-1.5 -right-1.5 text-[9px] font-black px-1.5 py-0.2 rounded-full bg-indigo-600 text-white border border-white dark:border-slate-900 shadow-2xs transition-all duration-300 ${
                 isCollapsed ? 'opacity-0 lg:opacity-100 scale-100' : 'opacity-0 scale-75 pointer-events-none'
               }`}>
                 {activeSemester.term_number}
@@ -343,7 +343,7 @@ export default function SemesterSwitcher({ className = '', isCompact = false, is
             }`}
           >
             <div className="flex items-center gap-1.5 whitespace-nowrap">
-              <span className="text-xs font-bold text-slate-800 truncate group-hover:text-indigo-600 transition-colors">
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                 {activeSemester ? `ปี ${activeSemester.academic_year}` : 'เลือกภาคเรียน'}
               </span>
               {activeSemester && (
@@ -352,7 +352,7 @@ export default function SemesterSwitcher({ className = '', isCompact = false, is
                 </span>
               )}
             </div>
-            <p className="text-[10px] text-slate-500 truncate whitespace-nowrap">
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate whitespace-nowrap">
               {activeSemester ? activeSemester.name : 'ยังไม่ได้เลือก'}
             </p>
           </div>
@@ -364,8 +364,8 @@ export default function SemesterSwitcher({ className = '', isCompact = false, is
           }`}
         >
           <ChevronDown
-            className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${
-              isOpen ? 'rotate-180 text-indigo-600' : 'group-hover:text-slate-600'
+            className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-300 ${
+              isOpen ? 'rotate-180 text-indigo-600 dark:text-indigo-400' : 'group-hover:text-slate-600 dark:group-hover:text-slate-300'
             }`}
           />
         </div>
@@ -383,14 +383,14 @@ export default function SemesterSwitcher({ className = '', isCompact = false, is
                 left: `${portalPos?.left ?? 86}px`,
                 zIndex: 9999,
               }}
-              className="w-[290px] py-2.5 bg-white border border-indigo-200/80 rounded-2xl shadow-2xl shadow-indigo-900/15 animate-fade-in-up"
+              className="w-[290px] py-2.5 bg-white dark:bg-slate-900 border border-indigo-200/80 dark:border-slate-700 rounded-2xl shadow-2xl shadow-indigo-900/15 dark:shadow-black/50 animate-fade-in-up"
             >
               {dropdownBody}
             </div>,
             document.body
           )
         ) : (
-          <div className={`absolute top-full mt-2 py-2.5 bg-white border border-indigo-200/80 rounded-2xl shadow-2xl shadow-indigo-900/10 z-[100] animate-fade-in-up ${
+          <div className={`absolute top-full mt-2 py-2.5 bg-white dark:bg-slate-900 border border-indigo-200/80 dark:border-slate-700 rounded-2xl shadow-2xl shadow-indigo-900/10 dark:shadow-black/50 z-[100] animate-fade-in-up ${
             isCompact ? 'right-0 w-[290px] max-w-[calc(100vw-1.5rem)]' : 'left-0 right-0 w-full'
           }`}>
             {dropdownBody}
@@ -413,7 +413,7 @@ export default function SemesterSwitcher({ className = '', isCompact = false, is
           />
 
           {/* Dialog Card */}
-          <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl shadow-indigo-500/20 border border-indigo-100 overflow-hidden animate-fade-in-up">
+          <div className="relative w-full max-w-sm bg-white dark:bg-slate-900 rounded-2xl shadow-2xl shadow-indigo-500/20 border border-indigo-100 dark:border-slate-700 overflow-hidden animate-fade-in-up">
             {/* Top accent bar */}
             <div className="h-1 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-400" />
 

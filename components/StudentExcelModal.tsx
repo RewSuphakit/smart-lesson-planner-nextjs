@@ -346,7 +346,7 @@ export default function StudentExcelModal({
       }}
     >
       <div 
-        className="bg-slate-50 rounded-2xl shadow-2xl border border-emerald-200 w-full max-w-6xl max-h-[92vh] flex flex-col overflow-hidden"
+        className="bg-white rounded-2xl shadow-2xl border border-emerald-200 w-full max-w-6xl max-h-[92vh] flex flex-col overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* Modal Header */}

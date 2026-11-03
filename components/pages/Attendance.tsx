@@ -19,6 +19,7 @@ const AttendanceImportModal = dynamic(() => import('@/components/AttendanceImpor
 
 import { getThaiHolidays, checkThaiHoliday, HolidayInfo } from '@/lib/thaiHolidays';
 import { buildStudentSectionGroups } from '@/lib/studentSections';
+import VirtualList, { useVirtualTable } from '@/components/VirtualList';
 
 const THAI_MONTHS_SHORT = [
   'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
@@ -329,7 +330,7 @@ const ThaiDateRangePicker = memo(({ startDate, endDate, onChange }: ThaiDateRang
         <div
           ref={popoverRef}
           style={{ top: `${popoverPos.top}px`, left: `${popoverPos.left}px` }}
-          className="fixed z-[9999] w-[320px] sm:w-[360px] bg-white/98 backdrop-blur-2xl p-4 sm:p-5 rounded-3xl border border-indigo-100 shadow-2xl shadow-indigo-500/20 animate-scale-up text-slate-800"
+          className="fixed z-[9999] w-[320px] sm:w-[360px] bg-white p-4 sm:p-5 rounded-3xl border border-indigo-100 shadow-2xl shadow-indigo-500/20 animate-scale-up text-slate-800"
         >
           {/* Header Controls */}
           <div className="flex items-center justify-between pb-3 border-b border-indigo-50 mb-3">
@@ -966,6 +967,17 @@ export default function Attendance() {
       (student.branch && student.branch.toLowerCase().includes(q))
     );
   }, [sectionScopedStudents, searchQuery]);
+
+  // Virtualization for Desktop Table Rows
+  const {
+    virtualItems: virtualDesktopAttendanceStudents,
+    paddingTop: desktopAttendancePaddingTop,
+    paddingBottom: desktopAttendancePaddingBottom,
+  } = useVirtualTable({
+    items: filteredStudents,
+    estimateSize: 64,
+    overscan: 8,
+  });
 
   // Grouped sections filtered by searchQuery (for combined 'all' mode when hasMultipleSections)
   const visibleSectionGroups = useMemo(() => {
@@ -1900,31 +1912,31 @@ export default function Attendance() {
       {!selectedClass ? (
         <div className="space-y-5 animate-fade-in">
           {/* Header & Filters */}
-          <div className="glass p-5 sm:p-6 rounded-3xl border border-white/60 bg-white/95 shadow-xl shadow-indigo-100/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="glass dark:bg-slate-900/85 p-5 sm:p-6 rounded-3xl border border-white/60 dark:border-slate-800 bg-white/95 dark:bg-slate-900 shadow-xl shadow-indigo-100/20 dark:shadow-black/40 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-3.5">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500 via-indigo-600 to-purple-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/25 shrink-0">
                 <BookOpen className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                <h3 className="text-lg font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
                   <span>เลือกห้องเรียนเพื่อบันทึกเวลาเรียน</span>
-                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/80 shadow-2xs">
+                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800 shadow-2xs">
                     {classrooms.length} ห้อง
                   </span>
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">เลือกห้องเรียนเพื่อเริ่มเช็คชื่อรายวันหรือดูตารางเวลาเรียนสะสม</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">เลือกห้องเรียนเพื่อเริ่มเช็คชื่อรายวันหรือดูตารางเวลาเรียนสะสม</p>
               </div>
             </div>
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
               {/* Category Filter Pills */}
-              <div className="flex items-center bg-slate-100/80 p-1 rounded-2xl border border-slate-200/60 flex-wrap gap-1">
+              <div className="flex items-center bg-slate-100/80 dark:bg-slate-800/80 p-1 rounded-2xl border border-slate-200/60 dark:border-slate-700 flex-wrap gap-1">
                 <button
                   type="button"
                   onClick={() => setClassFilter('all')}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${classFilter === 'all'
-                    ? 'bg-white text-indigo-600 shadow-2xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                     }`}
                 >
                   ทั้งหมด ({classrooms.length})
@@ -1935,7 +1947,7 @@ export default function Attendance() {
                     onClick={() => setClassFilter('today')}
                     className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${classFilter === 'today'
                       ? 'bg-emerald-600 text-white shadow-2xs ring-1 ring-emerald-400'
-                      : 'text-emerald-700 bg-emerald-50/80 hover:bg-emerald-100/90'
+                      : 'text-emerald-700 dark:text-emerald-300 bg-emerald-50/80 dark:bg-emerald-950/50 hover:bg-emerald-100/90 dark:hover:bg-emerald-900/50'
                       }`}
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -1946,8 +1958,8 @@ export default function Attendance() {
                   type="button"
                   onClick={() => setClassFilter('pvch')}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${classFilter === 'pvch'
-                    ? 'bg-white text-indigo-600 shadow-2xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                     }`}
                 >
                   ปวช. ({pvchCount})
@@ -1956,8 +1968,8 @@ export default function Attendance() {
                   type="button"
                   onClick={() => setClassFilter('pvs')}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${classFilter === 'pvs'
-                    ? 'bg-white text-indigo-600 shadow-2xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                     }`}
                 >
                   ปวส. ({pvsCount})
@@ -1966,19 +1978,19 @@ export default function Attendance() {
 
               {/* Search Box */}
               <div className="relative min-w-[220px]">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   value={classSearch}
                   onChange={e => setClassSearch(e.target.value)}
                   placeholder="ค้นหารหัสวิชา, ชื่อวิชา..."
-                  className="w-full pl-9 pr-8 py-2 text-xs font-medium rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400/50 focus:border-indigo-500 shadow-2xs"
+                  className="w-full pl-9 pr-8 py-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-400/50 focus:border-indigo-500 shadow-2xs"
                 />
                 {classSearch && (
                   <button
                     type="button"
                     onClick={() => setClassSearch('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -1989,17 +2001,17 @@ export default function Attendance() {
 
           {/* Classroom Cards Grid */}
           {filteredClassrooms.length === 0 ? (
-            <div className="glass p-12 text-center rounded-2xl border border-white/40 shadow-sm">
-              <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <h4 className="text-base font-bold text-slate-700">ไม่พบห้องเรียนที่ตรงกับเงื่อนไข</h4>
-              <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+            <div className="glass dark:bg-slate-900/80 p-12 text-center rounded-2xl border border-white/40 dark:border-slate-800 shadow-sm">
+              <Users className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+              <h4 className="text-base font-bold text-slate-700 dark:text-slate-200">ไม่พบห้องเรียนที่ตรงกับเงื่อนไข</h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
                 {classSearch ? `ไม่มีห้องเรียนที่ตรงกับคำค้นหา "${classSearch}"` : 'ยังไม่มีห้องเรียนในกลุ่มนี้'}
               </p>
               {(classSearch || classFilter !== 'all') && (
                 <button
                   type="button"
                   onClick={() => { setClassSearch(''); setClassFilter('all'); }}
-                  className="mt-3.5 px-4 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold border border-indigo-200 transition-colors"
+                  className="mt-3.5 px-4 py-2 rounded-xl bg-indigo-50 dark:bg-slate-800 hover:bg-indigo-100 dark:hover:bg-slate-700 text-indigo-700 dark:text-indigo-300 text-xs font-bold border border-indigo-200 dark:border-slate-700 transition-colors"
                 >
                   ล้างตัวกรองทั้งหมด
                 </button>
@@ -2021,9 +2033,9 @@ export default function Attendance() {
                       setSelectedClass(String(c.id));
                       setActiveTab('daily');
                     }}
-                    className={`group relative bg-white/90 hover:bg-white backdrop-blur-xl rounded-3xl p-5 sm:p-6 border text-left flex flex-col justify-between transition-all duration-200 hover:-translate-y-1 hover:shadow-xl hover:shadow-indigo-500/15 cursor-pointer overflow-hidden ${hasToday
-                      ? 'border-emerald-300 shadow-md shadow-emerald-500/5 ring-1 ring-emerald-400/40'
-                      : 'border-indigo-100/90 hover:border-indigo-300 shadow-xs'
+                    className={`group relative bg-white/90 dark:bg-slate-900/80 hover:bg-white dark:hover:bg-slate-900 backdrop-blur-xl rounded-3xl p-5 sm:p-6 border text-left flex flex-col justify-between transition-all duration-200 hover:-translate-y-1 hover:shadow-xl hover:shadow-indigo-500/15 dark:hover:shadow-black/50 cursor-pointer overflow-hidden ${hasToday
+                      ? 'border-emerald-300 dark:border-emerald-600/60 shadow-md shadow-emerald-500/5 ring-1 ring-emerald-400/40'
+                      : 'border-indigo-100/90 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-500/50 shadow-xs'
                       }`}
                   >
                     {/* Top Accent Gradient Bar */}
@@ -2039,25 +2051,25 @@ export default function Attendance() {
                       <div className="flex items-center justify-between gap-2 mb-3">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           {parsed.code && (
-                            <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-lg bg-slate-100/90 text-slate-700 border border-slate-200 shadow-2xs">
+                            <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-lg bg-slate-100/90 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-2xs">
                               {parsed.code}
                             </span>
                           )}
                           <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border shadow-2xs ${parsed.curriculumType === 'pvs'
-                            ? 'bg-purple-50 text-purple-700 border-purple-200'
-                            : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                            ? 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+                            : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
                             }`}>
                             {parsed.curriculumType === 'pvs' ? 'ปวส.' : 'ปวช.'}
                           </span>
                           {parsed.groupName && (
-                            <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-800 border border-amber-200/90 shadow-2xs">
+                            <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200/90 dark:border-amber-800 shadow-2xs">
                               {parsed.groupName}
                             </span>
                           )}
                         </div>
 
                         {hasToday && (
-                          <span className="flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-xs animate-pulse shrink-0">
+                          <span className="flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 shadow-xs animate-pulse shrink-0">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                             มีสอนวันนี้
                           </span>
@@ -2065,26 +2077,26 @@ export default function Attendance() {
                       </div>
 
                       {/* Course Title */}
-                      <h4 className="font-black text-base text-slate-800 group-hover:text-indigo-600 transition-colors line-clamp-2 leading-snug mb-3.5">
+                      <h4 className="font-black text-base text-slate-800 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors line-clamp-2 leading-snug mb-3.5">
                         {parsed.subjectTitle}
                       </h4>
 
                       {/* Info & Criteria Box */}
-                      <div className="space-y-2 bg-slate-50/80 group-hover:bg-indigo-50/40 p-3 rounded-xl border border-slate-100 group-hover:border-indigo-100/60 transition-colors mb-4">
-                        <div className="flex items-center justify-between text-xs text-slate-600">
+                      <div className="space-y-2 bg-slate-50/80 dark:bg-slate-800/60 group-hover:bg-indigo-50/40 dark:group-hover:bg-slate-800/90 p-3 rounded-xl border border-slate-100 dark:border-slate-800 group-hover:border-indigo-100/60 dark:group-hover:border-slate-700 transition-colors mb-4">
+                        <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
                           <span className="flex items-center gap-1.5">
-                            <Users className="w-3.5 h-3.5 text-indigo-500" />
+                            <Users className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
                             <span>นักเรียน</span>
                           </span>
-                          <strong className="text-slate-800 font-bold">{c.student_count || 0} คน</strong>
+                          <strong className="text-slate-800 dark:text-slate-100 font-bold">{c.student_count || 0} คน</strong>
                         </div>
 
-                        <div className="flex items-center justify-between text-xs text-slate-600">
+                        <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
                           <span className="flex items-center gap-1.5">
-                            <Clock className="w-3.5 h-3.5 text-indigo-500" />
+                            <Clock className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
                             <span>แผนการสอน</span>
                           </span>
-                          <span className="text-slate-700 font-medium">
+                          <span className="text-slate-700 dark:text-slate-300 font-medium">
                             {c.total_weeks || (parsed.curriculumType === 'pvs' ? 15 : 18)} สัปดาห์ · {c.total_classes || 40} คาบ
                           </span>
                         </div>
@@ -2482,18 +2494,25 @@ export default function Attendance() {
                       );
                     })
                   ) : (
-                    filteredStudents.map(student => (
-                      <MobileStudentAttendanceCard
-                        key={student.id}
-                        student={student}
-                        status={attendance[student.id]}
-                        stats={getStudentStats(student.id)}
-                        maxAllowedAbsences={maxAllowedAbsences}
-                        sectionBadge={hasMultipleSections ? (student.grade_level || null) : null}
-                        onStatusSelect={handleStatusChange}
-                        onViewHistory={setHistoryStudent}
-                      />
-                    ))
+                    <VirtualList
+                      items={filteredStudents}
+                      estimateSize={140}
+                      gap={10}
+                      useWindowScroll={true}
+                      getItemKey={(student) => student.id}
+                      renderItem={(student) => (
+                        <MobileStudentAttendanceCard
+                          key={student.id}
+                          student={student}
+                          status={attendance[student.id]}
+                          stats={getStudentStats(student.id)}
+                          maxAllowedAbsences={maxAllowedAbsences}
+                          sectionBadge={hasMultipleSections ? (student.grade_level || null) : null}
+                          onStatusSelect={handleStatusChange}
+                          onViewHistory={setHistoryStudent}
+                        />
+                      )}
+                    />
                   )}
                 </div>
 
@@ -2592,7 +2611,21 @@ export default function Attendance() {
                           );
                         })
                       ) : (
-                        filteredStudents.map((student, idx) => renderDesktopStudentRow(student, idx, false))
+                        <>
+                          {desktopAttendancePaddingTop > 0 && (
+                            <tr>
+                              <td style={{ height: `${desktopAttendancePaddingTop}px` }} colSpan={4} />
+                            </tr>
+                          )}
+                          {virtualDesktopAttendanceStudents.map(({ item: student, index: idx }) =>
+                            renderDesktopStudentRow(student, idx, false)
+                          )}
+                          {desktopAttendancePaddingBottom > 0 && (
+                            <tr>
+                              <td style={{ height: `${desktopAttendancePaddingBottom}px` }} colSpan={4} />
+                            </tr>
+                          )}
+                        </>
                       )}
                     </tbody>
                   </table>
@@ -2936,7 +2969,7 @@ export default function Attendance() {
       {/* ================= HISTORY LIST MODAL FOR SINGLE STUDENT ================= */}
       {historyStudent && createPortal(
         <div className="modal-overlay" onClick={() => setHistoryStudent(null)}>
-          <div className="glass w-full max-w-md p-6 animate-scale-up" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-md p-6 animate-scale-up" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
@@ -2971,7 +3004,7 @@ export default function Attendance() {
                     weekday: 'short'
                   });
                   return (
-                    <div key={record.id} className="flex items-center justify-between bg-indigo-50/50 p-3 rounded-xl border border-indigo-100/50 hover:bg-indigo-50 transition-colors group">
+                    <div key={record.id} className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200 hover:bg-indigo-50/60 transition-colors group">
                       <div className="flex items-center gap-3">
                         <CalendarIcon className="w-4 h-4 text-indigo-400" />
                         <span className="text-sm text-slate-700 font-semibold">{formattedDate}</span>
@@ -3042,7 +3075,7 @@ export default function Attendance() {
       {showRetroactiveModal && createPortal(
         <div className="modal-overlay" onClick={() => setShowRetroactiveModal(false)}>
           <div
-            className="glass w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto animate-scale-up"
+            className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto animate-scale-up"
             onClick={e => e.stopPropagation()}
           >
             {/* Header */}

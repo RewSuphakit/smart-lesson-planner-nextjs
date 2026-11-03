@@ -89,6 +89,8 @@ export async function GET(request: NextRequest) {
           studentCode: true,
           gradeLevel: true,
           branch: true,
+          avatar: true,
+          updatedAt: true,
           midtermScore: true,
           finalScore: true,
           affectiveScore: true,
@@ -210,7 +212,10 @@ export async function GET(request: NextRequest) {
         student_code: s.studentCode,
         grade_level: s.gradeLevel,
         branch: s.branch,
-        avatar: null,
+        avatar:
+          typeof s.avatar === 'string' && s.avatar.startsWith('data:image/')
+            ? `/api/students/${s.id}/avatar?v=${s.updatedAt ? s.updatedAt.getTime() : 0}`
+            : s.avatar ?? null,
         midterm_score: midtermScore,
         final_score: rawFinalScore,
         is_absent_final: isAbsentFinal,

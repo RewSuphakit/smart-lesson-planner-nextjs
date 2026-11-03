@@ -69,7 +69,7 @@ export default function UserAvatar({
 
   return (
     <div
-      className={`relative inline-flex items-center justify-center overflow-hidden shrink-0 select-none bg-gradient-to-br from-indigo-100 via-white to-purple-100 border border-indigo-200/60 shadow-xs ${sizeClass} ${className}`}
+      className={`relative inline-flex items-center justify-center overflow-hidden shrink-0 select-none bg-gradient-to-br from-indigo-100 via-white to-purple-100 dark:from-slate-800 dark:via-slate-800 dark:to-slate-900 border border-indigo-200/60 dark:border-slate-700 shadow-xs ${sizeClass} ${className}`}
     >
       {hasImage ? (
         <img

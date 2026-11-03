@@ -6,7 +6,7 @@ import api from '@/services/api';
 import {
   Loader2, Save, Settings, AlertCircle, Plus, Trash2,
   FileSpreadsheet, Printer, Zap, AlertTriangle, Search, Award, CheckCircle2, XCircle, Download,
-  SlidersHorizontal, LayoutGrid, Table as TableIcon, Grid
+  SlidersHorizontal, LayoutGrid, Table as TableIcon, Grid, Users
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Pagination from '@/components/Pagination';
@@ -22,6 +22,7 @@ const GradePdfModal = dynamic(() => import('@/components/GradePdfModal'), { ssr:
 const GradeCsvModal = dynamic(() => import('@/components/GradeCsvModal'), { ssr: false });
 import { useAuth } from '@/context/AuthContext';
 import UserAvatar from '@/components/UserAvatar';
+import VirtualList, { useVirtualTable } from '@/components/VirtualList';
 
 export interface Classroom {
   id: string;
@@ -172,13 +173,25 @@ export default function Grades() {
     return Math.max(220, Math.min(480, Math.round(base)));
   }, [report]);
 
+  const activeNameStyle = useMemo<React.CSSProperties>(() => {
+    if (nameColMode === 'auto') {
+      return { minWidth: '180px' };
+    }
+    let w = 220;
+    if (nameColMode === 'compact') w = 180;
+    else if (nameColMode === 'normal') w = 240;
+    else if (nameColMode === 'wide') w = 320;
+    const finalW = Math.max(160, Math.min(550, w + customWidthOffset));
+    return { minWidth: `${finalW}px`, width: `${finalW}px` };
+  }, [nameColMode, customWidthOffset]);
+
   const activeNameWidth = useMemo(() => {
-    let w = calculatedAutoWidth;
-    if (nameColMode === 'compact') w = 190;
-    else if (nameColMode === 'normal') w = 260;
-    else if (nameColMode === 'wide') w = 340;
+    let w = 220;
+    if (nameColMode === 'compact') w = 180;
+    else if (nameColMode === 'normal') w = 240;
+    else if (nameColMode === 'wide') w = 320;
     return Math.max(160, Math.min(550, w + customWidthOffset));
-  }, [nameColMode, calculatedAutoWidth, customWidthOffset]);
+  }, [nameColMode, customWidthOffset]);
 
   // ─── Query: ดึงข้อมูลห้องเรียน ───
   const { data: classrooms = EMPTY_CLASSROOMS, isLoading: loadingClassrooms } = useQuery<Classroom[]>({
@@ -391,6 +404,17 @@ export default function Grades() {
     const start = (currentPage - 1) * itemsPerPage;
     return filteredReport.slice(start, start + itemsPerPage);
   }, [filteredReport, currentPage, itemsPerPage]);
+
+  // Virtualization for Grades Desktop Table
+  const {
+    virtualItems: virtualGradeStudents,
+    paddingTop: gradePaddingTop,
+    paddingBottom: gradePaddingBottom,
+  } = useVirtualTable({
+    items: paginatedReport,
+    estimateSize: 56,
+    overscan: 8,
+  });
 
   const handleExamScoreChange = (studentId: string, field: 'midterm_score' | 'final_score' | 'affective_score', value: string) => {
     setHasUnsavedChanges(true);
@@ -719,7 +743,7 @@ export default function Grades() {
 
       {/* Active Classroom Bar (เมื่อเลือกห้องเรียนแล้ว) */}
       {selectedClass && activeParsed && (
-        <div className="glass p-5 sm:p-6 rounded-3xl border border-purple-100/80 bg-white/95 shadow-xl shadow-purple-100/20 space-y-4">
+        <div className="glass dark:bg-slate-900/85 p-5 sm:p-6 rounded-3xl border border-purple-100/80 dark:border-slate-800 bg-white/95 dark:bg-slate-900 shadow-xl shadow-purple-100/20 dark:shadow-black/40 space-y-4">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="flex items-start sm:items-center gap-3.5 min-w-0">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 via-purple-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-purple-500/25 shrink-0">
@@ -728,28 +752,28 @@ export default function Grades() {
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   {activeParsed.code && (
-                    <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700 border border-slate-200/80 shadow-2xs">
+                    <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 shadow-2xs">
                       {activeParsed.code}
                     </span>
                   )}
                   <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border shadow-2xs ${activeParsed.curriculumType === 'pvs' || weights.is_pws || classroomObj?.name?.includes('ปวส')
-                    ? 'bg-purple-50 text-purple-700 border-purple-200'
-                    : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                    ? 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+                    : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
                     }`}>
                     {activeParsed.curriculumType === 'pvs' || weights.is_pws || classroomObj?.name?.includes('ปวส')
                       ? `ปวส. (${weights.target_weeks || 15} สัปดาห์)`
                       : `ปวช. (${weights.target_weeks || 18} สัปดาห์)`}
                   </span>
                   {activeParsed.groupName && (
-                    <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-800 border border-amber-200/80 shadow-2xs">
+                    <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800 shadow-2xs">
                       {activeParsed.groupName}
                     </span>
                   )}
-                  <span className="text-xs font-semibold text-slate-500 ml-1">
+                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1">
                     (👥 {classroomObj?.student_count || report.length || 0} คน)
                   </span>
                 </div>
-                <h2 className="text-base sm:text-xl font-black text-slate-800 leading-tight mt-1 truncate" title={activeParsed.subjectTitle}>
+                <h2 className="text-base sm:text-xl font-black text-slate-800 dark:text-slate-100 leading-tight mt-1 truncate" title={activeParsed.subjectTitle}>
                   {activeParsed.subjectTitle}
                 </h2>
               </div>
@@ -761,7 +785,7 @@ export default function Grades() {
                 onClick={() => setShowSettings(!showSettings)}
                 className={`btn px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shrink-0 transition-all cursor-pointer ${showSettings
                   ? 'btn-primary shadow-md shadow-purple-500/20'
-                  : 'bg-white border border-purple-200 text-purple-700 hover:bg-purple-50'
+                  : 'bg-white dark:bg-slate-800 border border-purple-200 dark:border-slate-700 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-slate-700'
                   }`}
               >
                 <Settings className="w-3.5 h-3.5" />
@@ -772,7 +796,7 @@ export default function Grades() {
                 <select
                   value={selectedClass}
                   onChange={e => setSelectedClass(e.target.value)}
-                  className="form-input text-xs font-bold py-2 pl-3 pr-8 bg-white/90 hover:bg-white border-slate-200 rounded-xl focus:border-purple-400 focus:ring focus:ring-purple-200/50 transition-all text-slate-700 cursor-pointer shadow-xs max-w-[200px] sm:max-w-[260px] truncate"
+                  className="form-input text-xs font-bold py-2 pl-3 pr-8 bg-white/90 dark:bg-slate-800 hover:bg-white dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700 rounded-xl focus:border-purple-400 focus:ring focus:ring-purple-200/50 transition-all text-slate-700 dark:text-slate-200 cursor-pointer shadow-xs max-w-[200px] sm:max-w-[260px] truncate"
                   title="สลับห้องเรียนเร็ว"
                 >
                   {classrooms.map(c => (
@@ -785,10 +809,10 @@ export default function Grades() {
               <button
                 type="button"
                 onClick={() => setSelectedClass('')}
-                className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-purple-50/80 hover:bg-purple-100 text-purple-700 border border-purple-200/70 transition-all shadow-xs cursor-pointer shrink-0"
+                className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-purple-50/80 dark:bg-slate-800 hover:bg-purple-100 dark:hover:bg-slate-700 text-purple-700 dark:text-purple-300 border border-purple-200/70 dark:border-slate-700 transition-all shadow-xs cursor-pointer shrink-0"
                 title="ย้อนกลับไปดูการ์ดห้องเรียนทั้งหมด"
               >
-                <Grid className="w-3.5 h-3.5 text-purple-600" />
+                <Grid className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
                 <span>การ์ดทั้งหมด</span>
               </button>
             </div>
@@ -877,26 +901,26 @@ export default function Grades() {
           />
 
           {/* ==================== MAIN GRADEBOOK TOOLBAR & ACTIONS ==================== */}
-          <div className="glass overflow-hidden rounded-3xl border border-indigo-100/80 bg-white shadow-sm">
-            <div className="p-4 sm:p-5 border-b border-indigo-100/70 bg-gradient-to-r from-indigo-50/40 via-white to-purple-50/20 space-y-3.5">
+          <div className="rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-slate-200/80 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/90 space-y-3.5">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                 {/* Search & Filter Bar */}
                 <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 flex-1 max-w-xl">
                   <div className="relative flex-1 min-w-[180px]">
-                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                     <input
                       type="text"
                       value={searchQuery}
                       onChange={e => setSearchQuery(e.target.value)}
                       placeholder="ค้นหาชื่อ, รหัส หรือห้องย่อย..."
-                      className="form-input text-xs pl-9 py-2 bg-white border-indigo-100 focus:border-indigo-500 rounded-2xl shadow-xs w-full"
+                      className="w-full text-xs pl-9 pr-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 rounded-xl shadow-2xs"
                     />
                   </div>
 
                   <select
                     value={gradeFilter}
                     onChange={e => setGradeFilter(e.target.value)}
-                    className="form-input text-xs py-2 bg-white border-indigo-100 focus:border-indigo-500 rounded-2xl shadow-xs min-w-[130px]"
+                    className="text-xs py-2 px-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 rounded-xl shadow-2xs min-w-[130px]"
                   >
                     <option value="ALL">ทุกระดับเกรด</option>
                     <option value="4">เกรด 4</option>
@@ -914,11 +938,11 @@ export default function Grades() {
                   </select>
 
                   {/* View Mode Switcher: Table vs Cards */}
-                  <div className="inline-flex rounded-2xl bg-slate-100 p-1 border border-slate-200/80 shadow-xs shrink-0">
+                  <div className="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200 dark:border-slate-700 shadow-2xs shrink-0">
                     <button
                       type="button"
                       onClick={() => setViewMode('table')}
-                      className={`p-1.5 rounded-xl transition-all ${viewMode === 'table' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                      className={`p-1.5 rounded-lg transition-all ${viewMode === 'table' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-xs' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
                       title="มุมมองตาราง (Table View)"
                       aria-label="มุมมองตาราง"
                     >
@@ -927,8 +951,8 @@ export default function Grades() {
                     <button
                       type="button"
                       onClick={() => setViewMode('cards')}
-                      className={`p-1.5 rounded-xl transition-all ${viewMode === 'cards' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
-                      title="มุมมองการ์ด (Card View - แนะนำสำหรับมือถือ)"
+                      className={`p-1.5 rounded-lg transition-all ${viewMode === 'cards' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-xs' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
+                      title="มุมมองการ์ด (Card View)"
                       aria-label="มุมมองการ์ด"
                     >
                       <LayoutGrid className="w-4 h-4" />
@@ -939,30 +963,30 @@ export default function Grades() {
                 {/* Column Width Selector (Desktop view) */}
                 {viewMode === 'table' && (
                   <div className="hidden xl:flex items-center gap-1.5">
-                    <span className="text-xs font-semibold text-slate-600 flex items-center gap-1">
-                      <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-600" />
+                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                      <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-500" />
                       กว้างชื่อ:
                     </span>
-                    <div className="inline-flex rounded-2xl bg-white p-0.5 border border-indigo-200/80 shadow-xs text-xs font-semibold">
+                    <div className="inline-flex rounded-xl bg-white dark:bg-slate-800 p-0.5 border border-slate-200 dark:border-slate-700 shadow-2xs text-xs font-semibold">
                       <button
                         type="button"
                         onClick={() => { setNameColMode('auto'); setCustomWidthOffset(0); }}
-                        className={`px-2.5 py-1 rounded-xl transition-all ${nameColMode === 'auto' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:bg-indigo-50'}`}
-                        title={`ปรับพอดีกับความยาวชื่อ (${calculatedAutoWidth}px)`}
+                        className={`px-2.5 py-1 rounded-lg transition-all ${nameColMode === 'auto' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+                        title="ปรับความกว้างพอดีกับหน้าจอ (ไม่ต้องเลื่อนแกน X)"
                       >
-                        Auto ({calculatedAutoWidth}px)
+                        Auto (พอดีจอ)
                       </button>
                       <button
                         type="button"
                         onClick={() => { setNameColMode('compact'); setCustomWidthOffset(0); }}
-                        className={`px-2 py-1 rounded-xl transition-all ${nameColMode === 'compact' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:bg-indigo-50'}`}
+                        className={`px-2 py-1 rounded-lg transition-all ${nameColMode === 'compact' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
                       >
                         กระชับ
                       </button>
                       <button
                         type="button"
                         onClick={() => { setNameColMode('normal'); setCustomWidthOffset(0); }}
-                        className={`px-2 py-1 rounded-xl transition-all ${nameColMode === 'normal' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:bg-indigo-50'}`}
+                        className={`px-2 py-1 rounded-lg transition-all ${nameColMode === 'normal' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
                       >
                         ปกติ
                       </button>
@@ -972,37 +996,37 @@ export default function Grades() {
               </div>
 
               {/* Action Buttons Row */}
-              <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-indigo-100/60">
+              <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-slate-200/70 dark:border-slate-800">
                 <div className="flex items-center gap-2 flex-wrap">
                   <button
                     onClick={() => exportStd02('xlsx')}
-                    className="btn bg-white hover:bg-indigo-50 text-slate-700 border border-indigo-200 text-xs px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 shadow-xs"
+                    className="btn bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 shadow-2xs"
                   >
-                    <Download className="w-3.5 h-3.5 text-indigo-600" />
+                    <Download className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                     <span>Export ศธ.02 (Excel)</span>
                   </button>
 
                   <button
                     onClick={() => setShowCsvPreviewModal(true)}
-                    className="btn bg-white hover:bg-emerald-50 text-slate-700 border border-emerald-200 text-xs px-3 py-1.5 rounded-xl font-semibold flex items-center gap-1.5 shadow-xs"
+                    className="btn bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs px-3 py-1.5 rounded-xl font-semibold flex items-center gap-1.5 shadow-2xs"
                   >
-                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                     <span>พรีวิว CSV</span>
                   </button>
 
                   <button
                     onClick={() => setShowPdfPreviewModal(true)}
-                    className="btn bg-white hover:bg-violet-50 text-slate-700 border border-violet-200 text-xs px-3 py-1.5 rounded-xl font-semibold flex items-center gap-1.5 shadow-xs"
+                    className="btn bg-white dark:bg-slate-800 hover:bg-violet-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs px-3 py-1.5 rounded-xl font-semibold flex items-center gap-1.5 shadow-2xs"
                   >
-                    <Printer className="w-3.5 h-3.5 text-violet-600" />
+                    <Printer className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
                     <span>พิมพ์ PDF</span>
                   </button>
 
                   <button
                     onClick={autoCalculateAffective}
-                    className="btn bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs px-3 py-1.5 rounded-xl font-semibold flex items-center gap-1.5"
+                    className="btn bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/80 text-xs px-3 py-1.5 rounded-xl font-semibold flex items-center gap-1.5 shadow-2xs"
                   >
-                    <Zap className="w-3.5 h-3.5 text-amber-600" />
+                    <Zap className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
                     <span>คำนวณจิตพิสัยออโต้</span>
                   </button>
                 </div>
@@ -1010,7 +1034,7 @@ export default function Grades() {
                 <button
                   onClick={() => saveExamsMutation.mutate()}
                   disabled={saveExamsMutation.isPending}
-                  className={`btn text-xs px-4 py-2 rounded-2xl flex items-center gap-1.5 font-bold shadow-md transition-all ${hasUnsavedChanges
+                  className={`btn text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 font-bold shadow-md transition-all ${hasUnsavedChanges
                     ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-emerald-500/25 animate-pulse'
                     : 'btn-primary shadow-indigo-500/20'
                     }`}
@@ -1024,187 +1048,241 @@ export default function Grades() {
             {/* ==================== VIEW MODE 1: MODERN RESPONSIVE TABLE ==================== */}
             {viewMode === 'table' ? (
               <div className="overflow-x-auto relative">
-                <table className="w-full text-left border-collapse text-xs min-w-[900px]">
+                <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="bg-slate-100/90 border-b border-indigo-100 text-slate-700 font-bold sticky top-0 z-10 backdrop-blur-md">
-                      <th className="p-3 w-16 text-center">รหัส</th>
+                    <tr className="bg-slate-100/90 dark:bg-slate-900/95 border-b-2 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 font-bold sticky top-0 z-20 backdrop-blur-md">
+                      <th className="py-2.5 px-1.5 w-20 text-center text-slate-500 dark:text-slate-400 font-bold whitespace-nowrap">รหัส</th>
                       <th
-                        className="p-3 border-r border-indigo-200/60 sticky left-0 bg-slate-100/95 z-20 shadow-xs"
-                        style={{ minWidth: `${activeNameWidth}px`, width: `${activeNameWidth}px` }}
+                        className="py-2.5 px-3 border-r border-slate-200 dark:border-slate-800 sticky left-0 bg-slate-100/95 dark:bg-slate-900 z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] dark:shadow-[2px_0_5px_-2px_rgba(0,0,0,0.3)] text-slate-700 dark:text-slate-200 whitespace-nowrap"
+                        style={activeNameStyle}
                       >
                         ชื่อ-นามสกุล
                       </th>
-                      <th className="p-2.5 text-center text-pink-800 min-w-[85px] bg-pink-50/40 border-r border-pink-100/50">
-                        จิตพิสัย
-                        <div className="text-[10px] font-normal text-pink-600 font-mono">({weights.affective_weight}%)</div>
+                      <th className="py-2.5 px-1 text-center w-[90px] border-r border-slate-200 dark:border-slate-800">
+                        <div className="whitespace-nowrap inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-lg bg-pink-50 dark:bg-pink-950/60 text-pink-700 dark:text-pink-300 border border-pink-200/90 dark:border-pink-900/60 font-bold text-xs shadow-2xs">
+                          <span>จิตพิสัย</span>
+                          <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-pink-100 dark:bg-pink-900/70 font-semibold">{weights.affective_weight}%</span>
+                        </div>
                       </th>
-                      <th className="p-2.5 text-center text-amber-800 min-w-[95px] bg-amber-50/40 border-r border-amber-100/50">
-                        สอบย่อย
-                        <div className="text-[10px] font-normal text-amber-600 font-mono">({weights.post_test_weight}%)</div>
+                      <th className="py-2.5 px-1 text-center w-[90px] border-r border-slate-200 dark:border-slate-800">
+                        <div className="whitespace-nowrap inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200/90 dark:border-amber-900/60 font-bold text-xs shadow-2xs">
+                          <span>สอบย่อย</span>
+                          <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-amber-100 dark:bg-amber-900/70 font-semibold">{weights.post_test_weight}%</span>
+                        </div>
                       </th>
-                      <th className="p-2.5 text-center text-emerald-800 min-w-[95px] bg-emerald-50/40 border-r border-emerald-100/50">
-                        งานเก็บ
-                        <div className="text-[10px] font-normal text-emerald-600 font-mono">({weights.assignment_weight}%)</div>
+                      <th className="py-2.5 px-1 text-center w-[90px] border-r border-slate-200 dark:border-slate-800">
+                        <div className="whitespace-nowrap inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/90 dark:border-emerald-900/60 font-bold text-xs shadow-2xs">
+                          <span>งานเก็บ</span>
+                          <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-emerald-100 dark:bg-emerald-900/70 font-semibold">{weights.assignment_weight}%</span>
+                        </div>
                       </th>
-                      <th className="p-2.5 text-center text-cyan-800 min-w-[100px] bg-cyan-50/40 border-r border-cyan-100/50">
-                        กลางภาค
-                        <div className="text-[10px] font-normal text-cyan-600 font-mono">({weights.midterm_weight}%)</div>
+                      <th className="py-2.5 px-1 text-center w-[92px] border-r border-slate-200 dark:border-slate-800">
+                        <div className="whitespace-nowrap inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-lg bg-cyan-50 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-300 border border-cyan-200/90 dark:border-cyan-900/60 font-bold text-xs shadow-2xs">
+                          <span>กลางภาค</span>
+                          <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-cyan-100 dark:bg-cyan-900/70 font-semibold">{weights.midterm_weight}%</span>
+                        </div>
                       </th>
-                      <th className="p-2.5 text-center text-blue-800 min-w-[110px] bg-blue-50/40 border-r border-blue-100/50">
-                        ปลายภาค
-                        <div className="text-[10px] font-normal text-blue-600 font-mono">({weights.final_weight}%)</div>
+                      <th className="py-2.5 px-1 text-center w-[96px] border-r border-slate-200 dark:border-slate-800">
+                        <div className="whitespace-nowrap inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200/90 dark:border-blue-900/60 font-bold text-xs shadow-2xs">
+                          <span>ปลายภาค</span>
+                          <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-blue-100 dark:bg-blue-900/70 font-semibold">{weights.final_weight}%</span>
+                        </div>
                       </th>
-                      <th className="p-2.5 text-center bg-indigo-100/70 text-indigo-900 font-black min-w-[85px] border-r border-indigo-200/50">
-                        รวม
-                        <div className="text-[10px] font-normal text-indigo-700">(100)</div>
+                      <th className="py-2.5 px-1 text-center w-[76px] border-r border-slate-200 dark:border-slate-800">
+                        <div className="whitespace-nowrap inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/90 dark:border-indigo-900/60 font-bold text-xs shadow-2xs">
+                          <span>รวม</span>
+                          <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-indigo-100 dark:bg-indigo-900/70 font-semibold">100</span>
+                        </div>
                       </th>
-                      <th className="p-3 text-center min-w-[85px]">เกรด</th>
+                      <th className="py-2.5 px-1.5 text-center w-[66px]">
+                        <div className="whitespace-nowrap inline-flex items-center justify-center px-2.5 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-bold text-xs shadow-2xs">
+                          <span>เกรด</span>
+                        </div>
+                      </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-indigo-50">
-                    {paginatedReport.map((student, idx) => {
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                    {gradePaddingTop > 0 && (
+                      <tr>
+                        <td style={{ height: `${gradePaddingTop}px` }} colSpan={9} />
+                      </tr>
+                    )}
+                    {virtualGradeStudents.map(({ item: student, index: idx }) => {
                       const totalScore = Number(student.total_score_precise ?? student.total_score ?? 0);
                       const isKr = student.is_f || student.grade === 'ข.ร.' || student.grade === 'ขร';
                       const isKs = student.grade === 'ข.ส.' || student.is_absent_final || student.final_score === -1;
                       const isMs = student.grade === 'ม.ส.' || student.is_incomplete || student.final_score === -2;
                       const isAtRisk = !isKr && !isKs && !isMs && (totalScore < 50 || (student.remaining_absences !== undefined && student.remaining_absences <= 2 && student.remaining_absences >= 0));
 
-                      const stickyCellBg = isKr
-                        ? 'bg-rose-50'
-                        : isKs
-                          ? 'bg-amber-50'
-                          : isMs
-                            ? 'bg-purple-50'
-                            : isAtRisk
-                              ? 'bg-amber-50'
-                              : idx % 2 === 0
-                                ? 'bg-white'
-                                : 'bg-slate-50';
+                      let rowClass = 'bg-white dark:bg-slate-900 hover:bg-slate-50/80 dark:hover:bg-slate-800/50';
+                      let stickyClass = 'bg-white dark:bg-slate-900';
+                      let borderAccent = 'border-l-4 border-l-transparent';
+
+                      if (isKr) {
+                        rowClass = 'bg-rose-50/25 dark:bg-rose-950/20 hover:bg-rose-50/45 dark:hover:bg-rose-950/30';
+                        stickyClass = 'bg-rose-50/50 dark:bg-slate-900';
+                        borderAccent = 'border-l-4 border-l-rose-500';
+                      } else if (isKs) {
+                        rowClass = 'bg-amber-50/25 dark:bg-amber-950/20 hover:bg-amber-50/45 dark:hover:bg-amber-950/30';
+                        stickyClass = 'bg-amber-50/50 dark:bg-slate-900';
+                        borderAccent = 'border-l-4 border-l-amber-500';
+                      } else if (isMs) {
+                        rowClass = 'bg-purple-50/25 dark:bg-purple-950/20 hover:bg-purple-50/45 dark:hover:bg-purple-950/30';
+                        stickyClass = 'bg-purple-50/50 dark:bg-slate-900';
+                        borderAccent = 'border-l-4 border-l-purple-500';
+                      } else if (isAtRisk) {
+                        rowClass = 'bg-amber-50/15 dark:bg-amber-950/10 hover:bg-amber-50/30 dark:hover:bg-amber-950/20';
+                        stickyClass = 'bg-amber-50/30 dark:bg-slate-900';
+                        borderAccent = 'border-l-4 border-l-amber-400';
+                      } else if (idx % 2 === 1) {
+                        rowClass = 'bg-slate-50/40 dark:bg-slate-800/25 hover:bg-slate-100/60 dark:hover:bg-slate-800/50';
+                        stickyClass = 'bg-slate-50/60 dark:bg-slate-900';
+                      }
 
                       return (
                         <tr
                           key={student.student_id}
-                          className={`hover:bg-indigo-50/60 transition-colors ${isKr ? 'bg-rose-50/70' : isKs ? 'bg-amber-50/70' : isMs ? 'bg-purple-50/70' : isAtRisk ? 'bg-amber-50/30' : idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'
-                            }`}
+                          className={`transition-colors ${rowClass} ${borderAccent}`}
                         >
-                          <td className="p-2.5 text-slate-500 font-medium text-center font-mono">{student.student_code || '-'}</td>
+                          <td className="py-2 px-1 text-slate-500 dark:text-slate-400 font-semibold text-center font-mono text-xs whitespace-nowrap">
+                            {student.student_code || '-'}
+                          </td>
                           <td
-                            className={`p-2.5 font-semibold text-slate-800 border-r border-indigo-100/80 sticky left-0 z-10 ${stickyCellBg} shadow-xs`}
-                            style={{ minWidth: `${activeNameWidth}px`, width: `${activeNameWidth}px` }}
+                            className={`py-2 px-2.5 font-semibold text-slate-800 dark:text-slate-100 border-r border-slate-200 dark:border-slate-800 sticky left-0 z-10 ${stickyClass} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] dark:shadow-[2px_0_5px_-2px_rgba(0,0,0,0.3)]`}
+                            style={activeNameStyle}
                           >
                             <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <span className="whitespace-nowrap font-medium text-slate-800 text-xs truncate" title={student.name}>
-                                  {student.name}
-                                </span>
-                                {student.grade_level && (
-                                  <span className="shrink-0 px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100/80">
-                                    {student.grade_level}
+                              <div className="flex items-center gap-2 min-w-0">
+                                <UserAvatar
+                                  avatar={student.avatar}
+                                  name={student.name}
+                                  userId={student.student_id}
+                                  size="sm"
+                                  className="w-7 h-7 rounded-full border border-slate-200 dark:border-slate-700 shadow-2xs shrink-0"
+                                />
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-bold text-slate-800 dark:text-slate-100 text-xs truncate" title={student.name}>
+                                      {student.name}
+                                    </span>
+                                    {student.grade_level && (
+                                      <span className="shrink-0 px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-100/80 dark:border-indigo-800">
+                                        {student.grade_level}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">
+                                    #{student.student_code || '-'}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="shrink-0 flex items-center gap-1">
+                                {isKr && (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 text-[9px] font-extrabold border border-rose-200 dark:border-rose-800">
+                                    <AlertTriangle className="w-2.5 h-2.5 text-rose-600 dark:text-rose-400" /> ข.ร.
+                                  </span>
+                                )}
+                                {isKs && (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 text-[9px] font-extrabold border border-amber-200 dark:border-amber-800">
+                                    <AlertCircle className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" /> ข.ส.
+                                  </span>
+                                )}
+                                {isMs && (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/80 text-purple-800 dark:text-purple-300 text-[9px] font-extrabold border border-purple-200 dark:border-purple-800">
+                                    <AlertCircle className="w-2.5 h-2.5 text-purple-600 dark:text-purple-400" /> ม.ส.
+                                  </span>
+                                )}
+                                {isAtRisk && student.remaining_absences !== undefined && student.remaining_absences <= 2 && (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 text-[9px] font-extrabold border border-amber-200 dark:border-amber-800">
+                                    ขาดได้อีก {student.remaining_absences}
                                   </span>
                                 )}
                               </div>
-                              {isKr && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-bold shrink-0 border border-rose-200">
-                                  <AlertTriangle className="w-3 h-3 text-rose-600" /> ข.ร.
-                                </span>
-                              )}
-                              {isKs && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold shrink-0 border border-amber-200">
-                                  <AlertCircle className="w-3 h-3 text-amber-600" /> ข.ส.
-                                </span>
-                              )}
-                              {isMs && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 text-[10px] font-bold shrink-0 border border-purple-200">
-                                  <AlertCircle className="w-3 h-3 text-purple-600" /> ม.ส.
-                                </span>
-                              )}
-                              {isAtRisk && student.remaining_absences !== undefined && student.remaining_absences <= 2 && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold shrink-0 border border-amber-200">
-                                  ขาดได้อีก {student.remaining_absences}
-                                </span>
-                              )}
                             </div>
                           </td>
 
                           {/* Affective Editable Score */}
-                          <td className="p-2 text-center bg-pink-50/20 border-r border-pink-100/40">
+                          <td className="py-2 px-1 text-center border-r border-slate-100 dark:border-slate-800/80">
                             <input
                               type="number" step="0.5" min="0" max={weights.affective_weight}
                               value={student.affective_score ?? ''}
                               onChange={e => handleExamScoreChange(student.student_id, 'affective_score', e.target.value)}
-                              className="form-input text-center py-1 px-1.5 w-16 mx-auto text-pink-800 font-bold border-pink-200 focus:border-pink-500 text-xs rounded-xl bg-white shadow-2xs"
+                              className="text-center font-bold font-mono text-xs w-14 py-1 px-1 rounded-xl border border-pink-200 dark:border-pink-900/60 bg-white dark:bg-slate-800 text-pink-700 dark:text-pink-300 focus:outline-none focus:ring-2 focus:ring-pink-500/30 focus:border-pink-500 shadow-2xs transition-all mx-auto"
                               placeholder="0"
                             />
                           </td>
 
                           {/* Raw & Scaled Post-test Breakdown */}
-                          <td className="p-2 text-center bg-amber-50/20 border-r border-amber-100/40">
-                            <div className="font-extrabold text-amber-700 text-sm font-mono">{Number(student.precise_scaled_post_test || student.scaled_post_test || 0).toFixed(1)}</div>
-                            <div className="text-[10px] text-slate-400">ดิบ: {Number(student.raw_post_test || 0).toFixed(1)}/{student.max_post_test || 0}</div>
+                          <td className="py-2 px-1 text-center border-r border-slate-100 dark:border-slate-800/80">
+                            <div className="font-black text-amber-600 dark:text-amber-400 text-xs font-mono">{Number(student.precise_scaled_post_test || student.scaled_post_test || 0).toFixed(1)}</div>
+                            <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">ดิบ: {Number(student.raw_post_test || 0).toFixed(1)}/{student.max_post_test || 0}</div>
                           </td>
 
                           {/* Raw & Scaled Assignment Breakdown */}
-                          <td className="p-2 text-center bg-emerald-50/20 border-r border-emerald-100/40">
-                            <div className="font-extrabold text-emerald-700 text-sm font-mono">{Number(student.precise_scaled_assign || student.scaled_assign || 0).toFixed(1)}</div>
-                            <div className="text-[10px] text-slate-400">ดิบ: {Number(student.raw_assign || 0).toFixed(1)}/{student.max_assign || 0}</div>
+                          <td className="py-2 px-1 text-center border-r border-slate-100 dark:border-slate-800/80">
+                            <div className="font-black text-emerald-600 dark:text-emerald-400 text-xs font-mono">{Number(student.precise_scaled_assign || student.scaled_assign || 0).toFixed(1)}</div>
+                            <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">ดิบ: {Number(student.raw_assign || 0).toFixed(1)}/{student.max_assign || 0}</div>
                           </td>
 
                           {/* Midterm Editable Score */}
-                          <td className="p-2 text-center bg-cyan-50/20 border-r border-cyan-100/40">
-                            <input
-                              type="number" step="0.5" min="0" max={weights.midterm_max_score}
-                              value={student.midterm_score ?? ''}
-                              onChange={e => handleExamScoreChange(student.student_id, 'midterm_score', e.target.value)}
-                              className="form-input text-center py-1 px-1.5 w-16 mx-auto text-cyan-800 font-bold border-cyan-200 focus:border-cyan-500 text-xs rounded-xl bg-white shadow-2xs"
-                              placeholder="0"
-                            />
-                            <div className="text-[10px] text-cyan-700 font-semibold mt-0.5 font-mono">ได้: {Number(student.precise_scaled_midterm || student.scaled_midterm || 0).toFixed(1)}</div>
+                          <td className="py-2 px-1 text-center border-r border-slate-100 dark:border-slate-800/80">
+                            <div className="flex flex-col items-center">
+                              <input
+                                type="number" step="0.5" min="0" max={weights.midterm_max_score}
+                                value={student.midterm_score ?? ''}
+                                onChange={e => handleExamScoreChange(student.student_id, 'midterm_score', e.target.value)}
+                                className="text-center font-bold font-mono text-xs w-14 py-1 px-1 rounded-xl border border-cyan-200 dark:border-cyan-900/60 bg-white dark:bg-slate-800 text-cyan-700 dark:text-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 shadow-2xs transition-all mx-auto"
+                                placeholder="0"
+                              />
+                              <div className="text-[10px] text-cyan-600 dark:text-cyan-400 font-semibold mt-0.5 font-mono">ได้: {Number(student.precise_scaled_midterm || student.scaled_midterm || 0).toFixed(1)}</div>
+                            </div>
                           </td>
 
                           {/* Final Editable Score with Std02 Vocational Controls */}
-                          <td className="p-2 text-center bg-blue-50/20 border-r border-blue-100/40">
+                          <td className="py-2 px-1 text-center border-r border-slate-100 dark:border-slate-800/80">
                             {student.final_score === -1 || student.is_absent_final ? (
-                              <div className="flex flex-col items-center gap-1">
-                                <span className="px-2 py-0.5 rounded-lg text-[10px] font-extrabold bg-amber-600 text-white shadow-xs">
-                                  ข.ส. (ขาดสอบ)
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span className="px-1.5 py-0.2 rounded-md text-[9px] font-black bg-amber-500 text-white shadow-xs">
+                                  ข.ส.
                                 </span>
                                 <button
                                   type="button"
                                   onClick={() => handleExamScoreChange(student.student_id, 'final_score', '0')}
-                                  className="text-[10px] text-blue-600 hover:underline font-semibold"
+                                  className="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline font-semibold"
                                 >
                                   กรอกคะแนน
                                 </button>
                               </div>
                             ) : student.final_score === -2 || student.is_incomplete ? (
-                              <div className="flex flex-col items-center gap-1">
-                                <span className="px-2 py-0.5 rounded-lg text-[10px] font-extrabold bg-purple-600 text-white shadow-xs">
-                                  ม.ส. (ไม่สมบูรณ์)
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span className="px-1.5 py-0.2 rounded-md text-[9px] font-black bg-purple-600 text-white shadow-xs">
+                                  ม.ส.
                                 </span>
                                 <button
                                   type="button"
                                   onClick={() => handleExamScoreChange(student.student_id, 'final_score', '0')}
-                                  className="text-[10px] text-blue-600 hover:underline font-semibold"
+                                  className="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline font-semibold"
                                 >
                                   กรอกคะแนน
                                 </button>
                               </div>
                             ) : (
-                              <>
+                              <div className="flex flex-col items-center">
                                 <input
                                   type="number" step="0.5" min="0" max={weights.final_max_score}
                                   value={student.final_score ?? ''}
                                   onChange={e => handleExamScoreChange(student.student_id, 'final_score', e.target.value)}
-                                  className="form-input text-center py-1 px-1.5 w-16 mx-auto text-blue-800 font-bold border-blue-200 focus:border-blue-500 text-xs rounded-xl bg-white shadow-2xs"
+                                  className="text-center font-bold font-mono text-xs w-14 py-1 px-1 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 shadow-2xs transition-all mx-auto"
                                   placeholder="0"
                                 />
-                                <div className="text-[10px] text-blue-700 font-semibold mt-0.5 font-mono">ได้: {Number(student.precise_scaled_final || student.scaled_final || 0).toFixed(1)}</div>
-                                <div className="flex items-center justify-center gap-1 mt-1">
+                                <div className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold mt-0.5 font-mono">ได้: {Number(student.precise_scaled_final || student.scaled_final || 0).toFixed(1)}</div>
+                                <div className="flex items-center justify-center gap-1 mt-0.5">
                                   <button
                                     type="button"
                                     title="ทำเครื่องหมายขาดสอบ (ข.ส.)"
                                     onClick={() => handleExamScoreChange(student.student_id, 'final_score', '-1')}
-                                    className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-600 hover:bg-amber-100 hover:text-amber-800 transition-colors border border-slate-200"
+                                    className="px-1 py-0.2 rounded text-[8px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/80 border border-amber-200 dark:border-amber-800 transition-colors"
                                   >
                                     ข.ส.
                                   </button>
@@ -1212,45 +1290,65 @@ export default function Grades() {
                                     type="button"
                                     title="ทำเครื่องหมายผลการเรียนไม่สมบูรณ์ (ม.ส.)"
                                     onClick={() => handleExamScoreChange(student.student_id, 'final_score', '-2')}
-                                    className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-600 hover:bg-purple-100 hover:text-purple-800 transition-colors border border-slate-200"
+                                    className="px-1 py-0.2 rounded text-[8px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/80 border border-purple-200 dark:border-purple-800 transition-colors"
                                   >
                                     ม.ส.
                                   </button>
                                 </div>
-                              </>
+                              </div>
                             )}
                           </td>
 
                           {/* Precise Total Score */}
-                          <td className="p-2 text-center bg-indigo-100/50 border-r border-indigo-200/40">
-                            <span className="font-black text-indigo-900 text-sm font-mono">{totalScore.toFixed(1)}</span>
+                          <td className="py-2 px-1 text-center border-r border-slate-100 dark:border-slate-800/80">
+                            <span className="inline-block px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 font-black text-slate-800 dark:text-slate-100 text-xs font-mono shadow-2xs border border-slate-200/60 dark:border-slate-700/60">
+                              {totalScore.toFixed(1)}
+                            </span>
                           </td>
 
                           {/* Grade Pill Badge */}
-                          <td className="p-2.5 text-center">
-                            <span className={`inline-flex items-center justify-center min-w-[2.5rem] px-2.5 py-1 rounded-xl font-black text-xs shadow-xs transition-transform hover:scale-105 ${getGradeStyle(student.grade)}`}>
+                          <td className="py-2 px-1 text-center">
+                            <span className={`inline-flex items-center justify-center min-w-[2.5rem] px-2 py-0.5 rounded-lg font-black text-xs shadow-xs transition-transform hover:scale-105 ${getGradeStyle(student.grade)}`}>
                               {student.grade}
                             </span>
                           </td>
                         </tr>
                       );
                     })}
+                    {gradePaddingBottom > 0 && (
+                      <tr>
+                        <td style={{ height: `${gradePaddingBottom}px` }} colSpan={9} />
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
             ) : (
               /* ==================== VIEW MODE 2: MOBILE-FIRST CARD VIEW ==================== */
-              <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                {paginatedReport.map((student, _idx) => {
-                  const totalScore = Number(student.total_score_precise ?? student.total_score ?? 0);
-                  const isKr = student.is_f || student.grade === 'ข.ร.' || student.grade === 'ขร';
-                  const isKs = student.grade === 'ข.ส.' || student.is_absent_final || student.final_score === -1;
-                  const isMs = student.grade === 'ม.ส.' || student.is_incomplete || student.final_score === -2;
+              <div className="p-4">
+                <VirtualList
+                  items={paginatedReport}
+                  columns={{ default: 1, md: 2 }}
+                  gap={14}
+                  estimateSize={320}
+                  useWindowScroll={true}
+                  getItemKey={(student) => student.student_id}
+                  renderItem={(student) => {
+                    const totalScore = Number(student.total_score_precise ?? student.total_score ?? 0);
+                    const isKr = student.is_f || student.grade === 'ข.ร.' || student.grade === 'ขร';
+                    const isKs = student.grade === 'ข.ส.' || student.is_absent_final || student.final_score === -1;
+                    const isMs = student.grade === 'ม.ส.' || student.is_incomplete || student.final_score === -2;
 
-                  return (
+                    return (
                     <div
                       key={student.student_id}
-                      className={`p-4 rounded-3xl border transition-all space-y-3 ${isKr ? 'bg-rose-50/70 border-rose-200' : isKs ? 'bg-amber-50/70 border-amber-200' : isMs ? 'bg-purple-50/70 border-purple-200' : 'bg-white border-indigo-100/80 hover:border-indigo-300 shadow-xs'
+                      className={`p-4 rounded-3xl border transition-all space-y-3 ${isKr
+                        ? 'bg-rose-50/70 border-rose-200 dark:bg-rose-950/40 dark:border-rose-900/60'
+                        : isKs
+                          ? 'bg-amber-50/70 border-amber-200 dark:bg-amber-950/40 dark:border-amber-900/60'
+                          : isMs
+                            ? 'bg-purple-50/70 border-purple-200 dark:bg-purple-950/40 dark:border-purple-900/60'
+                            : 'bg-white dark:bg-slate-800/80 border-slate-200/90 dark:border-slate-700/80 hover:border-indigo-300 dark:hover:border-slate-600 shadow-xs'
                         }`}
                     >
                       {/* Card Header: Avatar, Name, Student Code, Grade Badge */}
@@ -1261,14 +1359,14 @@ export default function Grades() {
                             name={student.name}
                             userId={student.student_id}
                             size="md"
-                            className="rounded-2xl border border-indigo-100 shadow-xs shrink-0"
+                            className="rounded-2xl border border-indigo-100 dark:border-slate-700 shadow-xs shrink-0"
                           />
                           <div className="min-w-0">
-                            <h4 className="text-sm font-bold text-slate-800 truncate">{student.name}</h4>
+                            <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{student.name}</h4>
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <p className="text-xs text-slate-500 font-mono">รหัส: {student.student_code || '-'}</p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">รหัส: {student.student_code || '-'}</p>
                               {student.grade_level && (
-                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100/80">
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-100/80 dark:border-indigo-800">
                                   {student.grade_level}
                                 </span>
                               )}
@@ -1285,22 +1383,22 @@ export default function Grades() {
                       {(isKr || isKs || isMs || (student.remaining_absences !== undefined && student.remaining_absences <= 2)) && (
                         <div className="flex flex-wrap gap-1.5 pt-1">
                           {isKr && (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
                               ⚠️ หมดสิทธิ์สอบ (ข.ร.)
                             </span>
                           )}
                           {isKs && (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
                               ⚠️ ขาดสอบ (ข.ส.)
                             </span>
                           )}
                           {isMs && (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/80 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
                               ⚠️ ผลการเรียนไม่สมบูรณ์ (ม.ส.)
                             </span>
                           )}
                           {!isKr && student.remaining_absences !== undefined && student.remaining_absences <= 2 && (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
                               ขาดได้อีก {student.remaining_absences} ครั้ง
                             </span>
                           )}
@@ -1309,57 +1407,57 @@ export default function Grades() {
 
                       {/* Scores Grid */}
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1 text-xs">
-                        <div className="p-2.5 rounded-2xl bg-pink-50/50 border border-pink-100">
-                          <span className="text-[10px] font-bold text-pink-700 uppercase">จิตพิสัย ({weights.affective_weight}%)</span>
+                        <div className="p-2.5 rounded-2xl bg-pink-50/50 dark:bg-pink-950/30 border border-pink-100 dark:border-pink-900/50">
+                          <span className="text-[10px] font-bold text-pink-700 dark:text-pink-300 uppercase">จิตพิสัย ({weights.affective_weight}%)</span>
                           <input
                             type="number"
                             inputMode="decimal"
                             step="0.5" min="0" max={weights.affective_weight}
                             value={student.affective_score ?? ''}
                             onChange={e => handleExamScoreChange(student.student_id, 'affective_score', e.target.value)}
-                            className="form-input text-center py-1.5 px-1 w-full text-pink-900 font-bold border-pink-200 focus:border-pink-500 text-base md:text-xs rounded-xl bg-white mt-1"
+                            className="form-input text-center py-1.5 px-1 w-full text-pink-900 dark:text-pink-200 font-bold border-pink-200 dark:border-pink-800 focus:border-pink-500 text-base md:text-xs rounded-xl bg-white dark:bg-slate-800 mt-1"
                             placeholder="0"
                           />
                         </div>
 
-                        <div className="p-2.5 rounded-2xl bg-amber-50/50 border border-amber-100">
-                          <span className="text-[10px] font-bold text-amber-700 uppercase">สอบย่อย ({weights.post_test_weight}%)</span>
-                          <div className="font-extrabold text-amber-800 text-base font-mono">
+                        <div className="p-2.5 rounded-2xl bg-amber-50/50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900/50">
+                          <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 uppercase">สอบย่อย ({weights.post_test_weight}%)</span>
+                          <div className="font-extrabold text-amber-800 dark:text-amber-200 text-base font-mono">
                             {Number(student.precise_scaled_post_test || student.scaled_post_test || 0).toFixed(1)}
                           </div>
-                          <span className="text-[9px] text-slate-400">ดิบ {Number(student.raw_post_test || 0).toFixed(0)}/{student.max_post_test || 0}</span>
+                          <span className="text-[9px] text-slate-400 dark:text-slate-500">ดิบ {Number(student.raw_post_test || 0).toFixed(0)}/{student.max_post_test || 0}</span>
                         </div>
 
-                        <div className="p-2.5 rounded-2xl bg-emerald-50/50 border border-emerald-100">
-                          <span className="text-[10px] font-bold text-emerald-700 uppercase">งานเก็บ ({weights.assignment_weight}%)</span>
-                          <div className="font-extrabold text-emerald-800 text-base font-mono">
+                        <div className="p-2.5 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/50">
+                          <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 uppercase">งานเก็บ ({weights.assignment_weight}%)</span>
+                          <div className="font-extrabold text-emerald-800 dark:text-emerald-200 text-base font-mono">
                             {Number(student.precise_scaled_assign || student.scaled_assign || 0).toFixed(1)}
                           </div>
-                          <span className="text-[9px] text-slate-400">ดิบ {Number(student.raw_assign || 0).toFixed(0)}/{student.max_assign || 0}</span>
+                          <span className="text-[9px] text-slate-400 dark:text-slate-500">ดิบ {Number(student.raw_assign || 0).toFixed(0)}/{student.max_assign || 0}</span>
                         </div>
 
-                        <div className="p-2.5 rounded-2xl bg-cyan-50/50 border border-cyan-100">
-                          <span className="text-[10px] font-bold text-cyan-700 uppercase">กลางภาค ({weights.midterm_weight}%)</span>
+                        <div className="p-2.5 rounded-2xl bg-cyan-50/50 dark:bg-cyan-950/30 border border-cyan-100 dark:border-cyan-900/50">
+                          <span className="text-[10px] font-bold text-cyan-700 dark:text-cyan-300 uppercase">กลางภาค ({weights.midterm_weight}%)</span>
                           <input
                             type="number"
                             inputMode="decimal"
                             step="0.5" min="0" max={weights.midterm_max_score}
                             value={student.midterm_score ?? ''}
                             onChange={e => handleExamScoreChange(student.student_id, 'midterm_score', e.target.value)}
-                            className="form-input text-center py-1.5 px-1 w-full text-cyan-900 font-bold border-cyan-200 focus:border-cyan-500 text-base md:text-xs rounded-xl bg-white mt-1"
+                            className="form-input text-center py-1.5 px-1 w-full text-cyan-900 dark:text-cyan-200 font-bold border-cyan-200 dark:border-cyan-800 focus:border-cyan-500 text-base md:text-xs rounded-xl bg-white dark:bg-slate-800 mt-1"
                             placeholder="0"
                           />
                         </div>
 
-                        <div className="p-2.5 rounded-2xl bg-blue-50/50 border border-blue-100">
+                        <div className="p-2.5 rounded-2xl bg-blue-50/50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50">
                           <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-bold text-blue-700 uppercase">ปลายภาค ({weights.final_weight}%)</span>
+                            <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 uppercase">ปลายภาค ({weights.final_weight}%)</span>
                             <div className="flex items-center gap-1">
                               <button
                                 type="button"
                                 title="ขาดสอบ (ข.ส.)"
                                 onClick={() => handleExamScoreChange(student.student_id, 'final_score', '-1')}
-                                className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-white text-slate-600 hover:bg-amber-100 hover:text-amber-800 transition-colors border border-slate-200 shadow-2xs"
+                                className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-amber-100 dark:hover:bg-amber-950/60 hover:text-amber-800 dark:hover:text-amber-300 transition-colors border border-slate-200 dark:border-slate-700 shadow-2xs"
                               >
                                 ข.ส.
                               </button>
@@ -1367,7 +1465,7 @@ export default function Grades() {
                                 type="button"
                                 title="ไม่สมบูรณ์ (ม.ส.)"
                                 onClick={() => handleExamScoreChange(student.student_id, 'final_score', '-2')}
-                                className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-white text-slate-600 hover:bg-purple-100 hover:text-purple-800 transition-colors border border-slate-200 shadow-2xs"
+                                className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-purple-100 dark:hover:bg-purple-950/60 hover:text-purple-800 dark:hover:text-purple-300 transition-colors border border-slate-200 dark:border-slate-700 shadow-2xs"
                               >
                                 ม.ส.
                               </button>
@@ -1376,12 +1474,12 @@ export default function Grades() {
                           {student.final_score === -1 || student.is_absent_final ? (
                             <div className="mt-1 flex items-center justify-between">
                               <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-amber-600 text-white inline-block shadow-2xs">ข.ส.</span>
-                              <button type="button" onClick={() => handleExamScoreChange(student.student_id, 'final_score', '0')} className="text-[11px] text-blue-600 hover:underline font-bold">แก้คะแนน</button>
+                              <button type="button" onClick={() => handleExamScoreChange(student.student_id, 'final_score', '0')} className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-bold">แก้คะแนน</button>
                             </div>
                           ) : student.final_score === -2 || student.is_incomplete ? (
                             <div className="mt-1 flex items-center justify-between">
                               <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-purple-600 text-white inline-block shadow-2xs">ม.ส.</span>
-                              <button type="button" onClick={() => handleExamScoreChange(student.student_id, 'final_score', '0')} className="text-[11px] text-blue-600 hover:underline font-bold">แก้คะแนน</button>
+                              <button type="button" onClick={() => handleExamScoreChange(student.student_id, 'final_score', '0')} className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-bold">แก้คะแนน</button>
                             </div>
                           ) : (
                             <input
@@ -1390,26 +1488,27 @@ export default function Grades() {
                               step="0.5" min="0" max={weights.final_max_score}
                               value={student.final_score ?? ''}
                               onChange={e => handleExamScoreChange(student.student_id, 'final_score', e.target.value)}
-                              className="form-input text-center py-1.5 px-1 w-full text-blue-900 font-bold border-blue-200 focus:border-blue-500 text-base md:text-xs rounded-xl bg-white mt-1"
+                              className="form-input text-center py-1.5 px-1 w-full text-blue-900 dark:text-blue-200 font-bold border-blue-200 dark:border-blue-800 focus:border-blue-500 text-base md:text-xs rounded-xl bg-white dark:bg-slate-800 mt-1"
                               placeholder="0"
                             />
                           )}
                         </div>
 
-                        <div className="p-2.5 rounded-2xl bg-indigo-50 border border-indigo-200 flex flex-col justify-center text-center">
-                          <span className="text-[10px] font-bold text-indigo-700 uppercase">รวม (100)</span>
-                          <span className="text-lg font-black text-indigo-900 font-mono">{totalScore.toFixed(1)}</span>
+                        <div className="p-2.5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900/60 flex flex-col justify-center text-center">
+                          <span className="text-[10px] font-bold text-indigo-700 dark:text-indigo-300 uppercase">รวม (100)</span>
+                          <span className="text-lg font-black text-indigo-900 dark:text-indigo-200 font-mono">{totalScore.toFixed(1)}</span>
                         </div>
                       </div>
                     </div>
                   );
-                })}
-              </div>
-            )}
+                }}
+              />
+            </div>
+          )}
 
             {/* Pagination Footer */}
             {filteredReport.length > 0 && (
-              <div className="p-3.5 border-t border-indigo-100/70 bg-slate-50/50">
+              <div className="p-3.5 border-t border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/90">
                 <Pagination
                   currentPage={currentPage}
                   totalItems={filteredReport.length}

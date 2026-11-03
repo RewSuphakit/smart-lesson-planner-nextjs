@@ -6,6 +6,7 @@ import { Toaster as SonnerToaster } from 'sonner';
 import { AuthProvider } from '@/context/AuthContext';
 import QueryProvider from '@/components/QueryProvider';
 import { SemesterProvider } from '@/context/SemesterContext';
+import { ThemeProvider } from '@/context/ThemeContext';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { getServerSession } from '@/lib/server-session';
@@ -46,29 +47,50 @@ export default async function RootLayout({
   const { user: initialUser, semesters: initialSemesters } = await getServerSession();
 
   return (
-    <html lang="th" className={`h-full antialiased ${sarabun.variable}`}>
+    <html lang="th" className={`h-full antialiased ${sarabun.variable}`} suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function() {
+              try {
+                var t = localStorage.getItem('smart_planner_theme');
+                var d = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                if (t === 'dark' || (!t && d)) {
+                  document.documentElement.classList.add('dark');
+                  document.documentElement.style.colorScheme = 'dark';
+                } else {
+                  document.documentElement.classList.remove('dark');
+                  document.documentElement.style.colorScheme = 'light';
+                }
+              } catch (e) {}
+            })();`,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col">
         <QueryProvider>
           <AuthProvider initialUser={initialUser}>
             <SemesterProvider initialSemesters={initialSemesters}>
-              <HotToaster
-                position="top-right"
-                toastOptions={{
-                  style: {
-                    background: '#ffffff',
-                    color: '#334155',
-                    border: '1px solid rgba(165, 180, 252, 0.4)',
-                    borderRadius: '12px',
-                    boxShadow: '0 4px 12px rgba(99, 102, 241, 0.08)',
-                  },
-                  success: { iconTheme: { primary: '#10b981', secondary: '#fff' } },
-                  error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
-                }}
-              />
-              <SonnerToaster richColors position="top-right" closeButton />
-              {children}
-              <Analytics />
-              <SpeedInsights />
+              <ThemeProvider>
+                <HotToaster
+                  position="top-right"
+                  toastOptions={{
+                    style: {
+                      background: 'var(--toast-bg, #ffffff)',
+                      color: 'var(--toast-color, #334155)',
+                      border: '1px solid var(--toast-border, rgba(165, 180, 252, 0.4))',
+                      borderRadius: '12px',
+                      boxShadow: '0 4px 12px rgba(99, 102, 241, 0.08)',
+                    },
+                    success: { iconTheme: { primary: '#10b981', secondary: '#fff' } },
+                    error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
+                  }}
+                />
+                <SonnerToaster richColors position="top-right" closeButton />
+                {children}
+                <Analytics />
+                <SpeedInsights />
+              </ThemeProvider>
             </SemesterProvider>
           </AuthProvider>
         </QueryProvider>

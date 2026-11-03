@@ -359,7 +359,7 @@ export default function AttendanceImportModal({
   return createPortal(
     <div className="modal-overlay" onClick={onClose}>
       <div 
-        className="glass w-full max-w-4xl p-6 sm:p-8 rounded-3xl border border-indigo-100 bg-white shadow-2xl relative max-h-[90vh] overflow-y-auto space-y-6"
+        className="w-full max-w-4xl p-6 sm:p-8 rounded-3xl border border-slate-200 bg-white shadow-2xl relative max-h-[90vh] overflow-y-auto space-y-6"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}

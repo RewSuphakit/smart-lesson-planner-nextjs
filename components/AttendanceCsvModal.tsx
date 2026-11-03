@@ -595,7 +595,7 @@ export default function AttendanceCsvModal({
       }}
     >
       <div
-        className="bg-slate-50 rounded-2xl shadow-2xl border border-emerald-200 w-full max-w-7xl max-h-[95vh] flex flex-col overflow-hidden"
+        className="bg-white rounded-2xl shadow-2xl border border-emerald-200 w-full max-w-7xl max-h-[95vh] flex flex-col overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* Modal Header */}
