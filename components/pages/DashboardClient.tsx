@@ -377,7 +377,7 @@ export default function DashboardClient({
         className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-900 via-indigo-800 to-purple-950 text-white shadow-xl shadow-indigo-950/15 p-6 sm:p-8 lg:p-10 border border-white/10"
       >
         {/* Ambient Decorative Light Orbs */}
-        <div className="absolute -top-24 -right-24 w-96 h-96 bg-purple-500/25 rounded-full blur-3xl pointer-events-none animate-pulse-glow" />
+        <div className="absolute -top-24 -right-24 w-96 h-96 bg-purple-500/20 rounded-full blur-2xl pointer-events-none" />
         <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute top-1/2 left-1/3 w-64 h-64 bg-indigo-400/15 rounded-full blur-2xl pointer-events-none" />
         <div className="absolute inset-0 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:24px_24px] opacity-10 pointer-events-none" />

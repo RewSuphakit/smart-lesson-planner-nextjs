@@ -180,11 +180,11 @@ const ThaiDateRangePicker = memo(({ startDate, endDate, onChange }: ThaiDateRang
     if (isOpen) {
       updatePosition();
       window.addEventListener('resize', updatePosition);
-      window.addEventListener('scroll', updatePosition, true);
+      window.addEventListener('scroll', updatePosition, { passive: true, capture: true });
     }
     return () => {
       window.removeEventListener('resize', updatePosition);
-      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('scroll', updatePosition, { capture: true });
     };
   }, [isOpen, updatePosition]);
 
@@ -767,8 +767,8 @@ const MemoizedDesktopStudentRow = memo(({
         onClick={() => onStatusSelect(sId, statusVal)}
         className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-[13px] font-bold transition-all duration-150 cursor-pointer select-none ${isActive
           ? `${activeClass} [&>svg]:text-white shadow-xs scale-[1.02]`
-          : 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white border border-slate-200/90 dark:border-slate-700 shadow-2xs'
-          }`}
+          : 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white border border-slate-200/90 dark:border-slate-700 shadow-2xs hover:border-slate-300 dark:hover:border-slate-600'
+        }`}
         title={`ทำเครื่องหมาย: ${label}`}
       >
         {icon} <span>{label}</span>
@@ -777,79 +777,135 @@ const MemoizedDesktopStudentRow = memo(({
   };
 
   return (
-    <tr
+    <div
       key={student.id}
-      className={`border-b border-indigo-50/70 dark:border-slate-800/80 transition-colors duration-150 hover:bg-indigo-50/20 dark:hover:bg-slate-800/40 ${
-        idx % 2 === 0 ? 'bg-slate-50/40 dark:bg-slate-800/25' : 'bg-transparent'
+      className={`px-4 py-3 sm:py-3.5 rounded-2xl border transition-all duration-150 flex items-center justify-between gap-4 shadow-2xs hover:shadow-xs ${
+        status === 'present'
+          ? 'bg-emerald-50/20 dark:bg-slate-850/95 border-emerald-300 dark:border-emerald-800/80 ring-1 ring-emerald-400/20'
+          : status === 'absent'
+          ? 'bg-rose-50/20 dark:bg-slate-850/95 border-rose-300 dark:border-rose-800/80 ring-1 ring-rose-400/20'
+          : status === 'late'
+          ? 'bg-amber-50/20 dark:bg-slate-850/95 border-amber-300 dark:border-amber-800/80 ring-1 ring-amber-400/20'
+          : status === 'leave'
+          ? 'bg-sky-50/20 dark:bg-slate-850/95 border-sky-300 dark:border-sky-800/80 ring-1 ring-sky-400/20'
+          : 'bg-white dark:bg-slate-850/90 border-slate-200/90 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-slate-750'
       }`}
     >
-      <td className="p-3.5 text-slate-500 dark:text-slate-400 font-mono text-xs font-semibold">{student.student_code || '-'}</td>
-      <td className="p-3.5">
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <UserAvatar avatar={student.avatar} name={student.name} userId={student.id} size="sm" />
-          <div className="min-w-0">
-            <span className="font-bold text-slate-800 dark:text-slate-100 text-sm">{student.name}</span>
+      {/* Left Side: Number, Avatar, Name, Code, Room Badge, and Risk Tag */}
+      <div className="flex items-center gap-3 min-w-0 w-80 lg:w-96 shrink-0">
+        <span className="text-xs font-mono font-bold text-slate-400 dark:text-slate-500 w-6 text-right shrink-0">
+          {idx + 1}
+        </span>
+        <UserAvatar
+          avatar={student.avatar}
+          name={student.name}
+          userId={student.id}
+          size="md"
+          className="rounded-2xl border border-indigo-100 dark:border-slate-700 shadow-xs shrink-0"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm truncate" title={student.name}>
+              {student.name}
+            </span>
+            {stats.is_f ? (
+              <span className="text-[10px] font-extrabold text-white bg-rose-600 px-2 py-0.5 rounded-md animate-pulse border border-rose-700 shadow-2xs whitespace-nowrap">
+                มส. (หมดสิทธิ์สอบ)
+              </span>
+            ) : isCloseToFRisk ? (
+              <span className="text-[10px] font-bold text-amber-800 bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300 px-1.5 py-0.5 rounded-md border border-amber-300 dark:border-amber-700 whitespace-nowrap">
+                ⚠️ เสี่ยง มส.
+              </span>
+            ) : null}
+          </div>
+
+          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex-wrap">
+            <span className="font-mono text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+              {student.student_code ? `รหัส ${student.student_code}` : '-'}
+            </span>
             {showRoomPill && student.grade_level && (
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/70 dark:border-indigo-800 ml-2">
+              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/70 dark:border-indigo-800">
                 {student.grade_level}
               </span>
             )}
+            <button
+              type="button"
+              onClick={() => onViewHistory(student)}
+              className="p-0.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline text-[11px] flex items-center gap-1 cursor-pointer ml-1"
+              title="ดูประวัติการมาเรียนอย่างละเอียด"
+            >
+              <History className="w-3 h-3" />
+              <span>ประวัติ</span>
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => onViewHistory(student)}
-            className="p-1 rounded-lg text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors cursor-pointer ml-1"
-            title="ดูประวัติการมาเรียนอย่างละเอียด"
-          >
-            <History className="w-3.5 h-3.5" />
-          </button>
         </div>
-      </td>
-      <td className="p-3.5">
-        <div className="inline-flex items-center gap-1.5">
-          {renderStatusBtn('present', <CheckCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />, 'มาเรียน', 'bg-emerald-600 text-white border-emerald-600 ring-1 ring-emerald-500/30')}
-          {renderStatusBtn('late', <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />, 'สาย', 'bg-amber-500 text-white border-amber-500 ring-1 ring-amber-400/30')}
-          {renderStatusBtn('absent', <XCircle className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />, 'ขาด', 'bg-rose-600 text-white border-rose-600 ring-1 ring-rose-500/30')}
-          {renderStatusBtn('leave', <FileText className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />, 'ลา', 'bg-sky-600 text-white border-sky-600 ring-1 ring-sky-500/30')}
-        </div>
-      </td>
-      <td className="p-3.5 text-center">
-        <div className="flex flex-col items-center">
-          {stats.is_f ? (
-            <span className="text-[10px] font-extrabold text-white bg-rose-600 px-2.5 py-1 rounded-full animate-pulse border border-rose-700 shadow-xs">
-              หมดสิทธิ์สอบ (มส.)
-            </span>
-          ) : (
-            <div className="flex flex-col items-center w-full max-w-[110px]">
-              <div className="flex justify-between w-full text-[11px] font-bold mb-1">
-                <span className={stats.converted_absent_count > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-600 dark:text-slate-400'}>
-                  ขาด {stats.converted_absent_count}
-                </span>
-                <span className="text-slate-400 dark:text-slate-500">/ {maxAllowedAbsences} คาบ</span>
-              </div>
-              <div className="w-full bg-slate-200/80 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all duration-300 ${isCloseToFRisk
-                    ? 'bg-rose-500 animate-pulse'
-                    : stats.converted_absent_count >= maxAllowedAbsences * 0.5
-                      ? 'bg-amber-500'
-                      : 'bg-indigo-500'
-                    }`}
-                  style={{ width: `${Math.min((stats.converted_absent_count / (maxAllowedAbsences || 1)) * 100, 100)}%` }}
-                />
-              </div>
-            </div>
-          )}
+      </div>
 
+      {/* Center: Large, Tactile Check-in Buttons */}
+      <div className="inline-flex items-center gap-2 shrink-0">
+        {renderStatusBtn('present', <CheckCircle className="w-[18px] h-[18px] text-emerald-600 dark:text-emerald-400 shrink-0" />, 'มาเรียน', 'bg-emerald-600 text-white border-emerald-600 ring-2 ring-emerald-500/20')}
+        {renderStatusBtn('late', <Clock className="w-[18px] h-[18px] text-amber-500 dark:text-amber-400 shrink-0" />, 'สาย', 'bg-amber-500 text-white border-amber-500 ring-2 ring-amber-400/20')}
+        {renderStatusBtn('absent', <XCircle className="w-[18px] h-[18px] text-rose-500 dark:text-rose-400 shrink-0" />, 'ขาด', 'bg-rose-600 text-white border-rose-600 ring-2 ring-rose-500/20')}
+        {renderStatusBtn('leave', <FileText className="w-[18px] h-[18px] text-sky-500 dark:text-sky-400 shrink-0" />, 'ลา', 'bg-sky-600 text-white border-sky-600 ring-2 ring-sky-500/20')}
+      </div>
+
+      {/* Right Side: Attendance Quota Progress Bar & Secondary Stats */}
+      <div className="flex items-center gap-3 w-56 lg:w-64 justify-end shrink-0">
+        <div className="w-full">
+          <div className="flex justify-between items-center text-[11px] font-bold mb-1">
+            <span className={stats.converted_absent_count > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-600 dark:text-slate-400'}>
+              ขาด {stats.converted_absent_count} / {maxAllowedAbsences} คาบ
+            </span>
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-normal">
+              {stats.is_f ? 'หมดสิทธิ์สอบ' : `ขาดได้อีก ${Math.max(0, maxAllowedAbsences - stats.converted_absent_count)} คาบ`}
+            </span>
+          </div>
+          <div className="w-full bg-slate-200/80 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${
+                isCloseToFRisk
+                  ? 'bg-rose-500 animate-pulse'
+                  : stats.converted_absent_count >= maxAllowedAbsences * 0.5
+                  ? 'bg-amber-500'
+                  : 'bg-indigo-500'
+              }`}
+              style={{ width: `${Math.min((stats.converted_absent_count / (maxAllowedAbsences || 1)) * 100, 100)}%` }}
+            />
+          </div>
           {(stats.remaining_late_count > 0 || stats.remaining_leave_count > 0) && (
-            <div className="flex gap-1 text-[9px] mt-1.5 font-bold flex-wrap justify-center">
-              {stats.remaining_late_count > 0 && <span className="text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded-md border border-amber-200/60 dark:border-amber-800">สายสะสม {stats.remaining_late_count}</span>}
-              {stats.remaining_leave_count > 0 && <span className="text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/60 px-1.5 py-0.5 rounded-md border border-sky-200/60 dark:border-sky-800 font-semibold">ลาสะสม {stats.remaining_leave_count}</span>}
+            <div className="flex gap-1.5 text-[9px] mt-1 font-bold justify-end">
+              {stats.remaining_late_count > 0 && (
+                <span className="text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.2 rounded border border-amber-200/60 dark:border-amber-800">
+                  สาย {stats.remaining_late_count}
+                </span>
+              )}
+              {stats.remaining_leave_count > 0 && (
+                <span className="text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/60 px-1.5 py-0.2 rounded border border-sky-200/60 dark:border-sky-800">
+                  ลา {stats.remaining_leave_count}
+                </span>
+              )}
             </div>
           )}
         </div>
-      </td>
-    </tr>
+      </div>
+    </div>
+  );
+}, (prev, next) => {
+  return (
+    prev.student.id === next.student.id &&
+    prev.student.name === next.student.name &&
+    prev.student.avatar === next.student.avatar &&
+    prev.student.student_code === next.student.student_code &&
+    prev.idx === next.idx &&
+    prev.showRoomPill === next.showRoomPill &&
+    prev.status === next.status &&
+    prev.maxAllowedAbsences === next.maxAllowedAbsences &&
+    prev.stats.converted_absent_count === next.stats.converted_absent_count &&
+    prev.stats.remaining_late_count === next.stats.remaining_late_count &&
+    prev.stats.remaining_leave_count === next.stats.remaining_leave_count &&
+    prev.stats.is_f === next.stats.is_f &&
+    prev.onStatusSelect === next.onStatusSelect &&
+    prev.onViewHistory === next.onViewHistory
   );
 });
 
@@ -1742,128 +1798,6 @@ export default function Attendance() {
   const saving = saveMutation.isPending || clearDataMutation.isPending || markAllMutation.isPending;
   const matrixLoading = loadingMatrix;
   const historyLoading = loadingHistory;
-
-  const renderDesktopStudentRow = (student: Student, idx: number, showRoomPill = false) => {
-    const sStats = getStudentStats(student.id);
-    const isCloseToFRisk = sStats.converted_absent_count >= maxAllowedAbsences * 0.75;
-    const currentStatus = attendance[student.id];
-
-    return (
-      <div
-        key={student.id}
-        className={`px-4 py-3 sm:py-3.5 rounded-2xl border transition-all duration-150 flex items-center justify-between gap-4 shadow-2xs hover:shadow-xs ${
-          currentStatus === 'present'
-            ? 'bg-emerald-50/20 dark:bg-slate-850/95 border-emerald-300 dark:border-emerald-800/80 ring-1 ring-emerald-400/20'
-            : currentStatus === 'absent'
-            ? 'bg-rose-50/20 dark:bg-slate-850/95 border-rose-300 dark:border-rose-800/80 ring-1 ring-rose-400/20'
-            : currentStatus === 'late'
-            ? 'bg-amber-50/20 dark:bg-slate-850/95 border-amber-300 dark:border-amber-800/80 ring-1 ring-amber-400/20'
-            : currentStatus === 'leave'
-            ? 'bg-sky-50/20 dark:bg-slate-850/95 border-sky-300 dark:border-sky-800/80 ring-1 ring-sky-400/20'
-            : 'bg-white dark:bg-slate-850/90 border-slate-200/90 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-slate-750'
-        }`}
-      >
-        {/* Left Side: Number, Avatar, Name, Code, Room Badge, and Risk Tag */}
-        <div className="flex items-center gap-3 min-w-0 w-80 lg:w-96 shrink-0">
-          <span className="text-xs font-mono font-bold text-slate-400 dark:text-slate-500 w-6 text-right shrink-0">
-            {idx + 1}
-          </span>
-          <UserAvatar
-            avatar={student.avatar}
-            name={student.name}
-            userId={student.id}
-            size="md"
-            className="rounded-2xl border border-indigo-100 dark:border-slate-700 shadow-xs shrink-0"
-          />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm truncate" title={student.name}>
-                {student.name}
-              </span>
-              {/* Risk Badge inline with student name */}
-              {sStats.is_f ? (
-                <span className="text-[10px] font-extrabold text-white bg-rose-600 px-2 py-0.5 rounded-md animate-pulse border border-rose-700 shadow-2xs whitespace-nowrap">
-                  มส. (หมดสิทธิ์สอบ)
-                </span>
-              ) : isCloseToFRisk ? (
-                <span className="text-[10px] font-bold text-amber-800 bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300 px-1.5 py-0.5 rounded-md border border-amber-300 dark:border-amber-700 whitespace-nowrap">
-                  ⚠️ เสี่ยง มส.
-                </span>
-              ) : null}
-            </div>
-
-            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex-wrap">
-              <span className="font-mono text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                {student.student_code ? `รหัส ${student.student_code}` : '-'}
-              </span>
-              {showRoomPill && student.grade_level && (
-                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/70 dark:border-indigo-800">
-                  {student.grade_level}
-                </span>
-              )}
-              <button
-                type="button"
-                onClick={() => setHistoryStudent(student)}
-                className="p-0.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline text-[11px] flex items-center gap-1 cursor-pointer ml-1"
-                title="ดูประวัติการมาเรียนอย่างละเอียด"
-              >
-                <History className="w-3 h-3" />
-                <span>ประวัติ</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Center: Large, Tactile Check-in Buttons */}
-        <div className="inline-flex items-center gap-2 shrink-0">
-          {statusBtn(student.id, 'present', <CheckCircle className="w-[18px] h-[18px] text-emerald-600 dark:text-emerald-400 shrink-0" />, 'มาเรียน', 'bg-emerald-600 text-white border-emerald-600 ring-2 ring-emerald-500/20')}
-          {statusBtn(student.id, 'late', <Clock className="w-[18px] h-[18px] text-amber-500 dark:text-amber-400 shrink-0" />, 'สาย', 'bg-amber-500 text-white border-amber-500 ring-2 ring-amber-400/20')}
-          {statusBtn(student.id, 'absent', <XCircle className="w-[18px] h-[18px] text-rose-500 dark:text-rose-400 shrink-0" />, 'ขาด', 'bg-rose-600 text-white border-rose-600 ring-2 ring-rose-500/20')}
-          {statusBtn(student.id, 'leave', <FileText className="w-[18px] h-[18px] text-sky-500 dark:text-sky-400 shrink-0" />, 'ลา', 'bg-sky-600 text-white border-sky-600 ring-2 ring-sky-500/20')}
-        </div>
-
-        {/* Right Side: Attendance Quota Progress Bar & Secondary Stats */}
-        <div className="flex items-center gap-3 w-56 lg:w-64 justify-end shrink-0">
-          <div className="w-full">
-            <div className="flex justify-between items-center text-[11px] font-bold mb-1">
-              <span className={sStats.converted_absent_count > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-600 dark:text-slate-400'}>
-                ขาด {sStats.converted_absent_count} / {maxAllowedAbsences} คาบ
-              </span>
-              <span className="text-[10px] text-slate-400 dark:text-slate-500 font-normal">
-                {sStats.is_f ? 'หมดสิทธิ์สอบ' : `ขาดได้อีก ${Math.max(0, maxAllowedAbsences - sStats.converted_absent_count)} คาบ`}
-              </span>
-            </div>
-            <div className="w-full bg-slate-200/80 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-300 ${
-                  isCloseToFRisk
-                    ? 'bg-rose-500 animate-pulse'
-                    : sStats.converted_absent_count >= maxAllowedAbsences * 0.5
-                    ? 'bg-amber-500'
-                    : 'bg-indigo-500'
-                }`}
-                style={{ width: `${Math.min((sStats.converted_absent_count / (maxAllowedAbsences || 1)) * 100, 100)}%` }}
-              />
-            </div>
-            {(sStats.remaining_late_count > 0 || sStats.remaining_leave_count > 0) && (
-              <div className="flex gap-1.5 text-[9px] mt-1 font-bold justify-end">
-                {sStats.remaining_late_count > 0 && (
-                  <span className="text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.2 rounded border border-amber-200/60 dark:border-amber-800">
-                    สาย {sStats.remaining_late_count}
-                  </span>
-                )}
-                {sStats.remaining_leave_count > 0 && (
-                  <span className="text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/60 px-1.5 py-0.2 rounded border border-sky-200/60 dark:border-sky-800">
-                    ลา {sStats.remaining_leave_count}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   const renderMatrixStudentRow = (student: Student, idx: number, showRoomSubtitle = false) => (
     <tr
@@ -2847,18 +2781,38 @@ export default function Attendance() {
                             </div>
                             {!isCollapsed && (
                               <div className="space-y-2.5">
-                                {grp.students.map((student, idx) =>
-                                  renderDesktopStudentRow(student, idx, Boolean(searchQuery.trim()))
-                                )}
+                                {grp.students.map((student, idx) => (
+                                  <MemoizedDesktopStudentRow
+                                    key={student.id}
+                                    student={student}
+                                    idx={idx}
+                                    showRoomPill={Boolean(searchQuery.trim())}
+                                    status={attendance[student.id]}
+                                    stats={getStudentStats(student.id)}
+                                    maxAllowedAbsences={maxAllowedAbsences}
+                                    onStatusSelect={handleStatusChange}
+                                    onViewHistory={setHistoryStudent}
+                                  />
+                                ))}
                               </div>
                             )}
                           </div>
                         );
                       })
                     ) : (
-                      filteredStudents.map((student, idx) =>
-                        renderDesktopStudentRow(student, idx, false)
-                      )
+                      filteredStudents.map((student, idx) => (
+                        <MemoizedDesktopStudentRow
+                          key={student.id}
+                          student={student}
+                          idx={idx}
+                          showRoomPill={false}
+                          status={attendance[student.id]}
+                          stats={getStudentStats(student.id)}
+                          maxAllowedAbsences={maxAllowedAbsences}
+                          onStatusSelect={handleStatusChange}
+                          onViewHistory={setHistoryStudent}
+                        />
+                      ))
                     )}
                   </div>
                 </div>

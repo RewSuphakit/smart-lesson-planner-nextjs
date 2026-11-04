@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
@@ -111,6 +111,14 @@ export default function Schedule() {
   const [draggedEntry, setDraggedEntry] = useState<TimetableEntry | null>(null);
   const [dragType, setDragType] = useState<string | null>(null);
   const [dragOverCell, setDragOverCell] = useState<string | null>(null);
+  const dragOverCellRef = useRef<string | null>(null);
+
+  const updateDragOverCell = useCallback((nextCell: string | null) => {
+    if (dragOverCellRef.current !== nextCell) {
+      dragOverCellRef.current = nextCell;
+      setDragOverCell(nextCell);
+    }
+  }, []);
   const [hoverTooltip, setHoverTooltip] = useState<HoverTooltip | null>(null);
   const [isScrolling, setIsScrolling] = useState(false);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -493,18 +501,17 @@ export default function Schedule() {
     if (target) target.style.opacity = '1';
     setDraggedEntry(null);
     setDragType(null);
-    setDragOverCell(null);
+    updateDragOverCell(null);
   };
 
   const handleDragOver = (e: React.DragEvent, dayIdx: number, slotId: string | number) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    const nextCell = `${dayIdx}-${slotId}`;
-    setDragOverCell((prev) => (prev === nextCell ? prev : nextCell));
+    updateDragOverCell(`${dayIdx}-${slotId}`);
   };
 
   const handleDragLeave = () => {
-    setDragOverCell(null);
+    updateDragOverCell(null);
   };
 
   // ─── Mutations: ย้ายและปรับขนาดคาบเรียน ───
@@ -536,7 +543,7 @@ export default function Schedule() {
 
   const handleDrop = (e: React.DragEvent, dayIdx: number, slotId: string | number) => {
     e.preventDefault();
-    setDragOverCell(null);
+    updateDragOverCell(null);
     if (!draggedEntry) return;
 
     if (dragType === 'resize') {
@@ -691,10 +698,10 @@ export default function Schedule() {
                         const gridColEnd = effectiveEndIdx + 3;
 
                         const calcPeriodFromMouse = (e: React.MouseEvent<HTMLDivElement> | React.DragEvent<HTMLDivElement>) => {
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          const x = e.clientX - rect.left;
-                          const colWidth = rect.width / span;
-                          const colIdx = Math.min(span - 1, Math.max(0, Math.floor(x / colWidth)));
+                          const width = e.currentTarget.clientWidth || 1;
+                          const offsetX = (e.nativeEvent as MouseEvent).offsetX ?? 0;
+                          const colWidth = width / span;
+                          const colIdx = Math.min(span - 1, Math.max(0, Math.floor(offsetX / colWidth)));
                           return TIME_SLOTS[startIdx + colIdx]?.id;
                         };
 
@@ -714,8 +721,7 @@ export default function Schedule() {
                               e.dataTransfer.dropEffect = 'move';
                               const period = calcPeriodFromMouse(e);
                               if (period !== undefined) {
-                                const nextCell = `${dayIdx}-${period}`;
-                                setDragOverCell((prev) => (prev === nextCell ? prev : nextCell));
+                                updateDragOverCell(`${dayIdx}-${period}`);
                               }
                             }}
                             onDragLeave={handleDragLeave}

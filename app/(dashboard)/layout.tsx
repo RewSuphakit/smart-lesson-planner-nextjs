@@ -99,8 +99,8 @@ function NavItem({
   useEffect(() => {
     if (!showTooltip) return;
     const hide = () => setShowTooltip(false);
-    window.addEventListener('scroll', hide, true);
-    return () => window.removeEventListener('scroll', hide, true);
+    window.addEventListener('scroll', hide, { passive: true, capture: true });
+    return () => window.removeEventListener('scroll', hide, { capture: true });
   }, [showTooltip]);
 
   return (
@@ -200,8 +200,8 @@ function CollapsedTooltip<T extends HTMLElement>({
   useEffect(() => {
     if (!show) return;
     const hide = () => setShow(false);
-    window.addEventListener('scroll', hide, true);
-    return () => window.removeEventListener('scroll', hide, true);
+    window.addEventListener('scroll', hide, { passive: true, capture: true });
+    return () => window.removeEventListener('scroll', hide, { capture: true });
   }, [show]);
 
   return (

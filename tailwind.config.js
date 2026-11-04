@@ -26,8 +26,8 @@ module.exports = {
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
         pulseGlow: {
-          '0%, 100%': { boxShadow: '0 0 15px rgba(99, 102, 241, 0.4)' },
-          '50%': { boxShadow: '0 0 25px rgba(99, 102, 241, 0.7)' },
+          '0%, 100%': { opacity: '0.88', transform: 'scale(1)' },
+          '50%': { opacity: '1', transform: 'scale(1.02)' },
         },
         gradientShift: {
           '0%': { backgroundPosition: '0% 50%' },

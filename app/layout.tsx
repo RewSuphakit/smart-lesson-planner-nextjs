@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Sarabun } from 'next/font/google';
 import './globals.css';
 import { Toaster as HotToaster } from 'react-hot-toast';
-import { Toaster as SonnerToaster } from 'sonner';
+
 import { AuthProvider } from '@/context/AuthContext';
 import QueryProvider from '@/components/QueryProvider';
 import { SemesterProvider } from '@/context/SemesterContext';
@@ -94,7 +94,7 @@ export default async function RootLayout({
                     error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
                   }}
                 />
-                <SonnerToaster richColors position="top-right" closeButton />
+
                 <PwaRegister />
                 {children}
                 <Analytics />
