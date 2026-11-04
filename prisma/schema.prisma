@@ -110,6 +110,8 @@ model Classroom {
   assignmentWeight     Decimal? @default(10) @map("assignment_weight") @db.Decimal(5, 2)
   postTestWeight       Decimal? @default(70) @map("post_test_weight") @db.Decimal(5, 2)
   affectiveWeight      Decimal? @default(20) @map("affective_weight") @db.Decimal(5, 2)
+  lateDeductionScore   Decimal? @default(1) @map("late_deduction_score") @db.Decimal(5, 2)
+  absentDeductionScore Decimal? @default(2) @map("absent_deduction_score") @db.Decimal(5, 2)
   midtermWeight        Decimal? @default(0) @map("midterm_weight") @db.Decimal(5, 2)
   finalWeight          Decimal? @default(0) @map("final_weight") @db.Decimal(5, 2)
   midtermMaxScore      Decimal? @default(100) @map("midterm_max_score") @db.Decimal(5, 2)

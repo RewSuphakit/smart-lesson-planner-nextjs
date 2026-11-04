@@ -56,6 +56,8 @@ export async function GET(request: NextRequest) {
     const weightAssign = Number(classroom.assignmentWeight ?? 10);
     const weightPostTest = Number(classroom.postTestWeight ?? 70);
     const weightAffective = Number(classroom.affectiveWeight ?? 20);
+    const lateDeduction = classroom.lateDeductionScore !== null && classroom.lateDeductionScore !== undefined ? Number(classroom.lateDeductionScore) : 1;
+    const absentDeduction = classroom.absentDeductionScore !== null && classroom.absentDeductionScore !== undefined ? Number(classroom.absentDeductionScore) : 2;
     const weightMidterm = Number(classroom.midtermWeight ?? 0);
     const weightFinal = Number(classroom.finalWeight ?? 0);
     const maxMidtermScore = Number(classroom.midtermMaxScore ?? 100);
@@ -183,6 +185,8 @@ export async function GET(request: NextRequest) {
         maxWeight: weightAffective,
         absentCount,
         lateCount,
+        absentDeduction,
+        lateDeduction,
       });
 
       const totalScorePrecise = preciseScaledAssign + preciseScaledPostTest + affectiveScore + preciseScaledMidterm + preciseScaledFinal;
@@ -253,6 +257,8 @@ export async function GET(request: NextRequest) {
         assignment_weight: weightAssign,
         post_test_weight: weightPostTest,
         affective_weight: weightAffective,
+        late_deduction_score: lateDeduction,
+        absent_deduction_score: absentDeduction,
         midterm_weight: weightMidterm,
         final_weight: weightFinal,
         midterm_max_score: maxMidtermScore,

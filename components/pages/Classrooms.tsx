@@ -16,6 +16,8 @@ interface Classroom {
   student_count?: number;
   late_to_absent_ratio?: number;
   leave_to_absent_ratio?: number;
+  late_deduction_score?: number;
+  absent_deduction_score?: number;
   total_classes?: number;
   min_attendance_percent?: number;
   curriculum_type?: 'pvch' | 'pvs' | 'custom';
@@ -276,6 +278,8 @@ export default function Classrooms() {
     description: '', 
     late_to_absent_ratio: 3, 
     leave_to_absent_ratio: 2, 
+    late_deduction_score: 1,
+    absent_deduction_score: 2,
     total_classes: 36, 
     min_attendance_percent: 80,
     curriculum_type: 'pvch' as 'pvch' | 'pvs' | 'custom',
@@ -591,6 +595,8 @@ export default function Classrooms() {
       description: c.description || '', 
       late_to_absent_ratio: c.late_to_absent_ratio || 3,
       leave_to_absent_ratio: c.leave_to_absent_ratio || 2,
+      late_deduction_score: c.late_deduction_score !== undefined && c.late_deduction_score !== null ? Number(c.late_deduction_score) : 1,
+      absent_deduction_score: c.absent_deduction_score !== undefined && c.absent_deduction_score !== null ? Number(c.absent_deduction_score) : 2,
       total_classes: total,
       min_attendance_percent: c.min_attendance_percent || 80,
       curriculum_type: curType,
@@ -936,58 +942,101 @@ export default function Classrooms() {
                   onClick={() => setShowAttendanceSettings(!showAttendanceSettings)}
                   className="w-full px-3.5 py-2.5 flex items-center justify-between text-xs text-slate-600 hover:bg-slate-100/60 transition-colors"
                 >
-                  <span className="font-medium text-slate-700">เกณฑ์การเข้าเรียน</span>
+                  <span className="font-medium text-slate-700">เกณฑ์การเข้าเรียน & จิตพิสัย</span>
                   <span className="text-[11px] text-slate-400 flex items-center gap-1.5">
-                    สาย {form.late_to_absent_ratio}:1 · ลา {form.leave_to_absent_ratio}:1 · {form.min_attendance_percent}%
+                    สาย {form.late_to_absent_ratio}:1 · หักขาด {form.absent_deduction_score} · หักสาย {form.late_deduction_score}
                     <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showAttendanceSettings ? 'rotate-180' : ''}`} />
                   </span>
                 </button>
                 {showAttendanceSettings && (
-                  <div className="p-3 pt-1 grid grid-cols-3 gap-2.5 border-t border-slate-200/60 bg-white">
+                  <div className="p-3 pt-1 space-y-3 border-t border-slate-200/60 bg-white">
                     <div>
-                      <label htmlFor="classroom-late-ratio" className="text-[11px] text-slate-500 mb-1 block text-center">
-                        สาย (ครั้ง)
-                      </label>
-                      <input
-                        id="classroom-late-ratio"
-                        type="number"
-                        min="1"
-                        max="10"
-                        value={form.late_to_absent_ratio}
-                        onChange={e => setForm({ ...form, late_to_absent_ratio: parseInt(e.target.value) || 1 })}
-                        className="form-input text-xs text-center py-1.5 rounded-lg"
-                        required
-                      />
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">เกณฑ์ตัดสินสิทธิ์สอบ (มส.)</p>
+                      <div className="grid grid-cols-3 gap-2.5">
+                        <div>
+                          <label htmlFor="classroom-late-ratio" className="text-[11px] text-slate-500 mb-1 block text-center">
+                            สาย (ครั้ง)
+                          </label>
+                          <input
+                            id="classroom-late-ratio"
+                            type="number"
+                            min="1"
+                            max="10"
+                            value={form.late_to_absent_ratio}
+                            onChange={e => setForm({ ...form, late_to_absent_ratio: parseInt(e.target.value) || 1 })}
+                            className="form-input text-xs text-center py-1.5 rounded-lg"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="classroom-leave-ratio" className="text-[11px] text-slate-500 mb-1 block text-center">
+                            ลา (ครั้ง)
+                          </label>
+                          <input
+                            id="classroom-leave-ratio"
+                            type="number"
+                            min="1"
+                            max="10"
+                            value={form.leave_to_absent_ratio}
+                            onChange={e => setForm({ ...form, leave_to_absent_ratio: parseInt(e.target.value) || 1 })}
+                            className="form-input text-xs text-center py-1.5 rounded-lg"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="classroom-min-attendance" className="text-[11px] text-slate-500 mb-1 block text-center">
+                            เวลาเรียน (%)
+                          </label>
+                          <input
+                            id="classroom-min-attendance"
+                            type="number"
+                            min="1"
+                            max="100"
+                            value={form.min_attendance_percent}
+                            onChange={e => setForm({ ...form, min_attendance_percent: parseInt(e.target.value) || 80 })}
+                            className="form-input text-xs text-center py-1.5 rounded-lg"
+                            required
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <label htmlFor="classroom-leave-ratio" className="text-[11px] text-slate-500 mb-1 block text-center">
-                        ลา (ครั้ง)
-                      </label>
-                      <input
-                        id="classroom-leave-ratio"
-                        type="number"
-                        min="1"
-                        max="10"
-                        value={form.leave_to_absent_ratio}
-                        onChange={e => setForm({ ...form, leave_to_absent_ratio: parseInt(e.target.value) || 1 })}
-                        className="form-input text-xs text-center py-1.5 rounded-lg"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="classroom-min-attendance" className="text-[11px] text-slate-500 mb-1 block text-center">
-                        เวลาเรียน (%)
-                      </label>
-                      <input
-                        id="classroom-min-attendance"
-                        type="number"
-                        min="1"
-                        max="100"
-                        value={form.min_attendance_percent}
-                        onChange={e => setForm({ ...form, min_attendance_percent: parseInt(e.target.value) || 80 })}
-                        className="form-input text-xs text-center py-1.5 rounded-lg"
-                        required
-                      />
+
+                    <div className="pt-2 border-t border-slate-100">
+                      <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-1.5">สูตรหักคะแนนจิตพิสัย (ต่อครั้ง)</p>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <div>
+                          <label htmlFor="classroom-absent-deduction" className="text-[11px] text-slate-500 mb-1 block text-center">
+                            ขาด 1 ครั้ง หัก (คะแนน)
+                          </label>
+                          <input
+                            id="classroom-absent-deduction"
+                            type="number"
+                            step="0.5"
+                            min="0"
+                            max="50"
+                            value={form.absent_deduction_score}
+                            onChange={e => setForm({ ...form, absent_deduction_score: parseFloat(e.target.value) || 0 })}
+                            className="form-input text-xs text-center py-1.5 rounded-lg border-amber-200 focus:border-amber-400"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="classroom-late-deduction" className="text-[11px] text-slate-500 mb-1 block text-center">
+                            สาย 1 ครั้ง หัก (คะแนน)
+                          </label>
+                          <input
+                            id="classroom-late-deduction"
+                            type="number"
+                            step="0.5"
+                            min="0"
+                            max="50"
+                            value={form.late_deduction_score}
+                            onChange={e => setForm({ ...form, late_deduction_score: parseFloat(e.target.value) || 0 })}
+                            className="form-input text-xs text-center py-1.5 rounded-lg border-amber-200 focus:border-amber-400"
+                            required
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}

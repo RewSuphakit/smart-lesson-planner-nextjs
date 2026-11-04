@@ -8,6 +8,8 @@ export interface CalculateAffectiveScoreParams {
   maxWeight?: number;
   absentCount: number;
   lateCount: number;
+  absentDeduction?: number;
+  lateDeduction?: number;
 }
 
 export function calculateAffectiveScore({
@@ -15,8 +17,12 @@ export function calculateAffectiveScore({
   maxWeight = 20,
   absentCount = 0,
   lateCount = 0,
+  absentDeduction = 2,
+  lateDeduction = 1,
 }: CalculateAffectiveScoreParams): number {
   const weight = Number(maxWeight) || 20;
+  const absDeduct = absentDeduction !== undefined && absentDeduction !== null ? Number(absentDeduction) : 2;
+  const lateDeduct = lateDeduction !== undefined && lateDeduction !== null ? Number(lateDeduction) : 1;
 
   // If teacher explicitly set a score, respect it directly (clamped within [0, maxWeight])
   if (baseScore !== null && baseScore !== undefined && !isNaN(Number(baseScore))) {
@@ -24,7 +30,6 @@ export function calculateAffectiveScore({
   }
 
   // Otherwise calculate dynamically based on attendance penalty:
-  // 2 points deducted per absence, 1 point deducted per late arrival
-  const penalty = (absentCount * 2) + (lateCount * 1);
+  const penalty = (absentCount * absDeduct) + (lateCount * lateDeduct);
   return Math.max(0, weight - penalty);
 }

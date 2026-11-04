@@ -107,6 +107,7 @@ export async function GET(request: NextRequest) {
     const classrooms = (data.classrooms || []) as Array<{
       id: number; name: string; totalClasses: number; minAttendancePercent: number;
       assignmentWeight: unknown; postTestWeight: unknown; affectiveWeight: unknown;
+      lateDeductionScore: unknown; absentDeductionScore: unknown;
       midtermWeight: unknown; finalWeight: unknown; midtermMaxScore: unknown;
       finalMaxScore: unknown; lateToAbsentRatio: number; leaveToAbsentRatio: number;
       isPortalEnabled?: boolean;
@@ -189,6 +190,8 @@ export async function GET(request: NextRequest) {
         assignment_weight: c.assignmentWeight !== null && c.assignmentWeight !== undefined ? Number(c.assignmentWeight) : null,
         post_test_weight: c.postTestWeight !== null && c.postTestWeight !== undefined ? Number(c.postTestWeight) : null,
         affective_weight: c.affectiveWeight !== null && c.affectiveWeight !== undefined ? Number(c.affectiveWeight) : null,
+        late_deduction_score: c.lateDeductionScore !== null && c.lateDeductionScore !== undefined ? Number(c.lateDeductionScore) : 1,
+        absent_deduction_score: c.absentDeductionScore !== null && c.absentDeductionScore !== undefined ? Number(c.absentDeductionScore) : 2,
         midterm_weight: c.midtermWeight !== null && c.midtermWeight !== undefined ? Number(c.midtermWeight) : null,
         final_weight: c.finalWeight !== null && c.finalWeight !== undefined ? Number(c.finalWeight) : null,
         midterm_max_score: c.midtermMaxScore !== null && c.midtermMaxScore !== undefined ? Number(c.midtermMaxScore) : null,
@@ -208,11 +211,15 @@ export async function GET(request: NextRequest) {
         }
         const classroom = cId ? classroomMap.get(cId) : undefined;
         const weightAffective = classroom?.affectiveWeight !== null && classroom?.affectiveWeight !== undefined ? Number(classroom.affectiveWeight) : 20;
+        const lateDeduction = classroom?.lateDeductionScore !== null && classroom?.lateDeductionScore !== undefined ? Number(classroom.lateDeductionScore) : 1;
+        const absentDeduction = classroom?.absentDeductionScore !== null && classroom?.absentDeductionScore !== undefined ? Number(classroom.absentDeductionScore) : 2;
         const finalAffectiveScore = calculateAffectiveScore({
           baseScore: s.affectiveScore !== null && s.affectiveScore !== undefined ? Number(s.affectiveScore) : null,
           maxWeight: weightAffective,
           absentCount,
           lateCount,
+          absentDeduction,
+          lateDeduction,
         });
 
         return {

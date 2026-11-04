@@ -67,6 +67,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       assignment_weight: 'assignmentWeight',
       post_test_weight: 'postTestWeight',
       affective_weight: 'affectiveWeight',
+      late_deduction_score: 'lateDeductionScore',
+      absent_deduction_score: 'absentDeductionScore',
       midterm_weight: 'midtermWeight',
       final_weight: 'finalWeight',
       midterm_max_score: 'midtermMaxScore',

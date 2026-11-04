@@ -14,6 +14,8 @@ export interface FormattedClassroom {
   assignment_weight: number;
   post_test_weight: number;
   affective_weight: number;
+  late_deduction_score: number;
+  absent_deduction_score: number;
   midterm_weight: number;
   final_weight: number;
   midterm_max_score: number;
@@ -64,6 +66,14 @@ export function formatClassroomResponse(
       classroom.affectiveWeight !== null && classroom.affectiveWeight !== undefined
         ? Number(classroom.affectiveWeight)
         : 20,
+    late_deduction_score:
+      classroom.lateDeductionScore !== null && classroom.lateDeductionScore !== undefined
+        ? Number(classroom.lateDeductionScore)
+        : 1,
+    absent_deduction_score:
+      classroom.absentDeductionScore !== null && classroom.absentDeductionScore !== undefined
+        ? Number(classroom.absentDeductionScore)
+        : 2,
     midterm_weight:
       classroom.midtermWeight !== null && classroom.midtermWeight !== undefined
         ? Number(classroom.midtermWeight)

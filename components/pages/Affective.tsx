@@ -20,6 +20,8 @@ interface Classroom {
   id: string | number;
   name: string;
   affective_weight?: number;
+  late_deduction_score?: number;
+  absent_deduction_score?: number;
   student_count?: number;
   total_classes?: number;
   total_weeks?: number;
@@ -61,6 +63,8 @@ export default function Affective() {
   // Modal for calculating from attendance stats
   const [showCalcModal, setShowCalcModal] = useState(false);
   const [calcMode, setCalcMode] = useState<'deductFromCurrent' | 'resetFromMax'>('deductFromCurrent');
+  const [customAbsentDeduct, setCustomAbsentDeduct] = useState<number>(2);
+  const [customLateDeduct, setCustomLateDeduct] = useState<number>(1);
 
   // Modal for customizing max affective score
   const [showWeightModal, setShowWeightModal] = useState(false);
@@ -85,9 +89,17 @@ export default function Affective() {
     return currentClassroom?.affective_weight ?? 20;
   }, [currentClassroom]);
 
+  const absentDeduction = useMemo(() => {
+    return currentClassroom?.absent_deduction_score ?? 2;
+  }, [currentClassroom]);
+
+  const lateDeduction = useMemo(() => {
+    return currentClassroom?.late_deduction_score ?? 1;
+  }, [currentClassroom]);
+
   // ─── Query: ดึงข้อมูลนักเรียนและสถิติพฤติกรรม ───
   const { data: students = [], isLoading: loadingStudents } = useQuery<Student[]>({
-    queryKey: ['affective-students', selectedClass, maxAffectiveWeight],
+    queryKey: ['affective-students', selectedClass, maxAffectiveWeight, absentDeduction, lateDeduction],
     queryFn: async () => {
       const [studRes, gradesRes] = await Promise.all([
         api.get(`/students?classroom_id=${selectedClass}&include_avatar=true`),
@@ -109,7 +121,7 @@ export default function Affective() {
           avatar: s.avatar || (gradeInfo as any)?.avatar || null,
           affective_score: s.affective_score !== null && s.affective_score !== undefined
             ? Number(s.affective_score)
-            : Math.max(0, maxAffectiveWeight - ((gradeInfo?.absent_count || 0) * 2 + (gradeInfo?.late_count || 0) * 1)),
+            : Math.max(0, maxAffectiveWeight - ((gradeInfo?.absent_count || 0) * absentDeduction + (gradeInfo?.late_count || 0) * lateDeduction)),
           absent_count: gradeInfo?.absent_count || 0,
           late_count: gradeInfo?.late_count || 0
         };
@@ -301,16 +313,34 @@ export default function Affective() {
   // Global Action: Calculate from attendance statistics & persist to DB (เคารพขอบเขตห้องย่อยที่เลือก)
   const handleAutoCalculateFromAttendance = () => {
     if (sectionScopedStudents.length === 0) return;
+    setCustomAbsentDeduct(absentDeduction);
+    setCustomLateDeduct(lateDeduction);
     setShowCalcModal(true);
   };
 
   const executeAutoCalculate = () => {
     if (sectionScopedStudents.length === 0) return;
 
+    // Persist customized deduction rates to classroom settings if changed
+    if (
+      currentClassroom &&
+      (customAbsentDeduct !== absentDeduction || customLateDeduct !== lateDeduction)
+    ) {
+      api.put(`/classrooms/${selectedClass}`, {
+        absent_deduction_score: customAbsentDeduct,
+        late_deduction_score: customLateDeduct,
+      }).then(() => {
+        queryClient.invalidateQueries({ queryKey: ['classrooms'] });
+        queryClient.invalidateQueries({ queryKey: ['grades'] });
+      }).catch(err => {
+        console.error('Failed to update classroom deduction rates:', err);
+      });
+    }
+
     const batchScores = sectionScopedStudents.map(s => {
       const absent = s.absent_count || 0;
       const late = s.late_count || 0;
-      const penalty = (absent * 2) + (late * 1);
+      const penalty = (absent * customAbsentDeduct) + (late * customLateDeduct);
 
       let autoScore: number;
       if (calcMode === 'deductFromCurrent') {
@@ -331,8 +361,8 @@ export default function Affective() {
         const targetScopeName = activeSectionGroup ? `ห้อง "${activeSectionGroup.label}" (${sectionScopedStudents.length} คน)` : `ทุกคน (${students.length} คน)`;
         toast.success(
           calcMode === 'deductFromCurrent'
-            ? `คำนวณหักคะแนนตามสถิติ ขาด/สาย เพิ่มเติมจากคะแนนปัจจุบันสำหรับ${targetScopeName} เรียบร้อยแล้ว!`
-            : `คำนวณหักคะแนนตามสถิติ ขาด/สาย จากคะแนนเต็มสำหรับ${targetScopeName} เรียบร้อยแล้ว!`,
+            ? `คำนวณหักคะแนนตามสถิติ ขาด (หัก ${customAbsentDeduct}) / สาย (หัก ${customLateDeduct}) เพิ่มเติมจากคะแนนปัจจุบันสำหรับ${targetScopeName} เรียบร้อยแล้ว!`
+            : `คำนวณหักคะแนนตามสถิติ ขาด (หัก ${customAbsentDeduct}) / สาย (หัก ${customLateDeduct}) จากคะแนนเต็มสำหรับ${targetScopeName} เรียบร้อยแล้ว!`,
           { icon: '⚡' }
         );
       }
@@ -833,12 +863,52 @@ export default function Affective() {
                 </div>
                 <div>
                   <h3 className="font-extrabold text-slate-800 text-base">คำนวณคะแนนจิตพิสัยตามประวัติเข้าเรียน</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">หักคะแนนตามสถิติ ขาด (หัก 2 คะแนน) / สาย (หัก 1 คะแนน)</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    หักคะแนนตามสถิติ ขาด (หัก {customAbsentDeduct} คะแนน) / สาย (หัก {customLateDeduct} คะแนน)
+                  </p>
                 </div>
               </div>
               <button onClick={() => setShowCalcModal(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
                 <X className="w-5 h-5 text-slate-400" />
               </button>
+            </div>
+
+            {/* Configurable Penalty Formula */}
+            <div className="mb-4 p-3.5 bg-amber-50/60 rounded-2xl border border-amber-200/70">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-amber-900">กำหนดสูตรหักคะแนนสำหรับห้องนี้</span>
+                <span className="text-[10px] text-amber-700 font-semibold">(บันทึกลงห้องเรียนอัตโนมัติ)</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-600 mb-1 block">
+                    ขาด 1 ครั้ง หัก (คะแนน)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    max="50"
+                    value={customAbsentDeduct}
+                    onChange={e => setCustomAbsentDeduct(parseFloat(e.target.value) || 0)}
+                    className="form-input text-xs font-bold text-center py-1.5 rounded-xl border-amber-300 bg-white focus:ring-amber-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-600 mb-1 block">
+                    สาย 1 ครั้ง หัก (คะแนน)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    max="50"
+                    value={customLateDeduct}
+                    onChange={e => setCustomLateDeduct(parseFloat(e.target.value) || 0)}
+                    className="form-input text-xs font-bold text-center py-1.5 rounded-xl border-amber-300 bg-white focus:ring-amber-400"
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Mode Options */}
@@ -867,7 +937,7 @@ export default function Affective() {
                     นำโทษขาด/สาย หักลบเพิ่มเติมจากคะแนนจิตพิสัยเดิมที่ครูเคยบวกหรือหักไว้ (คะแนนพฤติกรรมที่ครูหักไว้แล้วจะไม่หายไป)
                   </p>
                   <div className="text-[11px] text-amber-800 font-semibold bg-amber-100/50 p-2.5 rounded-xl border border-amber-200/60 mt-2">
-                    💡 ตัวอย่าง: คะแนนพฤติกรรมเดิม 17 + ขาด 1 ครั้ง (หัก 2) ➔ คะแนนใหม่จะเท่ากับ <span className="font-bold text-amber-900">15 คะแนน</span>
+                    💡 ตัวอย่าง: คะแนนพฤติกรรมเดิม 17 + ขาด 1 ครั้ง (หัก {customAbsentDeduct}) ➔ คะแนนใหม่จะเท่ากับ <span className="font-bold text-amber-900">{Math.max(0, 17 - customAbsentDeduct)} คะแนน</span>
                   </div>
                 </div>
               </label>
@@ -890,7 +960,7 @@ export default function Affective() {
                 <div className="space-y-1">
                   <span className="font-extrabold text-sm text-slate-800">คำนวณใหม่จากคะแนนเต็ม ({maxAffectiveWeight})</span>
                   <p className="text-xs text-slate-600 leading-relaxed">
-                    คำนวณคะแนนใหม่จากคะแนนเต็มโดยตรง (`{maxAffectiveWeight} - โทษขาดสาย`) โดยล้างการหักคะแนนพฤติกรรมเดิมทั้งหมด
+                    คำนวณคะแนนใหม่จากคะแนนเต็มโดยตรง ({maxAffectiveWeight} - โทษขาดสาย) โดยล้างการหักคะแนนพฤติกรรมเดิมทั้งหมด
                   </p>
                 </div>
               </label>

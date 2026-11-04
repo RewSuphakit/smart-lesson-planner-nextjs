@@ -1,5 +1,6 @@
 {
   "css.lint.unknownAtRules": "ignore",
   "prisma-smart-formatter.prisma.defaultFormatter": "Prisma.prisma",
-  "prisma.pinToPrisma6": true
+  "prisma.pinToPrisma6": true,
+  "typescript.tsdk": "node_modules\\typescript\\lib"
 }
