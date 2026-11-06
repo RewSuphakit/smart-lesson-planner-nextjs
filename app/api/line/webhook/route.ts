@@ -20,7 +20,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { calculateAffectiveScore } from '@/lib/affective';
-import { resolveTargetWeeks, getCurrentWeek } from '@/lib/semester';
+import { resolveTargetWeeks, resolveCurrentTeachingWeek } from '@/lib/semester';
 import { decryptIfPresent, encryptIfPresent } from '@/lib/encryption';
 import {
   checkRateLimit,
@@ -898,8 +898,8 @@ async function handleMissingTasksQuery(
 
   const targetWeeks = resolveTargetWeeks(classroom);
 
-  // Parallel fetch: score structures, student scores, and latest recorded score in classroom
-  const [structures, studentScores, latestScoreInClassroom] = await Promise.all([
+  // Parallel fetch: score structures, student scores, latest recorded score in classroom, and attendance dates
+  const [structures, studentScores, latestScoreInClassroom, classroomAttendanceDates, classroomWeeklySchedules] = await Promise.all([
     prisma.scoreStructure.findMany({
       where: { classroomId: classroom.id },
       orderBy: { lessonNumber: 'asc' },
@@ -909,29 +909,41 @@ async function handleMissingTasksQuery(
       orderBy: { lessonNumber: 'asc' },
     }),
     prisma.studentScore.findFirst({
-      where: { classroomId: classroom.id },
+      where: {
+        classroomId: classroom.id,
+        OR: [
+          { assignmentScore: { not: null, gt: 0 } },
+          { postTestScore: { not: null, gt: 0 } },
+        ],
+      },
       orderBy: { lessonNumber: 'desc' },
       select: { lessonNumber: true },
     }),
+    prisma.attendance.findMany({
+      where: { classroomId: classroom.id },
+      select: { date: true },
+      distinct: ['date'],
+      orderBy: { date: 'asc' },
+    }),
+    prisma.weeklySchedule.findMany({
+      where: { classroomId: classroom.id },
+      select: { dayOfWeek: true },
+    }),
   ]);
 
-  // Determine current active week limit
+  // Determine current active week limit (do not count weeks that haven't reached teaching time yet)
+  const earliestAttendanceDate = classroomAttendanceDates.length > 0 ? classroomAttendanceDates[0].date : null;
+  const effectiveStartDate = classroom.semesterStartDate || earliestAttendanceDate;
   const highestRecordedWeek = latestScoreInClassroom?.lessonNumber || 0;
-  let maxWeekToCheck = targetWeeks;
+  const timetableDays = Array.from(new Set(classroomWeeklySchedules.map((ws) => ws.dayOfWeek)));
 
-  if (classroom.semesterStartDate) {
-    const currentWeek = getCurrentWeek(classroom.semesterStartDate, targetWeeks);
-    if (currentWeek !== null) {
-      maxWeekToCheck = Math.min(targetWeeks, Math.max(currentWeek, highestRecordedWeek));
-    }
-  } else if (highestRecordedWeek > 0) {
-    maxWeekToCheck = Math.min(targetWeeks, highestRecordedWeek);
-  } else if (structures.length > 0) {
-    const maxStructureWeek = Math.max(...structures.map((s) => s.lessonNumber));
-    if (maxStructureWeek > 0) {
-      maxWeekToCheck = Math.min(targetWeeks, maxStructureWeek);
-    }
-  }
+  const maxWeekToCheck = resolveCurrentTeachingWeek({
+    startDate: effectiveStartDate,
+    totalWeeks: targetWeeks,
+    highestScoredWeek: highestRecordedWeek,
+    attendanceDatesCount: classroomAttendanceDates.length,
+    timetableDays,
+  });
 
   const scoresMap = new Map<number, { assignmentScore: number | null; postTestScore: number | null }>();
   for (const sc of studentScores) {

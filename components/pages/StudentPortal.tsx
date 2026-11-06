@@ -43,6 +43,7 @@ interface ClassroomInfo {
   teacher_name: string;
   curriculum_type: string;
   total_weeks: number;
+  current_teaching_week?: number;
   total_classes: number;
   is_portal_enabled?: boolean;
 }
@@ -948,11 +949,18 @@ export default function StudentPortal() {
                   <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
-                        <h3 className="text-base font-bold text-slate-800">
-                          คะแนนการส่งงานและแบบทดสอบรายสัปดาห์
-                        </h3>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-base font-bold text-slate-800">
+                            คะแนนการส่งงานและแบบทดสอบรายสัปดาห์
+                          </h3>
+                          {data.classroom?.current_teaching_week && (
+                            <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/70">
+                              สัปดาห์ที่ 1 - {data.classroom.current_teaching_week} (จาก {data.classroom.total_weeks} สัปดาห์)
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-slate-500 mt-0.5">
-                          ตรวจสอบว่าสัปดาห์ไหนส่งงานแล้ว หรือยังมีงานค้างส่ง
+                          ตรวจสอบว่าสัปดาห์ไหนส่งงานแล้ว หรือยังมีงานค้างส่ง (เฉพาะสัปดาห์ที่ถึงเวลาสอนแล้ว)
                         </p>
                       </div>
 
@@ -1046,7 +1054,15 @@ export default function StudentPortal() {
                         ))
                       ) : (
                         <div className="text-center py-10 text-slate-400 text-xs">
-                          ไม่มีข้อมูลในเงื่อนไขที่เลือก
+                          {assignmentFilter === 'missing' ? (
+                            <div className="flex flex-col items-center gap-2 text-emerald-600">
+                              <CheckCircle2 className="w-8 h-8 text-emerald-500" />
+                              <span className="font-semibold text-sm">ไม่มีงานค้างส่งในสัปดาห์ที่เปิดสอนแล้ว</span>
+                              <span className="text-slate-400 text-xs">คุณส่งงานและทำแบบทดสอบครบถ้วนเรียบร้อย</span>
+                            </div>
+                          ) : (
+                            'ไม่มีข้อมูลในเงื่อนไขที่เลือก'
+                          )}
                         </div>
                       )}
                     </div>

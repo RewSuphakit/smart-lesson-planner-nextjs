@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { calculateAffectiveScore } from '@/lib/affective';
-import { resolveTargetWeeks } from '@/lib/semester';
+import { resolveTargetWeeks, resolveCurrentTeachingWeek } from '@/lib/semester';
 import { protectRequest, portalLimiter } from '@/lib/arcjet';
 import { invalidateCache, userCacheKey } from '@/lib/cache';
 import { generatePortalSession, verifyPortalSession, getAuthUser } from '@/lib/auth';
@@ -86,6 +86,7 @@ export async function GET(request: NextRequest) {
                 name: true,
               },
             },
+            semester: true,
           },
         },
       },
@@ -237,7 +238,16 @@ export async function GET(request: NextRequest) {
     const maxAllowedAbsences = Math.floor(totalClasses * ((100 - minAttPercent) / 100));
 
     // Fetch details in parallel
-    const [structures, studentScores, attendanceRecords, dbCriteria] = await Promise.all([
+    const [
+      structures,
+      studentScores,
+      attendanceRecords,
+      dbCriteria,
+      latestScoreInClassroom,
+      classroomAttendanceDates,
+      classroomWeeklySchedules,
+      activeSemester,
+    ] = await Promise.all([
       prisma.scoreStructure.findMany({
         where: { classroomId: numericClassroomId },
         orderBy: { lessonNumber: 'asc' },
@@ -254,7 +264,57 @@ export async function GET(request: NextRequest) {
         where: { classroomId: numericClassroomId },
         orderBy: { minScore: 'desc' },
       }),
+      prisma.studentScore.findFirst({
+        where: {
+          classroomId: numericClassroomId,
+          OR: [
+            { assignmentScore: { not: null, gt: 0 } },
+            { postTestScore: { not: null, gt: 0 } },
+          ],
+        },
+        orderBy: { lessonNumber: 'desc' },
+        select: { lessonNumber: true },
+      }),
+      prisma.attendance.findMany({
+        where: { classroomId: numericClassroomId },
+        select: { date: true },
+        distinct: ['date'],
+        orderBy: { date: 'asc' },
+      }),
+      prisma.weeklySchedule.findMany({
+        where: { classroomId: numericClassroomId },
+        select: { dayOfWeek: true },
+      }),
+      prisma.semester.findFirst({
+        where: { userId: classroom.userId, isActive: true },
+        select: { startDate: true },
+      }),
     ]);
+
+    // Resolve current teaching week based on calendar, attendance, and recorded scores
+    const earliestAttendanceDate = classroomAttendanceDates.length > 0 ? classroomAttendanceDates[0].date : null;
+    const effectiveStartDate =
+      classroom.semesterStartDate ||
+      classroom.semester?.startDate ||
+      activeSemester?.startDate ||
+      earliestAttendanceDate;
+
+    let highestScoredWeek = latestScoreInClassroom?.lessonNumber || 0;
+    for (const sc of studentScores) {
+      if ((sc.assignmentScore !== null && Number(sc.assignmentScore) > 0) || (sc.postTestScore !== null && Number(sc.postTestScore) > 0)) {
+        if (sc.lessonNumber > highestScoredWeek) highestScoredWeek = sc.lessonNumber;
+      }
+    }
+
+    const timetableDays = Array.from(new Set(classroomWeeklySchedules.map((ws) => ws.dayOfWeek)));
+
+    const currentTeachingWeek = resolveCurrentTeachingWeek({
+      startDate: effectiveStartDate,
+      totalWeeks: targetWeeks,
+      highestScoredWeek,
+      attendanceDatesCount: classroomAttendanceDates.length,
+      timetableDays,
+    });
 
     // Max assign and post test raw calculations
     const activeStructures = structures.filter((st) => st.lessonNumber <= targetWeeks);
@@ -311,7 +371,8 @@ export async function GET(request: NextRequest) {
     let sumPostTestRaw = 0;
     const weeklyLessons = [];
 
-    for (let w = 1; w <= targetWeeks; w++) {
+    // Only show and evaluate lessons up to currentTeachingWeek (lessons that have reached teaching time)
+    for (let w = 1; w <= currentTeachingWeek; w++) {
       const st = structureMap.get(w);
       const sc = scoresMap.get(w);
 
@@ -337,6 +398,14 @@ export async function GET(request: NextRequest) {
         is_submitted: isAssignmentSubmitted,
         is_missing: isMissingAssignment,
       });
+    }
+
+    // In case the student has recorded scores in any week beyond currentTeachingWeek, include them in score sums
+    for (const [lessonNum, sc] of scoresMap.entries()) {
+      if (lessonNum > currentTeachingWeek) {
+        if (sc.assignmentScore !== null) sumAssignRaw += sc.assignmentScore;
+        if (sc.postTestScore !== null) sumPostTestRaw += sc.postTestScore;
+      }
     }
 
     // Exam scores
@@ -409,6 +478,7 @@ export async function GET(request: NextRequest) {
         teacher_name: classroom.user.name,
         curriculum_type: classroom.curriculumType,
         total_weeks: targetWeeks,
+        current_teaching_week: currentTeachingWeek,
         total_classes: totalClasses,
         is_portal_enabled: true,
       },
