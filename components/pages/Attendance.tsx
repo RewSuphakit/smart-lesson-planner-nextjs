@@ -914,7 +914,13 @@ MemoizedDesktopStudentRow.displayName = 'MemoizedDesktopStudentRow';
 export default function Attendance() {
   const queryClient = useQueryClient();
 
-  const [selectedClass, setSelectedClass] = useState<string>('');
+  const [selectedClass, setSelectedClass] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('classroom_id') || '';
+    }
+    return '';
+  });
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [students, setStudents] = useState<Student[]>([]);
   const [attendance, setAttendance] = useState<Record<string, string>>({});
@@ -1012,7 +1018,8 @@ export default function Attendance() {
     queryFn: async () => {
       const res = await api.get('/classrooms');
       return res.data.data || [];
-    }
+    },
+    staleTime: 5 * 60 * 1000,
   });
 
   // ─── Query: ข้อมูลภาคเรียนและสัปดาห์ (Semester Info) ───
@@ -1022,7 +1029,8 @@ export default function Attendance() {
       const res = await api.get(`/semester?classroom_id=${selectedClass}`);
       return res.data.data;
     },
-    enabled: !!selectedClass
+    enabled: !!selectedClass,
+    staleTime: 5 * 60 * 1000,
   });
 
   // ─── Query: ดึงข้อมูลตารางเรียนทั้งหมด (All Timetable Entries) ───
@@ -1031,7 +1039,8 @@ export default function Attendance() {
     queryFn: async () => {
       const res = await api.get('/timetable');
       return res.data.data?.entries || [];
-    }
+    },
+    staleTime: 5 * 60 * 1000,
   });
 
   const todayEntries = useMemo(() => {
@@ -1094,17 +1103,32 @@ export default function Attendance() {
         stats: statsRes.data.data || []
       };
     },
-    enabled: !!selectedClass
+    enabled: !!selectedClass,
+    staleTime: 60 * 1000,
   });
+
+  // Ref to track which classroom+date combination has been initialized
+  const initializedClassAndDate = useRef<string>('');
 
   // Sync daily query data to local editing states
   useEffect(() => {
     if (attendanceData) {
       setStudents(attendanceData.students);
-      setAttendance(attendanceData.attendance);
       setStats(attendanceData.stats);
+
+      const currentKey = `${selectedClass}_${date}`;
+      if (initializedClassAndDate.current !== currentKey) {
+        initializedClassAndDate.current = currentKey;
+        setAttendance(attendanceData.attendance);
+      } else {
+        // Prevent background refetches from overwriting active user clicks
+        setAttendance((prev) => ({
+          ...attendanceData.attendance,
+          ...prev,
+        }));
+      }
     }
-  }, [attendanceData]);
+  }, [attendanceData, selectedClass, date]);
 
   // Reset local state if no class is selected, and reset section filter when switching classrooms
   useEffect(() => {
@@ -1268,74 +1292,139 @@ export default function Attendance() {
     }
   }, [selectedClass, date, attendance]);
 
-  // ─── Mutation: บันทึกการเข้าเรียนรายบุคคล (Auto Save with Offline Fallback) ───
-  const singleStatusMutation = useMutation({
-    mutationFn: async ({ studentId, status }: { studentId: string; status: string }) => {
-      if (typeof navigator !== 'undefined' && !navigator.onLine) {
-        enqueueOfflineAttendance({
-          studentId: Number(studentId),
-          classroomId: Number(selectedClass),
-          date: date,
-          status: status,
+  // ─── Debounced Batch Auto-Save (eliminates race conditions & flickering on consecutive clicks) ───
+  const pendingAutoSaveRef = useRef<Map<string, string>>(new Map());
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const flushPendingAutoSave = useCallback(async () => {
+    if (pendingAutoSaveRef.current.size === 0 || !selectedClass || !date) return;
+
+    const changes = new Map(pendingAutoSaveRef.current);
+    pendingAutoSaveRef.current.clear();
+
+    const recordsToSave: Array<{ student_id: number; classroom_id: number; date: string; status: string }> = [];
+    const idsToDelete: string[] = [];
+
+    for (const [studentId, status] of changes.entries()) {
+      if (status === '') {
+        idsToDelete.push(studentId);
+      } else {
+        recordsToSave.push({
+          student_id: Number(studentId),
+          classroom_id: Number(selectedClass),
+          date,
+          status,
         });
-        return { offline: true };
       }
-      return api.post('/attendance', {
-        student_id: Number(studentId),
-        classroom_id: Number(selectedClass),
-        date: date,
-        status: status
-      }).catch(() => {
-        enqueueOfflineAttendance({
-          studentId: Number(studentId),
-          classroomId: Number(selectedClass),
-          date: date,
-          status: status,
-        });
-        return { offline: true };
+    }
+
+    setAutoSaveStatus('saving');
+
+    try {
+      const promises: Promise<unknown>[] = [];
+
+      if (recordsToSave.length > 0) {
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          enqueueBatchOfflineAttendance(
+            recordsToSave.map((r) => ({
+              studentId: r.student_id,
+              classroomId: r.classroom_id,
+              date: r.date,
+              status: r.status,
+            }))
+          );
+        } else {
+          promises.push(
+            api.post('/attendance', { records: recordsToSave }).catch(() => {
+              enqueueBatchOfflineAttendance(
+                recordsToSave.map((r) => ({
+                  studentId: r.student_id,
+                  classroomId: r.classroom_id,
+                  date: r.date,
+                  status: r.status,
+                }))
+              );
+            })
+          );
+        }
+      }
+
+      if (idsToDelete.length > 0) {
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          // Handled offline
+        } else {
+          for (const sId of idsToDelete) {
+            promises.push(
+              api.delete(`/attendance?student_id=${sId}&classroom_id=${selectedClass}&date=${date}`).catch((err) => {
+                console.warn('Failed to delete attendance record:', err);
+              })
+            );
+          }
+        }
+      }
+
+      await Promise.all(promises);
+
+      // Optimistically update TanStack Query cache in memory (ZERO network refetch & zero flickering)
+      queryClient.setQueryData(['attendance-data', selectedClass, date], (old: unknown) => {
+        if (!old || typeof old !== 'object') return old;
+        const currentData = old as { attendance?: Record<string, string>; [key: string]: unknown };
+        const updatedAttendance = { ...(currentData.attendance || {}) };
+        for (const [studentId, status] of changes.entries()) {
+          if (status === '') {
+            delete updatedAttendance[studentId];
+          } else {
+            updatedAttendance[studentId] = status;
+          }
+        }
+        return {
+          ...currentData,
+          attendance: updatedAttendance,
+        };
+      });
+
+      setAutoSaveStatus('saved');
+    } catch (err) {
+      console.error('AutoSave batch error:', err);
+      setAutoSaveStatus('error');
+    }
+  }, [selectedClass, date, queryClient]);
+
+  // Flush on unmount or class/date change
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+      flushPendingAutoSave();
+    };
+  }, [flushPendingAutoSave]);
+
+  const handleStatusChange = useCallback(
+    (studentId: string, status: string) => {
+      setAttendance((prev) => {
+        const current = prev[studentId];
+        // Toggle off if clicking the active status
+        const newStatus = current === status ? '' : status;
+
+        if (autoSave) {
+          pendingAutoSaveRef.current.set(studentId, newStatus);
+          setAutoSaveStatus('saving');
+
+          if (autoSaveTimerRef.current) {
+            clearTimeout(autoSaveTimerRef.current);
+          }
+          // Debounce 400ms: collects consecutive rapid clicks into a single batch
+          autoSaveTimerRef.current = setTimeout(() => {
+            flushPendingAutoSave();
+          }, 400);
+        }
+
+        return { ...prev, [studentId]: newStatus };
       });
     },
-    onMutate: () => {
-      setAutoSaveStatus('saving');
-    },
-    onSuccess: (res: { offline?: boolean } | unknown) => {
-      setAutoSaveStatus('saved');
-      if ((res as { offline?: boolean })?.offline) {
-        toast('บันทึกข้อมูลในเครื่องแล้ว (โหมดออฟไลน์)', { icon: '💾', duration: 2000 });
-      } else {
-        queryClient.invalidateQueries({ queryKey: ['attendance-data', selectedClass] });
-      }
-    },
-    onError: () => {
-      setAutoSaveStatus('error');
-      toast.error('บันทึกอัตโนมัติไม่สำเร็จ');
-    }
-  });
-
-  const handleStatusChange = useCallback((studentId: string, status: string) => {
-    const current = attendance[studentId];
-    // Toggle off if clicking the active status
-    const newStatus = current === status ? '' : status;
-
-    setAttendance(prev => ({ ...prev, [studentId]: newStatus }));
-
-    if (newStatus === '') {
-      if (typeof navigator !== 'undefined' && !navigator.onLine) {
-        toast('ลบสถานะในเครื่องแล้ว (โหมดออฟไลน์)', { icon: '🗑️' });
-        return;
-      }
-      api.delete(`/attendance?student_id=${studentId}&classroom_id=${selectedClass}&date=${date}`)
-        .then(() => {
-          queryClient.invalidateQueries({ queryKey: ['attendance-data', selectedClass, date] });
-          toast.success('ลบข้อมูลการเช็คชื่อรายบุคคลเรียบร้อยแล้ว');
-        })
-        .catch(() => {
-          toast.error('ลบข้อมูลไม่สำเร็จ');
-        });
-    } else if (autoSave) {
-      singleStatusMutation.mutate({ studentId, status: newStatus });
-    }
-  }, [attendance, selectedClass, date, autoSave, singleStatusMutation, queryClient]);
+    [autoSave, flushPendingAutoSave]
+  );
 
   // ─── Mutation: บันทึกข้อมูลการเข้าเรียนด้วยตนเอง (Manual Save with Offline Fallback) ───
   const saveMutation = useMutation({
@@ -2308,6 +2397,68 @@ export default function Attendance() {
               })}
             </div>
           )}
+        </div>
+      ) : loadingAttendance && students.length === 0 ? (
+        /* Skeleton Loading State — eliminates blank flash & optimizes LCP */
+        <div className="space-y-6 animate-pulse" aria-busy="true" aria-label="กำลังโหลดข้อมูลการเช็คชื่อ">
+          {/* Date Control Panel Skeleton */}
+          <div className="glass dark:bg-slate-900/85 p-4 sm:p-5 rounded-3xl border border-indigo-100/80 dark:border-slate-800 bg-white/95 dark:bg-slate-900 shadow-xl shadow-indigo-100/20 dark:shadow-black/40">
+            <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3.5">
+              <div className="flex items-center gap-2 bg-slate-100/80 dark:bg-slate-800/80 p-1.5 rounded-2xl border border-slate-200/70 dark:border-slate-700 w-64 h-12">
+                <div className="w-8 h-8 rounded-xl bg-slate-200 dark:bg-slate-700"></div>
+                <div className="h-4 flex-1 bg-slate-200 dark:bg-slate-700 rounded-lg mx-2"></div>
+                <div className="w-8 h-8 rounded-xl bg-slate-200 dark:bg-slate-700"></div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="h-9 w-32 bg-slate-200 dark:bg-slate-800 rounded-2xl"></div>
+                <div className="h-9 w-32 bg-slate-200 dark:bg-slate-800 rounded-2xl"></div>
+              </div>
+            </div>
+          </div>
+
+          {/* 5 Dynamic Counters Cards Skeleton (Matches LCP elements) */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+            {[
+              { label: 'มาเรียน', color: 'bg-emerald-100 dark:bg-emerald-950/40' },
+              { label: 'สาย', color: 'bg-amber-100 dark:bg-amber-950/40' },
+              { label: 'ขาด', color: 'bg-rose-100 dark:bg-rose-950/40' },
+              { label: 'ลา', color: 'bg-blue-100 dark:bg-blue-950/40' },
+              { label: 'บันทึกผลแล้ว', color: 'bg-purple-100 dark:bg-purple-950/40' },
+            ].map((card, i) => (
+              <div
+                key={i}
+                className="glass dark:bg-slate-900/90 p-4 rounded-3xl border border-slate-200/70 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between shadow-xs"
+              >
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-slate-400 dark:text-slate-500">{card.label}</p>
+                  <div className="h-7 w-12 bg-slate-200 dark:bg-slate-700 rounded-lg"></div>
+                  <span className="text-[11px] text-slate-300 dark:text-slate-600 font-semibold">คน</span>
+                </div>
+                <div className={`w-11 h-11 rounded-2xl ${card.color} shrink-0`}></div>
+              </div>
+            ))}
+          </div>
+
+          {/* Student List Skeleton */}
+          <div className="glass dark:bg-slate-900/90 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-5 space-y-3 bg-white dark:bg-slate-900 shadow-xl shadow-indigo-100/20 dark:shadow-black/40">
+            <div className="h-11 w-full bg-slate-100 dark:bg-slate-800 rounded-2xl mb-4"></div>
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-2xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-slate-200 dark:bg-slate-700 shrink-0"></div>
+                  <div className="space-y-1.5">
+                    <div className="h-4 w-36 bg-slate-200 dark:bg-slate-700 rounded-lg"></div>
+                    <div className="h-3 w-24 bg-slate-200 dark:bg-slate-700 rounded"></div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 gap-1.5 sm:flex sm:items-center">
+                  {[1, 2, 3, 4].map((b) => (
+                    <div key={b} className="w-12 h-9 rounded-xl bg-slate-200 dark:bg-slate-700"></div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       ) : students.length === 0 ? (
         <div className="glass p-20 text-center rounded-2xl border border-white/30">
