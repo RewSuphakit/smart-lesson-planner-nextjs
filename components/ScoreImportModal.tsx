@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
@@ -7,7 +7,7 @@ import {
   HelpCircle, Sparkles, BookOpen, Layers, Info, Check, ArrowRight, Loader2,
   Table as TableIcon
 } from 'lucide-react';
-import toast from '@/lib/toast';
+import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 
 export interface Student {
@@ -89,9 +89,9 @@ export default function ScoreImportModal({
       return students.slice(0, 3);
     }
     return [
-      { id: '1', student_code: '67010001', name: 'à¸™à¸²à¸¢à¸ªà¸¡à¸Šà¸²à¸¢ à¹ƒà¸ˆà¸”à¸µ' },
-      { id: '2', student_code: '67010002', name: 'à¸™à¸²à¸‡à¸ªà¸²à¸§à¸ªà¸¡à¸«à¸à¸´à¸‡ à¸£à¸±à¸à¹€à¸£à¸µà¸¢à¸™' },
-      { id: '3', student_code: '67010003', name: 'à¸™à¸²à¸¢à¸à¸´à¸•à¸•à¸´à¸¨à¸±à¸à¸”à¸´à¹Œ à¸žà¸²à¸à¹€à¸žà¸µà¸¢à¸£' },
+      { id: '1', student_code: '67010001', name: 'นายสมชาย ใจดี' },
+      { id: '2', student_code: '67010002', name: 'นางสาวสมหญิง รักเรียน' },
+      { id: '3', student_code: '67010003', name: 'นายกิตติศักดิ์ พากเพียร' },
     ];
   }, [students]);
 
@@ -99,7 +99,7 @@ export default function ScoreImportModal({
   const handleDownloadScoreTemplate = () => {
     try {
       const weeksCount = Math.max(15, structures.length || 18);
-      const headers = ['à¸£à¸«à¸±à¸ªà¸›à¸£à¸°à¸ˆà¸³à¸•à¸±à¸§', 'à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥'];
+      const headers = ['รหัสประจำตัว', 'ชื่อ-นามสกุล'];
       for (let w = 1; w <= weeksCount; w++) {
         headers.push(String(w));
       }
@@ -133,20 +133,20 @@ export default function ScoreImportModal({
       }
       ws['!cols'] = colWidths;
 
-      const typeLabel = scoreType === 'assignment' ? 'à¸„à¸°à¹à¸™à¸™à¸‡à¸²à¸™à¹€à¸à¹‡à¸š' : 'à¸„à¸°à¹à¸™à¸™à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢';
+      const typeLabel = scoreType === 'assignment' ? 'คะแนนงานเก็บ' : 'คะแนนสอบย่อย';
       XLSX.utils.book_append_sheet(wb, ws, typeLabel);
-      XLSX.writeFile(wb, `à¹€à¸—à¸¡à¹€à¸žà¸¥à¸•_${typeLabel}_${classroomName || 'à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™'}.xlsx`);
-      toast.success(`à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œà¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡ ${typeLabel} à¸ªà¸³à¹€à¸£à¹‡à¸ˆ`);
+      XLSX.writeFile(wb, `เทมเพลต_${typeLabel}_${classroomName || 'ห้องเรียน'}.xlsx`);
+      toast.success(`ดาวน์โหลดไฟล์ตัวอย่าง ${typeLabel} สำเร็จ`);
     } catch (err) {
       console.error('Download template error:', err);
-      toast.error('à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œà¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
+      toast.error('ดาวน์โหลดไฟล์ตัวอย่างไม่สำเร็จ');
     }
   };
 
   // Download Sample Excel Template for Blueprint
   const handleDownloadBlueprintTemplate = () => {
     try {
-      const headers = ['à¸šà¸—à¹€à¸£à¸µà¸¢à¸™à¸—à¸µà¹ˆ', 'à¸Šà¸·à¹ˆà¸­à¸šà¸—à¹€à¸£à¸µà¸¢à¸™', 'à¸Šà¸±à¹ˆà¸§à¹‚à¸¡à¸‡', 'à¸„à¸°à¹à¸™à¸™à¸—à¸±à¸à¸©à¸° (à¸‡à¸²à¸™à¹€à¸à¹‡à¸š)', 'à¸žà¸¸à¸—à¸˜à¸´à¸žà¸´à¸ªà¸±à¸¢ (à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢)'];
+      const headers = ['บทเรียนที่', 'ชื่อบทเรียน', 'ชั่วโมง', 'คะแนนทักษะ (งานเก็บ)', 'พุทธิพิสัย (สอบย่อย)'];
       const rows: (string | number)[][] = [];
 
       const totalWeeks = Math.max(18, structures.length || 18);
@@ -154,7 +154,7 @@ export default function ScoreImportModal({
         const existing = structures.find(s => s.lesson_number === i);
         rows.push([
           i,
-          existing?.lesson_name || `à¸«à¸™à¹ˆà¸§à¸¢à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™à¸£à¸¹à¹‰à¸—à¸µà¹ˆ ${i}`,
+          existing?.lesson_name || `หน่วยการเรียนรู้ที่ ${i}`,
           existing?.hours || 4,
           existing?.max_assignment_score || 10,
           existing?.max_post_test_score || 10
@@ -165,12 +165,12 @@ export default function ScoreImportModal({
       const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
       ws['!cols'] = [{ wch: 12 }, { wch: 30 }, { wch: 10 }, { wch: 22 }, { wch: 22 }];
 
-      XLSX.utils.book_append_sheet(wb, ws, 'à¹‚à¸„à¸£à¸‡à¸ªà¸£à¹‰à¸²à¸‡à¸„à¸°à¹à¸™à¸™');
-      XLSX.writeFile(wb, `à¹€à¸—à¸¡à¹€à¸žà¸¥à¸•_à¹‚à¸„à¸£à¸‡à¸ªà¸£à¹‰à¸²à¸‡à¸„à¸°à¹à¸™à¸™_Blueprint.xlsx`);
-      toast.success('à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹€à¸—à¸¡à¹€à¸žà¸¥à¸• Blueprint à¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
+      XLSX.utils.book_append_sheet(wb, ws, 'โครงสร้างคะแนน');
+      XLSX.writeFile(wb, `เทมเพลต_โครงสร้างคะแนน_Blueprint.xlsx`);
+      toast.success('ดาวน์โหลดเทมเพลต Blueprint สำเร็จ');
     } catch (err) {
       console.error('Download blueprint template error:', err);
-      toast.error('à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹€à¸—à¸¡à¹€à¸žà¸¥à¸•à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
+      toast.error('ดาวน์โหลดเทมเพลตไม่สำเร็จ');
     }
   };
 
@@ -179,7 +179,7 @@ export default function ScoreImportModal({
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('à¸‚à¸™à¸²à¸”à¹„à¸Ÿà¸¥à¹Œà¹€à¸à¸´à¸™à¸à¸³à¸«à¸™à¸” (à¸ªà¸¹à¸‡à¸ªà¸¸à¸”à¹„à¸¡à¹ˆà¹€à¸à¸´à¸™ 5MB)');
+      toast.error('ขนาดไฟล์เกินกำหนด (สูงสุดไม่เกิน 5MB)');
       e.target.value = '';
       return;
     }
@@ -212,11 +212,11 @@ export default function ScoreImportModal({
                 const cell = String(row[j] ?? '').trim();
                 if (!isNaN(parseInt(cell)) && parseInt(cell) > 0) {
                   weekColumns[cell] = j;
-                } else if (cell.includes('à¹€à¸¥à¸‚') || cell.includes('à¸£à¸«à¸±à¸ª') || cell.toLowerCase().includes('code')) {
+                } else if (cell.includes('เลข') || cell.includes('รหัส') || cell.toLowerCase().includes('code')) {
                   idColIndex = j;
-                } else if (cell.includes('à¸Šà¸·à¹ˆà¸­') && !cell.includes('à¸šà¸—à¹€à¸£à¸µà¸¢à¸™')) {
+                } else if (cell.includes('ชื่อ') && !cell.includes('บทเรียน')) {
                   nameColIndex = j;
-                } else if (cell.includes('à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥')) {
+                } else if (cell.includes('นามสกุล')) {
                   lastNameColIndex = j;
                 }
               }
@@ -225,7 +225,7 @@ export default function ScoreImportModal({
           }
 
           if (headerRowIndex === -1) {
-            toast.error('à¹„à¸¡à¹ˆà¸žà¸šà¸„à¸­à¸¥à¸±à¸¡à¸™à¹Œà¸—à¸µà¹ˆà¹€à¸›à¹‡à¸™à¸•à¸±à¸§à¹€à¸¥à¸‚à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ (1, 2, 3...) à¹ƒà¸™à¹„à¸Ÿà¸¥à¹Œà¸™à¸µà¹‰');
+            toast.error('ไม่พบคอลัมน์ที่เป็นตัวเลขสัปดาห์ (1, 2, 3...) ในไฟล์นี้');
             return;
           }
 
@@ -240,7 +240,7 @@ export default function ScoreImportModal({
             let matched = null;
             if (studentCode) matched = students.find(s => s.student_code === studentCode);
             if (!matched && fullName) {
-              matched = students.find(s => fullName.includes(s.name) || s.name.includes(fullName.replace(/à¸™à¸²à¸¢|à¸™à¸²à¸‡à¸ªà¸²à¸§|à¹€à¸”à¹‡à¸à¸Šà¸²à¸¢|à¹€à¸”à¹‡à¸à¸«à¸à¸´à¸‡/g, '').trim()));
+              matched = students.find(s => fullName.includes(s.name) || s.name.includes(fullName.replace(/นาย|นางสาว|เด็กชาย|เด็กหญิง/g, '').trim()));
             }
 
             if (matched) {
@@ -263,10 +263,10 @@ export default function ScoreImportModal({
           }
 
           if (scores.length === 0) {
-            toast.error('à¹„à¸¡à¹ˆà¸žà¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸„à¸°à¹à¸™à¸™à¸—à¸µà¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸ˆà¸±à¸šà¸„à¸¹à¹ˆà¸à¸±à¸šà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¹ƒà¸™à¸«à¹‰à¸­à¸‡à¸™à¸µà¹‰à¹„à¸”à¹‰ à¸à¸£à¸¸à¸“à¸²à¸•à¸£à¸§à¸ˆà¸Šà¸·à¹ˆà¸­à¸«à¸£à¸·à¸­à¸£à¸«à¸±à¸ªà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™');
+            toast.error('ไม่พบข้อมูลคะแนนที่สามารถจับคู่กับนักเรียนในห้องนี้ได้ กรุณาตรวจชื่อหรือรหัสนักเรียน');
           } else {
             setParsedScores(scores);
-            toast.success(`à¸­à¹ˆà¸²à¸™à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸ªà¸³à¹€à¸£à¹‡à¸ˆ à¸•à¸£à¸§à¸ˆà¸žà¸š ${scores.length} à¸£à¸²à¸¢à¸à¸²à¸£à¸„à¸°à¹à¸™à¸™`);
+            toast.success(`อ่านข้อมูลสำเร็จ ตรวจพบ ${scores.length} รายการคะแนน`);
           }
         } else {
           // Blueprint parse
@@ -275,16 +275,16 @@ export default function ScoreImportModal({
             const row = data[i] || [];
             for (let j = 0; j < row.length; j++) {
               const cell = String(row[j] || '').trim().toLowerCase();
-              if (cell.includes('à¸šà¸—à¹€à¸£à¸µà¸¢à¸™à¸—à¸µà¹ˆ') || cell.includes('à¸«à¸™à¹ˆà¸§à¸¢à¸—à¸µà¹ˆ')) lessonCol = j;
-              if (cell.includes('à¸Šà¸±à¹ˆà¸§à¹‚à¸¡à¸‡')) hoursCol = j;
-              if (cell.includes('à¸„à¸°à¹à¸™à¸™à¸—à¸±à¸à¸©à¸°') && !cell.includes('à¹ƒà¸«à¸¡à¹ˆ')) skillCol = j;
-              if (cell.includes('à¸„à¸°à¹à¸™à¸™à¸£à¸²à¸¢à¸šà¸—à¹€à¸£à¸µà¸¢à¸™à¹ƒà¸«à¸¡à¹ˆ') || cell.includes('à¸žà¸¸à¸—à¸˜à¸´à¸žà¸´à¸ªà¸±à¸¢')) postTestCol = j;
+              if (cell.includes('บทเรียนที่') || cell.includes('หน่วยที่')) lessonCol = j;
+              if (cell.includes('ชั่วโมง')) hoursCol = j;
+              if (cell.includes('คะแนนทักษะ') && !cell.includes('ใหม่')) skillCol = j;
+              if (cell.includes('คะแนนรายบทเรียนใหม่') || cell.includes('พุทธิพิสัย')) postTestCol = j;
             }
             if (lessonCol !== -1 && skillCol !== -1 && postTestCol !== -1) break;
           }
 
           if (lessonCol === -1 || skillCol === -1 || postTestCol === -1) {
-            toast.error('à¹„à¸¡à¹ˆà¸žà¸šà¹‚à¸„à¸£à¸‡à¸ªà¸£à¹‰à¸²à¸‡à¸•à¸²à¸£à¸²à¸‡ Blueprint à¸—à¸µà¹ˆà¸£à¸­à¸‡à¸£à¸±à¸š');
+            toast.error('ไม่พบโครงสร้างตาราง Blueprint ที่รองรับ');
             return;
           }
 
@@ -295,7 +295,7 @@ export default function ScoreImportModal({
             if (!isNaN(lessonNum) && lessonNum > 0) {
               newStructs.push({
                 lesson_number: lessonNum,
-                lesson_name: `à¸šà¸—à¹€à¸£à¸µà¸¢à¸™à¸—à¸µà¹ˆ ${lessonNum}`,
+                lesson_name: `บทเรียนที่ ${lessonNum}`,
                 hours: hoursCol !== -1 ? (parseFloat(row[hoursCol]) || 4) : 4,
                 max_assignment_score: parseFloat(row[skillCol]) || 0,
                 max_post_test_score: parseFloat(row[postTestCol]) || 0,
@@ -304,15 +304,15 @@ export default function ScoreImportModal({
           }
 
           if (newStructs.length === 0) {
-            toast.error('à¹„à¸¡à¹ˆà¸žà¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸šà¸—à¹€à¸£à¸µà¸¢à¸™à¹ƒà¸™à¹„à¸Ÿà¸¥à¹Œ');
+            toast.error('ไม่พบข้อมูลบทเรียนในไฟล์');
           } else {
             setParsedBlueprint(newStructs);
-            toast.success(`à¸­à¹ˆà¸²à¸™à¹‚à¸„à¸£à¸‡à¸ªà¸£à¹‰à¸²à¸‡à¸ªà¸³à¹€à¸£à¹‡à¸ˆ ${newStructs.length} à¸šà¸—à¹€à¸£à¸µà¸¢à¸™`);
+            toast.success(`อ่านโครงสร้างสำเร็จ ${newStructs.length} บทเรียน`);
           }
         }
       } catch (err) {
         console.error('File parsing error:', err);
-        toast.error('à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸­à¹ˆà¸²à¸™à¹„à¸Ÿà¸¥à¹Œà¹„à¸”à¹‰ à¸à¸£à¸¸à¸“à¸²à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¸£à¸¹à¸›à¹à¸šà¸šà¹„à¸Ÿà¸¥à¹Œ');
+        toast.error('ไม่สามารถอ่านไฟล์ได้ กรุณาตรวจสอบรูปแบบไฟล์');
       }
     };
     reader.readAsBinaryString(file);
@@ -327,12 +327,12 @@ export default function ScoreImportModal({
         onClose();
       } else if (activeTab === 'blueprint' && parsedBlueprint.length > 0 && onImportBlueprint) {
         onImportBlueprint(parsedBlueprint);
-        toast.success(`à¸­à¸±à¸›à¹€à¸”à¸•à¹‚à¸„à¸£à¸‡à¸ªà¸£à¹‰à¸²à¸‡à¸„à¸°à¹à¸™à¸™ ${parsedBlueprint.length} à¸šà¸—à¹€à¸£à¸µà¸¢à¸™à¹à¸¥à¹‰à¸§`);
+        toast.success(`อัปเดตโครงสร้างคะแนน ${parsedBlueprint.length} บทเรียนแล้ว`);
         onClose();
       }
     } catch (err) {
       console.error(err);
-      toast.error('à¸šà¸±à¸™à¸—à¸¶à¸à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
+      toast.error('บันทึกข้อมูลไม่สำเร็จ');
     } finally {
       setIsSubmitting(false);
     }
@@ -354,10 +354,10 @@ export default function ScoreImportModal({
             </div>
             <div>
               <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                à¸™à¸³à¹€à¸‚à¹‰à¸²à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸ˆà¸²à¸ Excel & à¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡à¸£à¸¹à¸›à¹à¸šà¸š
+                นำเข้าข้อมูลจาก Excel & ตัวอย่างรูปแบบ
               </h2>
               <p className="text-xs text-slate-500">
-                {classroomName} â€¢ à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¸£à¸¹à¸›à¹à¸šà¸šà¸•à¸²à¸£à¸²à¸‡à¸—à¸µà¹ˆà¸£à¸°à¸šà¸šà¸£à¸­à¸‡à¸£à¸±à¸š à¹à¸¥à¸°à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹€à¸—à¸¡à¹€à¸žà¸¥à¸•à¸žà¸£à¹‰à¸­à¸¡à¹ƒà¸Šà¹‰à¸‡à¸²à¸™
+                {classroomName} • ตรวจสอบรูปแบบตารางที่ระบบรองรับ และดาวน์โหลดเทมเพลตพร้อมใช้งาน
               </p>
             </div>
           </div>
@@ -382,7 +382,7 @@ export default function ScoreImportModal({
               }`}
             >
               <FileSpreadsheet className="w-4 h-4" />
-              <span>à¸„à¸°à¹à¸™à¸™à¸‡à¸²à¸™à¹€à¸à¹‡à¸š / à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢</span>
+              <span>คะแนนงานเก็บ / สอบย่อย</span>
             </button>
 
             <button
@@ -394,7 +394,7 @@ export default function ScoreImportModal({
               }`}
             >
               <Layers className="w-4 h-4" />
-              <span>à¹‚à¸„à¸£à¸‡à¸ªà¸£à¹‰à¸²à¸‡à¸„à¸°à¹à¸™à¸™à¹€à¸•à¹‡à¸¡ (Blueprint)</span>
+              <span>โครงสร้างคะแนนเต็ม (Blueprint)</span>
             </button>
           </div>
 
@@ -408,7 +408,7 @@ export default function ScoreImportModal({
                     : 'text-emerald-800 hover:bg-emerald-100'
                 }`}
               >
-                à¸„à¸°à¹à¸™à¸™à¸‡à¸²à¸™à¹€à¸à¹‡à¸š (à¸›à¸à¸´à¸šà¸±à¸•à¸´)
+                คะแนนงานเก็บ (ปฏิบัติ)
               </button>
               <button
                 onClick={() => setScoreType('post_test')}
@@ -418,7 +418,7 @@ export default function ScoreImportModal({
                     : 'text-amber-800 hover:bg-amber-100'
                 }`}
               >
-                à¸„à¸°à¹à¸™à¸™à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢ (à¸—à¸¤à¸©à¸Žà¸µ)
+                คะแนนสอบย่อย (ทฤษฎี)
               </button>
             </div>
           )}
@@ -436,10 +436,10 @@ export default function ScoreImportModal({
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-slate-800">
-                      à¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡à¸£à¸¹à¸›à¹à¸šà¸šà¹„à¸Ÿà¸¥à¹Œ Excel à¸ªà¸³à¸«à¸£à¸±à¸š {scoreType === 'assignment' ? 'à¸„à¸°à¹à¸™à¸™à¸‡à¸²à¸™à¹€à¸à¹‡à¸š' : 'à¸„à¸°à¹à¸™à¸™à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢'}
+                      ตัวอย่างรูปแบบไฟล์ Excel สำหรับ {scoreType === 'assignment' ? 'คะแนนงานเก็บ' : 'คะแนนสอบย่อย'}
                     </h3>
                     <p className="text-xs text-slate-500">
-                      à¹à¸–à¸§à¹à¸£à¸à¸•à¹‰à¸­à¸‡à¹€à¸›à¹‡à¸™à¸«à¸±à¸§à¸„à¸­à¸¥à¸±à¸¡à¸™à¹Œ à¹à¸¥à¸°à¸„à¸­à¸¥à¸±à¸¡à¸™à¹Œà¸„à¸°à¹à¸™à¸™à¹ƒà¸Šà¹‰à¸•à¸±à¸§à¹€à¸¥à¸‚à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ (1, 2, 3...)
+                      แถวแรกต้องเป็นหัวคอลัมน์ และคอลัมน์คะแนนใช้ตัวเลขสัปดาห์ (1, 2, 3...)
                     </p>
                   </div>
                 </div>
@@ -450,7 +450,7 @@ export default function ScoreImportModal({
                   className="btn bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs px-3.5 py-2 rounded-xl font-bold flex items-center gap-2 shadow-xs shrink-0"
                 >
                   <Download className="w-4 h-4 text-indigo-600" />
-                  <span>à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œà¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡ (.xlsx)</span>
+                  <span>ดาวน์โหลดไฟล์ตัวอย่าง (.xlsx)</span>
                 </button>
               </div>
 
@@ -459,8 +459,8 @@ export default function ScoreImportModal({
                 <table className="w-full text-xs text-left border-collapse">
                   <thead>
                     <tr className="bg-indigo-100/70 text-indigo-950 font-bold border-b border-indigo-200">
-                      <th className="p-2.5 border-r border-indigo-200/60 font-mono">à¸£à¸«à¸±à¸ªà¸›à¸£à¸°à¸ˆà¸³à¸•à¸±à¸§</th>
-                      <th className="p-2.5 border-r border-indigo-200/60 min-w-[160px]">à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥</th>
+                      <th className="p-2.5 border-r border-indigo-200/60 font-mono">รหัสประจำตัว</th>
+                      <th className="p-2.5 border-r border-indigo-200/60 min-w-[160px]">ชื่อ-นามสกุล</th>
                       <th className="p-2.5 border-r border-indigo-200/60 text-center w-12 bg-indigo-200/50">1</th>
                       <th className="p-2.5 border-r border-indigo-200/60 text-center w-12 bg-indigo-200/50">2</th>
                       <th className="p-2.5 border-r border-indigo-200/60 text-center w-12 bg-indigo-200/50">3</th>
@@ -488,11 +488,11 @@ export default function ScoreImportModal({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-600 pt-1">
                 <div className="flex items-start gap-1.5">
                   <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                  <span>à¸£à¸°à¸šà¸šà¸ˆà¸±à¸šà¸„à¸¹à¹ˆà¸­à¸±à¸•à¹‚à¸™à¸¡à¸±à¸•à¸´à¸ˆà¸²à¸ <strong>à¸£à¸«à¸±à¸ªà¸›à¸£à¸°à¸ˆà¸³à¸•à¸±à¸§</strong> à¸«à¸£à¸·à¸­ <strong>à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥</strong></span>
+                  <span>ระบบจับคู่อัตโนมัติจาก <strong>รหัสประจำตัว</strong> หรือ <strong>ชื่อ-นามสกุล</strong></span>
                 </div>
                 <div className="flex items-start gap-1.5">
                   <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                  <span>à¸«à¸±à¸§à¸„à¸­à¸¥à¸±à¸¡à¸™à¹Œà¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¹ƒà¸Šà¹‰à¹€à¸¥à¸‚ <strong>1, 2, 3, ...</strong> à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¸—à¸µà¹ˆà¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¸¡à¸µà¸„à¸°à¹à¸™à¸™à¸ªà¸²à¸¡à¸²à¸£à¸–à¹€à¸§à¹‰à¸™à¸§à¹ˆà¸²à¸‡à¹„à¸”à¹‰</span>
+                  <span>หัวคอลัมน์สัปดาห์ใช้เลข <strong>1, 2, 3, ...</strong> สัปดาห์ที่ยังไม่มีคะแนนสามารถเว้นว่างได้</span>
                 </div>
               </div>
             </div>
@@ -505,9 +505,9 @@ export default function ScoreImportModal({
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-800">
-                    à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œ Excel à¹€à¸žà¸·à¹ˆà¸­à¸™à¸³à¹€à¸‚à¹‰à¸² ({scoreType === 'assignment' ? 'à¸„à¸°à¹à¸™à¸™à¸‡à¸²à¸™à¹€à¸à¹‡à¸š' : 'à¸„à¸°à¹à¸™à¸™à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢'})
+                    อัปโหลดไฟล์ Excel เพื่อนำเข้า ({scoreType === 'assignment' ? 'คะแนนงานเก็บ' : 'คะแนนสอบย่อย'})
                   </h3>
-                  <p className="text-xs text-slate-500">à¸£à¸­à¸‡à¸£à¸±à¸šà¹„à¸Ÿà¸¥à¹Œà¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥ .xlsx, .xls, .csv</p>
+                  <p className="text-xs text-slate-500">รองรับไฟล์นามสกุล .xlsx, .xls, .csv</p>
                 </div>
               </div>
 
@@ -523,10 +523,10 @@ export default function ScoreImportModal({
                     <Upload className="w-6 h-6" />
                   </div>
                   <p className="text-xs font-bold text-slate-700">
-                    à¸„à¸¥à¸´à¸à¹€à¸žà¸·à¹ˆà¸­à¹€à¸¥à¸·à¸­à¸à¹„à¸Ÿà¸¥à¹Œ Excel à¸«à¸£à¸·à¸­à¸¥à¸²à¸à¹„à¸Ÿà¸¥à¹Œà¸¡à¸²à¸§à¸²à¸‡à¸—à¸µà¹ˆà¸™à¸µà¹ˆ
+                    คลิกเพื่อเลือกไฟล์ Excel หรือลากไฟล์มาวางที่นี่
                   </p>
                   <p className="text-[10px] text-slate-400">
-                    {fileName ? `à¹„à¸Ÿà¸¥à¹Œà¸—à¸µà¹ˆà¹€à¸¥à¸·à¸­à¸: ${fileName}` : 'à¸£à¸­à¸‡à¸£à¸±à¸š .xlsx, .xls, .csv'}
+                    {fileName ? `ไฟล์ที่เลือก: ${fileName}` : 'รองรับ .xlsx, .xls, .csv'}
                   </p>
                 </div>
               </div>
@@ -537,10 +537,10 @@ export default function ScoreImportModal({
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-200 flex items-center gap-1.5">
                       <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                      à¸žà¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸žà¸£à¹‰à¸­à¸¡à¸™à¸³à¹€à¸‚à¹‰à¸² {parsedScores.length} à¸£à¸²à¸¢à¸à¸²à¸£à¸„à¸°à¹à¸™à¸™
+                      พบข้อมูลพร้อมนำเข้า {parsedScores.length} รายการคะแนน
                     </span>
                     <span className="text-xs text-slate-500">
-                      à¹à¸ªà¸”à¸‡à¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡ 5 à¸£à¸²à¸¢à¸à¸²à¸£à¹à¸£à¸
+                      แสดงตัวอย่าง 5 รายการแรก
                     </span>
                   </div>
 
@@ -548,16 +548,16 @@ export default function ScoreImportModal({
                     <table className="w-full text-left">
                       <thead className="bg-slate-100 text-slate-700 sticky top-0 font-bold">
                         <tr>
-                          <th className="p-2">à¸Šà¸·à¹ˆà¸­à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™</th>
-                          <th className="p-2 text-center">à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¸—à¸µà¹ˆ</th>
-                          <th className="p-2 text-center">à¸„à¸°à¹à¸™à¸™à¸—à¸µà¹ˆà¹„à¸”à¹‰</th>
+                          <th className="p-2">ชื่อนักเรียน</th>
+                          <th className="p-2 text-center">สัปดาห์ที่</th>
+                          <th className="p-2 text-center">คะแนนที่ได้</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {parsedScores.slice(0, 5).map((entry, i) => (
                           <tr key={i} className="hover:bg-slate-50">
                             <td className="p-2 font-medium text-slate-800">{entry.student_name}</td>
-                            <td className="p-2 text-center">à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ {entry.lesson_number}</td>
+                            <td className="p-2 text-center">สัปดาห์ {entry.lesson_number}</td>
                             <td className="p-2 text-center font-bold text-indigo-700">
                               {scoreType === 'assignment' ? entry.assignment_score : entry.post_test_score}
                             </td>
@@ -583,10 +583,10 @@ export default function ScoreImportModal({
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-slate-800">
-                      à¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡à¸£à¸¹à¸›à¹à¸šà¸šà¹„à¸Ÿà¸¥à¹Œ Excel à¹‚à¸„à¸£à¸‡à¸ªà¸£à¹‰à¸²à¸‡à¸„à¸°à¹à¸™à¸™ (Blueprint)
+                      ตัวอย่างรูปแบบไฟล์ Excel โครงสร้างคะแนน (Blueprint)
                     </h3>
                     <p className="text-xs text-slate-500">
-                      à¸à¸³à¸«à¸™à¸”à¸„à¸°à¹à¸™à¸™à¹€à¸•à¹‡à¸¡à¸‡à¸²à¸™à¹€à¸à¹‡à¸šà¹à¸¥à¸°à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢à¸‚à¸­à¸‡à¹à¸•à¹ˆà¸¥à¸°à¸šà¸—à¹€à¸£à¸µà¸¢à¸™à¸¥à¹ˆà¸§à¸‡à¸«à¸™à¹‰à¸²
+                      กำหนดคะแนนเต็มงานเก็บและสอบย่อยของแต่ละบทเรียนล่วงหน้า
                     </p>
                   </div>
                 </div>
@@ -597,7 +597,7 @@ export default function ScoreImportModal({
                   className="btn bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs px-3.5 py-2 rounded-xl font-bold flex items-center gap-2 shadow-xs shrink-0"
                 >
                   <Download className="w-4 h-4 text-indigo-600" />
-                  <span>à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹€à¸—à¸¡à¹€à¸žà¸¥à¸• Blueprint (.xlsx)</span>
+                  <span>ดาวน์โหลดเทมเพลต Blueprint (.xlsx)</span>
                 </button>
               </div>
 
@@ -606,18 +606,18 @@ export default function ScoreImportModal({
                 <table className="w-full text-xs text-left border-collapse">
                   <thead>
                     <tr className="bg-indigo-100/70 text-indigo-950 font-bold border-b border-indigo-200">
-                      <th className="p-2.5 border-r border-indigo-200/60 text-center w-20">à¸šà¸—à¹€à¸£à¸µà¸¢à¸™à¸—à¸µà¹ˆ</th>
-                      <th className="p-2.5 border-r border-indigo-200/60 min-w-[150px]">à¸Šà¸·à¹ˆà¸­à¸šà¸—à¹€à¸£à¸µà¸¢à¸™</th>
-                      <th className="p-2.5 border-r border-indigo-200/60 text-center w-16">à¸Šà¸±à¹ˆà¸§à¹‚à¸¡à¸‡</th>
-                      <th className="p-2.5 border-r border-indigo-200/60 text-center text-emerald-800">à¸„à¸°à¹à¸™à¸™à¸—à¸±à¸à¸©à¸° (à¸‡à¸²à¸™à¹€à¸à¹‡à¸š)</th>
-                      <th className="p-2.5 text-center text-amber-800">à¸žà¸¸à¸—à¸˜à¸´à¸žà¸´à¸ªà¸±à¸¢ (à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢)</th>
+                      <th className="p-2.5 border-r border-indigo-200/60 text-center w-20">บทเรียนที่</th>
+                      <th className="p-2.5 border-r border-indigo-200/60 min-w-[150px]">ชื่อบทเรียน</th>
+                      <th className="p-2.5 border-r border-indigo-200/60 text-center w-16">ชั่วโมง</th>
+                      <th className="p-2.5 border-r border-indigo-200/60 text-center text-emerald-800">คะแนนทักษะ (งานเก็บ)</th>
+                      <th className="p-2.5 text-center text-amber-800">พุทธิพิสัย (สอบย่อย)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium">
                     {[1, 2, 3].map(w => (
                       <tr key={w} className={w % 2 === 1 ? 'bg-white' : 'bg-slate-50/50'}>
                         <td className="p-2 text-center border-r border-slate-200 font-bold">{w}</td>
-                        <td className="p-2 text-slate-800 border-r border-slate-200 font-semibold">à¸«à¸™à¹ˆà¸§à¸¢à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™à¸£à¸¹à¹‰à¸—à¸µà¹ˆ {w}</td>
+                        <td className="p-2 text-slate-800 border-r border-slate-200 font-semibold">หน่วยการเรียนรู้ที่ {w}</td>
                         <td className="p-2 text-center border-r border-slate-200">4</td>
                         <td className="p-2 text-center border-r border-slate-200 font-bold text-emerald-700">10</td>
                         <td className="p-2 text-center font-bold text-amber-700">10</td>
@@ -636,9 +636,9 @@ export default function ScoreImportModal({
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-800">
-                    à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œ Excel à¹‚à¸„à¸£à¸‡à¸ªà¸£à¹‰à¸²à¸‡à¸„à¸°à¹à¸™à¸™ (Blueprint)
+                    อัปโหลดไฟล์ Excel โครงสร้างคะแนน (Blueprint)
                   </h3>
-                  <p className="text-xs text-slate-500">à¸£à¸­à¸‡à¸£à¸±à¸šà¹„à¸Ÿà¸¥à¹Œà¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥ .xlsx, .xls</p>
+                  <p className="text-xs text-slate-500">รองรับไฟล์นามสกุล .xlsx, .xls</p>
                 </div>
               </div>
 
@@ -654,10 +654,10 @@ export default function ScoreImportModal({
                     <Upload className="w-6 h-6" />
                   </div>
                   <p className="text-xs font-bold text-slate-700">
-                    à¸„à¸¥à¸´à¸à¹€à¸žà¸·à¹ˆà¸­à¹€à¸¥à¸·à¸­à¸à¹„à¸Ÿà¸¥à¹Œ Blueprint à¸«à¸£à¸·à¸­à¸¥à¸²à¸à¹„à¸Ÿà¸¥à¹Œà¸¡à¸²à¸§à¸²à¸‡à¸—à¸µà¹ˆà¸™à¸µà¹ˆ
+                    คลิกเพื่อเลือกไฟล์ Blueprint หรือลากไฟล์มาวางที่นี่
                   </p>
                   <p className="text-[10px] text-slate-400">
-                    {fileName ? `à¹„à¸Ÿà¸¥à¹Œà¸—à¸µà¹ˆà¹€à¸¥à¸·à¸­à¸: ${fileName}` : 'à¸£à¸­à¸‡à¸£à¸±à¸š .xlsx, .xls'}
+                    {fileName ? `ไฟล์ที่เลือก: ${fileName}` : 'รองรับ .xlsx, .xls'}
                   </p>
                 </div>
               </div>
@@ -666,7 +666,7 @@ export default function ScoreImportModal({
                 <div className="flex items-center justify-between bg-emerald-50 p-3 rounded-xl border border-emerald-200 text-emerald-800 text-xs font-bold">
                   <span className="flex items-center gap-1.5">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    à¸žà¸£à¹‰à¸­à¸¡à¸­à¸±à¸›à¹€à¸”à¸•à¹‚à¸„à¸£à¸‡à¸ªà¸£à¹‰à¸²à¸‡ {parsedBlueprint.length} à¸šà¸—à¹€à¸£à¸µà¸¢à¸™
+                    พร้อมอัปเดตโครงสร้าง {parsedBlueprint.length} บทเรียน
                   </span>
                 </div>
               )}
@@ -681,7 +681,7 @@ export default function ScoreImportModal({
             onClick={onClose}
             className="btn bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-4 py-2 rounded-xl font-semibold"
           >
-            à¸¢à¸à¹€à¸¥à¸´à¸
+            ยกเลิก
           </button>
 
           <button
@@ -691,7 +691,7 @@ export default function ScoreImportModal({
             className="btn btn-primary text-xs px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-md shadow-indigo-500/20 disabled:opacity-50"
           >
             {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-            <span>à¸¢à¸·à¸™à¸¢à¸±à¸™à¸™à¸³à¹€à¸‚à¹‰à¸²à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸¥à¸‡à¸£à¸°à¸šà¸š</span>
+            <span>ยืนยันนำเข้าข้อมูลลงระบบ</span>
           </button>
         </div>
       </div>

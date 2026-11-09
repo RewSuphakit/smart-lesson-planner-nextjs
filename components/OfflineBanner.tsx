@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import {
@@ -7,7 +7,7 @@ import {
 } from '@/lib/offlineAttendance';
 import api from '@/services/api';
 import { WifiOff, RefreshCw, CheckCircle2, CloudUpload } from 'lucide-react';
-import toast from '@/lib/toast';
+import toast from 'react-hot-toast';
 
 export default function OfflineBanner({ onSyncComplete }: { onSyncComplete?: () => void }) {
   const [isOnline, setIsOnline] = useState<boolean>(true);
@@ -56,16 +56,16 @@ export default function OfflineBanner({ onSyncComplete }: { onSyncComplete?: () 
     try {
       const result = await syncOfflineAttendance(api);
       if (result.success && result.syncedCount > 0) {
-        toast.success(`à¸‹à¸´à¸‡à¸„à¹Œà¸‚à¹‰à¸­à¸¡à¸¹à¸¥ ${result.syncedCount} à¸£à¸²à¸¢à¸à¸²à¸£à¸‚à¸¶à¹‰à¸™à¸£à¸°à¸šà¸šà¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢`, { icon: 'â˜ï¸' });
+        toast.success(`ซิงค์ข้อมูล ${result.syncedCount} รายการขึ้นระบบเรียบร้อย`, { icon: '☁️' });
         updateQueueCount();
         if (onSyncComplete) onSyncComplete();
       } else if (!result.success) {
-        toast.error(result.error || 'à¸‹à¸´à¸‡à¸„à¹Œà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ à¸à¸£à¸¸à¸“à¸²à¸¥à¸­à¸‡à¹ƒà¸«à¸¡à¹ˆ');
+        toast.error(result.error || 'ซิงค์ข้อมูลไม่สำเร็จ กรุณาลองใหม่');
       } else {
-        toast('à¹„à¸¡à¹ˆà¸¡à¸µà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸—à¸µà¹ˆà¸„à¹‰à¸²à¸‡à¸£à¸­à¸‹à¸´à¸‡à¸„à¹Œ', { icon: 'âœ…' });
+        toast('ไม่มีข้อมูลที่ค้างรอซิงค์', { icon: '✅' });
       }
     } catch {
-      toast.error('à¹€à¸à¸´à¸”à¸‚à¹‰à¸­à¸œà¸´à¸”à¸žà¸¥à¸²à¸”à¹ƒà¸™à¸à¸²à¸£à¹€à¸Šà¸·à¹ˆà¸­à¸¡à¸•à¹ˆà¸­');
+      toast.error('เกิดข้อผิดพลาดในการเชื่อมต่อ');
     } finally {
       setIsSyncing(false);
     }
@@ -87,21 +87,21 @@ export default function OfflineBanner({ onSyncComplete }: { onSyncComplete?: () 
             </div>
             <div className="min-w-0">
               <p className="text-xs font-bold leading-tight flex items-center gap-1.5 flex-wrap">
-                <span>à¸à¸³à¸¥à¸±à¸‡à¸—à¸³à¸‡à¸²à¸™à¹ƒà¸™à¹‚à¸«à¸¡à¸”à¸­à¸­à¸Ÿà¹„à¸¥à¸™à¹Œ</span>
+                <span>กำลังทำงานในโหมดออฟไลน์</span>
                 <span className="px-1.5 py-0.2 rounded text-[10px] font-extrabold bg-amber-200 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300">
-                  à¸­à¸­à¸Ÿà¹„à¸¥à¸™à¹Œ
+                  ออฟไลน์
                 </span>
               </p>
               <p className="text-[11px] text-amber-700/90 dark:text-amber-300/80 mt-0.5 truncate">
                 {pendingCount > 0
-                  ? `à¸šà¸±à¸™à¸—à¸¶à¸à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¹ƒà¸™à¹€à¸„à¸£à¸·à¹ˆà¸­à¸‡à¹à¸¥à¹‰à¸§ (${pendingCount} à¸£à¸²à¸¢à¸à¸²à¸£à¸ˆà¸°à¸–à¸¹à¸à¸ªà¹ˆà¸‡à¸‚à¸¶à¹‰à¸™à¸£à¸°à¸šà¸šà¸­à¸±à¸•à¹‚à¸™à¸¡à¸±à¸•à¸´à¹€à¸¡à¸·à¹ˆà¸­à¸•à¹ˆà¸­à¹€à¸™à¹‡à¸•)`
-                  : 'à¸ªà¸²à¸¡à¸²à¸£à¸–à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­à¹„à¸”à¹‰à¸•à¸²à¸¡à¸›à¸à¸•à¸´ à¸£à¸°à¸šà¸šà¸ˆà¸°à¹€à¸à¹‡à¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¹„à¸§à¹‰à¹ƒà¸™à¹€à¸„à¸£à¸·à¹ˆà¸­à¸‡'}
+                  ? `บันทึกข้อมูลในเครื่องแล้ว (${pendingCount} รายการจะถูกส่งขึ้นระบบอัตโนมัติเมื่อต่อเน็ต)`
+                  : 'สามารถเช็คชื่อได้ตามปกติ ระบบจะเก็บข้อมูลไว้ในเครื่อง'}
               </p>
             </div>
           </div>
           {pendingCount > 0 && (
             <span className="px-2.5 py-1 rounded-xl bg-amber-100 dark:bg-amber-900/80 text-amber-900 dark:text-amber-100 text-xs font-black shrink-0 border border-amber-200 dark:border-amber-700">
-              {pendingCount} à¸£à¸­à¸‹à¸´à¸‡à¸„à¹Œ
+              {pendingCount} รอซิงค์
             </span>
           )}
         </div>
@@ -113,8 +113,8 @@ export default function OfflineBanner({ onSyncComplete }: { onSyncComplete?: () 
               <CloudUpload className="w-4 h-4" />
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-bold leading-tight">à¸¡à¸µà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­à¸„à¹‰à¸²à¸‡à¸­à¸¢à¸¹à¹ˆà¹ƒà¸™à¹€à¸„à¸£à¸·à¹ˆà¸­à¸‡ {pendingCount} à¸£à¸²à¸¢à¸à¸²à¸£</p>
-              <p className="text-[11px] text-indigo-600 dark:text-indigo-400 mt-0.5">à¹€à¸Šà¸·à¹ˆà¸­à¸¡à¸•à¹ˆà¸­à¸­à¸´à¸™à¹€à¸—à¸­à¸£à¹Œà¹€à¸™à¹‡à¸•à¹à¸¥à¹‰à¸§ à¸à¸”à¸‹à¸´à¸‡à¸„à¹Œà¹€à¸žà¸·à¹ˆà¸­à¸­à¸±à¸›à¹€à¸”à¸•à¸‚à¸¶à¹‰à¸™à¸à¸²à¸™à¸‚à¹‰à¸­à¸¡à¸¹à¸¥</p>
+              <p className="text-xs font-bold leading-tight">มีข้อมูลเช็คชื่อค้างอยู่ในเครื่อง {pendingCount} รายการ</p>
+              <p className="text-[11px] text-indigo-600 dark:text-indigo-400 mt-0.5">เชื่อมต่ออินเทอร์เน็ตแล้ว กดซิงค์เพื่ออัปเดตขึ้นฐานข้อมูล</p>
             </div>
           </div>
           <button
@@ -124,7 +124,7 @@ export default function OfflineBanner({ onSyncComplete }: { onSyncComplete?: () 
             className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5 shrink-0 disabled:opacity-50 cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-            <span>{isSyncing ? 'à¸à¸³à¸¥à¸±à¸‡à¸‹à¸´à¸‡à¸„à¹Œ...' : 'à¸‹à¸´à¸‡à¸„à¹Œà¸—à¸±à¸™à¸—à¸µ'}</span>
+            <span>{isSyncing ? 'กำลังซิงค์...' : 'ซิงค์ทันที'}</span>
           </button>
         </div>
       )}

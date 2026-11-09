@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -8,7 +8,7 @@ import {
   FileSpreadsheet, Printer, Zap, AlertTriangle, Search, Award, CheckCircle2, XCircle, Download,
   SlidersHorizontal, LayoutGrid, Table as TableIcon, Grid, Users
 } from 'lucide-react';
-import toast from '@/lib/toast';
+import toast from 'react-hot-toast';
 import Pagination from '@/components/Pagination';
 import dynamic from 'next/dynamic';
 import { calculateAffectiveScore } from '@/lib/affective';
@@ -146,7 +146,7 @@ export default function Grades() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
 
-  // Auto & Dynamic Column Width State for "à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥"
+  // Auto & Dynamic Column Width State for "ชื่อ-นามสกุล"
   const [nameColMode, setNameColMode] = useState<'auto' | 'compact' | 'normal' | 'wide'>('auto');
   const [customWidthOffset, setCustomWidthOffset] = useState<number>(0);
 
@@ -165,7 +165,7 @@ export default function Grades() {
     if (!report || report.length === 0) return 260;
     const maxNameLen = Math.max(14, ...report.map(s => (s.name || '').length));
     const hasBadges = report.some(s =>
-      s.is_f || s.grade === 'à¸‚.à¸£.' || s.grade === 'à¸‚à¸£' || s.is_absent_final || s.is_incomplete ||
+      s.is_f || s.grade === 'ข.ร.' || s.grade === 'ขร' || s.is_absent_final || s.is_incomplete ||
       (s.remaining_absences !== undefined && s.remaining_absences <= 2 && s.remaining_absences >= 0)
     );
     const base = maxNameLen * 9.5 + (hasBadges ? 130 : 45);
@@ -192,7 +192,7 @@ export default function Grades() {
     return Math.max(160, Math.min(550, w + customWidthOffset));
   }, [nameColMode, customWidthOffset]);
 
-  // â”€â”€â”€ Query: à¸”à¸¶à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™ â”€â”€â”€
+  // ─── Query: ดึงข้อมูลห้องเรียน ───
   const { data: classrooms = EMPTY_CLASSROOMS, isLoading: loadingClassrooms } = useQuery<Classroom[]>({
     queryKey: ['classrooms'],
     queryFn: async () => {
@@ -209,7 +209,7 @@ export default function Grades() {
     return classroomObj ? parseClassroomName(classroomObj.name) : null;
   }, [classroomObj]);
 
-  // â”€â”€â”€ Query: à¸”à¸¶à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¹€à¸à¸£à¸”à¹à¸¥à¸°à¹€à¸à¸“à¸‘à¹Œ â”€â”€â”€
+  // ─── Query: ดึงข้อมูลเกรดและเกณฑ์ ───
   const { data: gradesData, isLoading: loadingGrades } = useQuery<{ criteria: Criterion[]; report: ReportStudent[]; weights?: Weights }>({
     queryKey: ['grades', selectedClass],
     queryFn: async () => {
@@ -291,7 +291,7 @@ export default function Grades() {
       Number(weights.final_weight || 0);
   }, [weights]);
 
-  // â”€â”€â”€ Sub-room / Section Grouping (à¹à¸¢à¸à¸«à¹‰à¸­à¸‡à¸¢à¹ˆà¸­à¸¢à¹€à¸¡à¸·à¹ˆà¸­à¹€à¸£à¸µà¸¢à¸™à¸£à¸§à¸¡ à¹€à¸Šà¹ˆà¸™ à¸›à¸§à¸Š.1/1 + à¸›à¸§à¸Š.1/2) â”€â”€â”€
+  // ─── Sub-room / Section Grouping (แยกห้องย่อยเมื่อเรียนรวม เช่น ปวช.1/1 + ปวช.1/2) ───
   const [selectedSectionKey, setSelectedSectionKey] = useState<string>('all');
 
   // Reset section filter and pagination when switching classrooms
@@ -330,7 +330,7 @@ export default function Grades() {
     setCurrentPage(1);
   };
 
-  // Grade Distribution & Analytics Calculation (à¸„à¸³à¸™à¸§à¸“à¸•à¸²à¸¡à¸‚à¸­à¸šà¹€à¸‚à¸•à¸«à¹‰à¸­à¸‡à¸¢à¹ˆà¸­à¸¢à¸—à¸µà¹ˆà¹€à¸¥à¸·à¸­à¸)
+  // Grade Distribution & Analytics Calculation (คำนวณตามขอบเขตห้องย่อยที่เลือก)
   const analytics = useMemo(() => {
     if (!sectionScopedReport || sectionScopedReport.length === 0) {
       return { gpa: '0.00', passRate: 0, passCount: 0, failCount: 0, krCount: 0, ksCount: 0, msCount: 0, distribution: {} as Record<string, number> };
@@ -346,19 +346,19 @@ export default function Grades() {
     let msCount = 0;
 
     sectionScopedReport.forEach(student => {
-      const g = student.grade || 'à¹„à¸¡à¹ˆà¸¡à¸µà¹€à¸à¸£à¸”';
+      const g = student.grade || 'ไม่มีเกรด';
       dist[g] = (dist[g] || 0) + 1;
 
-      if (g === 'à¸‚.à¸£.' || g === 'à¸‚à¸£' || student.is_f) {
+      if (g === 'ข.ร.' || g === 'ขร' || student.is_f) {
         krCount++;
         failCount++;
-      } else if (g === 'à¸‚.à¸ª.' || student.is_absent_final) {
+      } else if (g === 'ข.ส.' || student.is_absent_final) {
         ksCount++;
         failCount++;
-      } else if (g === 'à¸¡.à¸ª.' || student.is_incomplete) {
+      } else if (g === 'ม.ส.' || student.is_incomplete) {
         msCount++;
         failCount++;
-      } else if (g === '0' || g === 'F' || g === 'à¹„à¸¡à¹ˆà¸¡à¸µà¹€à¸à¸£à¸”') {
+      } else if (g === '0' || g === 'F' || g === 'ไม่มีเกรด') {
         failCount++;
       } else {
         passCount++;
@@ -377,7 +377,7 @@ export default function Grades() {
     return { gpa, passRate, passCount, failCount, krCount, ksCount, msCount, distribution: dist };
   }, [sectionScopedReport]);
 
-  // Filtered student list (à¸•à¸²à¸¡à¸‚à¸­à¸šà¹€à¸‚à¸•à¸«à¹‰à¸­à¸‡à¸¢à¹ˆà¸­à¸¢à¸—à¸µà¹ˆà¹€à¸¥à¸·à¸­à¸)
+  // Filtered student list (ตามขอบเขตห้องย่อยที่เลือก)
   const filteredReport = useMemo(() => {
     return sectionScopedReport.filter(student => {
       const q = searchQuery.trim().toLowerCase();
@@ -390,10 +390,10 @@ export default function Grades() {
       if (!matchesSearch) return false;
 
       if (gradeFilter === 'ALL') return true;
-      if (gradeFilter === 'KR') return student.is_f || student.grade === 'à¸‚.à¸£.' || student.grade === 'à¸‚à¸£';
-      if (gradeFilter === 'KS') return student.grade === 'à¸‚.à¸ª.' || student.is_absent_final;
-      if (gradeFilter === 'MS') return student.grade === 'à¸¡.à¸ª.' || student.is_incomplete;
-      if (gradeFilter === 'FAIL') return student.grade === '0' || student.grade === 'F' || student.grade === 'à¸‚.à¸£.' || student.grade === 'à¸‚.à¸ª.' || student.grade === 'à¸¡.à¸ª.' || student.is_f;
+      if (gradeFilter === 'KR') return student.is_f || student.grade === 'ข.ร.' || student.grade === 'ขร';
+      if (gradeFilter === 'KS') return student.grade === 'ข.ส.' || student.is_absent_final;
+      if (gradeFilter === 'MS') return student.grade === 'ม.ส.' || student.is_incomplete;
+      if (gradeFilter === 'FAIL') return student.grade === '0' || student.grade === 'F' || student.grade === 'ข.ร.' || student.grade === 'ข.ส.' || student.grade === 'ม.ส.' || student.is_f;
       return student.grade === gradeFilter;
     });
   }, [sectionScopedReport, searchQuery, gradeFilter]);
@@ -413,11 +413,11 @@ export default function Grades() {
         let isIncomplete = student.is_incomplete;
 
         if (field === 'final_score') {
-          if (valNum === -1 || value === 'à¸‚.à¸ª.' || value === 'à¸‚à¸²à¸”à¸ªà¸­à¸š') {
+          if (valNum === -1 || value === 'ข.ส.' || value === 'ขาดสอบ') {
             valNum = -1;
             isAbsentFinal = true;
             isIncomplete = false;
-          } else if (valNum === -2 || value === 'à¸¡.à¸ª.' || value === 'à¹„à¸¡à¹ˆà¸ªà¸¡à¸šà¸¹à¸£à¸“à¹Œ') {
+          } else if (valNum === -2 || value === 'ม.ส.' || value === 'ไม่สมบูรณ์') {
             valNum = -2;
             isAbsentFinal = false;
             isIncomplete = true;
@@ -463,11 +463,11 @@ export default function Grades() {
 
         let finalGrade = null;
         if (updatedStudent.is_f) {
-          finalGrade = 'à¸‚.à¸£.';
+          finalGrade = 'ข.ร.';
         } else if (updatedStudent.is_absent_final) {
-          finalGrade = 'à¸‚.à¸ª.';
+          finalGrade = 'ข.ส.';
         } else if (updatedStudent.is_incomplete) {
-          finalGrade = 'à¸¡.à¸ª.';
+          finalGrade = 'ม.ส.';
         } else {
           for (const c of criteria) {
             if (percentage >= Number(c.min_score)) {
@@ -476,7 +476,7 @@ export default function Grades() {
             }
           }
         }
-        updatedStudent.grade = finalGrade || 'à¹„à¸¡à¹ˆà¸¡à¸µà¹€à¸à¸£à¸”';
+        updatedStudent.grade = finalGrade || 'ไม่มีเกรด';
 
         return updatedStudent;
       }
@@ -484,7 +484,7 @@ export default function Grades() {
     }));
   };
 
-  // â”€â”€â”€ Mutation: à¸šà¸±à¸™à¸—à¸¶à¸à¸„à¸°à¹à¸™à¸™à¸ªà¸­à¸š â”€â”€â”€
+  // ─── Mutation: บันทึกคะแนนสอบ ───
   const saveExamsMutation = useMutation({
     mutationFn: async () => {
       const scores = report.map(s => ({
@@ -498,12 +498,12 @@ export default function Grades() {
       return api.put('/students/exams', { scores });
     },
     onSuccess: () => {
-      toast.success('à¸šà¸±à¸™à¸—à¸¶à¸à¸„à¸°à¹à¸™à¸™à¸ªà¸­à¸šà¹à¸¥à¸°à¸ˆà¸´à¸•à¸žà¸´à¸ªà¸±à¸¢à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢à¹à¸¥à¹‰à¸§');
+      toast.success('บันทึกคะแนนสอบและจิตพิสัยเรียบร้อยแล้ว');
       setHasUnsavedChanges(false);
       queryClient.invalidateQueries({ queryKey: ['grades', selectedClass] });
     },
     onError: () => {
-      toast.error('à¸šà¸±à¸™à¸—à¸¶à¸à¸„à¸°à¹à¸™à¸™à¸ªà¸­à¸šà¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
+      toast.error('บันทึกคะแนนสอบไม่สำเร็จ');
     },
   });
 
@@ -532,11 +532,11 @@ export default function Grades() {
 
       let finalGrade = null;
       if (updatedStudent.is_f) {
-        finalGrade = 'à¸‚.à¸£.';
+        finalGrade = 'ข.ร.';
       } else if (updatedStudent.is_absent_final) {
-        finalGrade = 'à¸‚.à¸ª.';
+        finalGrade = 'ข.ส.';
       } else if (updatedStudent.is_incomplete) {
-        finalGrade = 'à¸¡.à¸ª.';
+        finalGrade = 'ม.ส.';
       } else {
         for (const c of criteria) {
           if (percentage >= Number(c.min_score)) {
@@ -545,17 +545,17 @@ export default function Grades() {
           }
         }
       }
-      updatedStudent.grade = finalGrade || 'à¹„à¸¡à¹ˆà¸¡à¸µà¹€à¸à¸£à¸”';
+      updatedStudent.grade = finalGrade || 'ไม่มีเกรด';
       count++;
       return updatedStudent;
     }));
-    toast.success(`à¸„à¸³à¸™à¸§à¸“à¸ˆà¸´à¸•à¸žà¸´à¸ªà¸±à¸¢à¸­à¸±à¸•à¹‚à¸™à¸¡à¸±à¸•à¸´à¸ˆà¸²à¸à¸ªà¸–à¸´à¸•à¸´à¹€à¸§à¸¥à¸²à¹€à¸£à¸µà¸¢à¸™à¹€à¸ªà¸£à¹‡à¸ˆ ${count} à¸„à¸™`);
+    toast.success(`คำนวณจิตพิสัยอัตโนมัติจากสถิติเวลาเรียนเสร็จ ${count} คน`);
   };
 
-  // Export Std02 Online (à¸¨à¸˜.02 à¸­à¸­à¸™à¹„à¸¥à¸™à¹Œ Template - à¸ªà¸­à¸¨.)
+  // Export Std02 Online (ศธ.02 ออนไลน์ Template - สอศ.)
   const exportStd02 = async (fileType: 'xlsx' | 'csv' = 'xlsx') => {
     if (!report || report.length === 0) {
-      toast.error('à¹„à¸¡à¹ˆà¸žà¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸ªà¸³à¸«à¸£à¸±à¸šà¸ªà¹ˆà¸‡à¸­à¸­à¸');
+      toast.error('ไม่พบข้อมูลสำหรับส่งออก');
       return;
     }
 
@@ -563,32 +563,32 @@ export default function Grades() {
     const cleanClassName = (currentClass?.name || 'Classroom').replace(/[/\\?%*:|"<>]/g, '_');
 
     const headers = [
-      'à¸¥à¸³à¸”à¸±à¸š',
-      'à¸£à¸«à¸±à¸ªà¸›à¸£à¸°à¸ˆà¸³à¸•à¸±à¸§',
-      'à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥',
-      `à¸ˆà¸´à¸•à¸žà¸´à¸ªà¸±à¸¢ (${weights.affective_weight}%)`,
-      `à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢ (${weights.post_test_weight}%)`,
-      `à¸‡à¸²à¸™à¹€à¸à¹‡à¸š (${weights.assignment_weight}%)`,
-      `à¸à¸¥à¸²à¸‡à¸ à¸²à¸„ (${weights.midterm_weight}%)`,
-      `à¸›à¸¥à¸²à¸¢à¸ à¸²à¸„ (${weights.final_weight}%)`,
-      'à¸£à¸§à¸¡à¸„à¸°à¹à¸™à¸™ (100)',
-      'à¸£à¸°à¸”à¸±à¸šà¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™',
-      'à¹€à¸§à¸¥à¸²à¹€à¸£à¸µà¸¢à¸™ (%)',
-      'à¸«à¸¡à¸²à¸¢à¹€à¸«à¸•à¸¸'
+      'ลำดับ',
+      'รหัสประจำตัว',
+      'ชื่อ-นามสกุล',
+      `จิตพิสัย (${weights.affective_weight}%)`,
+      `สอบย่อย (${weights.post_test_weight}%)`,
+      `งานเก็บ (${weights.assignment_weight}%)`,
+      `กลางภาค (${weights.midterm_weight}%)`,
+      `ปลายภาค (${weights.final_weight}%)`,
+      'รวมคะแนน (100)',
+      'ระดับผลการเรียน',
+      'เวลาเรียน (%)',
+      'หมายเหตุ'
     ];
 
     const buildRowsForList = (studentsList: ReportStudent[]) => {
       return studentsList.map((student, idx) => {
-        const isKr = student.is_f || student.grade === 'à¸‚.à¸£.' || student.grade === 'à¸‚à¸£';
-        const isKs = student.grade === 'à¸‚.à¸ª.' || student.is_absent_final;
-        const isMs = student.grade === 'à¸¡.à¸ª.' || student.is_incomplete;
+        const isKr = student.is_f || student.grade === 'ข.ร.' || student.grade === 'ขร';
+        const isKs = student.grade === 'ข.ส.' || student.is_absent_final;
+        const isMs = student.grade === 'ม.ส.' || student.is_incomplete;
 
         let remark = '';
-        if (isKr) remark = 'à¸«à¸¡à¸”à¸ªà¸´à¸—à¸˜à¸´à¹Œà¸ªà¸­à¸š (à¸‚.à¸£.)';
-        else if (isKs) remark = 'à¸‚à¸²à¸”à¸ªà¸­à¸šà¸›à¸¥à¸²à¸¢à¸ à¸²à¸„ (à¸‚.à¸ª.)';
-        else if (isMs) remark = 'à¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™à¹„à¸¡à¹ˆà¸ªà¸¡à¸šà¸¹à¸£à¸“à¹Œ (à¸¡.à¸ª.)';
+        if (isKr) remark = 'หมดสิทธิ์สอบ (ข.ร.)';
+        else if (isKs) remark = 'ขาดสอบปลายภาค (ข.ส.)';
+        else if (isMs) remark = 'ผลการเรียนไม่สมบูรณ์ (ม.ส.)';
 
-        const finalDisplay = isKs ? 'à¸‚.à¸ª.' : isMs ? 'à¸¡.à¸ª.' : Number(student.precise_scaled_final || student.scaled_final || 0).toFixed(1);
+        const finalDisplay = isKs ? 'ข.ส.' : isMs ? 'ม.ส.' : Number(student.precise_scaled_final || student.scaled_final || 0).toFixed(1);
         const totalDisplay = (isKs || isMs) ? '-' : Number(student.total_score_precise ?? student.total_score ?? 0).toFixed(1);
 
         return [
@@ -635,29 +635,29 @@ export default function Grades() {
           const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
           ws['!cols'] = colWidths;
           XLSX.utils.book_append_sheet(wb, ws, activeSectionGroup.shortSheetName);
-          XLSX.writeFile(wb, `à¸¨à¸˜02_à¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™_${cleanClassName}_${activeSectionGroup.shortSheetName}.xlsx`);
+          XLSX.writeFile(wb, `ศธ02_ผลการเรียน_${cleanClassName}_${activeSectionGroup.shortSheetName}.xlsx`);
         } else if (hasMultipleSections) {
-          // à¸£à¸§à¸¡à¸—à¸¸à¸à¸«à¹‰à¸­à¸‡à¹€à¸›à¹‡à¸™à¹à¸œà¹ˆà¸™à¹à¸£à¸
+          // รวมทุกห้องเป็นแผ่นแรก
           const wsAll = XLSX.utils.aoa_to_sheet([headers, ...rows]);
           wsAll['!cols'] = colWidths;
-          XLSX.utils.book_append_sheet(wb, wsAll, 'à¸£à¸§à¸¡à¸—à¸¸à¸à¸«à¹‰à¸­à¸‡');
+          XLSX.utils.book_append_sheet(wb, wsAll, 'รวมทุกห้อง');
 
-          // à¹à¸¢à¸à¹à¸œà¹ˆà¸™à¸‡à¸²à¸™à¸•à¸²à¸¡à¹à¸•à¹ˆà¸¥à¸°à¸«à¹‰à¸­à¸‡à¸¢à¹ˆà¸­à¸¢
+          // แยกแผ่นงานตามแต่ละห้องย่อย
           sectionGroups.forEach(grp => {
             const grpRows = buildRowsForList(grp.students);
             const wsGrp = XLSX.utils.aoa_to_sheet([headers, ...grpRows]);
             wsGrp['!cols'] = colWidths;
             XLSX.utils.book_append_sheet(wb, wsGrp, grp.shortSheetName);
           });
-          XLSX.writeFile(wb, `à¸¨à¸˜02_à¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™_${cleanClassName}_à¹à¸¢à¸à¸«à¹‰à¸­à¸‡à¸¢à¹ˆà¸­à¸¢.xlsx`);
+          XLSX.writeFile(wb, `ศธ02_ผลการเรียน_${cleanClassName}_แยกห้องย่อย.xlsx`);
         } else {
           const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
           ws['!cols'] = colWidths;
-          XLSX.utils.book_append_sheet(wb, ws, 'à¸¨à¸˜.02 à¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™');
-          XLSX.writeFile(wb, `à¸¨à¸˜02_à¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™_${cleanClassName}.xlsx`);
+          XLSX.utils.book_append_sheet(wb, ws, 'ศธ.02 ผลการเรียน');
+          XLSX.writeFile(wb, `ศธ02_ผลการเรียน_${cleanClassName}.xlsx`);
         }
 
-        toast.success('à¸ªà¹ˆà¸‡à¸­à¸­à¸à¹„à¸Ÿà¸¥à¹Œ Excel à¸¨à¸˜.02 à¸­à¸­à¸™à¹„à¸¥à¸™à¹Œ à¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
+        toast.success('ส่งออกไฟล์ Excel ศธ.02 ออนไลน์ สำเร็จ');
         return;
       } catch (err) {
         console.error('XLSX export error:', err);
@@ -674,14 +674,14 @@ export default function Grades() {
     const link = document.createElement('a');
     const csvSuffix = activeSectionGroup ? `_${activeSectionGroup.shortSheetName}` : '';
     link.href = url;
-    link.setAttribute('download', `à¸¨à¸˜02_à¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™_${cleanClassName}${csvSuffix}.csv`);
+    link.setAttribute('download', `ศธ02_ผลการเรียน_${cleanClassName}${csvSuffix}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast.success('à¸ªà¹ˆà¸‡à¸­à¸­à¸à¹„à¸Ÿà¸¥à¹Œ CSV à¸¨à¸˜.02 à¸­à¸­à¸™à¹„à¸¥à¸™à¹Œ à¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
+    toast.success('ส่งออกไฟล์ CSV ศธ.02 ออนไลน์ สำเร็จ');
   };
 
-  // â”€â”€â”€ Mutation: à¸šà¸±à¸™à¸—à¸¶à¸à¹€à¸à¸“à¸‘à¹Œà¸•à¸±à¸”à¹€à¸à¸£à¸” â”€â”€â”€
+  // ─── Mutation: บันทึกเกณฑ์ตัดเกรด ───
   const saveCriteriaMutation = useMutation({
     mutationFn: async () => {
       await api.post(`/grades?classroom_id=${selectedClass}&type=criteria`, { criteria });
@@ -696,21 +696,21 @@ export default function Grades() {
       });
     },
     onSuccess: () => {
-      toast.success('à¸šà¸±à¸™à¸—à¸¶à¸à¸à¸²à¸£à¸•à¸±à¹‰à¸‡à¸„à¹ˆà¸²à¸™à¹‰à¸³à¸«à¸™à¸±à¸à¹à¸¥à¸°à¹€à¸à¸“à¸‘à¹Œà¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢');
+      toast.success('บันทึกการตั้งค่าน้ำหนักและเกณฑ์เรียบร้อย');
       setShowSettings(false);
       queryClient.invalidateQueries({ queryKey: ['classrooms'] });
       queryClient.invalidateQueries({ queryKey: ['grades', selectedClass] });
     },
     onError: () => {
-      toast.error('à¸šà¸±à¸™à¸—à¸¶à¸à¸à¸²à¸£à¸•à¸±à¹‰à¸‡à¸„à¹ˆà¸²à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
+      toast.error('บันทึกการตั้งค่าไม่สำเร็จ');
     },
   });
 
 
   const getGradeStyle = (grade?: string) => {
-    if (grade === 'à¸‚.à¸£.' || grade === 'à¸‚à¸£' || grade === 'F') return 'bg-rose-600 text-white shadow-sm shadow-rose-500/20';
-    if (grade === 'à¸‚.à¸ª.') return 'bg-amber-500 text-white shadow-sm shadow-amber-500/20';
-    if (grade === 'à¸¡.à¸ª.') return 'bg-purple-600 text-white shadow-sm shadow-purple-500/20';
+    if (grade === 'ข.ร.' || grade === 'ขร' || grade === 'F') return 'bg-rose-600 text-white shadow-sm shadow-rose-500/20';
+    if (grade === 'ข.ส.') return 'bg-amber-500 text-white shadow-sm shadow-amber-500/20';
+    if (grade === 'ม.ส.') return 'bg-purple-600 text-white shadow-sm shadow-purple-500/20';
     if (grade === '4' || grade === '3.5' || grade === '3' || grade === 'A') return 'bg-emerald-600 text-white shadow-sm shadow-emerald-500/20';
     if (grade === '2.5' || grade === '2' || grade === '1.5' || grade === '1' || grade === 'B' || grade === 'C') return 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/20';
     if (grade === '0' || grade === 'D') return 'bg-rose-500 text-white shadow-sm shadow-rose-500/20';
@@ -720,7 +720,7 @@ export default function Grades() {
   if (loadingClassrooms) return (
     <div className="flex flex-col items-center justify-center h-64 gap-3">
       <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
-      <p className="text-xs text-slate-500">à¸à¸³à¸¥à¸±à¸‡à¹‚à¸«à¸¥à¸”à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™...</p>
+      <p className="text-xs text-slate-500">กำลังโหลดข้อมูลห้องเรียน...</p>
     </div>
   );
 
@@ -729,7 +729,7 @@ export default function Grades() {
       {/* ==================== PAGE HEADER ==================== */}
 
 
-      {/* Active Classroom Bar (à¹€à¸¡à¸·à¹ˆà¸­à¹€à¸¥à¸·à¸­à¸à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™à¹à¸¥à¹‰à¸§) */}
+      {/* Active Classroom Bar (เมื่อเลือกห้องเรียนแล้ว) */}
       {selectedClass && activeParsed && (
         <div className="glass dark:bg-slate-900/85 p-5 sm:p-6 rounded-3xl border border-purple-100/80 dark:border-slate-800 bg-white/95 dark:bg-slate-900 shadow-xl shadow-purple-100/20 dark:shadow-black/40 space-y-4">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -744,13 +744,13 @@ export default function Grades() {
                       {activeParsed.code}
                     </span>
                   )}
-                  <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border shadow-2xs ${activeParsed.curriculumType === 'pvs' || weights.is_pws || classroomObj?.name?.includes('à¸›à¸§à¸ª')
+                  <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border shadow-2xs ${activeParsed.curriculumType === 'pvs' || weights.is_pws || classroomObj?.name?.includes('ปวส')
                     ? 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
                     : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
                     }`}>
-                    {activeParsed.curriculumType === 'pvs' || weights.is_pws || classroomObj?.name?.includes('à¸›à¸§à¸ª')
-                      ? `à¸›à¸§à¸ª. (${weights.target_weeks || 15} à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ)`
-                      : `à¸›à¸§à¸Š. (${weights.target_weeks || 18} à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ)`}
+                    {activeParsed.curriculumType === 'pvs' || weights.is_pws || classroomObj?.name?.includes('ปวส')
+                      ? `ปวส. (${weights.target_weeks || 15} สัปดาห์)`
+                      : `ปวช. (${weights.target_weeks || 18} สัปดาห์)`}
                   </span>
                   {activeParsed.groupName && (
                     <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800 shadow-2xs">
@@ -758,7 +758,7 @@ export default function Grades() {
                     </span>
                   )}
                   <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1">
-                    (ðŸ‘¥ {classroomObj?.student_count || report.length || 0} à¸„à¸™)
+                    (👥 {classroomObj?.student_count || report.length || 0} คน)
                   </span>
                 </div>
                 <h2 className="text-base sm:text-xl font-black text-slate-800 dark:text-slate-100 leading-tight mt-1 truncate" title={activeParsed.subjectTitle}>
@@ -767,7 +767,7 @@ export default function Grades() {
               </div>
             </div>
 
-            {/* Quick Switch / à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¸«à¹‰à¸­à¸‡ & Settings button */}
+            {/* Quick Switch / เปลี่ยนห้อง & Settings button */}
             <div className="flex items-center gap-2 shrink-0 self-start lg:self-center flex-wrap">
               <button
                 onClick={() => setShowSettings(!showSettings)}
@@ -777,7 +777,7 @@ export default function Grades() {
                   }`}
               >
                 <Settings className="w-3.5 h-3.5" />
-                <span>à¸•à¸±à¹‰à¸‡à¸„à¹ˆà¸²à¹€à¸à¸“à¸‘à¹Œ & à¸™à¹‰à¸³à¸«à¸™à¸±à¸</span>
+                <span>ตั้งค่าเกณฑ์ & น้ำหนัก</span>
               </button>
 
               <div className="relative">
@@ -785,7 +785,7 @@ export default function Grades() {
                   value={selectedClass}
                   onChange={e => setSelectedClass(e.target.value)}
                   className="form-input text-xs font-bold py-2 pl-3 pr-8 bg-white/90 dark:bg-slate-800 hover:bg-white dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700 rounded-xl focus:border-purple-400 focus:ring focus:ring-purple-200/50 transition-all text-slate-700 dark:text-slate-200 cursor-pointer shadow-xs max-w-[200px] sm:max-w-[260px] truncate"
-                  title="à¸ªà¸¥à¸±à¸šà¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™à¹€à¸£à¹‡à¸§"
+                  title="สลับห้องเรียนเร็ว"
                 >
                   {classrooms.map(c => (
                     <option key={c.id} value={c.id}>
@@ -798,10 +798,10 @@ export default function Grades() {
                 type="button"
                 onClick={() => setSelectedClass('')}
                 className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-purple-50/80 dark:bg-slate-800 hover:bg-purple-100 dark:hover:bg-slate-700 text-purple-700 dark:text-purple-300 border border-purple-200/70 dark:border-slate-700 transition-all shadow-xs cursor-pointer shrink-0"
-                title="à¸¢à¹‰à¸­à¸™à¸à¸¥à¸±à¸šà¹„à¸›à¸”à¸¹à¸à¸²à¸£à¹Œà¸”à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”"
+                title="ย้อนกลับไปดูการ์ดห้องเรียนทั้งหมด"
               >
                 <Grid className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                <span>à¸à¸²à¸£à¹Œà¸”à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”</span>
+                <span>การ์ดทั้งหมด</span>
               </button>
             </div>
           </div>
@@ -818,16 +818,16 @@ export default function Grades() {
                   totalStudentsCount={report.length}
                   sharedBranch={sharedBranch}
                   themeColor="purple"
-                  label="à¹à¸¢à¸à¸«à¹‰à¸­à¸‡à¸•à¸±à¸”à¹€à¸à¸£à¸”:"
+                  label="แยกห้องตัดเกรด:"
                   rightContent={
                     activeSectionGroup ? (
                       <span className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
-                        à¸à¸³à¸¥à¸±à¸‡à¸”à¸¹à¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™à¸«à¹‰à¸­à¸‡: <span className="text-purple-700 font-extrabold bg-purple-50 px-2.5 py-0.5 rounded-lg border border-purple-200/70">{activeSectionGroup.label}</span>
-                        <span className="text-slate-400">({activeSectionGroup.students.length} à¸„à¸™)</span>
+                        กำลังดูผลการเรียนห้อง: <span className="text-purple-700 font-extrabold bg-purple-50 px-2.5 py-0.5 rounded-lg border border-purple-200/70">{activeSectionGroup.label}</span>
+                        <span className="text-slate-400">({activeSectionGroup.students.length} คน)</span>
                       </span>
                     ) : (
                       <span className="text-xs text-slate-400 font-medium">
-                        (à¹à¸ªà¸”à¸‡à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸—à¸¸à¸à¸«à¹‰à¸­à¸‡à¸¢à¹ˆà¸­à¸¢à¸£à¸§à¸¡à¸à¸±à¸™)
+                        (แสดงนักเรียนทุกห้องย่อยรวมกัน)
                       </span>
                     )
                   }
@@ -838,27 +838,27 @@ export default function Grades() {
         </div>
       )}
 
-      {/* Classroom Card Picker (à¹€à¸¡à¸·à¹ˆà¸­à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¹„à¸”à¹‰à¹€à¸¥à¸·à¸­à¸à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™) */}
+      {/* Classroom Card Picker (เมื่อยังไม่ได้เลือกห้องเรียน) */}
       {!selectedClass ? (
         <ClassroomCardPicker
           classrooms={classrooms}
           onSelect={setSelectedClass}
-          title="à¹€à¸¥à¸·à¸­à¸à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™à¹€à¸žà¸·à¹ˆà¸­à¸”à¸¹à¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™à¹à¸¥à¸°à¸•à¸±à¸”à¹€à¸à¸£à¸”"
+          title="เลือกห้องเรียนเพื่อดูผลการเรียนและตัดเกรด"
           subtitle=""
           icon={<Award className="w-6 h-6" />}
           themeColor="purple"
-          actionText="à¸”à¸¹à¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™ & à¸•à¸±à¸”à¹€à¸à¸£à¸”"
+          actionText="ดูผลการเรียน & ตัดเกรด"
           customCardStat={(_c) => (
             <div className="pt-1.5 border-t border-slate-200/50 flex items-center justify-between text-[11px] text-purple-700 font-semibold">
-              <span>à¹€à¸à¸“à¸‘à¹Œà¸›à¸£à¸°à¹€à¸¡à¸´à¸™</span>
-              <span>à¸ªà¸±à¸”à¸ªà¹ˆà¸§à¸™ 100% Â· 8 à¸£à¸°à¸”à¸±à¸š</span>
+              <span>เกณฑ์ประเมิน</span>
+              <span>สัดส่วน 100% · 8 ระดับ</span>
             </div>
           )}
         />
       ) : loadingGrades ? (
         <div className="flex flex-col items-center justify-center h-64 gap-3">
           <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-          <p className="text-xs text-slate-500">à¸à¸³à¸¥à¸±à¸‡à¸›à¸£à¸°à¸¡à¸§à¸¥à¸œà¸¥à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¹€à¸à¸£à¸”à¹à¸¥à¸°à¸„à¸°à¹à¸™à¸™...</p>
+          <p className="text-xs text-slate-500">กำลังประมวลผลข้อมูลเกรดและคะแนน...</p>
         </div>
       ) : showSettings ? (
         <GradesSettingsDrawer
@@ -875,8 +875,8 @@ export default function Grades() {
       ) : report.length === 0 ? (
         <div className="glass p-12 text-center rounded-3xl border border-indigo-100 bg-white">
           <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
-          <h3 className="text-lg font-bold text-slate-800 mb-1">à¹„à¸¡à¹ˆà¸žà¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¹ƒà¸™à¸«à¹‰à¸­à¸‡à¸™à¸µà¹‰</h3>
-          <p className="text-slate-500 text-xs sm:text-sm mt-1">à¸à¸£à¸¸à¸“à¸²à¹€à¸žà¸´à¹ˆà¸¡à¸£à¸²à¸¢à¸Šà¸·à¹ˆà¸­à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¹ƒà¸™à¹€à¸¡à¸™à¸¹ <strong>&quot;à¸ˆà¸±à¸”à¸à¸²à¸£à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™&quot;</strong> à¸à¹ˆà¸­à¸™</p>
+          <h3 className="text-lg font-bold text-slate-800 mb-1">ไม่พบข้อมูลนักเรียนในห้องนี้</h3>
+          <p className="text-slate-500 text-xs sm:text-sm mt-1">กรุณาเพิ่มรายชื่อนักเรียนในเมนู <strong>&quot;จัดการนักเรียน&quot;</strong> ก่อน</p>
         </div>
       ) : (
         <div className="space-y-6">
@@ -900,7 +900,7 @@ export default function Grades() {
                       type="text"
                       value={searchQuery}
                       onChange={e => setSearchQuery(e.target.value)}
-                      placeholder="à¸„à¹‰à¸™à¸«à¸²à¸Šà¸·à¹ˆà¸­, à¸£à¸«à¸±à¸ª à¸«à¸£à¸·à¸­à¸«à¹‰à¸­à¸‡à¸¢à¹ˆà¸­à¸¢..."
+                      placeholder="ค้นหาชื่อ, รหัส หรือห้องย่อย..."
                       className="w-full text-xs pl-9 pr-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 rounded-xl shadow-2xs"
                     />
                   </div>
@@ -910,19 +910,19 @@ export default function Grades() {
                     onChange={e => setGradeFilter(e.target.value)}
                     className="text-xs py-2 px-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 rounded-xl shadow-2xs min-w-[130px]"
                   >
-                    <option value="ALL">à¸—à¸¸à¸à¸£à¸°à¸”à¸±à¸šà¹€à¸à¸£à¸”</option>
-                    <option value="4">à¹€à¸à¸£à¸” 4</option>
-                    <option value="3.5">à¹€à¸à¸£à¸” 3.5</option>
-                    <option value="3">à¹€à¸à¸£à¸” 3</option>
-                    <option value="2.5">à¹€à¸à¸£à¸” 2.5</option>
-                    <option value="2">à¹€à¸à¸£à¸” 2</option>
-                    <option value="1.5">à¹€à¸à¸£à¸” 1.5</option>
-                    <option value="1">à¹€à¸à¸£à¸” 1</option>
-                    <option value="0">à¹€à¸à¸£à¸” 0</option>
-                    <option value="KR">à¹€à¸‰à¸žà¸²à¸° à¸‚.à¸£. (à¸‚à¸²à¸”à¹€à¸£à¸µà¸¢à¸™)</option>
-                    <option value="KS">à¹€à¸‰à¸žà¸²à¸° à¸‚.à¸ª. (à¸‚à¸²à¸”à¸ªà¸­à¸š)</option>
-                    <option value="MS">à¹€à¸‰à¸žà¸²à¸° à¸¡.à¸ª. (à¹„à¸¡à¹ˆà¸ªà¸¡à¸šà¸¹à¸£à¸“à¹Œ)</option>
-                    <option value="FAIL">à¹„à¸¡à¹ˆà¸œà¹ˆà¸²à¸™ / à¹€à¸‡à¸·à¹ˆà¸­à¸™à¹„à¸‚à¸žà¸´à¹€à¸¨à¸©</option>
+                    <option value="ALL">ทุกระดับเกรด</option>
+                    <option value="4">เกรด 4</option>
+                    <option value="3.5">เกรด 3.5</option>
+                    <option value="3">เกรด 3</option>
+                    <option value="2.5">เกรด 2.5</option>
+                    <option value="2">เกรด 2</option>
+                    <option value="1.5">เกรด 1.5</option>
+                    <option value="1">เกรด 1</option>
+                    <option value="0">เกรด 0</option>
+                    <option value="KR">เฉพาะ ข.ร. (ขาดเรียน)</option>
+                    <option value="KS">เฉพาะ ข.ส. (ขาดสอบ)</option>
+                    <option value="MS">เฉพาะ ม.ส. (ไม่สมบูรณ์)</option>
+                    <option value="FAIL">ไม่ผ่าน / เงื่อนไขพิเศษ</option>
                   </select>
 
                   {/* View Mode Switcher: Table vs Cards */}
@@ -931,8 +931,8 @@ export default function Grades() {
                       type="button"
                       onClick={() => setViewMode('table')}
                       className={`p-1.5 rounded-lg transition-all ${viewMode === 'table' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-xs' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
-                      title="à¸¡à¸¸à¸¡à¸¡à¸­à¸‡à¸•à¸²à¸£à¸²à¸‡ (Table View)"
-                      aria-label="à¸¡à¸¸à¸¡à¸¡à¸­à¸‡à¸•à¸²à¸£à¸²à¸‡"
+                      title="มุมมองตาราง (Table View)"
+                      aria-label="มุมมองตาราง"
                     >
                       <TableIcon className="w-4 h-4" />
                     </button>
@@ -940,8 +940,8 @@ export default function Grades() {
                       type="button"
                       onClick={() => setViewMode('cards')}
                       className={`p-1.5 rounded-lg transition-all ${viewMode === 'cards' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-xs' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
-                      title="à¸¡à¸¸à¸¡à¸¡à¸­à¸‡à¸à¸²à¸£à¹Œà¸” (Card View)"
-                      aria-label="à¸¡à¸¸à¸¡à¸¡à¸­à¸‡à¸à¸²à¸£à¹Œà¸”"
+                      title="มุมมองการ์ด (Card View)"
+                      aria-label="มุมมองการ์ด"
                     >
                       <LayoutGrid className="w-4 h-4" />
                     </button>
@@ -953,30 +953,30 @@ export default function Grades() {
                   <div className="hidden xl:flex items-center gap-1.5">
                     <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">
                       <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-500" />
-                      à¸à¸§à¹‰à¸²à¸‡à¸Šà¸·à¹ˆà¸­:
+                      กว้างชื่อ:
                     </span>
                     <div className="inline-flex rounded-xl bg-white dark:bg-slate-800 p-0.5 border border-slate-200 dark:border-slate-700 shadow-2xs text-xs font-semibold">
                       <button
                         type="button"
                         onClick={() => { setNameColMode('auto'); setCustomWidthOffset(0); }}
                         className={`px-2.5 py-1 rounded-lg transition-all ${nameColMode === 'auto' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
-                        title="à¸›à¸£à¸±à¸šà¸„à¸§à¸²à¸¡à¸à¸§à¹‰à¸²à¸‡à¸žà¸­à¸”à¸µà¸à¸±à¸šà¸«à¸™à¹‰à¸²à¸ˆà¸­ (à¹„à¸¡à¹ˆà¸•à¹‰à¸­à¸‡à¹€à¸¥à¸·à¹ˆà¸­à¸™à¹à¸à¸™ X)"
+                        title="ปรับความกว้างพอดีกับหน้าจอ (ไม่ต้องเลื่อนแกน X)"
                       >
-                        Auto (à¸žà¸­à¸”à¸µà¸ˆà¸­)
+                        Auto (พอดีจอ)
                       </button>
                       <button
                         type="button"
                         onClick={() => { setNameColMode('compact'); setCustomWidthOffset(0); }}
                         className={`px-2 py-1 rounded-lg transition-all ${nameColMode === 'compact' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
                       >
-                        à¸à¸£à¸°à¸Šà¸±à¸š
+                        กระชับ
                       </button>
                       <button
                         type="button"
                         onClick={() => { setNameColMode('normal'); setCustomWidthOffset(0); }}
                         className={`px-2 py-1 rounded-lg transition-all ${nameColMode === 'normal' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
                       >
-                        à¸›à¸à¸•à¸´
+                        ปกติ
                       </button>
                     </div>
                   </div>
@@ -991,7 +991,7 @@ export default function Grades() {
                     className="btn bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 shadow-2xs"
                   >
                     <Download className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                    <span>Export à¸¨à¸˜.02 (Excel)</span>
+                    <span>Export ศธ.02 (Excel)</span>
                   </button>
 
                   <button
@@ -999,7 +999,7 @@ export default function Grades() {
                     className="btn bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs px-3 py-1.5 rounded-xl font-semibold flex items-center gap-1.5 shadow-2xs"
                   >
                     <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                    <span>à¸žà¸£à¸µà¸§à¸´à¸§ CSV</span>
+                    <span>พรีวิว CSV</span>
                   </button>
 
                   <button
@@ -1007,7 +1007,7 @@ export default function Grades() {
                     className="btn bg-white dark:bg-slate-800 hover:bg-violet-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs px-3 py-1.5 rounded-xl font-semibold flex items-center gap-1.5 shadow-2xs"
                   >
                     <Printer className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
-                    <span>à¸žà¸´à¸¡à¸žà¹Œ PDF</span>
+                    <span>พิมพ์ PDF</span>
                   </button>
 
                   <button
@@ -1015,7 +1015,7 @@ export default function Grades() {
                     className="btn bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/80 text-xs px-3 py-1.5 rounded-xl font-semibold flex items-center gap-1.5 shadow-2xs"
                   >
                     <Zap className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                    <span>à¸„à¸³à¸™à¸§à¸“à¸ˆà¸´à¸•à¸žà¸´à¸ªà¸±à¸¢à¸­à¸­à¹‚à¸•à¹‰</span>
+                    <span>คำนวณจิตพิสัยออโต้</span>
                   </button>
                 </div>
 
@@ -1028,7 +1028,7 @@ export default function Grades() {
                     }`}
                 >
                   {saveExamsMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                  <span>{hasUnsavedChanges ? 'à¸šà¸±à¸™à¸—à¸¶à¸à¸à¸²à¸£à¹à¸à¹‰à¹„à¸‚' : 'à¸šà¸±à¸™à¸—à¸¶à¸à¸„à¸°à¹à¸™à¸™'}</span>
+                  <span>{hasUnsavedChanges ? 'บันทึกการแก้ไข' : 'บันทึกคะแนน'}</span>
                 </button>
               </div>
             </div>
@@ -1039,52 +1039,52 @@ export default function Grades() {
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="bg-slate-100/90 dark:bg-slate-900/95 border-b-2 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 font-bold sticky top-0 z-20 backdrop-blur-md">
-                      <th className="py-2.5 px-1.5 w-20 text-center text-slate-500 dark:text-slate-400 font-bold whitespace-nowrap">à¸£à¸«à¸±à¸ª</th>
+                      <th className="py-2.5 px-1.5 w-20 text-center text-slate-500 dark:text-slate-400 font-bold whitespace-nowrap">รหัส</th>
                       <th
                         className="py-2.5 px-3 border-r border-slate-200 dark:border-slate-800 sticky left-0 bg-slate-100/95 dark:bg-slate-900 z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] dark:shadow-[2px_0_5px_-2px_rgba(0,0,0,0.3)] text-slate-700 dark:text-slate-200 whitespace-nowrap"
                         style={activeNameStyle}
                       >
-                        à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥
+                        ชื่อ-นามสกุล
                       </th>
                       <th className="py-2.5 px-1 text-center w-[90px] border-r border-slate-200 dark:border-slate-800">
                         <div className="whitespace-nowrap inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-lg bg-pink-50 dark:bg-pink-950/60 text-pink-700 dark:text-pink-300 border border-pink-200/90 dark:border-pink-900/60 font-bold text-xs shadow-2xs">
-                          <span>à¸ˆà¸´à¸•à¸žà¸´à¸ªà¸±à¸¢</span>
+                          <span>จิตพิสัย</span>
                           <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-pink-100 dark:bg-pink-900/70 font-semibold">{weights.affective_weight}%</span>
                         </div>
                       </th>
                       <th className="py-2.5 px-1 text-center w-[90px] border-r border-slate-200 dark:border-slate-800">
                         <div className="whitespace-nowrap inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200/90 dark:border-amber-900/60 font-bold text-xs shadow-2xs">
-                          <span>à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢</span>
+                          <span>สอบย่อย</span>
                           <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-amber-100 dark:bg-amber-900/70 font-semibold">{weights.post_test_weight}%</span>
                         </div>
                       </th>
                       <th className="py-2.5 px-1 text-center w-[90px] border-r border-slate-200 dark:border-slate-800">
                         <div className="whitespace-nowrap inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/90 dark:border-emerald-900/60 font-bold text-xs shadow-2xs">
-                          <span>à¸‡à¸²à¸™à¹€à¸à¹‡à¸š</span>
+                          <span>งานเก็บ</span>
                           <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-emerald-100 dark:bg-emerald-900/70 font-semibold">{weights.assignment_weight}%</span>
                         </div>
                       </th>
                       <th className="py-2.5 px-1 text-center w-[92px] border-r border-slate-200 dark:border-slate-800">
                         <div className="whitespace-nowrap inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-lg bg-cyan-50 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-300 border border-cyan-200/90 dark:border-cyan-900/60 font-bold text-xs shadow-2xs">
-                          <span>à¸à¸¥à¸²à¸‡à¸ à¸²à¸„</span>
+                          <span>กลางภาค</span>
                           <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-cyan-100 dark:bg-cyan-900/70 font-semibold">{weights.midterm_weight}%</span>
                         </div>
                       </th>
                       <th className="py-2.5 px-1 text-center w-[96px] border-r border-slate-200 dark:border-slate-800">
                         <div className="whitespace-nowrap inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200/90 dark:border-blue-900/60 font-bold text-xs shadow-2xs">
-                          <span>à¸›à¸¥à¸²à¸¢à¸ à¸²à¸„</span>
+                          <span>ปลายภาค</span>
                           <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-blue-100 dark:bg-blue-900/70 font-semibold">{weights.final_weight}%</span>
                         </div>
                       </th>
                       <th className="py-2.5 px-1 text-center w-[76px] border-r border-slate-200 dark:border-slate-800">
                         <div className="whitespace-nowrap inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/90 dark:border-indigo-900/60 font-bold text-xs shadow-2xs">
-                          <span>à¸£à¸§à¸¡</span>
+                          <span>รวม</span>
                           <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-indigo-100 dark:bg-indigo-900/70 font-semibold">100</span>
                         </div>
                       </th>
                       <th className="py-2.5 px-1.5 text-center w-[66px]">
                         <div className="whitespace-nowrap inline-flex items-center justify-center px-2.5 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-bold text-xs shadow-2xs">
-                          <span>à¹€à¸à¸£à¸”</span>
+                          <span>เกรด</span>
                         </div>
                       </th>
                     </tr>
@@ -1092,9 +1092,9 @@ export default function Grades() {
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
                     {paginatedReport.map((student, idx) => {
                       const totalScore = Number(student.total_score_precise ?? student.total_score ?? 0);
-                      const isKr = student.is_f || student.grade === 'à¸‚.à¸£.' || student.grade === 'à¸‚à¸£';
-                      const isKs = student.grade === 'à¸‚.à¸ª.' || student.is_absent_final || student.final_score === -1;
-                      const isMs = student.grade === 'à¸¡.à¸ª.' || student.is_incomplete || student.final_score === -2;
+                      const isKr = student.is_f || student.grade === 'ข.ร.' || student.grade === 'ขร';
+                      const isKs = student.grade === 'ข.ส.' || student.is_absent_final || student.final_score === -1;
+                      const isMs = student.grade === 'ม.ส.' || student.is_incomplete || student.final_score === -2;
                       const isAtRisk = !isKr && !isKs && !isMs && (totalScore < 50 || (student.remaining_absences !== undefined && student.remaining_absences <= 2 && student.remaining_absences >= 0));
 
                       let rowClass = 'bg-white dark:bg-slate-900 hover:bg-slate-50/80 dark:hover:bg-slate-800/50';
@@ -1163,22 +1163,22 @@ export default function Grades() {
                               <div className="shrink-0 flex items-center gap-1">
                                 {isKr && (
                                   <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 text-[9px] font-extrabold border border-rose-200 dark:border-rose-800">
-                                    <AlertTriangle className="w-2.5 h-2.5 text-rose-600 dark:text-rose-400" /> à¸‚.à¸£.
+                                    <AlertTriangle className="w-2.5 h-2.5 text-rose-600 dark:text-rose-400" /> ข.ร.
                                   </span>
                                 )}
                                 {isKs && (
                                   <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 text-[9px] font-extrabold border border-amber-200 dark:border-amber-800">
-                                    <AlertCircle className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" /> à¸‚.à¸ª.
+                                    <AlertCircle className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" /> ข.ส.
                                   </span>
                                 )}
                                 {isMs && (
                                   <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/80 text-purple-800 dark:text-purple-300 text-[9px] font-extrabold border border-purple-200 dark:border-purple-800">
-                                    <AlertCircle className="w-2.5 h-2.5 text-purple-600 dark:text-purple-400" /> à¸¡.à¸ª.
+                                    <AlertCircle className="w-2.5 h-2.5 text-purple-600 dark:text-purple-400" /> ม.ส.
                                   </span>
                                 )}
                                 {isAtRisk && student.remaining_absences !== undefined && student.remaining_absences <= 2 && (
                                   <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 text-[9px] font-extrabold border border-amber-200 dark:border-amber-800">
-                                    à¸‚à¸²à¸”à¹„à¸”à¹‰à¸­à¸µà¸ {student.remaining_absences}
+                                    ขาดได้อีก {student.remaining_absences}
                                   </span>
                                 )}
                               </div>
@@ -1199,13 +1199,13 @@ export default function Grades() {
                           {/* Raw & Scaled Post-test Breakdown */}
                           <td className="py-2 px-1 text-center border-r border-slate-100 dark:border-slate-800/80">
                             <div className="font-black text-amber-600 dark:text-amber-400 text-xs font-mono">{Number(student.precise_scaled_post_test || student.scaled_post_test || 0).toFixed(1)}</div>
-                            <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">à¸”à¸´à¸š: {Number(student.raw_post_test || 0).toFixed(1)}/{student.max_post_test || 0}</div>
+                            <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">ดิบ: {Number(student.raw_post_test || 0).toFixed(1)}/{student.max_post_test || 0}</div>
                           </td>
 
                           {/* Raw & Scaled Assignment Breakdown */}
                           <td className="py-2 px-1 text-center border-r border-slate-100 dark:border-slate-800/80">
                             <div className="font-black text-emerald-600 dark:text-emerald-400 text-xs font-mono">{Number(student.precise_scaled_assign || student.scaled_assign || 0).toFixed(1)}</div>
-                            <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">à¸”à¸´à¸š: {Number(student.raw_assign || 0).toFixed(1)}/{student.max_assign || 0}</div>
+                            <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">ดิบ: {Number(student.raw_assign || 0).toFixed(1)}/{student.max_assign || 0}</div>
                           </td>
 
                           {/* Midterm Editable Score */}
@@ -1218,7 +1218,7 @@ export default function Grades() {
                                 className="text-center font-bold font-mono text-xs w-14 py-1 px-1 rounded-xl border border-cyan-200 dark:border-cyan-900/60 bg-white dark:bg-slate-800 text-cyan-700 dark:text-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 shadow-2xs transition-all mx-auto"
                                 placeholder="0"
                               />
-                              <div className="text-[10px] text-cyan-600 dark:text-cyan-400 font-semibold mt-0.5 font-mono">à¹„à¸”à¹‰: {Number(student.precise_scaled_midterm || student.scaled_midterm || 0).toFixed(1)}</div>
+                              <div className="text-[10px] text-cyan-600 dark:text-cyan-400 font-semibold mt-0.5 font-mono">ได้: {Number(student.precise_scaled_midterm || student.scaled_midterm || 0).toFixed(1)}</div>
                             </div>
                           </td>
 
@@ -1227,27 +1227,27 @@ export default function Grades() {
                             {student.final_score === -1 || student.is_absent_final ? (
                               <div className="flex flex-col items-center gap-0.5">
                                 <span className="px-1.5 py-0.2 rounded-md text-[9px] font-black bg-amber-500 text-white shadow-xs">
-                                  à¸‚.à¸ª.
+                                  ข.ส.
                                 </span>
                                 <button
                                   type="button"
                                   onClick={() => handleExamScoreChange(student.student_id, 'final_score', '0')}
                                   className="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline font-semibold"
                                 >
-                                  à¸à¸£à¸­à¸à¸„à¸°à¹à¸™à¸™
+                                  กรอกคะแนน
                                 </button>
                               </div>
                             ) : student.final_score === -2 || student.is_incomplete ? (
                               <div className="flex flex-col items-center gap-0.5">
                                 <span className="px-1.5 py-0.2 rounded-md text-[9px] font-black bg-purple-600 text-white shadow-xs">
-                                  à¸¡.à¸ª.
+                                  ม.ส.
                                 </span>
                                 <button
                                   type="button"
                                   onClick={() => handleExamScoreChange(student.student_id, 'final_score', '0')}
                                   className="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline font-semibold"
                                 >
-                                  à¸à¸£à¸­à¸à¸„à¸°à¹à¸™à¸™
+                                  กรอกคะแนน
                                 </button>
                               </div>
                             ) : (
@@ -1259,23 +1259,23 @@ export default function Grades() {
                                   className="text-center font-bold font-mono text-xs w-14 py-1 px-1 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 shadow-2xs transition-all mx-auto"
                                   placeholder="0"
                                 />
-                                <div className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold mt-0.5 font-mono">à¹„à¸”à¹‰: {Number(student.precise_scaled_final || student.scaled_final || 0).toFixed(1)}</div>
+                                <div className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold mt-0.5 font-mono">ได้: {Number(student.precise_scaled_final || student.scaled_final || 0).toFixed(1)}</div>
                                 <div className="flex items-center justify-center gap-1 mt-0.5">
                                   <button
                                     type="button"
-                                    title="à¸—à¸³à¹€à¸„à¸£à¸·à¹ˆà¸­à¸‡à¸«à¸¡à¸²à¸¢à¸‚à¸²à¸”à¸ªà¸­à¸š (à¸‚.à¸ª.)"
+                                    title="ทำเครื่องหมายขาดสอบ (ข.ส.)"
                                     onClick={() => handleExamScoreChange(student.student_id, 'final_score', '-1')}
                                     className="px-1 py-0.2 rounded text-[8px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/80 border border-amber-200 dark:border-amber-800 transition-colors"
                                   >
-                                    à¸‚.à¸ª.
+                                    ข.ส.
                                   </button>
                                   <button
                                     type="button"
-                                    title="à¸—à¸³à¹€à¸„à¸£à¸·à¹ˆà¸­à¸‡à¸«à¸¡à¸²à¸¢à¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™à¹„à¸¡à¹ˆà¸ªà¸¡à¸šà¸¹à¸£à¸“à¹Œ (à¸¡.à¸ª.)"
+                                    title="ทำเครื่องหมายผลการเรียนไม่สมบูรณ์ (ม.ส.)"
                                     onClick={() => handleExamScoreChange(student.student_id, 'final_score', '-2')}
                                     className="px-1 py-0.2 rounded text-[8px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/80 border border-purple-200 dark:border-purple-800 transition-colors"
                                   >
-                                    à¸¡.à¸ª.
+                                    ม.ส.
                                   </button>
                                 </div>
                               </div>
@@ -1307,9 +1307,9 @@ export default function Grades() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                   {paginatedReport.map((student) => {
                     const totalScore = Number(student.total_score_precise ?? student.total_score ?? 0);
-                    const isKr = student.is_f || student.grade === 'à¸‚.à¸£.' || student.grade === 'à¸‚à¸£';
-                    const isKs = student.grade === 'à¸‚.à¸ª.' || student.is_absent_final || student.final_score === -1;
-                    const isMs = student.grade === 'à¸¡.à¸ª.' || student.is_incomplete || student.final_score === -2;
+                    const isKr = student.is_f || student.grade === 'ข.ร.' || student.grade === 'ขร';
+                    const isKs = student.grade === 'ข.ส.' || student.is_absent_final || student.final_score === -1;
+                    const isMs = student.grade === 'ม.ส.' || student.is_incomplete || student.final_score === -2;
 
                     return (
                     <div
@@ -1336,7 +1336,7 @@ export default function Grades() {
                           <div className="min-w-0">
                             <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{student.name}</h4>
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">à¸£à¸«à¸±à¸ª: {student.student_code || '-'}</p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">รหัส: {student.student_code || '-'}</p>
                               {student.grade_level && (
                                 <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-100/80 dark:border-indigo-800">
                                   {student.grade_level}
@@ -1347,7 +1347,7 @@ export default function Grades() {
                         </div>
 
                         <span className={`inline-flex items-center justify-center px-3 py-1 rounded-xl font-black text-xs shadow-xs shrink-0 ${getGradeStyle(student.grade)}`}>
-                          à¹€à¸à¸£à¸” {student.grade}
+                          เกรด {student.grade}
                         </span>
                       </div>
 
@@ -1356,22 +1356,22 @@ export default function Grades() {
                         <div className="flex flex-wrap gap-1.5 pt-1">
                           {isKr && (
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
-                              âš ï¸ à¸«à¸¡à¸”à¸ªà¸´à¸—à¸˜à¸´à¹Œà¸ªà¸­à¸š (à¸‚.à¸£.)
+                              ⚠️ หมดสิทธิ์สอบ (ข.ร.)
                             </span>
                           )}
                           {isKs && (
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-                              âš ï¸ à¸‚à¸²à¸”à¸ªà¸­à¸š (à¸‚.à¸ª.)
+                              ⚠️ ขาดสอบ (ข.ส.)
                             </span>
                           )}
                           {isMs && (
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/80 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                              âš ï¸ à¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™à¹„à¸¡à¹ˆà¸ªà¸¡à¸šà¸¹à¸£à¸“à¹Œ (à¸¡.à¸ª.)
+                              ⚠️ ผลการเรียนไม่สมบูรณ์ (ม.ส.)
                             </span>
                           )}
                           {!isKr && student.remaining_absences !== undefined && student.remaining_absences <= 2 && (
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-                              à¸‚à¸²à¸”à¹„à¸”à¹‰à¸­à¸µà¸ {student.remaining_absences} à¸„à¸£à¸±à¹‰à¸‡
+                              ขาดได้อีก {student.remaining_absences} ครั้ง
                             </span>
                           )}
                         </div>
@@ -1380,7 +1380,7 @@ export default function Grades() {
                       {/* Scores Grid */}
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1 text-xs">
                         <div className="p-2.5 rounded-2xl bg-pink-50/50 dark:bg-pink-950/30 border border-pink-100 dark:border-pink-900/50">
-                          <span className="text-[10px] font-bold text-pink-700 dark:text-pink-300 uppercase">à¸ˆà¸´à¸•à¸žà¸´à¸ªà¸±à¸¢ ({weights.affective_weight}%)</span>
+                          <span className="text-[10px] font-bold text-pink-700 dark:text-pink-300 uppercase">จิตพิสัย ({weights.affective_weight}%)</span>
                           <input
                             type="number"
                             inputMode="decimal"
@@ -1393,23 +1393,23 @@ export default function Grades() {
                         </div>
 
                         <div className="p-2.5 rounded-2xl bg-amber-50/50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900/50">
-                          <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 uppercase">à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢ ({weights.post_test_weight}%)</span>
+                          <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 uppercase">สอบย่อย ({weights.post_test_weight}%)</span>
                           <div className="font-extrabold text-amber-800 dark:text-amber-200 text-base font-mono">
                             {Number(student.precise_scaled_post_test || student.scaled_post_test || 0).toFixed(1)}
                           </div>
-                          <span className="text-[9px] text-slate-400 dark:text-slate-500">à¸”à¸´à¸š {Number(student.raw_post_test || 0).toFixed(0)}/{student.max_post_test || 0}</span>
+                          <span className="text-[9px] text-slate-400 dark:text-slate-500">ดิบ {Number(student.raw_post_test || 0).toFixed(0)}/{student.max_post_test || 0}</span>
                         </div>
 
                         <div className="p-2.5 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/50">
-                          <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 uppercase">à¸‡à¸²à¸™à¹€à¸à¹‡à¸š ({weights.assignment_weight}%)</span>
+                          <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 uppercase">งานเก็บ ({weights.assignment_weight}%)</span>
                           <div className="font-extrabold text-emerald-800 dark:text-emerald-200 text-base font-mono">
                             {Number(student.precise_scaled_assign || student.scaled_assign || 0).toFixed(1)}
                           </div>
-                          <span className="text-[9px] text-slate-400 dark:text-slate-500">à¸”à¸´à¸š {Number(student.raw_assign || 0).toFixed(0)}/{student.max_assign || 0}</span>
+                          <span className="text-[9px] text-slate-400 dark:text-slate-500">ดิบ {Number(student.raw_assign || 0).toFixed(0)}/{student.max_assign || 0}</span>
                         </div>
 
                         <div className="p-2.5 rounded-2xl bg-cyan-50/50 dark:bg-cyan-950/30 border border-cyan-100 dark:border-cyan-900/50">
-                          <span className="text-[10px] font-bold text-cyan-700 dark:text-cyan-300 uppercase">à¸à¸¥à¸²à¸‡à¸ à¸²à¸„ ({weights.midterm_weight}%)</span>
+                          <span className="text-[10px] font-bold text-cyan-700 dark:text-cyan-300 uppercase">กลางภาค ({weights.midterm_weight}%)</span>
                           <input
                             type="number"
                             inputMode="decimal"
@@ -1423,35 +1423,35 @@ export default function Grades() {
 
                         <div className="p-2.5 rounded-2xl bg-blue-50/50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50">
                           <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 uppercase">à¸›à¸¥à¸²à¸¢à¸ à¸²à¸„ ({weights.final_weight}%)</span>
+                            <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 uppercase">ปลายภาค ({weights.final_weight}%)</span>
                             <div className="flex items-center gap-1">
                               <button
                                 type="button"
-                                title="à¸‚à¸²à¸”à¸ªà¸­à¸š (à¸‚.à¸ª.)"
+                                title="ขาดสอบ (ข.ส.)"
                                 onClick={() => handleExamScoreChange(student.student_id, 'final_score', '-1')}
                                 className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-amber-100 dark:hover:bg-amber-950/60 hover:text-amber-800 dark:hover:text-amber-300 transition-colors border border-slate-200 dark:border-slate-700 shadow-2xs"
                               >
-                                à¸‚.à¸ª.
+                                ข.ส.
                               </button>
                               <button
                                 type="button"
-                                title="à¹„à¸¡à¹ˆà¸ªà¸¡à¸šà¸¹à¸£à¸“à¹Œ (à¸¡.à¸ª.)"
+                                title="ไม่สมบูรณ์ (ม.ส.)"
                                 onClick={() => handleExamScoreChange(student.student_id, 'final_score', '-2')}
                                 className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-purple-100 dark:hover:bg-purple-950/60 hover:text-purple-800 dark:hover:text-purple-300 transition-colors border border-slate-200 dark:border-slate-700 shadow-2xs"
                               >
-                                à¸¡.à¸ª.
+                                ม.ส.
                               </button>
                             </div>
                           </div>
                           {student.final_score === -1 || student.is_absent_final ? (
                             <div className="mt-1 flex items-center justify-between">
-                              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-amber-600 text-white inline-block shadow-2xs">à¸‚.à¸ª.</span>
-                              <button type="button" onClick={() => handleExamScoreChange(student.student_id, 'final_score', '0')} className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-bold">à¹à¸à¹‰à¸„à¸°à¹à¸™à¸™</button>
+                              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-amber-600 text-white inline-block shadow-2xs">ข.ส.</span>
+                              <button type="button" onClick={() => handleExamScoreChange(student.student_id, 'final_score', '0')} className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-bold">แก้คะแนน</button>
                             </div>
                           ) : student.final_score === -2 || student.is_incomplete ? (
                             <div className="mt-1 flex items-center justify-between">
-                              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-purple-600 text-white inline-block shadow-2xs">à¸¡.à¸ª.</span>
-                              <button type="button" onClick={() => handleExamScoreChange(student.student_id, 'final_score', '0')} className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-bold">à¹à¸à¹‰à¸„à¸°à¹à¸™à¸™</button>
+                              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-purple-600 text-white inline-block shadow-2xs">ม.ส.</span>
+                              <button type="button" onClick={() => handleExamScoreChange(student.student_id, 'final_score', '0')} className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-bold">แก้คะแนน</button>
                             </div>
                           ) : (
                             <input
@@ -1467,7 +1467,7 @@ export default function Grades() {
                         </div>
 
                         <div className="p-2.5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900/60 flex flex-col justify-center text-center">
-                          <span className="text-[10px] font-bold text-indigo-700 dark:text-indigo-300 uppercase">à¸£à¸§à¸¡ (100)</span>
+                          <span className="text-[10px] font-bold text-indigo-700 dark:text-indigo-300 uppercase">รวม (100)</span>
                           <span className="text-lg font-black text-indigo-900 dark:text-indigo-200 font-mono">{totalScore.toFixed(1)}</span>
                         </div>
                       </div>
@@ -1501,8 +1501,8 @@ export default function Grades() {
             <div className="flex items-center gap-2.5 min-w-0 pl-1">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
               <div className="min-w-0">
-                <p className="text-xs font-bold text-white truncate">à¸¡à¸µà¸„à¸°à¹à¸™à¸™à¸—à¸µà¹ˆà¸£à¸­à¸à¸²à¸£à¸šà¸±à¸™à¸—à¸¶à¸</p>
-                <p className="text-[0.68rem] text-slate-300 truncate">à¸­à¸¢à¹ˆà¸²à¸¥à¸·à¸¡à¸à¸”à¸šà¸±à¸™à¸—à¸¶à¸à¹€à¸žà¸·à¹ˆà¸­à¹ƒà¸«à¹‰à¸„à¸°à¹à¸™à¸™à¸­à¸±à¸›à¹€à¸”à¸•à¸¥à¸‡à¸£à¸°à¸šà¸š</p>
+                <p className="text-xs font-bold text-white truncate">มีคะแนนที่รอการบันทึก</p>
+                <p className="text-[0.68rem] text-slate-300 truncate">อย่าลืมกดบันทึกเพื่อให้คะแนนอัปเดตลงระบบ</p>
               </div>
             </div>
 
@@ -1512,7 +1512,7 @@ export default function Grades() {
               className="btn btn-accent text-xs font-bold px-4 py-2 rounded-xl shrink-0 shadow-lg shadow-emerald-500/20"
             >
               {saveExamsMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-              <span>à¸šà¸±à¸™à¸—à¸¶à¸à¸„à¸°à¹à¸™à¸™</span>
+              <span>บันทึกคะแนน</span>
             </button>
           </div>
         </div>
@@ -1528,7 +1528,7 @@ export default function Grades() {
             report={sectionScopedReport}
             weights={weights}
             criteria={criteria}
-            teacherNameDefault={user?.name || 'à¸„à¸£à¸¹à¸œà¸¹à¹‰à¸ªà¸­à¸™'}
+            teacherNameDefault={user?.name || 'ครูผู้สอน'}
           />
           <GradeCsvModal
             isOpen={showCsvPreviewModal}

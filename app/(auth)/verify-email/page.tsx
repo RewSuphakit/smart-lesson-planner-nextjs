@@ -1,10 +1,10 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/services/api';
-import toast from '@/lib/toast';
+import toast from 'react-hot-toast';
 import { Mail, ArrowRight, Check, Loader2, RefreshCw } from 'lucide-react';
 
 interface ApiError {
@@ -62,15 +62,15 @@ function VerifyEmailContent() {
     const cleanNew = newEmail.trim().toLowerCase();
 
     if (!cleanCurrent) {
-      toast.error('à¸à¸£à¸¸à¸“à¸²à¸£à¸°à¸šà¸¸à¸­à¸µà¹€à¸¡à¸¥à¹€à¸”à¸´à¸¡');
+      toast.error('กรุณาระบุอีเมลเดิม');
       return;
     }
     if (!cleanNew) {
-      toast.error('à¸à¸£à¸¸à¸“à¸²à¸£à¸°à¸šà¸¸à¸­à¸µà¹€à¸¡à¸¥à¹ƒà¸«à¸¡à¹ˆ');
+      toast.error('กรุณาระบุอีเมลใหม่');
       return;
     }
     if (cleanCurrent === cleanNew) {
-      toast.error('à¸­à¸µà¹€à¸¡à¸¥à¹ƒà¸«à¸¡à¹ˆà¸•à¸£à¸‡à¸à¸±à¸šà¸­à¸µà¹€à¸¡à¸¥à¹€à¸”à¸´à¸¡');
+      toast.error('อีเมลใหม่ตรงกับอีเมลเดิม');
       return;
     }
 
@@ -81,7 +81,7 @@ function VerifyEmailContent() {
         newEmail: cleanNew,
       });
 
-      toast.success(res.data.message || 'à¸ªà¹ˆà¸‡à¸£à¸«à¸±à¸ª OTP à¹à¸¥à¹‰à¸§');
+      toast.success(res.data.message || 'ส่งรหัส OTP แล้ว');
       if (res.data.isDevMode && res.data.devCode) {
         setDevOtpChange(res.data.devCode);
       } else {
@@ -91,7 +91,7 @@ function VerifyEmailContent() {
       setChangeCountdown(60);
     } catch (err: unknown) {
       const apiErr = err as ApiError;
-      toast.error(apiErr.response?.data?.message || 'à¸ªà¹ˆà¸‡à¸£à¸«à¸±à¸ªà¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
+      toast.error(apiErr.response?.data?.message || 'ส่งรหัสไม่สำเร็จ');
     } finally {
       setLoadingChange(false);
     }
@@ -101,7 +101,7 @@ function VerifyEmailContent() {
     e.preventDefault();
     const cleanCode = changeOtp.trim();
     if (cleanCode.length !== 6) {
-      toast.error('à¸à¸£à¸¸à¸“à¸²à¸à¸£à¸­à¸à¸£à¸«à¸±à¸ª 6 à¸«à¸¥à¸±à¸');
+      toast.error('กรุณากรอกรหัส 6 หลัก');
       return;
     }
 
@@ -116,11 +116,11 @@ function VerifyEmailContent() {
         updateUser(res.data.user);
       }
 
-      toast.success('à¸¢à¸·à¸™à¸¢à¸±à¸™à¸­à¸µà¹€à¸¡à¸¥à¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
+      toast.success('ยืนยันอีเมลสำเร็จ');
       router.push('/');
     } catch (err: unknown) {
       const apiErr = err as ApiError;
-      toast.error(apiErr.response?.data?.message || 'à¸£à¸«à¸±à¸ªà¹„à¸¡à¹ˆà¸–à¸¹à¸à¸•à¹‰à¸­à¸‡');
+      toast.error(apiErr.response?.data?.message || 'รหัสไม่ถูกต้อง');
     } finally {
       setLoadingChange(false);
     }
@@ -130,7 +130,7 @@ function VerifyEmailContent() {
     e.preventDefault();
     const cleanCode = existingOtp.trim();
     if (cleanCode.length !== 6) {
-      toast.error('à¸à¸£à¸¸à¸“à¸²à¸à¸£à¸­à¸à¸£à¸«à¸±à¸ª 6 à¸«à¸¥à¸±à¸');
+      toast.error('กรุณากรอกรหัส 6 หลัก');
       return;
     }
 
@@ -145,11 +145,11 @@ function VerifyEmailContent() {
         updateUser(res.data.user);
       }
 
-      toast.success('à¸¢à¸·à¸™à¸¢à¸±à¸™à¸­à¸µà¹€à¸¡à¸¥à¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
+      toast.success('ยืนยันอีเมลสำเร็จ');
       router.push('/');
     } catch (err: unknown) {
       const apiErr = err as ApiError;
-      toast.error(apiErr.response?.data?.message || 'à¸£à¸«à¸±à¸ªà¹„à¸¡à¹ˆà¸–à¸¹à¸à¸•à¹‰à¸­à¸‡');
+      toast.error(apiErr.response?.data?.message || 'รหัสไม่ถูกต้อง');
     } finally {
       setLoadingExisting(false);
     }
@@ -166,10 +166,10 @@ function VerifyEmailContent() {
       if (res.data.devCode) {
         setDevOtpExisting(res.data.devCode);
       }
-      toast.success(res.data.message || 'à¸ªà¹ˆà¸‡à¸£à¸«à¸±à¸ªà¹ƒà¸«à¸¡à¹ˆà¹à¸¥à¹‰à¸§');
+      toast.success(res.data.message || 'ส่งรหัสใหม่แล้ว');
     } catch (err: unknown) {
       const apiErr = err as ApiError;
-      toast.error(apiErr.response?.data?.message || 'à¸ªà¹ˆà¸‡à¸£à¸«à¸±à¸ªà¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
+      toast.error(apiErr.response?.data?.message || 'ส่งรหัสไม่สำเร็จ');
     } finally {
       setLoadingExisting(false);
     }
@@ -190,28 +190,28 @@ function VerifyEmailContent() {
               <Mail className="w-6 h-6" />
             </div>
             <h1 className="text-xl font-bold text-slate-800 tracking-tight">
-              à¸¢à¸·à¸™à¸¢à¸±à¸™à¸­à¸µà¹€à¸¡à¸¥
+              ยืนยันอีเมล
             </h1>
             <p className="text-xs text-slate-400 mt-1">
-              à¸à¸£à¸¸à¸“à¸²à¸¢à¸·à¸™à¸¢à¸±à¸™à¸­à¸µà¹€à¸¡à¸¥à¹€à¸žà¸·à¹ˆà¸­à¹€à¸£à¸´à¹ˆà¸¡à¹ƒà¸Šà¹‰à¸‡à¸²à¸™
+              กรุณายืนยันอีเมลเพื่อเริ่มใช้งาน
             </p>
           </div>
 
           {/* Current Email Info */}
           {currentEmail ? (
             <div className="text-center text-xs text-slate-500 mb-5 pb-4 border-b border-slate-100">
-              à¸­à¸µà¹€à¸¡à¸¥à¸›à¸±à¸ˆà¸ˆà¸¸à¸šà¸±à¸™: <span className="font-semibold text-slate-700">{currentEmail}</span>
+              อีเมลปัจจุบัน: <span className="font-semibold text-slate-700">{currentEmail}</span>
             </div>
           ) : (
             <div className="mb-4">
               <label className="block text-xs font-medium text-slate-600 mb-1.5">
-                à¸­à¸µà¹€à¸¡à¸¥à¸›à¸±à¸ˆà¸ˆà¸¸à¸šà¸±à¸™
+                อีเมลปัจจุบัน
               </label>
               <input
                 type="email"
                 value={currentEmail}
                 onChange={(e) => setCurrentEmail(e.target.value)}
-                placeholder="à¸£à¸°à¸šà¸¸à¸­à¸µà¹€à¸¡à¸¥à¸—à¸µà¹ˆà¸¥à¸‡à¸—à¸°à¹€à¸šà¸µà¸¢à¸™à¹„à¸§à¹‰"
+                placeholder="ระบุอีเมลที่ลงทะเบียนไว้"
                 className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
               />
             </div>
@@ -228,7 +228,7 @@ function VerifyEmailContent() {
                   : 'text-slate-500 hover:text-slate-700'
               }`}
             >
-              à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¸­à¸µà¹€à¸¡à¸¥
+              เปลี่ยนอีเมล
             </button>
             <button
               type="button"
@@ -239,7 +239,7 @@ function VerifyEmailContent() {
                   : 'text-slate-500 hover:text-slate-700'
               }`}
             >
-              à¹ƒà¸Šà¹‰à¸­à¸µà¹€à¸¡à¸¥à¹€à¸”à¸´à¸¡
+              ใช้อีเมลเดิม
             </button>
           </div>
 
@@ -250,7 +250,7 @@ function VerifyEmailContent() {
                 <form onSubmit={handleRequestChangeOtp} className="space-y-4">
                   <div>
                     <label className="block text-xs font-medium text-slate-600 mb-1.5">
-                      à¸­à¸µà¹€à¸¡à¸¥à¹ƒà¸«à¸¡à¹ˆ
+                      อีเมลใหม่
                     </label>
                     <input
                       type="email"
@@ -272,7 +272,7 @@ function VerifyEmailContent() {
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
                       <>
-                        <span>à¸ªà¹ˆà¸‡à¸£à¸«à¸±à¸ª OTP</span>
+                        <span>ส่งรหัส OTP</span>
                         <ArrowRight className="w-4 h-4" />
                       </>
                     )}
@@ -281,7 +281,7 @@ function VerifyEmailContent() {
               ) : (
                 <form onSubmit={handleVerifyChangeOtp} className="space-y-4">
                   <div className="flex items-center justify-between text-xs px-1 text-slate-500">
-                    <span className="truncate">à¸ªà¹ˆà¸‡à¹„à¸›à¸—à¸µà¹ˆ <strong className="text-slate-700">{newEmail}</strong></span>
+                    <span className="truncate">ส่งไปที่ <strong className="text-slate-700">{newEmail}</strong></span>
                     <button
                       type="button"
                       onClick={() => {
@@ -290,21 +290,21 @@ function VerifyEmailContent() {
                       }}
                       className="text-indigo-600 hover:underline shrink-0 ml-2 font-medium"
                     >
-                      à¹à¸à¹‰à¹„à¸‚
+                      แก้ไข
                     </button>
                   </div>
 
                   {devOtpChange && (
                     <div className="py-2 px-3 bg-amber-50 border border-amber-200/70 rounded-xl text-xs flex items-center justify-between">
                       <span className="text-amber-800">
-                        à¸£à¸«à¸±à¸ªà¸—à¸”à¸ªà¸­à¸š: <strong className="font-mono">{devOtpChange}</strong>
+                        รหัสทดสอบ: <strong className="font-mono">{devOtpChange}</strong>
                       </span>
                       <button
                         type="button"
                         onClick={() => setChangeOtp(devOtpChange)}
                         className="text-amber-700 hover:text-amber-900 underline font-medium"
                       >
-                        à¹ƒà¸ªà¹ˆà¸£à¸«à¸±à¸ª
+                        ใส่รหัส
                       </button>
                     </div>
                   )}
@@ -325,7 +325,7 @@ function VerifyEmailContent() {
 
                   <div className="flex items-center justify-between text-xs px-1 text-slate-500">
                     {changeCountdown > 0 ? (
-                      <span className="text-slate-400">à¸ªà¹ˆà¸‡à¸­à¸µà¸à¸„à¸£à¸±à¹‰à¸‡à¹ƒà¸™ {changeCountdown}s</span>
+                      <span className="text-slate-400">ส่งอีกครั้งใน {changeCountdown}s</span>
                     ) : (
                       <button
                         type="button"
@@ -334,7 +334,7 @@ function VerifyEmailContent() {
                         className="text-indigo-600 hover:underline flex items-center gap-1 font-medium"
                       >
                         <RefreshCw className={`w-3 h-3 ${loadingChange ? 'animate-spin' : ''}`} />
-                        à¸ªà¹ˆà¸‡à¸£à¸«à¸±à¸ªà¹ƒà¸«à¸¡à¹ˆ
+                        ส่งรหัสใหม่
                       </button>
                     )}
                   </div>
@@ -348,7 +348,7 @@ function VerifyEmailContent() {
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
                       <>
-                        <span>à¸¢à¸·à¸™à¸¢à¸±à¸™</span>
+                        <span>ยืนยัน</span>
                         <Check className="w-4 h-4" />
                       </>
                     )}
@@ -362,20 +362,20 @@ function VerifyEmailContent() {
           {activeMode === 'existing' && (
             <form onSubmit={handleVerifyExistingOtp} className="space-y-4">
               <div className="text-xs px-1 text-slate-500">
-                à¸ªà¹ˆà¸‡à¹„à¸›à¸—à¸µà¹ˆ <strong className="text-slate-700">{currentEmail}</strong>
+                ส่งไปที่ <strong className="text-slate-700">{currentEmail}</strong>
               </div>
 
               {devOtpExisting && (
                 <div className="py-2 px-3 bg-amber-50 border border-amber-200/70 rounded-xl text-xs flex items-center justify-between">
                   <span className="text-amber-800">
-                    à¸£à¸«à¸±à¸ªà¸—à¸”à¸ªà¸­à¸š: <strong className="font-mono">{devOtpExisting}</strong>
+                    รหัสทดสอบ: <strong className="font-mono">{devOtpExisting}</strong>
                   </span>
                   <button
                     type="button"
                     onClick={() => setExistingOtp(devOtpExisting)}
                     className="text-amber-700 hover:text-amber-900 underline font-medium"
                   >
-                    à¹ƒà¸ªà¹ˆà¸£à¸«à¸±à¸ª
+                    ใส่รหัส
                   </button>
                 </div>
               )}
@@ -396,7 +396,7 @@ function VerifyEmailContent() {
 
               <div className="flex items-center justify-between text-xs px-1 text-slate-500">
                 {existingCountdown > 0 ? (
-                  <span className="text-slate-400">à¸ªà¹ˆà¸‡à¸­à¸µà¸à¸„à¸£à¸±à¹‰à¸‡à¹ƒà¸™ {existingCountdown}s</span>
+                  <span className="text-slate-400">ส่งอีกครั้งใน {existingCountdown}s</span>
                 ) : (
                   <button
                     type="button"
@@ -405,7 +405,7 @@ function VerifyEmailContent() {
                     className="text-indigo-600 hover:underline flex items-center gap-1 font-medium"
                   >
                     <RefreshCw className={`w-3 h-3 ${loadingExisting ? 'animate-spin' : ''}`} />
-                    à¸ªà¹ˆà¸‡à¸£à¸«à¸±à¸ªà¹ƒà¸«à¸¡à¹ˆ
+                    ส่งรหัสใหม่
                   </button>
                 )}
               </div>
@@ -419,7 +419,7 @@ function VerifyEmailContent() {
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <>
-                    <span>à¸¢à¸·à¸™à¸¢à¸±à¸™</span>
+                    <span>ยืนยัน</span>
                     <Check className="w-4 h-4" />
                   </>
                 )}
@@ -437,7 +437,7 @@ function VerifyEmailContent() {
               }}
               className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
             >
-              à¸­à¸­à¸à¸ˆà¸²à¸à¸£à¸°à¸šà¸š
+              ออกจากระบบ
             </button>
           </div>
         </div>

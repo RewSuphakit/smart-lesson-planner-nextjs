@@ -1,10 +1,10 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/services/api';
-import toast from '@/lib/toast';
+import toast from 'react-hot-toast';
 import { Loader2 } from 'lucide-react';
 
 declare global {
@@ -72,18 +72,18 @@ export default function GoogleSignInButton({ text = 'continue_with' }: GoogleSig
 
   const handleCredentialResponse = useCallback(async (response: { credential: string }) => {
     if (!response?.credential) {
-      toast.error('à¹„à¸¡à¹ˆà¸žà¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸à¸²à¸£à¹€à¸‚à¹‰à¸²à¸ªà¸¹à¹ˆà¸£à¸°à¸šà¸šà¸ˆà¸²à¸ Google');
+      toast.error('ไม่พบข้อมูลการเข้าสู่ระบบจาก Google');
       return;
     }
 
     setLoading(true);
     try {
       await googleLogin(response.credential);
-      toast.success('à¹€à¸‚à¹‰à¸²à¸ªà¸¹à¹ˆà¸£à¸°à¸šà¸šà¸”à¹‰à¸§à¸¢ Google à¸ªà¸³à¹€à¸£à¹‡à¸ˆ!');
+      toast.success('เข้าสู่ระบบด้วย Google สำเร็จ!');
       router.push('/');
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
-      toast.error(err.response?.data?.message || 'à¹€à¸‚à¹‰à¸²à¸ªà¸¹à¹ˆà¸£à¸°à¸šà¸šà¸”à¹‰à¸§à¸¢ Google à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
+      toast.error(err.response?.data?.message || 'เข้าสู่ระบบด้วย Google ไม่สำเร็จ');
     } finally {
       setLoading(false);
     }
@@ -153,7 +153,7 @@ export default function GoogleSignInButton({ text = 'continue_with' }: GoogleSig
     return (
       <div className="w-full h-[42px] rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center gap-2 text-xs font-medium text-slate-500 animate-pulse">
         <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
-        <span>à¸à¸³à¸¥à¸±à¸‡à¹€à¸‚à¹‰à¸²à¸ªà¸¹à¹ˆà¸£à¸°à¸šà¸šà¸”à¹‰à¸§à¸¢ Google...</span>
+        <span>กำลังเข้าสู่ระบบด้วย Google...</span>
       </div>
     );
   }
@@ -171,7 +171,7 @@ export default function GoogleSignInButton({ text = 'continue_with' }: GoogleSig
 
         {/* Text */}
         <span className="text-xs font-semibold text-slate-700">
-          {text === 'signup_with' ? 'à¸ªà¸¡à¸±à¸„à¸£à¸ªà¸¡à¸²à¸Šà¸´à¸à¸”à¹‰à¸§à¸¢ Google' : 'à¹€à¸‚à¹‰à¸²à¸ªà¸¹à¹ˆà¸£à¸°à¸šà¸šà¸”à¹‰à¸§à¸¢ Google'}
+          {text === 'signup_with' ? 'สมัครสมาชิกด้วย Google' : 'เข้าสู่ระบบด้วย Google'}
         </span>
 
         {/* Invisible Google GSI overlay to capture official OAuth click */}

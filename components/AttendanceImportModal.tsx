@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
@@ -6,7 +6,7 @@ import {
   Upload, X, Download, FileSpreadsheet, CheckCircle2, AlertCircle, 
   HelpCircle, Calendar, Check, Info, Loader2, ArrowRight, Table as TableIcon
 } from 'lucide-react';
-import toast from '@/lib/toast';
+import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import api from '@/services/api';
 
@@ -85,9 +85,9 @@ export default function AttendanceImportModal({
   const sampleStudents = useMemo(() => {
     if (students && students.length >= 3) return students.slice(0, 3);
     return [
-      { id: 1, student_code: '67010001', name: 'à¸™à¸²à¸¢à¸ªà¸¡à¸Šà¸²à¸¢ à¹ƒà¸ˆà¸”à¸µ' },
-      { id: 2, student_code: '67010002', name: 'à¸™à¸²à¸‡à¸ªà¸²à¸§à¸ªà¸¡à¸«à¸à¸´à¸‡ à¸£à¸±à¸à¹€à¸£à¸µà¸¢à¸™' },
-      { id: 3, student_code: '67010003', name: 'à¸™à¸²à¸¢à¸à¸´à¸•à¸•à¸´à¸¨à¸±à¸à¸”à¸´à¹Œ à¸žà¸²à¸à¹€à¸žà¸µà¸¢à¸£' },
+      { id: 1, student_code: '67010001', name: 'นายสมชาย ใจดี' },
+      { id: 2, student_code: '67010002', name: 'นางสาวสมหญิง รักเรียน' },
+      { id: 3, student_code: '67010003', name: 'นายกิตติศักดิ์ พากเพียร' },
     ];
   }, [students]);
 
@@ -98,13 +98,13 @@ export default function AttendanceImportModal({
     if (!str) return null;
 
     // Present patterns
-    if (['à¸¡à¸²', 'à¸¡à¸²à¹€à¸£à¸µà¸¢à¸™', 'present', 'p', '1', '/', 'âœ“', 'v', 'à¸”à¸µ'].includes(str)) return 'present';
+    if (['มา', 'มาเรียน', 'present', 'p', '1', '/', '✓', 'v', 'ดี'].includes(str)) return 'present';
     // Late patterns
-    if (['à¸ªà¸²à¸¢', 'à¸¡à¸²à¸ªà¸²à¸¢', 'late', 'l', 'à¸ª'].includes(str)) return 'late';
+    if (['สาย', 'มาสาย', 'late', 'l', 'ส'].includes(str)) return 'late';
     // Absent patterns
-    if (['à¸‚à¸²à¸”', 'à¸‚à¸²à¸”à¹€à¸£à¸µà¸¢à¸™', 'absent', 'a', '0', 'x', 'à¸‚'].includes(str)) return 'absent';
+    if (['ขาด', 'ขาดเรียน', 'absent', 'a', '0', 'x', 'ข'].includes(str)) return 'absent';
     // Leave patterns
-    if (['à¸¥à¸²', 'à¸¥à¸²à¸à¸´à¸ˆ', 'à¸¥à¸²à¸›à¹ˆà¸§à¸¢', 'leave', 'à¸¥'].includes(str)) return 'leave';
+    if (['ลา', 'ลากิจ', 'ลาป่วย', 'leave', 'ล'].includes(str)) return 'leave';
 
     return null;
   };
@@ -146,10 +146,10 @@ export default function AttendanceImportModal({
           sampleDates.push(d.toISOString().split('T')[0]);
         }
 
-        const headers = ['à¸£à¸«à¸±à¸ªà¸›à¸£à¸°à¸ˆà¸³à¸•à¸±à¸§', 'à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥', ...sampleDates];
+        const headers = ['รหัสประจำตัว', 'ชื่อ-นามสกุล', ...sampleDates];
         const rows: (string | number)[][] = [];
 
-        const statuses = ['à¸¡à¸²', 'à¸ªà¸²à¸¢', 'à¸‚à¸²à¸”', 'à¸¥à¸²'];
+        const statuses = ['มา', 'สาย', 'ขาด', 'ลา'];
         targetStudents.forEach((student, idx) => {
           const row: (string | number)[] = [
             student.student_code || `6701000${idx + 1}`,
@@ -165,15 +165,15 @@ export default function AttendanceImportModal({
         const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
         ws['!cols'] = [{ wch: 16 }, { wch: 28 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }];
 
-        XLSX.utils.book_append_sheet(wb, ws, 'à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­');
-        XLSX.writeFile(wb, `à¹€à¸—à¸¡à¹€à¸žà¸¥à¸•_à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­Matrix_${classroomName || 'à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™'}.xlsx`);
-        toast.success('à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹€à¸—à¸¡à¹€à¸žà¸¥à¸• Matrix à¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
+        XLSX.utils.book_append_sheet(wb, ws, 'เช็คชื่อ');
+        XLSX.writeFile(wb, `เทมเพลต_เช็คชื่อMatrix_${classroomName || 'ห้องเรียน'}.xlsx`);
+        toast.success('ดาวน์โหลดเทมเพลต Matrix สำเร็จ');
       } else {
         // Daily Format
-        const headers = ['à¸£à¸«à¸±à¸ªà¸›à¸£à¸°à¸ˆà¸³à¸•à¸±à¸§', 'à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥', 'à¸ªà¸–à¸²à¸™à¸° (à¸¡à¸²/à¸ªà¸²à¸¢/à¸‚à¸²à¸”/à¸¥à¸²)'];
+        const headers = ['รหัสประจำตัว', 'ชื่อ-นามสกุล', 'สถานะ (มา/สาย/ขาด/ลา)'];
         const rows: (string | number)[][] = [];
 
-        const statuses = ['à¸¡à¸²', 'à¸ªà¸²à¸¢', 'à¸‚à¸²à¸”', 'à¸¥à¸²'];
+        const statuses = ['มา', 'สาย', 'ขาด', 'ลา'];
         targetStudents.forEach((student, idx) => {
           rows.push([
             student.student_code || `6701000${idx + 1}`,
@@ -186,13 +186,13 @@ export default function AttendanceImportModal({
         const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
         ws['!cols'] = [{ wch: 16 }, { wch: 28 }, { wch: 24 }];
 
-        XLSX.utils.book_append_sheet(wb, ws, 'à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­à¸£à¸²à¸¢à¸§à¸±à¸™');
-        XLSX.writeFile(wb, `à¹€à¸—à¸¡à¹€à¸žà¸¥à¸•_à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­à¸£à¸²à¸¢à¸§à¸±à¸™_${classroomName || 'à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™'}.xlsx`);
-        toast.success('à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹€à¸—à¸¡à¹€à¸žà¸¥à¸•à¸£à¸²à¸¢à¸§à¸±à¸™ à¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
+        XLSX.utils.book_append_sheet(wb, ws, 'เช็คชื่อรายวัน');
+        XLSX.writeFile(wb, `เทมเพลต_เช็คชื่อรายวัน_${classroomName || 'ห้องเรียน'}.xlsx`);
+        toast.success('ดาวน์โหลดเทมเพลตรายวัน สำเร็จ');
       }
     } catch (err) {
       console.error(err);
-      toast.error('à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹€à¸—à¸¡à¹€à¸žà¸¥à¸•à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
+      toast.error('ดาวน์โหลดเทมเพลตไม่สำเร็จ');
     }
   };
 
@@ -201,7 +201,7 @@ export default function AttendanceImportModal({
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('à¸‚à¸™à¸²à¸”à¹„à¸Ÿà¸¥à¹Œà¹€à¸à¸´à¸™à¸à¸³à¸«à¸™à¸” (à¸ªà¸¹à¸‡à¸ªà¸¸à¸”à¹„à¸¡à¹ˆà¹€à¸à¸´à¸™ 5MB)');
+      toast.error('ขนาดไฟล์เกินกำหนด (สูงสุดไม่เกิน 5MB)');
       e.target.value = '';
       return;
     }
@@ -225,13 +225,13 @@ export default function AttendanceImportModal({
           const row = data[i] || [];
           for (let j = 0; j < row.length; j++) {
             const cell = String(row[j] ?? '').trim();
-            if (cell.includes('à¸£à¸«à¸±à¸ª') || cell.includes('à¹€à¸¥à¸‚à¸›à¸£à¸°à¸ˆà¸³à¸•à¸±à¸§') || cell.toLowerCase().includes('code')) {
+            if (cell.includes('รหัส') || cell.includes('เลขประจำตัว') || cell.toLowerCase().includes('code')) {
               idColIndex = j;
-            } else if (cell.includes('à¸Šà¸·à¹ˆà¸­') && !cell.includes('à¸«à¹‰à¸­à¸‡')) {
+            } else if (cell.includes('ชื่อ') && !cell.includes('ห้อง')) {
               nameColIndex = j;
-            } else if (cell.includes('à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥')) {
+            } else if (cell.includes('นามสกุล')) {
               lastNameColIndex = j;
-            } else if (cell.includes('à¸ªà¸–à¸²à¸™à¸°') || cell.toLowerCase().includes('status')) {
+            } else if (cell.includes('สถานะ') || cell.toLowerCase().includes('status')) {
               statusColIndex = j;
             } else {
               // Try parsing as date header
@@ -249,7 +249,7 @@ export default function AttendanceImportModal({
         }
 
         if (headerRowIndex === -1) {
-          toast.error('à¹„à¸¡à¹ˆà¸žà¸šà¸«à¸±à¸§à¸„à¸­à¸¥à¸±à¸¡à¸™à¹Œà¸—à¸µà¹ˆà¸£à¸­à¸‡à¸£à¸±à¸š (à¸£à¸«à¸±à¸ªà¸›à¸£à¸°à¸ˆà¸³à¸•à¸±à¸§, à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥, à¸§à¸±à¸™à¸—à¸µà¹ˆ à¸«à¸£à¸·à¸­ à¸ªà¸–à¸²à¸™à¸°)');
+          toast.error('ไม่พบหัวคอลัมน์ที่รองรับ (รหัสประจำตัว, ชื่อ-นามสกุล, วันที่ หรือ สถานะ)');
           return;
         }
 
@@ -269,7 +269,7 @@ export default function AttendanceImportModal({
           let matched = null;
           if (studentCode) matched = students.find(s => s.student_code === studentCode);
           if (!matched && fullName) {
-            matched = students.find(s => fullName.includes(s.name) || s.name.includes(fullName.replace(/à¸™à¸²à¸¢|à¸™à¸²à¸‡à¸ªà¸²à¸§|à¹€à¸”à¹‡à¸à¸Šà¸²à¸¢|à¹€à¸”à¹‡à¸à¸«à¸à¸´à¸‡/g, '').trim()));
+            matched = students.find(s => fullName.includes(s.name) || s.name.includes(fullName.replace(/นาย|นางสาว|เด็กชาย|เด็กหญิง/g, '').trim()));
           }
 
           if (matched) {
@@ -316,7 +316,7 @@ export default function AttendanceImportModal({
         }
 
         if (records.length === 0) {
-          toast.error('à¹„à¸¡à¹ˆà¸žà¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸à¸²à¸£à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­à¸—à¸µà¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸ˆà¸±à¸šà¸„à¸¹à¹ˆà¸à¸±à¸šà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¹ƒà¸™à¸«à¹‰à¸­à¸‡à¸™à¸µà¹‰à¹„à¸”à¹‰ à¸à¸£à¸¸à¸“à¸²à¸•à¸£à¸§à¸ˆà¸£à¸«à¸±à¸ªà¸«à¸£à¸·à¸­à¸Šà¸·à¹ˆà¸­');
+          toast.error('ไม่พบข้อมูลการเช็คชื่อที่สามารถจับคู่กับนักเรียนในห้องนี้ได้ กรุณาตรวจรหัสหรือชื่อ');
         } else {
           setParsedRecords(records);
           setStatsSummary({
@@ -327,11 +327,11 @@ export default function AttendanceImportModal({
             total: records.length,
             dates: uniqueDates.size,
           });
-          toast.success(`à¸­à¹ˆà¸²à¸™à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸ªà¸³à¹€à¸£à¹‡à¸ˆ à¸•à¸£à¸§à¸ˆà¸žà¸š ${records.length} à¸£à¸²à¸¢à¸à¸²à¸£à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­ (${uniqueDates.size} à¸§à¸±à¸™)`);
+          toast.success(`อ่านข้อมูลสำเร็จ ตรวจพบ ${records.length} รายการเช็คชื่อ (${uniqueDates.size} วัน)`);
         }
       } catch (err) {
         console.error(err);
-        toast.error('à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸­à¹ˆà¸²à¸™à¹„à¸Ÿà¸¥à¹Œà¹„à¸”à¹‰ à¸à¸£à¸¸à¸“à¸²à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¸£à¸¹à¸›à¹à¸šà¸šà¹„à¸Ÿà¸¥à¹Œ');
+        toast.error('ไม่สามารถอ่านไฟล์ได้ กรุณาตรวจสอบรูปแบบไฟล์');
       }
     };
     reader.readAsBinaryString(file);
@@ -343,12 +343,12 @@ export default function AttendanceImportModal({
     setIsSubmitting(true);
     try {
       await api.post('/attendance', { records: parsedRecords });
-      toast.success(`à¸šà¸±à¸™à¸—à¸¶à¸à¹€à¸§à¸¥à¸²à¹€à¸£à¸µà¸¢à¸™à¸ªà¸³à¹€à¸£à¹‡à¸ˆ ${parsedRecords.length} à¸£à¸²à¸¢à¸à¸²à¸£`);
+      toast.success(`บันทึกเวลาเรียนสำเร็จ ${parsedRecords.length} รายการ`);
       onSuccess();
       onClose();
     } catch (err) {
       console.error(err);
-      toast.error('à¸šà¸±à¸™à¸—à¸¶à¸à¹€à¸§à¸¥à¸²à¹€à¸£à¸µà¸¢à¸™à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ à¸à¸£à¸¸à¸“à¸²à¸¥à¸­à¸‡à¹ƒà¸«à¸¡à¹ˆà¸­à¸µà¸à¸„à¸£à¸±à¹‰à¸‡');
+      toast.error('บันทึกเวลาเรียนไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
     } finally {
       setIsSubmitting(false);
     }
@@ -370,10 +370,10 @@ export default function AttendanceImportModal({
             </div>
             <div>
               <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                à¸™à¸³à¹€à¸‚à¹‰à¸²à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸à¸²à¸£à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­à¸ˆà¸²à¸ Excel & à¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡à¸£à¸¹à¸›à¹à¸šà¸š
+                นำเข้าข้อมูลการเช็คชื่อจาก Excel & ตัวอย่างรูปแบบ
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                {classroomName} â€¢ à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¸£à¸¹à¸›à¹à¸šà¸šà¸•à¸²à¸£à¸²à¸‡à¹€à¸§à¸¥à¸²à¹€à¸£à¸µà¸¢à¸™à¸—à¸µà¹ˆà¸£à¸°à¸šà¸šà¸£à¸­à¸‡à¸£à¸±à¸š à¹à¸¥à¸°à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹€à¸—à¸¡à¹€à¸žà¸¥à¸•à¸žà¸£à¹‰à¸­à¸¡à¹ƒà¸Šà¹‰à¸‡à¸²à¸™
+                {classroomName} • ตรวจสอบรูปแบบตารางเวลาเรียนที่ระบบรองรับ และดาวน์โหลดเทมเพลตพร้อมใช้งาน
               </p>
             </div>
           </div>
@@ -398,7 +398,7 @@ export default function AttendanceImportModal({
               }`}
             >
               <TableIcon className="w-4 h-4" />
-              <span>à¹à¸šà¸šà¸•à¸²à¸£à¸²à¸‡à¸«à¸¥à¸²à¸¢à¸§à¸±à¸™ (Matrix - à¹à¸™à¸°à¸™à¸³)</span>
+              <span>แบบตารางหลายวัน (Matrix - แนะนำ)</span>
             </button>
 
             <button
@@ -410,13 +410,13 @@ export default function AttendanceImportModal({
               }`}
             >
               <Calendar className="w-4 h-4" />
-              <span>à¹à¸šà¸šà¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­à¸£à¸²à¸¢à¸§à¸±à¸™ (Single Date)</span>
+              <span>แบบเช็คชื่อรายวัน (Single Date)</span>
             </button>
           </div>
 
           {formatMode === 'daily' && (
             <div className="flex items-center gap-2 text-xs">
-              <label className="font-semibold text-slate-600">à¸§à¸±à¸™à¸—à¸µà¹ˆà¸šà¸±à¸™à¸—à¸¶à¸:</label>
+              <label className="font-semibold text-slate-600">วันที่บันทึก:</label>
               <input
                 type="date"
                 value={selectedSingleDate}
@@ -436,12 +436,12 @@ export default function AttendanceImportModal({
               </div>
               <div>
                 <h3 className="text-sm font-bold text-slate-800">
-                  à¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡à¸£à¸¹à¸›à¹à¸šà¸šà¹„à¸Ÿà¸¥à¹Œ Excel ({formatMode === 'matrix' ? 'à¸•à¸²à¸£à¸²à¸‡à¸«à¸¥à¸²à¸¢à¸§à¸±à¸™à¸—à¸µà¹ˆ' : 'à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­à¸£à¸²à¸¢à¸§à¸±à¸™'})
+                  ตัวอย่างรูปแบบไฟล์ Excel ({formatMode === 'matrix' ? 'ตารางหลายวันที่' : 'เช็คชื่อรายวัน'})
                 </h3>
                 <p className="text-xs text-slate-500">
                   {formatMode === 'matrix' 
-                    ? 'à¸«à¸±à¸§à¸„à¸­à¸¥à¸±à¸¡à¸™à¹Œà¹ƒà¸Šà¹‰à¸§à¸±à¸™à¸—à¸µà¹ˆ à¹€à¸Šà¹ˆà¸™ 2026-09-01 à¸«à¸£à¸·à¸­ 01/09/2026'
-                    : 'à¸„à¸­à¸¥à¸±à¸¡à¸™à¹Œà¸—à¸µà¹ˆ 3 à¹€à¸›à¹‡à¸™à¸ªà¸–à¸²à¸™à¸°à¸à¸²à¸£à¸¡à¸²à¹€à¸£à¸µà¸¢à¸™à¸‚à¸­à¸‡à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¹à¸•à¹ˆà¸¥à¸°à¸„à¸™'}
+                    ? 'หัวคอลัมน์ใช้วันที่ เช่น 2026-09-01 หรือ 01/09/2026'
+                    : 'คอลัมน์ที่ 3 เป็นสถานะการมาเรียนของนักเรียนแต่ละคน'}
                 </p>
               </div>
             </div>
@@ -452,7 +452,7 @@ export default function AttendanceImportModal({
               className="btn bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs px-3.5 py-2 rounded-xl font-bold flex items-center gap-2 shadow-xs shrink-0"
             >
               <Download className="w-4 h-4 text-emerald-600" />
-              <span>à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œà¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡ (.xlsx)</span>
+              <span>ดาวน์โหลดไฟล์ตัวอย่าง (.xlsx)</span>
             </button>
           </div>
 
@@ -461,8 +461,8 @@ export default function AttendanceImportModal({
             <table className="w-full text-xs text-left border-collapse">
               <thead>
                 <tr className="bg-emerald-100/70 text-emerald-950 font-bold border-b border-emerald-200">
-                  <th className="p-2.5 border-r border-emerald-200/60 font-mono">à¸£à¸«à¸±à¸ªà¸›à¸£à¸°à¸ˆà¸³à¸•à¸±à¸§</th>
-                  <th className="p-2.5 border-r border-emerald-200/60 min-w-[160px]">à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥</th>
+                  <th className="p-2.5 border-r border-emerald-200/60 font-mono">รหัสประจำตัว</th>
+                  <th className="p-2.5 border-r border-emerald-200/60 min-w-[160px]">ชื่อ-นามสกุล</th>
                   {formatMode === 'matrix' ? (
                     <>
                       <th className="p-2.5 border-r border-emerald-200/60 text-center font-mono bg-emerald-200/50">2026-09-01</th>
@@ -471,7 +471,7 @@ export default function AttendanceImportModal({
                       <th className="p-2.5 border-r border-emerald-200/60 text-center font-mono bg-emerald-200/50">2026-09-22</th>
                     </>
                   ) : (
-                    <th className="p-2.5 text-center bg-emerald-200/50">à¸ªà¸–à¸²à¸™à¸° (à¸¡à¸²/à¸ªà¸²à¸¢/à¸‚à¸²à¸”/à¸¥à¸²)</th>
+                    <th className="p-2.5 text-center bg-emerald-200/50">สถานะ (มา/สาย/ขาด/ลา)</th>
                   )}
                 </tr>
               </thead>
@@ -482,17 +482,17 @@ export default function AttendanceImportModal({
                     <td className="p-2 text-slate-800 border-r border-slate-200 font-semibold">{s.name}</td>
                     {formatMode === 'matrix' ? (
                       <>
-                        <td className="p-2 text-center border-r border-slate-200"><span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold text-[11px]">à¸¡à¸²</span></td>
-                        <td className="p-2 text-center border-r border-slate-200"><span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-bold text-[11px]">à¸ªà¸²à¸¢</span></td>
-                        <td className="p-2 text-center border-r border-slate-200"><span className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 font-bold text-[11px]">à¸‚à¸²à¸”</span></td>
-                        <td className="p-2 text-center border-r border-slate-200"><span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 font-bold text-[11px]">à¸¥à¸²</span></td>
+                        <td className="p-2 text-center border-r border-slate-200"><span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold text-[11px]">มา</span></td>
+                        <td className="p-2 text-center border-r border-slate-200"><span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-bold text-[11px]">สาย</span></td>
+                        <td className="p-2 text-center border-r border-slate-200"><span className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 font-bold text-[11px]">ขาด</span></td>
+                        <td className="p-2 text-center border-r border-slate-200"><span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 font-bold text-[11px]">ลา</span></td>
                       </>
                     ) : (
                       <td className="p-2 text-center">
                         <span className={`px-2.5 py-0.5 rounded-md font-bold text-[11px] ${
                           idx === 0 ? 'bg-emerald-100 text-emerald-800' : idx === 1 ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
                         }`}>
-                          {idx === 0 ? 'à¸¡à¸²' : idx === 1 ? 'à¸ªà¸²à¸¢' : 'à¸‚à¸²à¸”'}
+                          {idx === 0 ? 'มา' : idx === 1 ? 'สาย' : 'ขาด'}
                         </span>
                       </td>
                     )}
@@ -504,19 +504,19 @@ export default function AttendanceImportModal({
 
           {/* Recognized Legend / Values */}
           <div className="pt-1">
-            <p className="text-[11px] font-bold text-slate-700 mb-1">à¸ªà¸±à¸à¸¥à¸±à¸à¸©à¸“à¹Œà¹à¸¥à¸°à¸„à¸³à¸—à¸µà¹ˆà¸£à¸°à¸šà¸šà¸•à¸£à¸§à¸ˆà¸ˆà¸±à¸šà¸­à¸±à¸•à¹‚à¸™à¸¡à¸±à¸•à¸´:</p>
+            <p className="text-[11px] font-bold text-slate-700 mb-1">สัญลักษณ์และคำที่ระบบตรวจจับอัตโนมัติ:</p>
             <div className="flex flex-wrap gap-2 text-[10px]">
               <span className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200">
-                <strong>à¸¡à¸²à¹€à¸£à¸µà¸¢à¸™:</strong> &quot;à¸¡à¸²&quot;, &quot;1&quot;, &quot;/&quot;, &quot;âœ“&quot;, &quot;present&quot;
+                <strong>มาเรียน:</strong> &quot;มา&quot;, &quot;1&quot;, &quot;/&quot;, &quot;✓&quot;, &quot;present&quot;
               </span>
               <span className="px-2 py-1 rounded-lg bg-amber-50 text-amber-800 border border-amber-200">
-                <strong>à¸¡à¸²à¸ªà¸²à¸¢:</strong> &quot;à¸ªà¸²à¸¢&quot;, &quot;à¸ª&quot;, &quot;late&quot;
+                <strong>มาสาย:</strong> &quot;สาย&quot;, &quot;ส&quot;, &quot;late&quot;
               </span>
               <span className="px-2 py-1 rounded-lg bg-rose-50 text-rose-800 border border-rose-200">
-                <strong>à¸‚à¸²à¸”à¹€à¸£à¸µà¸¢à¸™:</strong> &quot;à¸‚à¸²à¸”&quot;, &quot;à¸‚&quot;, &quot;0&quot;, &quot;x&quot;, &quot;absent&quot;
+                <strong>ขาดเรียน:</strong> &quot;ขาด&quot;, &quot;ข&quot;, &quot;0&quot;, &quot;x&quot;, &quot;absent&quot;
               </span>
               <span className="px-2 py-1 rounded-lg bg-blue-50 text-blue-800 border border-blue-200">
-                <strong>à¸¥à¸²:</strong> &quot;à¸¥à¸²&quot;, &quot;à¸¥&quot;, &quot;leave&quot;
+                <strong>ลา:</strong> &quot;ลา&quot;, &quot;ล&quot;, &quot;leave&quot;
               </span>
             </div>
           </div>
@@ -530,9 +530,9 @@ export default function AttendanceImportModal({
             </div>
             <div>
               <h3 className="text-sm font-bold text-slate-800">
-                à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œ Excel à¹€à¸žà¸·à¹ˆà¸­à¸™à¸³à¹€à¸‚à¹‰à¸²à¹€à¸§à¸¥à¸²à¹€à¸£à¸µà¸¢à¸™
+                อัปโหลดไฟล์ Excel เพื่อนำเข้าเวลาเรียน
               </h3>
-              <p className="text-xs text-slate-500">à¸£à¸­à¸‡à¸£à¸±à¸šà¹„à¸Ÿà¸¥à¹Œ .xlsx, .xls, .csv</p>
+              <p className="text-xs text-slate-500">รองรับไฟล์ .xlsx, .xls, .csv</p>
             </div>
           </div>
 
@@ -548,10 +548,10 @@ export default function AttendanceImportModal({
                 <Upload className="w-6 h-6" />
               </div>
               <p className="text-xs font-bold text-slate-700">
-                à¸„à¸¥à¸´à¸à¹€à¸žà¸·à¹ˆà¸­à¹€à¸¥à¸·à¸­à¸à¹„à¸Ÿà¸¥à¹Œ Excel à¸«à¸£à¸·à¸­à¸¥à¸²à¸à¹„à¸Ÿà¸¥à¹Œà¸¡à¸²à¸§à¸²à¸‡à¸—à¸µà¹ˆà¸™à¸µà¹ˆ
+                คลิกเพื่อเลือกไฟล์ Excel หรือลากไฟล์มาวางที่นี่
               </p>
               <p className="text-[10px] text-slate-400">
-                {fileName ? `à¹„à¸Ÿà¸¥à¹Œà¸—à¸µà¹ˆà¹€à¸¥à¸·à¸­à¸: ${fileName}` : 'à¸£à¸­à¸‡à¸£à¸±à¸š .xlsx, .xls, .csv'}
+                {fileName ? `ไฟล์ที่เลือก: ${fileName}` : 'รองรับ .xlsx, .xls, .csv'}
               </p>
             </div>
           </div>
@@ -561,23 +561,23 @@ export default function AttendanceImportModal({
             <div className="space-y-3 pt-2">
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
                 <div className="p-2.5 rounded-xl bg-slate-100 text-slate-800 text-center font-bold">
-                  <div>à¸£à¸§à¸¡à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”</div>
-                  <div className="text-base text-indigo-700">{statsSummary.total} à¸„à¸£à¸±à¹‰à¸‡</div>
+                  <div>รวมทั้งหมด</div>
+                  <div className="text-base text-indigo-700">{statsSummary.total} ครั้ง</div>
                 </div>
                 <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-800 text-center font-bold">
-                  <div>à¸¡à¸²à¹€à¸£à¸µà¸¢à¸™</div>
+                  <div>มาเรียน</div>
                   <div className="text-base text-emerald-700">{statsSummary.present}</div>
                 </div>
                 <div className="p-2.5 rounded-xl bg-amber-50 text-amber-800 text-center font-bold">
-                  <div>à¸¡à¸²à¸ªà¸²à¸¢</div>
+                  <div>มาสาย</div>
                   <div className="text-base text-amber-700">{statsSummary.late}</div>
                 </div>
                 <div className="p-2.5 rounded-xl bg-rose-50 text-rose-800 text-center font-bold">
-                  <div>à¸‚à¸²à¸”à¹€à¸£à¸µà¸¢à¸™</div>
+                  <div>ขาดเรียน</div>
                   <div className="text-base text-rose-700">{statsSummary.absent}</div>
                 </div>
                 <div className="p-2.5 rounded-xl bg-blue-50 text-blue-800 text-center font-bold">
-                  <div>à¸¥à¸²</div>
+                  <div>ลา</div>
                   <div className="text-base text-blue-700">{statsSummary.leave}</div>
                 </div>
               </div>
@@ -592,7 +592,7 @@ export default function AttendanceImportModal({
             onClick={onClose}
             className="btn bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-4 py-2 rounded-xl font-semibold"
           >
-            à¸¢à¸à¹€à¸¥à¸´à¸
+            ยกเลิก
           </button>
 
           <button
@@ -602,7 +602,7 @@ export default function AttendanceImportModal({
             className="btn btn-accent text-xs px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-md shadow-emerald-500/20 disabled:opacity-50"
           >
             {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-            <span>à¸¢à¸·à¸™à¸¢à¸±à¸™à¸šà¸±à¸™à¸—à¸¶à¸à¹€à¸§à¸¥à¸²à¹€à¸£à¸µà¸¢à¸™ ({parsedRecords.length} à¸£à¸²à¸¢à¸à¸²à¸£)</span>
+            <span>ยืนยันบันทึกเวลาเรียน ({parsedRecords.length} รายการ)</span>
           </button>
         </div>
       </div>

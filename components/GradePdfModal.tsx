@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -7,7 +7,7 @@ import {
   ZoomIn, ZoomOut, RotateCcw, Award, CheckCircle2, UserCheck,
   Building2, Calendar, BookOpen, Layers
 } from 'lucide-react';
-import toast from '@/lib/toast';
+import toast from 'react-hot-toast';
 
 import type { Classroom, Criterion, ReportStudent, Weights } from '@/components/pages/Grades';
 
@@ -28,7 +28,7 @@ export default function GradePdfModal({
   report,
   weights,
   criteria,
-  teacherNameDefault = 'à¸„à¸£à¸¹à¸œà¸¹à¹‰à¸ªà¸­à¸™'
+  teacherNameDefault = 'ครูผู้สอน'
 }: GradePdfModalProps) {
   // Tabs for settings
   const [activeTab, setActiveTab] = useState<'info' | 'display' | 'signatures'>('info');
@@ -40,19 +40,19 @@ export default function GradePdfModal({
   }, []);
 
   const isPws: boolean = useMemo(() => {
-    return Boolean(weights.is_pws || classroom?.name?.includes('à¸›à¸§à¸ª') || classroom?.name?.includes('à¸›à¸§à¸ª.'));
+    return Boolean(weights.is_pws || classroom?.name?.includes('ปวส') || classroom?.name?.includes('ปวส.'));
   }, [weights, classroom]);
 
   // Customizable PDF State
-  const [institutionName, setInstitutionName] = useState('à¸§à¸´à¸—à¸¢à¸²à¸¥à¸±à¸¢à¸­à¸²à¸Šà¸µà¸§à¸¨à¸¶à¸à¸©à¸²');
-  const [academicYear, setAcademicYear] = useState('à¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™à¸—à¸µà¹ˆ 1 à¸›à¸µà¸à¸²à¸£à¸¨à¸¶à¸à¸©à¸² 2567');
+  const [institutionName, setInstitutionName] = useState('วิทยาลัยอาชีวศึกษา');
+  const [academicYear, setAcademicYear] = useState('ภาคเรียนที่ 1 ปีการศึกษา 2567');
   const [subjectCodeAndName, setSubjectCodeAndName] = useState('');
   const [curriculumLevel, setCurriculumLevel] = useState('');
-  const [departmentName, setDepartmentName] = useState('à¹à¸œà¸™à¸à¸§à¸´à¸Šà¸²à¸„à¸­à¸¡à¸žà¸´à¸§à¹€à¸•à¸­à¸£à¹Œà¸˜à¸¸à¸£à¸à¸´à¸ˆà¹à¸¥à¸°à¹€à¸—à¸„à¹‚à¸™à¹‚à¸¥à¸¢à¸µà¸ªà¸²à¸£à¸ªà¸™à¹€à¸—à¸¨');
+  const [departmentName, setDepartmentName] = useState('แผนกวิชาคอมพิวเตอร์ธุรกิจและเทคโนโลยีสารสนเทศ');
   const [teacherName, setTeacherName] = useState('');
-  const [headOfDepartment, setHeadOfDepartment] = useState('à¸«à¸±à¸§à¸«à¸™à¹‰à¸²à¹à¸œà¸™à¸à¸§à¸´à¸Šà¸²');
-  const [headOfCurriculum, setHeadOfCurriculum] = useState('à¸«à¸±à¸§à¸«à¸™à¹‰à¸²à¸‡à¸²à¸™à¸§à¸±à¸”à¸œà¸¥à¹à¸¥à¸°à¸›à¸£à¸°à¹€à¸¡à¸´à¸™à¸œà¸¥');
-  const [deputyDirector, setDeputyDirector] = useState('à¸£à¸­à¸‡à¸œà¸¹à¹‰à¸­à¸³à¸™à¸§à¸¢à¸à¸²à¸£à¸à¹ˆà¸²à¸¢à¸§à¸´à¸Šà¸²à¸à¸²à¸£');
+  const [headOfDepartment, setHeadOfDepartment] = useState('หัวหน้าแผนกวิชา');
+  const [headOfCurriculum, setHeadOfCurriculum] = useState('หัวหน้างานวัดผลและประเมินผล');
+  const [deputyDirector, setDeputyDirector] = useState('รองผู้อำนวยการฝ่ายวิชาการ');
 
   // Display Options
   const [reportType, setReportType] = useState<'official_vocational' | 'compact_announcement'>('official_vocational');
@@ -62,7 +62,7 @@ export default function GradePdfModal({
   const [showPrintDate, setShowPrintDate] = useState(true);
   const [paperOrientation, setPaperOrientation] = useState<'portrait' | 'landscape'>('portrait');
 
-  // Column Visibility Options (à¹€à¸¥à¸·à¸­à¸à¸„à¸­à¸¥à¸±à¸¡à¸™à¹Œà¸—à¸µà¹ˆà¸ˆà¸°à¹à¸ªà¸”à¸‡)
+  // Column Visibility Options (เลือกคอลัมน์ที่จะแสดง)
   const [showStudentCode, setShowStudentCode] = useState(true);
   const [showAffective, setShowAffective] = useState(true);
   const [showPostTest, setShowPostTest] = useState(true);
@@ -84,7 +84,7 @@ export default function GradePdfModal({
     setShowTotal(true);
     setShowAttendance(true);
     setShowGrade(true);
-    toast.success('à¹€à¸¥à¸·à¸­à¸à¹à¸ªà¸”à¸‡à¸—à¸¸à¸à¸„à¸­à¸¥à¸±à¸¡à¸™à¹Œà¹à¸¥à¹‰à¸§');
+    toast.success('เลือกแสดงทุกคอลัมน์แล้ว');
   };
 
   const applyPresetAnnouncement = () => {
@@ -97,7 +97,7 @@ export default function GradePdfModal({
     setShowTotal(true);
     setShowAttendance(false);
     setShowGrade(true);
-    toast.success('à¹ƒà¸Šà¹‰à¸£à¸¹à¸›à¹à¸šà¸šà¸•à¸´à¸”à¸šà¸­à¸£à¹Œà¸” (à¸£à¸«à¸±à¸ª, à¸£à¸§à¸¡, à¹€à¸à¸£à¸”)');
+    toast.success('ใช้รูปแบบติดบอร์ด (รหัส, รวม, เกรด)');
   };
 
   const applyPresetContinuous = () => {
@@ -110,7 +110,7 @@ export default function GradePdfModal({
     setShowTotal(true);
     setShowAttendance(false);
     setShowGrade(false);
-    toast.success('à¹ƒà¸Šà¹‰à¸£à¸¹à¸›à¹à¸šà¸šà¸„à¸°à¹à¸™à¸™à¹€à¸à¹‡à¸šà¸£à¸°à¸«à¸§à¹ˆà¸²à¸‡à¸ à¸²à¸„');
+    toast.success('ใช้รูปแบบคะแนนเก็บระหว่างภาค');
   };
 
   const applyPresetGradeOnly = () => {
@@ -123,7 +123,7 @@ export default function GradePdfModal({
     setShowTotal(true);
     setShowAttendance(true);
     setShowGrade(true);
-    toast.success('à¹ƒà¸Šà¹‰à¸£à¸¹à¸›à¹à¸šà¸šà¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™à¹à¸¥à¸°à¹€à¸§à¸¥à¸²à¹€à¸£à¸µà¸¢à¸™');
+    toast.success('ใช้รูปแบบผลการเรียนและเวลาเรียน');
   };
 
   // Count active columns
@@ -148,7 +148,7 @@ export default function GradePdfModal({
     if (typeof window !== 'undefined') {
       localStorage.setItem('grades_pdf_orientation', newOrientation);
     }
-    toast.success(newOrientation === 'portrait' ? 'à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¹€à¸›à¹‡à¸™ A4 à¹à¸™à¸§à¸•à¸±à¹‰à¸‡' : 'à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¹€à¸›à¹‡à¸™ A4 à¹à¸™à¸§à¸™à¸­à¸™');
+    toast.success(newOrientation === 'portrait' ? 'เปลี่ยนเป็น A4 แนวตั้ง' : 'เปลี่ยนเป็น A4 แนวนอน');
   };
 
   // Initialize and load persisted preferences
@@ -210,8 +210,8 @@ export default function GradePdfModal({
       setSubjectCodeAndName(classroom.name || '');
       setCurriculumLevel(
         isPws
-          ? 'à¸«à¸¥à¸±à¸à¸ªà¸¹à¸•à¸£à¸›à¸£à¸°à¸à¸²à¸¨à¸™à¸µà¸¢à¸šà¸±à¸•à¸£à¸§à¸´à¸Šà¸²à¸Šà¸µà¸žà¸Šà¸±à¹‰à¸™à¸ªà¸¹à¸‡ (à¸›à¸§à¸ª.) 15 à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ'
-          : 'à¸«à¸¥à¸±à¸à¸ªà¸¹à¸•à¸£à¸›à¸£à¸°à¸à¸²à¸¨à¸™à¸µà¸¢à¸šà¸±à¸•à¸£à¸§à¸´à¸Šà¸²à¸Šà¸µà¸ž (à¸›à¸§à¸Š.) 18 à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ'
+          ? 'หลักสูตรประกาศนียบัตรวิชาชีพชั้นสูง (ปวส.) 15 สัปดาห์'
+          : 'หลักสูตรประกาศนียบัตรวิชาชีพ (ปวช.) 18 สัปดาห์'
       );
     }
   }, [classroom, isPws]);
@@ -260,7 +260,7 @@ export default function GradePdfModal({
         attendance: showAttendance,
         grade: showGrade,
       }));
-      toast.success('à¸šà¸±à¸™à¸—à¸¶à¸à¸£à¸¹à¸›à¹à¸šà¸šà¸•à¸±à¹‰à¸‡à¸•à¹‰à¸™à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢');
+      toast.success('บันทึกรูปแบบตั้งต้นเรียบร้อย');
     }
   };
 
@@ -275,14 +275,14 @@ export default function GradePdfModal({
     let totalScoreSum = 0;
 
     report.forEach(s => {
-      const g = s.grade || 'à¹„à¸¡à¹ˆà¸¡à¸µà¹€à¸à¸£à¸”';
+      const g = s.grade || 'ไม่มีเกรด';
       dist[g] = (dist[g] || 0) + 1;
       const score = Number(s.total_score_precise ?? s.total_score ?? 0);
       totalScoreSum += score;
 
-      if (g === 'à¸‚.à¸£.' || g === 'à¸‚à¸£' || s.is_f) { krCount++; failCount++; }
-      else if (g === 'à¸‚.à¸ª.' || s.is_absent_final) { ksCount++; failCount++; }
-      else if (g === 'à¸¡.à¸ª.' || s.is_incomplete) { msCount++; failCount++; }
+      if (g === 'ข.ร.' || g === 'ขร' || s.is_f) { krCount++; failCount++; }
+      else if (g === 'ข.ส.' || s.is_absent_final) { ksCount++; failCount++; }
+      else if (g === 'ม.ส.' || s.is_incomplete) { msCount++; failCount++; }
       else if (g === '0' || g === 'F') { failCount++; }
       else { passCount++; }
     });
@@ -297,7 +297,7 @@ export default function GradePdfModal({
     handleSavePreferences();
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      toast.error('à¹€à¸šà¸£à¸²à¸§à¹Œà¹€à¸‹à¸­à¸£à¹Œà¸šà¸¥à¹‡à¸­à¸à¸«à¸™à¹‰à¸²à¸•à¹ˆà¸²à¸‡à¸žà¸´à¸¡à¸žà¹Œ à¸à¸£à¸¸à¸“à¸²à¸­à¸™à¸¸à¸à¸²à¸• Pop-up');
+      toast.error('เบราว์เซอร์บล็อกหน้าต่างพิมพ์ กรุณาอนุญาต Pop-up');
       return;
     }
 
@@ -313,7 +313,7 @@ export default function GradePdfModal({
 <html lang="th">
 <head>
   <meta charset="UTF-8">
-  <title>à¹à¸šà¸šà¸šà¸±à¸™à¸—à¸¶à¸à¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™_${subjectCodeAndName.replace(/[^a-zA-Z0-9à¸-à¹™_-]/g, '_')}</title>
+  <title>แบบบันทึกผลการเรียน_${subjectCodeAndName.replace(/[^a-zA-Z0-9ก-๙_-]/g, '_')}</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap');
 
@@ -517,21 +517,21 @@ export default function GradePdfModal({
   <div class="print-sheet">
     <div class="header-block">
       <div class="emblem-title">${institutionName}</div>
-      <div class="emblem-sub">à¹à¸šà¸šà¸£à¸²à¸¢à¸‡à¸²à¸™à¹à¸¥à¸°à¸šà¸±à¸™à¸—à¸¶à¸à¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™à¸£à¸²à¸¢à¸§à¸´à¸Šà¸²</div>
-      <div class="emblem-dept">à¸ªà¸±à¸‡à¸à¸±à¸”à¸ªà¸³à¸™à¸±à¸à¸‡à¸²à¸™à¸„à¸“à¸°à¸à¸£à¸£à¸¡à¸à¸²à¸£à¸à¸²à¸£à¸­à¸²à¸Šà¸µà¸§à¸¨à¸¶à¸à¸©à¸² (à¸ªà¸­à¸¨.) à¸à¸£à¸°à¸—à¸£à¸§à¸‡à¸¨à¸¶à¸à¸©à¸²à¸˜à¸´à¸à¸²à¸£</div>
+      <div class="emblem-sub">แบบรายงานและบันทึกผลการเรียนรายวิชา</div>
+      <div class="emblem-dept">สังกัดสำนักงานคณะกรรมการการอาชีวศึกษา (สอศ.) กระทรวงศึกษาธิการ</div>
     </div>
 
     <div class="meta-grid">
       <div class="meta-row">
         <div class="meta-cell-left">
-          <div><span class="strong">à¸£à¸²à¸¢à¸§à¸´à¸Šà¸² / à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™:</span> ${subjectCodeAndName}</div>
-          <div><span class="strong">à¸«à¸¥à¸±à¸à¸ªà¸¹à¸•à¸£:</span> ${curriculumLevel}</div>
-          <div><span class="strong">à¹à¸œà¸™à¸à¸§à¸´à¸Šà¸²:</span> ${departmentName}</div>
+          <div><span class="strong">รายวิชา / ห้องเรียน:</span> ${subjectCodeAndName}</div>
+          <div><span class="strong">หลักสูตร:</span> ${curriculumLevel}</div>
+          <div><span class="strong">แผนกวิชา:</span> ${departmentName}</div>
         </div>
         <div class="meta-cell-right">
-          <div><span class="strong">à¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™ / à¸›à¸µà¸à¸²à¸£à¸¨à¸¶à¸à¸©à¸²:</span> ${academicYear}</div>
-          <div><span class="strong">à¸„à¸£à¸¹à¸œà¸¹à¹‰à¸ªà¸­à¸™:</span> ${teacherName}</div>
-          <div><span class="strong">à¸ˆà¸³à¸™à¸§à¸™à¸œà¸¹à¹‰à¹€à¸£à¸µà¸¢à¸™à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”:</span> ${report.length} à¸„à¸™</div>
+          <div><span class="strong">ภาคเรียน / ปีการศึกษา:</span> ${academicYear}</div>
+          <div><span class="strong">ครูผู้สอน:</span> ${teacherName}</div>
+          <div><span class="strong">จำนวนผู้เรียนทั้งหมด:</span> ${report.length} คน</div>
         </div>
       </div>
     </div>
@@ -539,28 +539,28 @@ export default function GradePdfModal({
     <table class="data-table">
       <thead>
         <tr>
-          <th style="width: 32px;">à¸¥à¸³à¸”à¸±à¸š</th>
-          ${showStudentCode ? `<th style="width: 90px;">à¸£à¸«à¸±à¸ªà¸™à¸±à¸à¸¨à¸¶à¸à¸©à¸²</th>` : ''}
-          <th>à¸Šà¸·à¹ˆà¸­ - à¸ªà¸à¸¸à¸¥</th>
-          ${showAffective ? `<th style="width: 55px;">à¸ˆà¸´à¸•à¸žà¸´à¸ªà¸±à¸¢<br>(${weights.affective_weight}%)</th>` : ''}
-          ${showPostTest ? `<th style="width: 65px;">à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢<br>(${weights.post_test_weight}%)</th>` : ''}
-          ${showAssignment ? `<th style="width: 65px;">à¸‡à¸²à¸™à¹€à¸à¹‡à¸š<br>(${weights.assignment_weight}%)</th>` : ''}
-          ${showMidterm ? `<th style="width: 55px;">à¸à¸¥à¸²à¸‡à¸ à¸²à¸„<br>(${weights.midterm_weight}%)</th>` : ''}
-          ${showFinal ? `<th style="width: 55px;">à¸›à¸¥à¸²à¸¢à¸ à¸²à¸„<br>(${weights.final_weight}%)</th>` : ''}
-          ${showTotal ? `<th class="col-total" style="width: 65px;">à¸£à¸§à¸¡<br>(100)</th>` : ''}
-          ${showAttendance ? `<th style="width: 55px;">à¹€à¸§à¸¥à¸²à¹€à¸£à¸µà¸¢à¸™<br>(%)</th>` : ''}
-          ${showGrade ? `<th style="width: 55px;">à¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™</th>` : ''}
+          <th style="width: 32px;">ลำดับ</th>
+          ${showStudentCode ? `<th style="width: 90px;">รหัสนักศึกษา</th>` : ''}
+          <th>ชื่อ - สกุล</th>
+          ${showAffective ? `<th style="width: 55px;">จิตพิสัย<br>(${weights.affective_weight}%)</th>` : ''}
+          ${showPostTest ? `<th style="width: 65px;">สอบย่อย<br>(${weights.post_test_weight}%)</th>` : ''}
+          ${showAssignment ? `<th style="width: 65px;">งานเก็บ<br>(${weights.assignment_weight}%)</th>` : ''}
+          ${showMidterm ? `<th style="width: 55px;">กลางภาค<br>(${weights.midterm_weight}%)</th>` : ''}
+          ${showFinal ? `<th style="width: 55px;">ปลายภาค<br>(${weights.final_weight}%)</th>` : ''}
+          ${showTotal ? `<th class="col-total" style="width: 65px;">รวม<br>(100)</th>` : ''}
+          ${showAttendance ? `<th style="width: 55px;">เวลาเรียน<br>(%)</th>` : ''}
+          ${showGrade ? `<th style="width: 55px;">ผลการเรียน</th>` : ''}
         </tr>
       </thead>
       <tbody>
         ${report.map((s, idx) => {
-        const isKr = s.grade === 'à¸‚.à¸£.' || s.grade === 'à¸‚à¸£' || s.is_f;
-        const isKs = s.grade === 'à¸‚.à¸ª.' || s.is_absent_final;
-        const isMs = s.grade === 'à¸¡.à¸ª.' || s.is_incomplete;
+        const isKr = s.grade === 'ข.ร.' || s.grade === 'ขร' || s.is_f;
+        const isKs = s.grade === 'ข.ส.' || s.is_absent_final;
+        const isMs = s.grade === 'ม.ส.' || s.is_incomplete;
         const isFail = s.grade === '0' || s.grade === 'F';
         const rowClass = isKr ? 'kr' : isKs ? 'ks' : isMs ? 'ms' : isFail ? 'fail' : '';
 
-        const finalVal = isKs ? 'à¸‚.à¸ª.' : isMs ? 'à¸¡.à¸ª.' : Number(s.precise_scaled_final || s.scaled_final || 0).toFixed(1);
+        const finalVal = isKs ? 'ข.ส.' : isMs ? 'ม.ส.' : Number(s.precise_scaled_final || s.scaled_final || 0).toFixed(1);
         const totalVal = (isKs || isMs) ? '-' : Number(s.total_score_precise ?? s.total_score ?? 0).toFixed(1);
 
         const rawAssignHint = showRawScore ? `<span class="raw-hint">(${Number(s.raw_assign || 0).toFixed(0)}/${s.max_assign || (isPws ? 150 : 180)})</span>` : '';
@@ -585,21 +585,21 @@ export default function GradePdfModal({
 
     ${showStats ? `
     <div class="stats-container">
-      <div style="font-weight: 700; margin-bottom: 4px; font-size: 9pt; color: #0f172a;">à¸ªà¸£à¸¸à¸›à¸ªà¸–à¸´à¸•à¸´à¸œà¸¥à¸à¸²à¸£à¸›à¸£à¸°à¹€à¸¡à¸´à¸™à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™à¸£à¸¹à¹‰:</div>
+      <div style="font-weight: 700; margin-bottom: 4px; font-size: 9pt; color: #0f172a;">สรุปสถิติผลการประเมินการเรียนรู้:</div>
       <table class="stats-table">
         <thead>
           <tr>
-            <th>à¹€à¸à¸£à¸”</th>
+            <th>เกรด</th>
             <th>4</th><th>3.5</th><th>3</th><th>2.5</th><th>2</th><th>1.5</th><th>1</th><th>0</th>
-            <th>à¸‚.à¸£.</th><th>à¸‚.à¸ª.</th><th>à¸¡.à¸ª.</th>
-            <th>à¸£à¸§à¸¡ (à¸„à¸™)</th>
-            <th>à¸„à¸°à¹à¸™à¸™à¹€à¸‰à¸¥à¸µà¹ˆà¸¢</th>
-            <th>à¸£à¹‰à¸­à¸¢à¸¥à¸°à¸—à¸µà¹ˆà¸œà¹ˆà¸²à¸™</th>
+            <th>ข.ร.</th><th>ข.ส.</th><th>ม.ส.</th>
+            <th>รวม (คน)</th>
+            <th>คะแนนเฉลี่ย</th>
+            <th>ร้อยละที่ผ่าน</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td style="font-weight: 700;">à¸ˆà¸³à¸™à¸§à¸™</td>
+            <td style="font-weight: 700;">จำนวน</td>
             <td>${analytics.dist['4'] || 0}</td>
             <td>${analytics.dist['3.5'] || 0}</td>
             <td>${analytics.dist['3'] || 0}</td>
@@ -626,26 +626,26 @@ export default function GradePdfModal({
         <div class="sig-cell">
           <div class="sig-line"></div>
           <div class="sig-name">(${teacherName})</div>
-          <div class="sig-title">à¸„à¸£à¸¹à¸œà¸¹à¹‰à¸ªà¸­à¸™</div>
-          <div class="sig-date">à¸§à¸±à¸™à¸—à¸µà¹ˆ ...... / ...... / ......</div>
+          <div class="sig-title">ครูผู้สอน</div>
+          <div class="sig-date">วันที่ ...... / ...... / ......</div>
         </div>
         <div class="sig-cell">
           <div class="sig-line"></div>
           <div class="sig-name">(${headOfDepartment})</div>
-          <div class="sig-title">à¸«à¸±à¸§à¸«à¸™à¹‰à¸²à¹à¸œà¸™à¸à¸§à¸´à¸Šà¸²</div>
-          <div class="sig-date">à¸§à¸±à¸™à¸—à¸µà¹ˆ ...... / ...... / ......</div>
+          <div class="sig-title">หัวหน้าแผนกวิชา</div>
+          <div class="sig-date">วันที่ ...... / ...... / ......</div>
         </div>
         <div class="sig-cell">
           <div class="sig-line"></div>
           <div class="sig-name">(${headOfCurriculum})</div>
-          <div class="sig-title">à¸«à¸±à¸§à¸«à¸™à¹‰à¸²à¸‡à¸²à¸™à¸§à¸±à¸”à¸œà¸¥à¹à¸¥à¸°à¸›à¸£à¸°à¹€à¸¡à¸´à¸™à¸œà¸¥</div>
-          <div class="sig-date">à¸§à¸±à¸™à¸—à¸µà¹ˆ ...... / ...... / ......</div>
+          <div class="sig-title">หัวหน้างานวัดผลและประเมินผล</div>
+          <div class="sig-date">วันที่ ...... / ...... / ......</div>
         </div>
         <div class="sig-cell">
           <div class="sig-line"></div>
           <div class="sig-name">(${deputyDirector})</div>
-          <div class="sig-title">à¸£à¸­à¸‡à¸œà¸¹à¹‰à¸­à¸³à¸™à¸§à¸¢à¸à¸²à¸£à¸à¹ˆà¸²à¸¢à¸§à¸´à¸Šà¸²à¸à¸²à¸£</div>
-          <div class="sig-date">à¸§à¸±à¸™à¸—à¸µà¹ˆ ...... / ...... / ......</div>
+          <div class="sig-title">รองผู้อำนวยการฝ่ายวิชาการ</div>
+          <div class="sig-date">วันที่ ...... / ...... / ......</div>
         </div>
       </div>
     </div>
@@ -654,7 +654,7 @@ export default function GradePdfModal({
     ${showPrintDate ? `
     <div class="footer-note">
       <span></span>
-      <span>à¸§à¸±à¸™à¸—à¸µà¹ˆà¸­à¸­à¸à¸£à¸²à¸¢à¸‡à¸²à¸™: ${printDateStr}</span>
+      <span>วันที่ออกรายงาน: ${printDateStr}</span>
     </div>
     ` : ''}
   </div>
@@ -691,12 +691,12 @@ export default function GradePdfModal({
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
-                à¸žà¸£à¸µà¸§à¸´à¸§à¹à¸¥à¸°à¸ˆà¸±à¸”à¸£à¸¹à¸›à¹à¸šà¸šà¸£à¸²à¸¢à¸‡à¸²à¸™à¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™ PDF
+                พรีวิวและจัดรูปแบบรายงานผลการเรียน PDF
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-200">
-                  à¸ªà¹„à¸•à¸¥à¹Œ à¸¨à¸˜.02 à¸­à¸­à¸™à¹„à¸¥à¸™à¹Œ
+                  สไตล์ ศธ.02 ออนไลน์
                 </span>
               </h2>
-              <p className="text-xs text-slate-500">à¸›à¸£à¸±à¸šà¹à¸•à¹ˆà¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸«à¸±à¸§à¸£à¸²à¸¢à¸‡à¸²à¸™ à¸¥à¸²à¸¢à¹€à¸‹à¹‡à¸™ à¹à¸¥à¸°à¸”à¸¹à¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡à¹€à¸­à¸à¸ªà¸²à¸£ A4 à¹à¸šà¸šà¸ªà¸” à¸à¹ˆà¸­à¸™à¸ªà¸±à¹ˆà¸‡à¸žà¸´à¸¡à¸žà¹Œà¸«à¸£à¸·à¸­à¸šà¸±à¸™à¸—à¸¶à¸ PDF</p>
+              <p className="text-xs text-slate-500">ปรับแต่งข้อมูลหัวรายงาน ลายเซ็น และดูตัวอย่างเอกสาร A4 แบบสด ก่อนสั่งพิมพ์หรือบันทึก PDF</p>
             </div>
           </div>
 
@@ -705,13 +705,13 @@ export default function GradePdfModal({
               onClick={handlePrint}
               className="btn bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white flex items-center gap-2 text-xs font-bold px-4 py-2.5 rounded-xl shadow-md shadow-indigo-500/20 transition-all active:scale-95"
             >
-              <Printer className="w-4 h-4" /> à¸žà¸´à¸¡à¸žà¹Œà¹€à¸­à¸à¸ªà¸²à¸£ / à¸šà¸±à¸™à¸—à¸¶à¸ PDF
+              <Printer className="w-4 h-4" /> พิมพ์เอกสาร / บันทึก PDF
             </button>
             <button
               onClick={onClose}
               className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition-all duration-150 shadow-sm"
-              title="à¸›à¸´à¸”à¸«à¸™à¹‰à¸²à¸•à¹ˆà¸²à¸‡ (à¸à¸”à¸à¸²à¸à¸šà¸²à¸—à¹€à¸žà¸·à¹ˆà¸­à¸›à¸´à¸”)"
-              aria-label="à¸›à¸´à¸”à¸«à¸™à¹‰à¸²à¸•à¹ˆà¸²à¸‡"
+              title="ปิดหน้าต่าง (กดกากบาทเพื่อปิด)"
+              aria-label="ปิดหน้าต่าง"
             >
               <X className="w-5 h-5" />
             </button>
@@ -731,21 +731,21 @@ export default function GradePdfModal({
                 className={`flex-1 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${activeTab === 'info' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                   }`}
               >
-                <Building2 className="w-3.5 h-3.5" /> à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸«à¸±à¸§à¸£à¸²à¸¢à¸‡à¸²à¸™
+                <Building2 className="w-3.5 h-3.5" /> ข้อมูลหัวรายงาน
               </button>
               <button
                 onClick={() => setActiveTab('display')}
                 className={`flex-1 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${activeTab === 'display' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                   }`}
               >
-                <Layers className="w-3.5 h-3.5" /> à¸•à¸±à¸§à¹€à¸¥à¸·à¸­à¸à¸•à¸²à¸£à¸²à¸‡
+                <Layers className="w-3.5 h-3.5" /> ตัวเลือกตาราง
               </button>
               <button
                 onClick={() => setActiveTab('signatures')}
                 className={`flex-1 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${activeTab === 'signatures' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                   }`}
               >
-                <UserCheck className="w-3.5 h-3.5" /> à¸Šà¹ˆà¸­à¸‡à¸¥à¸‡à¸™à¸²à¸¡
+                <UserCheck className="w-3.5 h-3.5" /> ช่องลงนาม
               </button>
             </div>
 
@@ -753,73 +753,73 @@ export default function GradePdfModal({
             {activeTab === 'info' && (
               <div className="space-y-3.5 text-xs">
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">à¸Šà¸·à¹ˆà¸­à¸ªà¸–à¸²à¸™à¸¨à¸¶à¸à¸©à¸² / à¸§à¸´à¸—à¸¢à¸²à¸¥à¸±à¸¢:</label>
+                  <label className="font-semibold text-slate-700 block mb-1">ชื่อสถานศึกษา / วิทยาลัย:</label>
                   <input
                     type="text"
                     value={institutionName}
                     onChange={e => setInstitutionName(e.target.value)}
                     className="form-input text-xs w-full"
-                    placeholder="à¹€à¸Šà¹ˆà¸™ à¸§à¸´à¸—à¸¢à¸²à¸¥à¸±à¸¢à¹€à¸—à¸„à¸™à¸´à¸„..., à¸§à¸´à¸—à¸¢à¸²à¸¥à¸±à¸¢à¸­à¸²à¸Šà¸µà¸§à¸¨à¸¶à¸à¸©à¸²..."
+                    placeholder="เช่น วิทยาลัยเทคนิค..., วิทยาลัยอาชีวศึกษา..."
                   />
                 </div>
 
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">à¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™ / à¸›à¸µà¸à¸²à¸£à¸¨à¸¶à¸à¸©à¸²:</label>
+                  <label className="font-semibold text-slate-700 block mb-1">ภาคเรียน / ปีการศึกษา:</label>
                   <input
                     type="text"
                     value={academicYear}
                     onChange={e => setAcademicYear(e.target.value)}
                     className="form-input text-xs w-full"
-                    placeholder="à¹€à¸Šà¹ˆà¸™ à¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™à¸—à¸µà¹ˆ 1 à¸›à¸µà¸à¸²à¸£à¸¨à¸¶à¸à¸©à¸² 2567"
+                    placeholder="เช่น ภาคเรียนที่ 1 ปีการศึกษา 2567"
                   />
                 </div>
 
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">à¸£à¸«à¸±à¸ªà¸§à¸´à¸Šà¸² - à¸Šà¸·à¹ˆà¸­à¸§à¸´à¸Šà¸²:</label>
+                  <label className="font-semibold text-slate-700 block mb-1">รหัสวิชา - ชื่อวิชา:</label>
                   <input
                     type="text"
                     value={subjectCodeAndName}
                     onChange={e => setSubjectCodeAndName(e.target.value)}
                     className="form-input text-xs w-full"
-                    placeholder="à¸£à¸«à¸±à¸ªà¸§à¸´à¸Šà¸² à¹à¸¥à¸°à¸Šà¸·à¹ˆà¸­à¸§à¸´à¸Šà¸²"
+                    placeholder="รหัสวิชา และชื่อวิชา"
                   />
                 </div>
 
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">à¸£à¸°à¸”à¸±à¸šà¸Šà¸±à¹‰à¸™ / à¸«à¸¥à¸±à¸à¸ªà¸¹à¸•à¸£:</label>
+                  <label className="font-semibold text-slate-700 block mb-1">ระดับชั้น / หลักสูตร:</label>
                   <input
                     type="text"
                     value={curriculumLevel}
                     onChange={e => setCurriculumLevel(e.target.value)}
                     className="form-input text-xs w-full"
-                    placeholder="à¹€à¸Šà¹ˆà¸™ à¸«à¸¥à¸±à¸à¸ªà¸¹à¸•à¸£ à¸›à¸§à¸Š. à¸«à¸£à¸·à¸­ à¸›à¸§à¸ª."
+                    placeholder="เช่น หลักสูตร ปวช. หรือ ปวส."
                   />
                 </div>
 
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">à¹à¸œà¸™à¸à¸§à¸´à¸Šà¸² / à¸ªà¸²à¸‚à¸²à¸‡à¸²à¸™:</label>
+                  <label className="font-semibold text-slate-700 block mb-1">แผนกวิชา / สาขางาน:</label>
                   <input
                     type="text"
                     value={departmentName}
                     onChange={e => setDepartmentName(e.target.value)}
                     className="form-input text-xs w-full"
-                    placeholder="à¹€à¸Šà¹ˆà¸™ à¹à¸œà¸™à¸à¸§à¸´à¸Šà¸²à¹€à¸—à¸„à¹‚à¸™à¹‚à¸¥à¸¢à¸µà¸ªà¸²à¸£à¸ªà¸™à¹€à¸—à¸¨"
+                    placeholder="เช่น แผนกวิชาเทคโนโลยีสารสนเทศ"
                   />
                 </div>
 
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">à¸Šà¸·à¹ˆà¸­à¸„à¸£à¸¹à¸œà¸¹à¹‰à¸ªà¸­à¸™:</label>
+                  <label className="font-semibold text-slate-700 block mb-1">ชื่อครูผู้สอน:</label>
                   <input
                     type="text"
                     value={teacherName}
                     onChange={e => setTeacherName(e.target.value)}
                     className="form-input text-xs w-full"
-                    placeholder="à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥ à¸„à¸£à¸¹à¸œà¸¹à¹‰à¸ªà¸­à¸™"
+                    placeholder="ชื่อ-นามสกุล ครูผู้สอน"
                   />
                 </div>
 
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">à¸£à¸¹à¸›à¹à¸šà¸šà¹€à¸­à¸à¸ªà¸²à¸£:</label>
+                  <label className="font-semibold text-slate-700 block mb-1">รูปแบบเอกสาร:</label>
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
@@ -829,8 +829,8 @@ export default function GradePdfModal({
                           : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                         }`}
                     >
-                      <div className="font-bold">à¸¨à¸˜.02 à¸—à¸²à¸‡à¸à¸²à¸£</div>
-                      <div className="text-[10px] text-slate-500 font-normal">à¸¡à¸µà¸«à¸±à¸§à¸«à¸™à¸±à¸‡à¸ªà¸·à¸­à¸£à¸²à¸Šà¸à¸²à¸£à¹à¸¥à¸°à¸Šà¹ˆà¸­à¸‡à¸¥à¸‡à¸™à¸²à¸¡</div>
+                      <div className="font-bold">ศธ.02 ทางการ</div>
+                      <div className="text-[10px] text-slate-500 font-normal">มีหัวหนังสือราชการและช่องลงนาม</div>
                     </button>
                     <button
                       type="button"
@@ -840,8 +840,8 @@ export default function GradePdfModal({
                           : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                         }`}
                     >
-                      <div className="font-bold">à¹à¸šà¸šà¸•à¸´à¸”à¸šà¸­à¸£à¹Œà¸”</div>
-                      <div className="text-[10px] text-slate-500 font-normal">à¸à¸£à¸°à¸Šà¸±à¸š à¹à¸ˆà¹‰à¸‡à¸„à¸°à¹à¸™à¸™à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™</div>
+                      <div className="font-bold">แบบติดบอร์ด</div>
+                      <div className="text-[10px] text-slate-500 font-normal">กระชับ แจ้งคะแนนนักเรียน</div>
                     </button>
                   </div>
                 </div>
@@ -856,23 +856,23 @@ export default function GradePdfModal({
                   <div className="flex items-center justify-between">
                     <div className="font-bold text-slate-800 flex items-center gap-1.5">
                       <CheckSquare className="w-4 h-4 text-indigo-600" />
-                      à¹€à¸¥à¸·à¸­à¸à¸„à¸­à¸¥à¸±à¸¡à¸™à¹Œà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸—à¸µà¹ˆà¸•à¹‰à¸­à¸‡à¸à¸²à¸£à¹à¸ªà¸”à¸‡
+                      เลือกคอลัมน์ข้อมูลที่ต้องการแสดง
                     </div>
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700">
-                      {activeColumnsCount} / 9 à¸„à¸­à¸¥à¸±à¸¡à¸™à¹Œ
+                      {activeColumnsCount} / 9 คอลัมน์
                     </span>
                   </div>
 
                   {/* Quick Presets */}
                   <div>
-                    <div className="text-[11px] font-medium text-slate-500 mb-1.5">à¸Šà¸¸à¸”à¸•à¸±à¸§à¹€à¸¥à¸·à¸­à¸à¸”à¹ˆà¸§à¸™ (Presets):</div>
+                    <div className="text-[11px] font-medium text-slate-500 mb-1.5">ชุดตัวเลือกด่วน (Presets):</div>
                     <div className="grid grid-cols-2 gap-1.5">
                       <button
                         type="button"
                         onClick={applyPresetAll}
                         className="px-2 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-indigo-50 hover:border-indigo-300 text-slate-700 hover:text-indigo-700 font-medium text-[11px] transition-all text-left flex items-center justify-between shadow-2xs"
                       >
-                        <span>ðŸŒŸ à¹à¸ªà¸”à¸‡à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”</span>
+                        <span>🌟 แสดงทั้งหมด</span>
                         <span className="text-[9px] text-slate-400">9/9</span>
                       </button>
                       <button
@@ -880,7 +880,7 @@ export default function GradePdfModal({
                         onClick={applyPresetAnnouncement}
                         className="px-2 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-indigo-50 hover:border-indigo-300 text-slate-700 hover:text-indigo-700 font-medium text-[11px] transition-all text-left flex items-center justify-between shadow-2xs"
                       >
-                        <span>ðŸ“‹ à¹à¸šà¸šà¸•à¸´à¸”à¸šà¸­à¸£à¹Œà¸”</span>
+                        <span>📋 แบบติดบอร์ด</span>
                         <span className="text-[9px] text-slate-400">3/9</span>
                       </button>
                       <button
@@ -888,7 +888,7 @@ export default function GradePdfModal({
                         onClick={applyPresetContinuous}
                         className="px-2 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-indigo-50 hover:border-indigo-300 text-slate-700 hover:text-indigo-700 font-medium text-[11px] transition-all text-left flex items-center justify-between shadow-2xs"
                       >
-                        <span>ðŸ“ à¹€à¸‰à¸žà¸²à¸°à¸„à¸°à¹à¸™à¸™à¹€à¸à¹‡à¸š</span>
+                        <span>📝 เฉพาะคะแนนเก็บ</span>
                         <span className="text-[9px] text-slate-400">6/9</span>
                       </button>
                       <button
@@ -896,7 +896,7 @@ export default function GradePdfModal({
                         onClick={applyPresetGradeOnly}
                         className="px-2 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-indigo-50 hover:border-indigo-300 text-slate-700 hover:text-indigo-700 font-medium text-[11px] transition-all text-left flex items-center justify-between shadow-2xs"
                       >
-                        <span>ðŸŽ“ à¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™ & à¹€à¸§à¸¥à¸²</span>
+                        <span>🎓 ผลการเรียน & เวลา</span>
                         <span className="text-[9px] text-slate-400">4/9</span>
                       </button>
                     </div>
@@ -912,7 +912,7 @@ export default function GradePdfModal({
                           onChange={e => setShowStudentCode(e.target.checked)}
                           className="rounded text-indigo-600 focus:ring-indigo-500"
                         />
-                        <span className="text-slate-700 font-medium">à¸£à¸«à¸±à¸ªà¸™à¸±à¸à¸¨à¸¶à¸à¸©à¸²</span>
+                        <span className="text-slate-700 font-medium">รหัสนักศึกษา</span>
                       </span>
                       <span className="text-[10px] text-slate-400 font-mono">student_code</span>
                     </label>
@@ -925,7 +925,7 @@ export default function GradePdfModal({
                           onChange={e => setShowAffective(e.target.checked)}
                           className="rounded text-indigo-600 focus:ring-indigo-500"
                         />
-                        <span className="text-slate-700 font-medium">à¸ˆà¸´à¸•à¸žà¸´à¸ªà¸±à¸¢</span>
+                        <span className="text-slate-700 font-medium">จิตพิสัย</span>
                       </span>
                       <span className="text-[10px] font-semibold text-slate-500 bg-slate-200/70 px-1.5 py-0.5 rounded">
                         {weights.affective_weight}%
@@ -940,7 +940,7 @@ export default function GradePdfModal({
                           onChange={e => setShowPostTest(e.target.checked)}
                           className="rounded text-indigo-600 focus:ring-indigo-500"
                         />
-                        <span className="text-slate-700 font-medium">à¹à¸šà¸šà¸—à¸”à¸ªà¸­à¸š / à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢</span>
+                        <span className="text-slate-700 font-medium">แบบทดสอบ / สอบย่อย</span>
                       </span>
                       <span className="text-[10px] font-semibold text-slate-500 bg-slate-200/70 px-1.5 py-0.5 rounded">
                         {weights.post_test_weight}%
@@ -955,7 +955,7 @@ export default function GradePdfModal({
                           onChange={e => setShowAssignment(e.target.checked)}
                           className="rounded text-indigo-600 focus:ring-indigo-500"
                         />
-                        <span className="text-slate-700 font-medium">à¸ à¸²à¸£à¸°à¸‡à¸²à¸™ / à¸‡à¸²à¸™à¹€à¸à¹‡à¸š</span>
+                        <span className="text-slate-700 font-medium">ภาระงาน / งานเก็บ</span>
                       </span>
                       <span className="text-[10px] font-semibold text-slate-500 bg-slate-200/70 px-1.5 py-0.5 rounded">
                         {weights.assignment_weight}%
@@ -970,7 +970,7 @@ export default function GradePdfModal({
                           onChange={e => setShowMidterm(e.target.checked)}
                           className="rounded text-indigo-600 focus:ring-indigo-500"
                         />
-                        <span className="text-slate-700 font-medium">à¸ªà¸­à¸šà¸à¸¥à¸²à¸‡à¸ à¸²à¸„</span>
+                        <span className="text-slate-700 font-medium">สอบกลางภาค</span>
                       </span>
                       <span className="text-[10px] font-semibold text-slate-500 bg-slate-200/70 px-1.5 py-0.5 rounded">
                         {weights.midterm_weight}%
@@ -985,7 +985,7 @@ export default function GradePdfModal({
                           onChange={e => setShowFinal(e.target.checked)}
                           className="rounded text-indigo-600 focus:ring-indigo-500"
                         />
-                        <span className="text-slate-700 font-medium">à¸ªà¸­à¸šà¸›à¸¥à¸²à¸¢à¸ à¸²à¸„</span>
+                        <span className="text-slate-700 font-medium">สอบปลายภาค</span>
                       </span>
                       <span className="text-[10px] font-semibold text-slate-500 bg-slate-200/70 px-1.5 py-0.5 rounded">
                         {weights.final_weight}%
@@ -1000,10 +1000,10 @@ export default function GradePdfModal({
                           onChange={e => setShowTotal(e.target.checked)}
                           className="rounded text-indigo-600 focus:ring-indigo-500"
                         />
-                        <span className="text-slate-700 font-bold">à¸£à¸§à¸¡à¸„à¸°à¹à¸™à¸™ (100)</span>
+                        <span className="text-slate-700 font-bold">รวมคะแนน (100)</span>
                       </span>
                       <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
-                        100 à¸„à¸°à¹à¸™à¸™
+                        100 คะแนน
                       </span>
                     </label>
 
@@ -1015,9 +1015,9 @@ export default function GradePdfModal({
                           onChange={e => setShowAttendance(e.target.checked)}
                           className="rounded text-indigo-600 focus:ring-indigo-500"
                         />
-                        <span className="text-slate-700 font-medium">à¹€à¸§à¸¥à¸²à¹€à¸£à¸µà¸¢à¸™ / à¹€à¸‚à¹‰à¸²à¹€à¸£à¸µà¸¢à¸™ (%)</span>
+                        <span className="text-slate-700 font-medium">เวลาเรียน / เข้าเรียน (%)</span>
                       </span>
-                      <span className="text-[10px] text-slate-400 font-mono">% à¹€à¸‚à¹‰à¸²à¹€à¸£à¸µà¸¢à¸™</span>
+                      <span className="text-[10px] text-slate-400 font-mono">% เข้าเรียน</span>
                     </label>
 
                     <label className="flex items-center justify-between p-1.5 rounded-lg hover:bg-white transition-colors cursor-pointer select-none">
@@ -1028,22 +1028,22 @@ export default function GradePdfModal({
                           onChange={e => setShowGrade(e.target.checked)}
                           className="rounded text-indigo-600 focus:ring-indigo-500"
                         />
-                        <span className="text-slate-700 font-bold text-indigo-950">à¸£à¸°à¸”à¸±à¸šà¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™ (à¹€à¸à¸£à¸”)</span>
+                        <span className="text-slate-700 font-bold text-indigo-950">ระดับผลการเรียน (เกรด)</span>
                       </span>
                       <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
-                        à¹€à¸à¸£à¸”
+                        เกรด
                       </span>
                     </label>
                   </div>
 
                   <div className="pt-2 border-t border-slate-200/80 text-[11px] text-slate-500 italic">
-                    * à¸„à¸­à¸¥à¸±à¸¡à¸™à¹Œ &quot;à¸¥à¸³à¸”à¸±à¸š&quot; à¹à¸¥à¸° &quot;à¸Šà¸·à¹ˆà¸­ - à¸ªà¸à¸¸à¸¥&quot; à¸ˆà¸°à¹à¸ªà¸”à¸‡à¹€à¸ªà¸¡à¸­à¹€à¸žà¸·à¹ˆà¸­à¸£à¸°à¸šà¸¸à¸•à¸±à¸§à¸•à¸™à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™
+                    * คอลัมน์ &quot;ลำดับ&quot; และ &quot;ชื่อ - สกุล&quot; จะแสดงเสมอเพื่อระบุตัวตนนักเรียน
                   </div>
                 </div>
 
                 {/* Additional Elements */}
                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2.5">
-                  <div className="font-bold text-slate-700 mb-1">à¸­à¸‡à¸„à¹Œà¸›à¸£à¸°à¸à¸­à¸šà¹€à¸žà¸´à¹ˆà¸¡à¹€à¸•à¸´à¸¡à¹ƒà¸™à¹€à¸­à¸à¸ªà¸²à¸£:</div>
+                  <div className="font-bold text-slate-700 mb-1">องค์ประกอบเพิ่มเติมในเอกสาร:</div>
 
                   <label className="flex items-center gap-2.5 cursor-pointer select-none">
                     <input
@@ -1052,7 +1052,7 @@ export default function GradePdfModal({
                       onChange={e => setShowRawScore(e.target.checked)}
                       className="rounded text-indigo-600 focus:ring-indigo-500"
                     />
-                    <span className="text-slate-700 font-medium">à¹à¸ªà¸”à¸‡à¸„à¸°à¹à¸™à¸™à¸”à¸´à¸šà¸„à¸¹à¹ˆà¸„à¸°à¹à¸™à¸™à¸ªà¸±à¸”à¸ªà¹ˆà¸§à¸™ (à¹€à¸Šà¹ˆà¸™ à¸”à¸´à¸š: 122/150)</span>
+                    <span className="text-slate-700 font-medium">แสดงคะแนนดิบคู่คะแนนสัดส่วน (เช่น ดิบ: 122/150)</span>
                   </label>
 
                   <label className="flex items-center gap-2.5 cursor-pointer select-none">
@@ -1062,7 +1062,7 @@ export default function GradePdfModal({
                       onChange={e => setShowStats(e.target.checked)}
                       className="rounded text-indigo-600 focus:ring-indigo-500"
                     />
-                    <span className="text-slate-700 font-medium">à¹à¸ªà¸”à¸‡à¸•à¸²à¸£à¸²à¸‡à¸ªà¸£à¸¸à¸›à¸ªà¸–à¸´à¸•à¸´à¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™à¹à¸¥à¸°à¸£à¹‰à¸­à¸¢à¸¥à¸°à¸œà¹ˆà¸²à¸™</span>
+                    <span className="text-slate-700 font-medium">แสดงตารางสรุปสถิติผลการเรียนและร้อยละผ่าน</span>
                   </label>
 
                   <label className="flex items-center gap-2.5 cursor-pointer select-none">
@@ -1072,7 +1072,7 @@ export default function GradePdfModal({
                       onChange={e => setShowSignatures(e.target.checked)}
                       className="rounded text-indigo-600 focus:ring-indigo-500"
                     />
-                    <span className="text-slate-700 font-medium">à¹à¸ªà¸”à¸‡à¸Šà¹ˆà¸­à¸‡à¸¥à¸‡à¸™à¸²à¸¡à¸£à¸±à¸šà¸£à¸­à¸‡à¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™ (4 à¸•à¸³à¹à¸«à¸™à¹ˆà¸‡)</span>
+                    <span className="text-slate-700 font-medium">แสดงช่องลงนามรับรองผลการเรียน (4 ตำแหน่ง)</span>
                   </label>
 
                   <label className="flex items-center gap-2.5 cursor-pointer select-none">
@@ -1082,12 +1082,12 @@ export default function GradePdfModal({
                       onChange={e => setShowPrintDate(e.target.checked)}
                       className="rounded text-indigo-600 focus:ring-indigo-500"
                     />
-                    <span className="text-slate-700 font-medium">à¹à¸ªà¸”à¸‡à¸§à¸±à¸™à¸—à¸µà¹ˆà¸­à¸­à¸à¸£à¸²à¸¢à¸‡à¸²à¸™à¸—à¸µà¹ˆà¸ªà¹ˆà¸§à¸™à¸—à¹‰à¸²à¸¢à¹€à¸­à¸à¸ªà¸²à¸£</span>
+                    <span className="text-slate-700 font-medium">แสดงวันที่ออกรายงานที่ส่วนท้ายเอกสาร</span>
                   </label>
                 </div>
 
                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-                  <div className="font-bold text-slate-700">à¸—à¸´à¸¨à¸—à¸²à¸‡à¸à¸£à¸°à¸”à¸²à¸© A4:</div>
+                  <div className="font-bold text-slate-700">ทิศทางกระดาษ A4:</div>
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
@@ -1095,7 +1095,7 @@ export default function GradePdfModal({
                       className={`p-2 rounded-lg border text-center font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${paperOrientation === 'portrait' ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                         }`}
                     >
-                      <span>ðŸ“„</span> à¹à¸™à¸§à¸•à¸±à¹‰à¸‡ (Portrait)
+                      <span>📄</span> แนวตั้ง (Portrait)
                     </button>
                     <button
                       type="button"
@@ -1103,7 +1103,7 @@ export default function GradePdfModal({
                       className={`p-2 rounded-lg border text-center font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${paperOrientation === 'landscape' ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                         }`}
                     >
-                      <span>ðŸ“‘</span> à¹à¸™à¸§à¸™à¸­à¸™ (Landscape)
+                      <span>📑</span> แนวนอน (Landscape)
                     </button>
                   </div>
                 </div>
@@ -1114,50 +1114,50 @@ export default function GradePdfModal({
             {activeTab === 'signatures' && (
               <div className="space-y-3 text-xs">
                 <p className="text-slate-500 text-[11px]">
-                  à¸à¸³à¸«à¸™à¸”à¸£à¸²à¸¢à¸Šà¸·à¹ˆà¸­à¸œà¸¹à¹‰à¸¥à¸‡à¸™à¸²à¸¡à¸£à¸±à¸šà¸£à¸­à¸‡à¸œà¸¥à¸à¸²à¸£à¸›à¸£à¸°à¹€à¸¡à¸´à¸™à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™à¸£à¸¹à¹‰ (à¸ˆà¸°à¸›à¸£à¸²à¸à¸à¹ƒà¸™à¹à¸šà¸šà¸£à¸²à¸¢à¸‡à¸²à¸™ à¸¨à¸˜.02 à¸—à¸²à¸‡à¸à¸²à¸£):
+                  กำหนดรายชื่อผู้ลงนามรับรองผลการประเมินการเรียนรู้ (จะปรากฏในแบบรายงาน ศธ.02 ทางการ):
                 </p>
 
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">1. à¸„à¸£à¸¹à¸œà¸¹à¹‰à¸ªà¸­à¸™:</label>
+                  <label className="font-semibold text-slate-700 block mb-1">1. ครูผู้สอน:</label>
                   <input
                     type="text"
                     value={teacherName}
                     onChange={e => setTeacherName(e.target.value)}
                     className="form-input text-xs w-full"
-                    placeholder="à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥ à¸„à¸£à¸¹à¸œà¸¹à¹‰à¸ªà¸­à¸™"
+                    placeholder="ชื่อ-นามสกุล ครูผู้สอน"
                   />
                 </div>
 
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">2. à¸«à¸±à¸§à¸«à¸™à¹‰à¸²à¹à¸œà¸™à¸à¸§à¸´à¸Šà¸²:</label>
+                  <label className="font-semibold text-slate-700 block mb-1">2. หัวหน้าแผนกวิชา:</label>
                   <input
                     type="text"
                     value={headOfDepartment}
                     onChange={e => setHeadOfDepartment(e.target.value)}
                     className="form-input text-xs w-full"
-                    placeholder="à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥ à¸«à¸±à¸§à¸«à¸™à¹‰à¸²à¹à¸œà¸™à¸à¸§à¸´à¸Šà¸²"
+                    placeholder="ชื่อ-นามสกุล หัวหน้าแผนกวิชา"
                   />
                 </div>
 
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">3. à¸«à¸±à¸§à¸«à¸™à¹‰à¸²à¸‡à¸²à¸™à¸§à¸±à¸”à¸œà¸¥à¹à¸¥à¸°à¸›à¸£à¸°à¹€à¸¡à¸´à¸™à¸œà¸¥:</label>
+                  <label className="font-semibold text-slate-700 block mb-1">3. หัวหน้างานวัดผลและประเมินผล:</label>
                   <input
                     type="text"
                     value={headOfCurriculum}
                     onChange={e => setHeadOfCurriculum(e.target.value)}
                     className="form-input text-xs w-full"
-                    placeholder="à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥ à¸«à¸±à¸§à¸«à¸™à¹‰à¸²à¸‡à¸²à¸™à¸§à¸±à¸”à¸œà¸¥à¸¯"
+                    placeholder="ชื่อ-นามสกุล หัวหน้างานวัดผลฯ"
                   />
                 </div>
 
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">4. à¸£à¸­à¸‡à¸œà¸¹à¹‰à¸­à¸³à¸™à¸§à¸¢à¸à¸²à¸£à¸à¹ˆà¸²à¸¢à¸§à¸´à¸Šà¸²à¸à¸²à¸£:</label>
+                  <label className="font-semibold text-slate-700 block mb-1">4. รองผู้อำนวยการฝ่ายวิชาการ:</label>
                   <input
                     type="text"
                     value={deputyDirector}
                     onChange={e => setDeputyDirector(e.target.value)}
                     className="form-input text-xs w-full"
-                    placeholder="à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥ à¸£à¸­à¸‡ à¸œà¸­. à¸à¹ˆà¸²à¸¢à¸§à¸´à¸Šà¸²à¸à¸²à¸£"
+                    placeholder="ชื่อ-นามสกุล รอง ผอ. ฝ่ายวิชาการ"
                   />
                 </div>
 
@@ -1167,7 +1167,7 @@ export default function GradePdfModal({
                     onClick={handleSavePreferences}
                     className="btn bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs w-full flex items-center justify-center gap-1.5"
                   >
-                    <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" /> à¸šà¸±à¸™à¸—à¸¶à¸à¸Šà¸·à¹ˆà¸­à¸œà¸¹à¹‰à¸¥à¸‡à¸™à¸²à¸¡à¹€à¸›à¹‡à¸™à¸„à¹ˆà¸²à¹€à¸£à¸´à¹ˆà¸¡à¸•à¹‰à¸™
+                    <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" /> บันทึกชื่อผู้ลงนามเป็นค่าเริ่มต้น
                   </button>
                 </div>
               </div>
@@ -1175,8 +1175,8 @@ export default function GradePdfModal({
 
             {/* Quick Summary Badge */}
             <div className="mt-auto pt-4 border-t border-slate-200 text-[11px] text-slate-500 flex items-center justify-between">
-              <span>à¸à¸²à¸™à¸„à¸°à¹à¸™à¸™à¹€à¸•à¹‡à¸¡: <strong className="text-slate-800">{isPws ? '150' : '180'} à¸„à¸°à¹à¸™à¸™</strong></span>
-              <span>à¸œà¸¹à¹‰à¹€à¸£à¸µà¸¢à¸™: <strong className="text-slate-800">{report.length} à¸„à¸™</strong></span>
+              <span>ฐานคะแนนเต็ม: <strong className="text-slate-800">{isPws ? '150' : '180'} คะแนน</strong></span>
+              <span>ผู้เรียน: <strong className="text-slate-800">{report.length} คน</strong></span>
             </div>
           </div>
 
@@ -1186,7 +1186,7 @@ export default function GradePdfModal({
             {/* Preview Toolbar */}
             <div className="px-4 py-2 bg-slate-100 border-b border-slate-300 flex items-center justify-between text-xs text-slate-600 shrink-0">
               <div className="flex items-center gap-2.5">
-                <span className="font-bold text-slate-700 hidden sm:inline">à¸—à¸´à¸¨à¸—à¸²à¸‡à¸à¸£à¸°à¸”à¸²à¸©:</span>
+                <span className="font-bold text-slate-700 hidden sm:inline">ทิศทางกระดาษ:</span>
                 <div className="flex items-center bg-white p-0.5 rounded-lg border border-slate-200 shadow-2xs">
                   <button
                     type="button"
@@ -1196,8 +1196,8 @@ export default function GradePdfModal({
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                       }`}
                   >
-                    <span>ðŸ“„</span>
-                    <span>à¹à¸™à¸§à¸•à¸±à¹‰à¸‡</span>
+                    <span>📄</span>
+                    <span>แนวตั้ง</span>
                   </button>
                   <button
                     type="button"
@@ -1207,8 +1207,8 @@ export default function GradePdfModal({
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                       }`}
                   >
-                    <span>ðŸ“‘</span>
-                    <span>à¹à¸™à¸§à¸™à¸­à¸™</span>
+                    <span>📑</span>
+                    <span>แนวนอน</span>
                   </button>
                 </div>
               </div>
@@ -1217,7 +1217,7 @@ export default function GradePdfModal({
                 <button
                   onClick={() => setZoomLevel(prev => Math.max(40, prev - 10))}
                   className="p-1 rounded bg-white hover:bg-slate-50 border border-slate-200 text-slate-700"
-                  title="à¸¥à¸”à¸‚à¸™à¸²à¸”"
+                  title="ลดขนาด"
                 >
                   <ZoomOut className="w-3.5 h-3.5" />
                 </button>
@@ -1225,14 +1225,14 @@ export default function GradePdfModal({
                 <button
                   onClick={() => setZoomLevel(prev => Math.min(130, prev + 10))}
                   className="p-1 rounded bg-white hover:bg-slate-50 border border-slate-200 text-slate-700"
-                  title="à¹€à¸žà¸´à¹ˆà¸¡à¸‚à¸™à¸²à¸”"
+                  title="เพิ่มขนาด"
                 >
                   <ZoomIn className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={() => setZoomLevel(paperOrientation === 'landscape' ? 68 : 85)}
                   className="p-1 rounded bg-white hover:bg-slate-50 border border-slate-200 text-slate-700"
-                  title="à¸£à¸µà¹€à¸‹à¹‡à¸•à¸‚à¸™à¸²à¸”à¸žà¸­à¸”à¸µ"
+                  title="รีเซ็ตขนาดพอดี"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                 </button>
@@ -1262,24 +1262,24 @@ export default function GradePdfModal({
                 <div className="text-center border-b-2 border-slate-900 pb-2 mb-3">
                   <div className="text-lg sm:text-xl font-bold text-slate-950 tracking-wide">{institutionName}</div>
                   <div className="text-sm font-bold text-slate-900 mt-0.5">
-                    à¹à¸šà¸šà¸£à¸²à¸¢à¸‡à¸²à¸™à¹à¸¥à¸°à¸šà¸±à¸™à¸—à¸¶à¸à¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™à¸£à¸²à¸¢à¸§à¸´à¸Šà¸²
+                    แบบรายงานและบันทึกผลการเรียนรายวิชา
                   </div>
                   <div className="text-[11px] text-slate-600 mt-0.5">
-                    à¸ªà¸±à¸‡à¸à¸±à¸”à¸ªà¸³à¸™à¸±à¸à¸‡à¸²à¸™à¸„à¸“à¸°à¸à¸£à¸£à¸¡à¸à¸²à¸£à¸à¸²à¸£à¸­à¸²à¸Šà¸µà¸§à¸¨à¸¶à¸à¸©à¸² (à¸ªà¸­à¸¨.) à¸à¸£à¸°à¸—à¸£à¸§à¸‡à¸¨à¸¶à¸à¸©à¸²à¸˜à¸´à¸à¸²à¸£
+                    สังกัดสำนักงานคณะกรรมการการอาชีวศึกษา (สอศ.) กระทรวงศึกษาธิการ
                   </div>
                 </div>
 
                 {/* Metadata Grid */}
                 <div className="flex justify-between text-[11px] mb-3 text-slate-800 leading-relaxed">
                   <div className="space-y-0.5">
-                    <div><span className="font-bold text-slate-950">à¸£à¸²à¸¢à¸§à¸´à¸Šà¸² / à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™:</span> {subjectCodeAndName}</div>
-                    <div><span className="font-bold text-slate-950">à¸«à¸¥à¸±à¸à¸ªà¸¹à¸•à¸£:</span> {curriculumLevel}</div>
-                    <div><span className="font-bold text-slate-950">à¹à¸œà¸™à¸à¸§à¸´à¸Šà¸²:</span> {departmentName}</div>
+                    <div><span className="font-bold text-slate-950">รายวิชา / ห้องเรียน:</span> {subjectCodeAndName}</div>
+                    <div><span className="font-bold text-slate-950">หลักสูตร:</span> {curriculumLevel}</div>
+                    <div><span className="font-bold text-slate-950">แผนกวิชา:</span> {departmentName}</div>
                   </div>
                   <div className="space-y-0.5 text-right">
-                    <div><span className="font-bold text-slate-950">à¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™ / à¸›à¸µà¸à¸²à¸£à¸¨à¸¶à¸à¸©à¸²:</span> {academicYear}</div>
-                    <div><span className="font-bold text-slate-950">à¸„à¸£à¸¹à¸œà¸¹à¹‰à¸ªà¸­à¸™:</span> {teacherName}</div>
-                    <div><span className="font-bold text-slate-950">à¸ˆà¸³à¸™à¸§à¸™à¸œà¸¹à¹‰à¹€à¸£à¸µà¸¢à¸™à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”:</span> {report.length} à¸„à¸™</div>
+                    <div><span className="font-bold text-slate-950">ภาคเรียน / ปีการศึกษา:</span> {academicYear}</div>
+                    <div><span className="font-bold text-slate-950">ครูผู้สอน:</span> {teacherName}</div>
+                    <div><span className="font-bold text-slate-950">จำนวนผู้เรียนทั้งหมด:</span> {report.length} คน</div>
                   </div>
                 </div>
 
@@ -1287,59 +1287,59 @@ export default function GradePdfModal({
                 <table className="w-full border-collapse border border-slate-600 text-[11px] mb-3">
                   <thead>
                     <tr className="bg-slate-100 text-slate-900 font-bold">
-                      <th className="border border-slate-600 p-1 w-8 text-center">à¸¥à¸³à¸”à¸±à¸š</th>
-                      {showStudentCode && <th className="border border-slate-600 p-1 w-24 text-center">à¸£à¸«à¸±à¸ªà¸™à¸±à¸à¸¨à¸¶à¸à¸©à¸²</th>}
-                      <th className="border border-slate-600 p-1 text-left pl-2">à¸Šà¸·à¹ˆà¸­ - à¸ªà¸à¸¸à¸¥</th>
+                      <th className="border border-slate-600 p-1 w-8 text-center">ลำดับ</th>
+                      {showStudentCode && <th className="border border-slate-600 p-1 w-24 text-center">รหัสนักศึกษา</th>}
+                      <th className="border border-slate-600 p-1 text-left pl-2">ชื่อ - สกุล</th>
                       {showAffective && (
                         <th className="border border-slate-600 p-1 text-center w-14">
-                          à¸ˆà¸´à¸•à¸žà¸´à¸ªà¸±à¸¢<br /><span className="text-[10px] font-normal">({weights.affective_weight}%)</span>
+                          จิตพิสัย<br /><span className="text-[10px] font-normal">({weights.affective_weight}%)</span>
                         </th>
                       )}
                       {showPostTest && (
                         <th className="border border-slate-600 p-1 text-center w-16">
-                          à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢<br /><span className="text-[10px] font-normal">({weights.post_test_weight}%)</span>
+                          สอบย่อย<br /><span className="text-[10px] font-normal">({weights.post_test_weight}%)</span>
                         </th>
                       )}
                       {showAssignment && (
                         <th className="border border-slate-600 p-1 text-center w-16">
-                          à¸‡à¸²à¸™à¹€à¸à¹‡à¸š<br /><span className="text-[10px] font-normal">({weights.assignment_weight}%)</span>
+                          งานเก็บ<br /><span className="text-[10px] font-normal">({weights.assignment_weight}%)</span>
                         </th>
                       )}
                       {showMidterm && (
                         <th className="border border-slate-600 p-1 text-center w-14">
-                          à¸à¸¥à¸²à¸‡à¸ à¸²à¸„<br /><span className="text-[10px] font-normal">({weights.midterm_weight}%)</span>
+                          กลางภาค<br /><span className="text-[10px] font-normal">({weights.midterm_weight}%)</span>
                         </th>
                       )}
                       {showFinal && (
                         <th className="border border-slate-600 p-1 text-center w-14">
-                          à¸›à¸¥à¸²à¸¢à¸ à¸²à¸„<br /><span className="text-[10px] font-normal">({weights.final_weight}%)</span>
+                          ปลายภาค<br /><span className="text-[10px] font-normal">({weights.final_weight}%)</span>
                         </th>
                       )}
                       {showTotal && (
                         <th className="border border-slate-600 p-1 text-center w-16 font-extrabold bg-slate-200">
-                          à¸£à¸§à¸¡<br /><span className="text-[10px] font-normal">(100)</span>
+                          รวม<br /><span className="text-[10px] font-normal">(100)</span>
                         </th>
                       )}
                       {showAttendance && (
                         <th className="border border-slate-600 p-1 text-center w-14">
-                          à¹€à¸§à¸¥à¸²à¹€à¸£à¸µà¸¢à¸™<br /><span className="text-[10px] font-normal">(%)</span>
+                          เวลาเรียน<br /><span className="text-[10px] font-normal">(%)</span>
                         </th>
                       )}
-                      {showGrade && <th className="border border-slate-600 p-1 text-center w-14 font-extrabold">à¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™</th>}
+                      {showGrade && <th className="border border-slate-600 p-1 text-center w-14 font-extrabold">ผลการเรียน</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {report.map((s, idx) => {
-                      const isKr = s.grade === 'à¸‚.à¸£.' || s.grade === 'à¸‚à¸£' || s.is_f;
-                      const isKs = s.grade === 'à¸‚.à¸ª.' || s.is_absent_final;
-                      const isMs = s.grade === 'à¸¡.à¸ª.' || s.is_incomplete;
+                      const isKr = s.grade === 'ข.ร.' || s.grade === 'ขร' || s.is_f;
+                      const isKs = s.grade === 'ข.ส.' || s.is_absent_final;
+                      const isMs = s.grade === 'ม.ส.' || s.is_incomplete;
                       const isFail = s.grade === '0' || s.grade === 'F';
                       const bgClass = isKr ? 'bg-rose-100/70 text-rose-900 font-bold'
                         : isKs ? 'bg-amber-100/70 text-amber-900 font-bold'
                           : isMs ? 'bg-purple-100/70 text-purple-900 font-bold'
                             : isFail ? 'bg-rose-50 text-rose-800' : '';
 
-                      const finalVal = isKs ? 'à¸‚.à¸ª.' : isMs ? 'à¸¡.à¸ª.' : Number(s.precise_scaled_final || s.scaled_final || 0).toFixed(1);
+                      const finalVal = isKs ? 'ข.ส.' : isMs ? 'ม.ส.' : Number(s.precise_scaled_final || s.scaled_final || 0).toFixed(1);
                       const totalVal = (isKs || isMs) ? '-' : Number(s.total_score_precise ?? s.total_score ?? 0).toFixed(1);
 
                       return (
@@ -1394,11 +1394,11 @@ export default function GradePdfModal({
                 {/* Stats Table */}
                 {showStats && (
                   <div className="mb-4">
-                    <div className="font-bold text-xs text-slate-800 mb-1">à¸ªà¸£à¸¸à¸›à¸ªà¸–à¸´à¸•à¸´à¸œà¸¥à¸à¸²à¸£à¸›à¸£à¸°à¹€à¸¡à¸´à¸™à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™à¸£à¸¹à¹‰:</div>
+                    <div className="font-bold text-xs text-slate-800 mb-1">สรุปสถิติผลการประเมินการเรียนรู้:</div>
                     <table className="w-full border-collapse border border-slate-400 text-[10px]">
                       <thead>
                         <tr className="bg-slate-100 text-slate-800 font-bold">
-                          <th className="border border-slate-400 p-1">à¹€à¸à¸£à¸”</th>
+                          <th className="border border-slate-400 p-1">เกรด</th>
                           <th className="border border-slate-400 p-1">4</th>
                           <th className="border border-slate-400 p-1">3.5</th>
                           <th className="border border-slate-400 p-1">3</th>
@@ -1407,17 +1407,17 @@ export default function GradePdfModal({
                           <th className="border border-slate-400 p-1">1.5</th>
                           <th className="border border-slate-400 p-1">1</th>
                           <th className="border border-slate-400 p-1">0</th>
-                          <th className="border border-slate-400 p-1 text-rose-800">à¸‚.à¸£.</th>
-                          <th className="border border-slate-400 p-1 text-amber-800">à¸‚.à¸ª.</th>
-                          <th className="border border-slate-400 p-1 text-purple-800">à¸¡.à¸ª.</th>
-                          <th className="border border-slate-400 p-1">à¸£à¸§à¸¡ (à¸„à¸™)</th>
-                          <th className="border border-slate-400 p-1 text-blue-900">à¸„à¸°à¹à¸™à¸™à¹€à¸‰à¸¥à¸µà¹ˆà¸¢</th>
-                          <th className="border border-slate-400 p-1 text-emerald-800">à¸£à¹‰à¸­à¸¢à¸¥à¸°à¸—à¸µà¹ˆà¸œà¹ˆà¸²à¸™</th>
+                          <th className="border border-slate-400 p-1 text-rose-800">ข.ร.</th>
+                          <th className="border border-slate-400 p-1 text-amber-800">ข.ส.</th>
+                          <th className="border border-slate-400 p-1 text-purple-800">ม.ส.</th>
+                          <th className="border border-slate-400 p-1">รวม (คน)</th>
+                          <th className="border border-slate-400 p-1 text-blue-900">คะแนนเฉลี่ย</th>
+                          <th className="border border-slate-400 p-1 text-emerald-800">ร้อยละที่ผ่าน</th>
                         </tr>
                       </thead>
                       <tbody>
                         <tr className="text-center font-medium">
-                          <td className="border border-slate-400 p-1 font-bold">à¸ˆà¸³à¸™à¸§à¸™</td>
+                          <td className="border border-slate-400 p-1 font-bold">จำนวน</td>
                           <td className="border border-slate-400 p-1">{analytics.dist['4'] || 0}</td>
                           <td className="border border-slate-400 p-1">{analytics.dist['3.5'] || 0}</td>
                           <td className="border border-slate-400 p-1">{analytics.dist['3'] || 0}</td>
@@ -1444,28 +1444,28 @@ export default function GradePdfModal({
                 {showSignatures && reportType === 'official_vocational' && (
                   <div className="grid grid-cols-4 gap-2 text-center text-xs mt-6 pt-2">
                     <div className="space-y-1">
-                      <div>à¸¥à¸‡à¸Šà¸·à¹ˆà¸­ ..........................................</div>
+                      <div>ลงชื่อ ..........................................</div>
                       <div className="font-medium text-slate-900">({teacherName})</div>
-                      <div className="text-[10px] text-slate-600">à¸„à¸£à¸¹à¸œà¸¹à¹‰à¸ªà¸­à¸™</div>
-                      <div className="text-[9px] text-slate-400 mt-1">à¸§à¸±à¸™à¸—à¸µà¹ˆ ...... / ...... / ......</div>
+                      <div className="text-[10px] text-slate-600">ครูผู้สอน</div>
+                      <div className="text-[9px] text-slate-400 mt-1">วันที่ ...... / ...... / ......</div>
                     </div>
                     <div className="space-y-1">
-                      <div>à¸¥à¸‡à¸Šà¸·à¹ˆà¸­ ..........................................</div>
+                      <div>ลงชื่อ ..........................................</div>
                       <div className="font-medium text-slate-900">({headOfDepartment})</div>
-                      <div className="text-[10px] text-slate-600">à¸«à¸±à¸§à¸«à¸™à¹‰à¸²à¹à¸œà¸™à¸à¸§à¸´à¸Šà¸²</div>
-                      <div className="text-[9px] text-slate-400 mt-1">à¸§à¸±à¸™à¸—à¸µà¹ˆ ...... / ...... / ......</div>
+                      <div className="text-[10px] text-slate-600">หัวหน้าแผนกวิชา</div>
+                      <div className="text-[9px] text-slate-400 mt-1">วันที่ ...... / ...... / ......</div>
                     </div>
                     <div className="space-y-1">
-                      <div>à¸¥à¸‡à¸Šà¸·à¹ˆà¸­ ..........................................</div>
+                      <div>ลงชื่อ ..........................................</div>
                       <div className="font-medium text-slate-900">({headOfCurriculum})</div>
-                      <div className="text-[10px] text-slate-600">à¸«à¸±à¸§à¸«à¸™à¹‰à¸²à¸‡à¸²à¸™à¸§à¸±à¸”à¸œà¸¥à¹à¸¥à¸°à¸›à¸£à¸°à¹€à¸¡à¸´à¸™à¸œà¸¥</div>
-                      <div className="text-[9px] text-slate-400 mt-1">à¸§à¸±à¸™à¸—à¸µà¹ˆ ...... / ...... / ......</div>
+                      <div className="text-[10px] text-slate-600">หัวหน้างานวัดผลและประเมินผล</div>
+                      <div className="text-[9px] text-slate-400 mt-1">วันที่ ...... / ...... / ......</div>
                     </div>
                     <div className="space-y-1">
-                      <div>à¸¥à¸‡à¸Šà¸·à¹ˆà¸­ ..........................................</div>
+                      <div>ลงชื่อ ..........................................</div>
                       <div className="font-medium text-slate-900">({deputyDirector})</div>
-                      <div className="text-[10px] text-slate-600">à¸£à¸­à¸‡à¸œà¸¹à¹‰à¸­à¸³à¸™à¸§à¸¢à¸à¸²à¸£à¸à¹ˆà¸²à¸¢à¸§à¸´à¸Šà¸²à¸à¸²à¸£</div>
-                      <div className="text-[9px] text-slate-400 mt-1">à¸§à¸±à¸™à¸—à¸µà¹ˆ ...... / ...... / ......</div>
+                      <div className="text-[10px] text-slate-600">รองผู้อำนวยการฝ่ายวิชาการ</div>
+                      <div className="text-[9px] text-slate-400 mt-1">วันที่ ...... / ...... / ......</div>
                     </div>
                   </div>
                 )}
@@ -1474,7 +1474,7 @@ export default function GradePdfModal({
                 {showPrintDate && (
                   <div className="flex justify-between items-center text-[10px] text-slate-500 mt-6 pt-2 border-t border-slate-200">
                     <span></span>
-                    <span>à¸§à¸±à¸™à¸—à¸µà¹ˆà¸­à¸­à¸à¸£à¸²à¸¢à¸‡à¸²à¸™: {new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                    <span>วันที่ออกรายงาน: {new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                   </div>
                 )}
               </div>

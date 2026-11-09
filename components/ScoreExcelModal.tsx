@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
@@ -8,7 +8,7 @@ import {
   Layers, Calendar, Award, CheckCircle2, TrendingUp,
   TableProperties, Hash
 } from 'lucide-react';
-import toast from '@/lib/toast';
+import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 
 export interface Classroom {
@@ -108,7 +108,7 @@ export default function ScoreExcelModal({
 
   // Custom filenames & sheets
   const [fileName, setFileName] = useState('');
-  const [sheetName, setSheetName] = useState('à¸•à¸²à¸£à¸²à¸‡à¸„à¸°à¹à¸™à¸™');
+  const [sheetName, setSheetName] = useState('ตารางคะแนน');
 
   // SSR hydration guard
   useEffect(() => {
@@ -136,10 +136,10 @@ export default function ScoreExcelModal({
   // Set default file name when modal opens or classroom changes
   useEffect(() => {
     if (isOpen && classroom) {
-      const safeName = classroom.name.replace(/[^a-zA-Z0-9à¸-à¹™_-]/g, '_');
+      const safeName = classroom.name.replace(/[^a-zA-Z0-9ก-๙_-]/g, '_');
       const today = new Date().toISOString().split('T')[0];
-      setFileName(`à¸•à¸²à¸£à¸²à¸‡à¸„à¸°à¹à¸™à¸™_${safeName}_${today}`);
-      setSheetName(exportMode === 'multi_sheet' ? 'à¸ªà¸¡à¸¸à¸”à¸‡à¸²à¸™à¸„à¸°à¹à¸™à¸™' : 'à¸•à¸²à¸£à¸²à¸‡à¸„à¸°à¹à¸™à¸™à¸£à¸§à¸¡');
+      setFileName(`ตารางคะแนน_${safeName}_${today}`);
+      setSheetName(exportMode === 'multi_sheet' ? 'สมุดงานคะแนน' : 'ตารางคะแนนรวม');
     }
   }, [isOpen, classroom, exportMode]);
 
@@ -149,7 +149,7 @@ export default function ScoreExcelModal({
     try {
       const d = new Date(dateStr);
       if (isNaN(d.getTime())) return '';
-      const THAI_SHORT_MONTHS = ['à¸¡.à¸„.', 'à¸.à¸ž.', 'à¸¡à¸µ.à¸„.', 'à¹€à¸¡.à¸¢.', 'à¸ž.à¸„.', 'à¸¡à¸´.à¸¢.', 'à¸.à¸„.', 'à¸ª.à¸„.', 'à¸.à¸¢.', 'à¸•.à¸„.', 'à¸ž.à¸¢.', 'à¸˜.à¸„.'];
+      const THAI_SHORT_MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
       return `${d.getDate()} ${THAI_SHORT_MONTHS[d.getMonth()]}`;
     } catch {
       return '';
@@ -188,24 +188,24 @@ export default function ScoreExcelModal({
     return isNaN(n) ? val : n;
   };
 
-  // â”€â”€â”€ Table Builders for each View/Sheet â”€â”€â”€
+  // ─── Table Builders for each View/Sheet ───
 
   // 1. Full Matrix Data
   const fullMatrixData = useMemo(() => {
-    const headers: string[] = ['à¸¥à¸³à¸”à¸±à¸š', 'à¸£à¸«à¸±à¸ªà¸›à¸£à¸°à¸ˆà¸³à¸•à¸±à¸§', 'à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥'];
-    const maxScoreRow: (string | number)[] = ['-', '-', 'à¸„à¸°à¹à¸™à¸™à¹€à¸•à¹‡à¸¡'];
+    const headers: string[] = ['ลำดับ', 'รหัสประจำตัว', 'ชื่อ-นามสกุล'];
+    const maxScoreRow: (string | number)[] = ['-', '-', 'คะแนนเต็ม'];
     const colWidths: { wch: number }[] = [
-      { wch: 8 },  // à¸¥à¸³à¸”à¸±à¸š
-      { wch: 16 }, // à¸£à¸«à¸±à¸ª
-      { wch: 28 }, // à¸Šà¸·à¹ˆà¸­
+      { wch: 8 },  // ลำดับ
+      { wch: 16 }, // รหัส
+      { wch: 28 }, // ชื่อ
     ];
 
     structures.forEach(st => {
       const dateStr = calculatedWeekDates[st.lesson_number];
       const dateText = includeDatesInHeader && dateStr ? ` (${formatThaiDateShort(dateStr)})` : '';
       
-      headers.push(`W${st.lesson_number} à¸‡à¸²à¸™${dateText}`);
-      headers.push(`W${st.lesson_number} à¸ªà¸­à¸š${dateText}`);
+      headers.push(`W${st.lesson_number} งาน${dateText}`);
+      headers.push(`W${st.lesson_number} สอบ${dateText}`);
 
       maxScoreRow.push(Number(st.max_assignment_score) || 0);
       maxScoreRow.push(Number(st.max_post_test_score) || 0);
@@ -215,22 +215,22 @@ export default function ScoreExcelModal({
     });
 
     if (includeMidterm) {
-      headers.push('à¸à¸¥à¸²à¸‡à¸ à¸²à¸„');
+      headers.push('กลางภาค');
       maxScoreRow.push(Number(classroom?.midterm_max_score) || 20);
       colWidths.push({ wch: 12 });
     }
     if (includeFinal) {
-      headers.push('à¸›à¸¥à¸²à¸¢à¸ à¸²à¸„');
+      headers.push('ปลายภาค');
       maxScoreRow.push(Number(classroom?.final_max_score) || 30);
       colWidths.push({ wch: 12 });
     }
     if (includeAffective) {
-      headers.push('à¸ˆà¸´à¸•à¸žà¸´à¸ªà¸±à¸¢');
+      headers.push('จิตพิสัย');
       maxScoreRow.push(Number(classroom?.affective_weight) || 20);
       colWidths.push({ wch: 12 });
     }
     if (includeTotalScore) {
-      headers.push('à¸£à¸§à¸¡à¸„à¸°à¹à¸™à¸™');
+      headers.push('รวมคะแนน');
       let totalPossible = structures.reduce((sum, s) => sum + Number(s.max_assignment_score || 0) + Number(s.max_post_test_score || 0), 0);
       if (includeMidterm) totalPossible += Number(classroom?.midterm_max_score || 0);
       if (includeFinal) totalPossible += Number(classroom?.final_max_score || 0);
@@ -288,19 +288,19 @@ export default function ScoreExcelModal({
 
   // 2. Assignments Only Data
   const assignmentsOnlyData = useMemo(() => {
-    const headers: string[] = ['à¸¥à¸³à¸”à¸±à¸š', 'à¸£à¸«à¸±à¸ªà¸›à¸£à¸°à¸ˆà¸³à¸•à¸±à¸§', 'à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥'];
-    const maxScoreRow: (string | number)[] = ['-', '-', 'à¸„à¸°à¹à¸™à¸™à¹€à¸•à¹‡à¸¡'];
+    const headers: string[] = ['ลำดับ', 'รหัสประจำตัว', 'ชื่อ-นามสกุล'];
+    const maxScoreRow: (string | number)[] = ['-', '-', 'คะแนนเต็ม'];
     const colWidths: { wch: number }[] = [{ wch: 8 }, { wch: 16 }, { wch: 28 }];
 
     structures.forEach(st => {
       const dateStr = calculatedWeekDates[st.lesson_number];
       const dateText = includeDatesInHeader && dateStr ? ` (${formatThaiDateShort(dateStr)})` : '';
-      headers.push(`W${st.lesson_number} à¸‡à¸²à¸™à¹€à¸à¹‡à¸š${dateText}`);
+      headers.push(`W${st.lesson_number} งานเก็บ${dateText}`);
       maxScoreRow.push(Number(st.max_assignment_score) || 0);
       colWidths.push({ wch: 14 });
     });
 
-    headers.push('à¸£à¸§à¸¡à¸‡à¸²à¸™à¹€à¸à¹‡à¸š');
+    headers.push('รวมงานเก็บ');
     const totalAssignMax = structures.reduce((sum, s) => sum + Number(s.max_assignment_score || 0), 0);
     maxScoreRow.push(totalAssignMax);
     colWidths.push({ wch: 14 });
@@ -326,19 +326,19 @@ export default function ScoreExcelModal({
 
   // 3. Post-Tests Only Data
   const postTestsOnlyData = useMemo(() => {
-    const headers: string[] = ['à¸¥à¸³à¸”à¸±à¸š', 'à¸£à¸«à¸±à¸ªà¸›à¸£à¸°à¸ˆà¸³à¸•à¸±à¸§', 'à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥'];
-    const maxScoreRow: (string | number)[] = ['-', '-', 'à¸„à¸°à¹à¸™à¸™à¹€à¸•à¹‡à¸¡'];
+    const headers: string[] = ['ลำดับ', 'รหัสประจำตัว', 'ชื่อ-นามสกุล'];
+    const maxScoreRow: (string | number)[] = ['-', '-', 'คะแนนเต็ม'];
     const colWidths: { wch: number }[] = [{ wch: 8 }, { wch: 16 }, { wch: 28 }];
 
     structures.forEach(st => {
       const dateStr = calculatedWeekDates[st.lesson_number];
       const dateText = includeDatesInHeader && dateStr ? ` (${formatThaiDateShort(dateStr)})` : '';
-      headers.push(`W${st.lesson_number} à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢${dateText}`);
+      headers.push(`W${st.lesson_number} สอบย่อย${dateText}`);
       maxScoreRow.push(Number(st.max_post_test_score) || 0);
       colWidths.push({ wch: 14 });
     });
 
-    headers.push('à¸£à¸§à¸¡à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢');
+    headers.push('รวมสอบย่อย');
     const totalTestMax = structures.reduce((sum, s) => sum + Number(s.max_post_test_score || 0), 0);
     maxScoreRow.push(totalTestMax);
     colWidths.push({ wch: 14 });
@@ -364,9 +364,9 @@ export default function ScoreExcelModal({
 
   // 4. Summary & Stats Data
   const summaryStatsData = useMemo(() => {
-    const headers = ['à¸¥à¸³à¸”à¸±à¸š', 'à¸£à¸«à¸±à¸ªà¸›à¸£à¸°à¸ˆà¸³à¸•à¸±à¸§', 'à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥', 'à¸£à¸§à¸¡à¸‡à¸²à¸™à¹€à¸à¹‡à¸š', 'à¸£à¸§à¸¡à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢', 'à¸à¸¥à¸²à¸‡à¸ à¸²à¸„', 'à¸›à¸¥à¸²à¸¢à¸ à¸²à¸„', 'à¸ˆà¸´à¸•à¸žà¸´à¸ªà¸±à¸¢', 'à¸„à¸°à¹à¸™à¸™à¸£à¸§à¸¡à¸ªà¸¸à¸—à¸˜à¸´'];
+    const headers = ['ลำดับ', 'รหัสประจำตัว', 'ชื่อ-นามสกุล', 'รวมงานเก็บ', 'รวมสอบย่อย', 'กลางภาค', 'ปลายภาค', 'จิตพิสัย', 'คะแนนรวมสุทธิ'];
     const maxScoreRow = [
-      '-', '-', 'à¸„à¸°à¹à¸™à¸™à¹€à¸•à¹‡à¸¡',
+      '-', '-', 'คะแนนเต็ม',
       structures.reduce((sum, s) => sum + Number(s.max_assignment_score || 0), 0),
       structures.reduce((sum, s) => sum + Number(s.max_post_test_score || 0), 0),
       Number(classroom?.midterm_max_score) || 20,
@@ -415,7 +415,7 @@ export default function ScoreExcelModal({
   const singleWeekData = useMemo(() => {
     const st = structures.find(s => s.lesson_number === selectedSingleWeek) || structures[0] || {
       lesson_number: 1,
-      lesson_name: 'à¸šà¸—à¹€à¸£à¸µà¸¢à¸™à¸—à¸µà¹ˆ 1',
+      lesson_name: 'บทเรียนที่ 1',
       max_assignment_score: 10,
       max_post_test_score: 10,
       hours: 4
@@ -425,14 +425,14 @@ export default function ScoreExcelModal({
     const dateText = dateStr ? ` (${formatThaiDateShort(dateStr)})` : '';
 
     const headers = [
-      'à¸¥à¸³à¸”à¸±à¸š', 'à¸£à¸«à¸±à¸ªà¸›à¸£à¸°à¸ˆà¸³à¸•à¸±à¸§', 'à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥',
-      `à¸‡à¸²à¸™à¹€à¸à¹‡à¸š W${st.lesson_number} (à¹€à¸•à¹‡à¸¡ ${st.max_assignment_score})${dateText}`,
-      `à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢ W${st.lesson_number} (à¹€à¸•à¹‡à¸¡ ${st.max_post_test_score})${dateText}`,
-      `à¸£à¸§à¸¡à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¸—à¸µà¹ˆ ${st.lesson_number} (à¹€à¸•à¹‡à¸¡ ${Number(st.max_assignment_score) + Number(st.max_post_test_score)})`
+      'ลำดับ', 'รหัสประจำตัว', 'ชื่อ-นามสกุล',
+      `งานเก็บ W${st.lesson_number} (เต็ม ${st.max_assignment_score})${dateText}`,
+      `สอบย่อย W${st.lesson_number} (เต็ม ${st.max_post_test_score})${dateText}`,
+      `รวมสัปดาห์ที่ ${st.lesson_number} (เต็ม ${Number(st.max_assignment_score) + Number(st.max_post_test_score)})`
     ];
 
     const maxScoreRow = [
-      '-', '-', 'à¸„à¸°à¹à¸™à¸™à¹€à¸•à¹‡à¸¡',
+      '-', '-', 'คะแนนเต็ม',
       Number(st.max_assignment_score),
       Number(st.max_post_test_score),
       Number(st.max_assignment_score) + Number(st.max_post_test_score)
@@ -503,8 +503,8 @@ export default function ScoreExcelModal({
     const sheetData: (string | number)[][] = [];
 
     if (includeHeaderSummary) {
-      sheetData.push([`à¸£à¸²à¸¢à¸‡à¸²à¸™à¸•à¸²à¸£à¸²à¸‡à¸„à¸°à¹à¸™à¸™ â€” ${classroom?.name || 'à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™'}`]);
-      sheetData.push([`${title || 'à¸•à¸²à¸£à¸²à¸‡à¸„à¸°à¹à¸™à¸™'} | à¸‚à¹‰à¸­à¸¡à¸¹à¸¥ à¸“ à¸§à¸±à¸™à¸—à¸µà¹ˆ: ${new Date().toLocaleDateString('th-TH')} | à¸ˆà¸³à¸™à¸§à¸™à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™: ${targetStudents.length} à¸„à¸™`]);
+      sheetData.push([`รายงานตารางคะแนน — ${classroom?.name || 'ห้องเรียน'}`]);
+      sheetData.push([`${title || 'ตารางคะแนน'} | ข้อมูล ณ วันที่: ${new Date().toLocaleDateString('th-TH')} | จำนวนนักเรียน: ${targetStudents.length} คน`]);
       sheetData.push([]); // Blank separator
     }
 
@@ -521,10 +521,10 @@ export default function ScoreExcelModal({
     return ws;
   };
 
-  // â”€â”€â”€ 1. Download Excel (.xlsx) â”€â”€â”€
+  // ─── 1. Download Excel (.xlsx) ───
   const handleDownloadExcel = () => {
     if (targetStudents.length === 0) {
-      toast.error('à¹„à¸¡à¹ˆà¸¡à¸µà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸ªà¸³à¸«à¸£à¸±à¸šà¸ªà¹ˆà¸‡à¸­à¸­à¸');
+      toast.error('ไม่มีข้อมูลนักเรียนสำหรับส่งออก');
       return;
     }
 
@@ -533,51 +533,51 @@ export default function ScoreExcelModal({
 
       if (exportMode === 'multi_sheet') {
         // Multi-Sheet Workbook with 4 separate worksheets
-        const wsMatrix = buildSheet(fullMatrixData, 'à¸•à¸²à¸£à¸²à¸‡à¸„à¸°à¹à¸™à¸™à¸£à¸§à¸¡à¸—à¸±à¹‰à¸‡à¹€à¸—à¸­à¸¡ (Full Matrix)');
-        XLSX.utils.book_append_sheet(wb, wsMatrix, 'à¸•à¸²à¸£à¸²à¸‡à¸„à¸°à¹à¸™à¸™à¸£à¸§à¸¡');
+        const wsMatrix = buildSheet(fullMatrixData, 'ตารางคะแนนรวมทั้งเทอม (Full Matrix)');
+        XLSX.utils.book_append_sheet(wb, wsMatrix, 'ตารางคะแนนรวม');
 
-        const wsAssign = buildSheet(assignmentsOnlyData, 'à¸„à¸°à¹à¸™à¸™à¸‡à¸²à¸™à¹€à¸à¹‡à¸šà¸£à¸²à¸¢à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ (Assignments)');
-        XLSX.utils.book_append_sheet(wb, wsAssign, 'à¸„à¸°à¹à¸™à¸™à¸‡à¸²à¸™à¹€à¸à¹‡à¸š');
+        const wsAssign = buildSheet(assignmentsOnlyData, 'คะแนนงานเก็บรายสัปดาห์ (Assignments)');
+        XLSX.utils.book_append_sheet(wb, wsAssign, 'คะแนนงานเก็บ');
 
-        const wsTests = buildSheet(postTestsOnlyData, 'à¸„à¸°à¹à¸™à¸™à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢à¸£à¸²à¸¢à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ (Post-Tests)');
-        XLSX.utils.book_append_sheet(wb, wsTests, 'à¸„à¸°à¹à¸™à¸™à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢');
+        const wsTests = buildSheet(postTestsOnlyData, 'คะแนนสอบย่อยรายสัปดาห์ (Post-Tests)');
+        XLSX.utils.book_append_sheet(wb, wsTests, 'คะแนนสอบย่อย');
 
-        const wsSummary = buildSheet(summaryStatsData, 'à¸ªà¸£à¸¸à¸›à¸œà¸¥à¸„à¸°à¹à¸™à¸™à¹à¸¥à¸°à¸ªà¸–à¸´à¸•à¸´ (Summary & Stats)');
-        XLSX.utils.book_append_sheet(wb, wsSummary, 'à¸ªà¸£à¸¸à¸›à¸œà¸¥à¹à¸¥à¸°à¸ªà¸–à¸´à¸•à¸´');
+        const wsSummary = buildSheet(summaryStatsData, 'สรุปผลคะแนนและสถิติ (Summary & Stats)');
+        XLSX.utils.book_append_sheet(wb, wsSummary, 'สรุปผลและสถิติ');
       } else {
         // Single Sheet Mode
         let curData = fullMatrixData;
-        let titleName = 'à¸•à¸²à¸£à¸²à¸‡à¸„à¸°à¹à¸™à¸™à¸£à¸§à¸¡';
+        let titleName = 'ตารางคะแนนรวม';
 
         if (exportMode === 'assignments_only') {
           curData = assignmentsOnlyData;
-          titleName = 'à¸„à¸°à¹à¸™à¸™à¸‡à¸²à¸™à¹€à¸à¹‡à¸š';
+          titleName = 'คะแนนงานเก็บ';
         } else if (exportMode === 'post_tests_only') {
           curData = postTestsOnlyData;
-          titleName = 'à¸„à¸°à¹à¸™à¸™à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢';
+          titleName = 'คะแนนสอบย่อย';
         } else if (exportMode === 'single_week') {
           curData = singleWeekData;
-          titleName = `à¸„à¸°à¹à¸™à¸™à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¸—à¸µà¹ˆ_${selectedSingleWeek}`;
+          titleName = `คะแนนสัปดาห์ที่_${selectedSingleWeek}`;
         }
 
         const ws = buildSheet(curData, titleName);
         XLSX.utils.book_append_sheet(wb, ws, sheetName || titleName);
       }
 
-      const finalFileName = `${fileName.trim() || 'à¸•à¸²à¸£à¸²à¸‡à¸„à¸°à¹à¸™à¸™'}.xlsx`;
+      const finalFileName = `${fileName.trim() || 'ตารางคะแนน'}.xlsx`;
       XLSX.writeFile(wb, finalFileName);
-      toast.success(`à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œ Excel à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢ (${exportMode === 'multi_sheet' ? 'à¸ªà¸¡à¸¸à¸”à¸‡à¸²à¸™ 4 à¹à¸œà¹ˆà¸™à¸‡à¸²à¸™' : 'à¹à¸œà¹ˆà¸™à¸‡à¸²à¸™à¹€à¸”à¸µà¸¢à¸§'})`);
+      toast.success(`ดาวน์โหลดไฟล์ Excel เรียบร้อย (${exportMode === 'multi_sheet' ? 'สมุดงาน 4 แผ่นงาน' : 'แผ่นงานเดียว'})`);
       onClose();
     } catch (err) {
       console.error(err);
-      toast.error('à¹€à¸à¸´à¸”à¸‚à¹‰à¸­à¸œà¸´à¸”à¸žà¸¥à¸²à¸”à¹ƒà¸™à¸à¸²à¸£à¸ªà¸£à¹‰à¸²à¸‡à¹„à¸Ÿà¸¥à¹Œ Excel');
+      toast.error('เกิดข้อผิดพลาดในการสร้างไฟล์ Excel');
     }
   };
 
-  // â”€â”€â”€ 2. Copy to Clipboard (TSV) â”€â”€â”€
+  // ─── 2. Copy to Clipboard (TSV) ───
   const handleCopyToClipboard = async () => {
     if (targetStudents.length === 0) {
-      toast.error('à¹„à¸¡à¹ˆà¸¡à¸µà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸ªà¸³à¸«à¸£à¸±à¸šà¸„à¸±à¸”à¸¥à¸­à¸');
+      toast.error('ไม่มีข้อมูลสำหรับคัดลอก');
       return;
     }
 
@@ -586,8 +586,8 @@ export default function ScoreExcelModal({
       const lines: string[] = [];
 
       if (includeHeaderSummary) {
-        lines.push(`à¸£à¸²à¸¢à¸‡à¸²à¸™à¸•à¸²à¸£à¸²à¸‡à¸„à¸°à¹à¸™à¸™ â€” ${classroom?.name || 'à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™'}`);
-        lines.push(`à¸‚à¹‰à¸­à¸¡à¸¹à¸¥ à¸“ à¸§à¸±à¸™à¸—à¸µà¹ˆ: ${new Date().toLocaleDateString('th-TH')} | à¸ˆà¸³à¸™à¸§à¸™à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™: ${targetStudents.length} à¸„à¸™`);
+        lines.push(`รายงานตารางคะแนน — ${classroom?.name || 'ห้องเรียน'}`);
+        lines.push(`ข้อมูล ณ วันที่: ${new Date().toLocaleDateString('th-TH')} | จำนวนนักเรียน: ${targetStudents.length} คน`);
         lines.push('');
       }
 
@@ -605,17 +605,17 @@ export default function ScoreExcelModal({
       await navigator.clipboard.writeText(tsvContent);
 
       setCopied(true);
-      toast.success('à¸„à¸±à¸”à¸¥à¸­à¸à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸•à¸²à¸£à¸²à¸‡ (TSV) à¸¥à¸‡à¸„à¸¥à¸´à¸›à¸šà¸­à¸£à¹Œà¸”à¹à¸¥à¹‰à¸§! à¸ªà¸²à¸¡à¸²à¸£à¸–à¸à¸” Ctrl+V à¸§à¸²à¸‡à¸¥à¸‡à¹ƒà¸™ Excel à¸«à¸£à¸·à¸­ Google Sheets à¹„à¸”à¹‰à¸—à¸±à¸™à¸—à¸µ');
+      toast.success('คัดลอกข้อมูลตาราง (TSV) ลงคลิปบอร์ดแล้ว! สามารถกด Ctrl+V วางลงใน Excel หรือ Google Sheets ได้ทันที');
       setTimeout(() => setCopied(false), 2500);
     } catch (err) {
-      toast.error('à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸„à¸±à¸”à¸¥à¸­à¸à¸¥à¸‡à¸„à¸¥à¸´à¸›à¸šà¸­à¸£à¹Œà¸”à¹„à¸”à¹‰');
+      toast.error('ไม่สามารถคัดลอกลงคลิปบอร์ดได้');
     }
   };
 
-  // â”€â”€â”€ 3. Download CSV (UTF-8 BOM) â”€â”€â”€
+  // ─── 3. Download CSV (UTF-8 BOM) ───
   const handleDownloadCsv = () => {
     if (targetStudents.length === 0) {
-      toast.error('à¹„à¸¡à¹ˆà¸¡à¸µà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸ªà¸³à¸«à¸£à¸±à¸šà¸ªà¹ˆà¸‡à¸­à¸­à¸');
+      toast.error('ไม่มีข้อมูลสำหรับส่งออก');
       return;
     }
 
@@ -632,8 +632,8 @@ export default function ScoreExcelModal({
       const lines: string[] = [];
 
       if (includeHeaderSummary) {
-        lines.push(escapeCsv(`à¸£à¸²à¸¢à¸‡à¸²à¸™à¸•à¸²à¸£à¸²à¸‡à¸„à¸°à¹à¸™à¸™ â€” ${classroom?.name || 'à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™'}`));
-        lines.push(escapeCsv(`à¸‚à¹‰à¸­à¸¡à¸¹à¸¥ à¸“ à¸§à¸±à¸™à¸—à¸µà¹ˆ: ${new Date().toLocaleDateString('th-TH')} | à¸ˆà¸³à¸™à¸§à¸™: ${targetStudents.length} à¸„à¸™`));
+        lines.push(escapeCsv(`รายงานตารางคะแนน — ${classroom?.name || 'ห้องเรียน'}`));
+        lines.push(escapeCsv(`ข้อมูล ณ วันที่: ${new Date().toLocaleDateString('th-TH')} | จำนวน: ${targetStudents.length} คน`));
         lines.push('');
       }
 
@@ -653,16 +653,16 @@ export default function ScoreExcelModal({
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `${fileName.trim() || 'à¸•à¸²à¸£à¸²à¸‡à¸„à¸°à¹à¸™à¸™'}.csv`);
+      link.setAttribute('download', `${fileName.trim() || 'ตารางคะแนน'}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      toast.success('à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œ CSV à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢à¹à¸¥à¹‰à¸§ (à¸£à¸­à¸‡à¸£à¸±à¸šà¸ à¸²à¸©à¸²à¹„à¸—à¸¢)');
+      toast.success('ดาวน์โหลดไฟล์ CSV เรียบร้อยแล้ว (รองรับภาษาไทย)');
       onClose();
     } catch (err) {
-      toast.error('à¹€à¸à¸´à¸”à¸‚à¹‰à¸­à¸œà¸´à¸”à¸žà¸¥à¸²à¸”à¹ƒà¸™à¸à¸²à¸£à¸ªà¸£à¹‰à¸²à¸‡à¹„à¸Ÿà¸¥à¹Œ CSV');
+      toast.error('เกิดข้อผิดพลาดในการสร้างไฟล์ CSV');
     }
   };
 
@@ -687,17 +687,17 @@ export default function ScoreExcelModal({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold">à¸žà¸£à¸µà¸§à¸´à¸§à¹à¸¥à¸°à¸ªà¹ˆà¸‡à¸­à¸­à¸à¸„à¸°à¹à¸™à¸™ (Excel & CSV)</h2>
+                <h2 className="text-lg font-bold">พรีวิวและส่งออกคะแนน (Excel & CSV)</h2>
                 <span className="bg-emerald-500/40 text-white text-[11px] font-semibold px-2 py-0.5 rounded-full border border-white/20 flex items-center gap-1">
                   <Sparkles className="w-3 h-3 text-amber-300" /> Live Preview
                 </span>
               </div>
               <p className="text-xs text-emerald-100 mt-0.5 flex items-center gap-2">
-                <span>à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™: <strong>{classroom?.name || 'à¹„à¸¡à¹ˆà¸£à¸°à¸šà¸¸à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™'}</strong></span>
-                <span>â€¢</span>
-                <span>à¸«à¸¥à¸±à¸à¸ªà¸¹à¸•à¸£: <strong>{structures.length} à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ</strong> ({structures.length === 15 ? 'à¸›à¸§à¸ª.' : 'à¸›à¸§à¸Š.'})</span>
-                <span>â€¢</span>
-                <span>à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”: <strong>{students.length} à¸„à¸™</strong></span>
+                <span>ห้องเรียน: <strong>{classroom?.name || 'ไม่ระบุห้องเรียน'}</strong></span>
+                <span>•</span>
+                <span>หลักสูตร: <strong>{structures.length} สัปดาห์</strong> ({structures.length === 15 ? 'ปวส.' : 'ปวช.'})</span>
+                <span>•</span>
+                <span>นักเรียนทั้งหมด: <strong>{students.length} คน</strong></span>
               </p>
             </div>
           </div>
@@ -706,7 +706,7 @@ export default function ScoreExcelModal({
             type="button"
             onClick={onClose}
             className="w-9 h-9 rounded-xl hover:bg-white/20 flex items-center justify-center transition-colors text-white/80 hover:text-white"
-            title="à¸›à¸´à¸”à¸«à¸™à¹‰à¸²à¸•à¹ˆà¸²à¸‡ (Esc)"
+            title="ปิดหน้าต่าง (Esc)"
           >
             <X className="w-5 h-5" />
           </button>
@@ -718,38 +718,38 @@ export default function ScoreExcelModal({
           <div>
             <label className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
               <Layers className="w-4 h-4 text-emerald-600" />
-              1. à¹€à¸¥à¸·à¸­à¸à¸£à¸¹à¸›à¹à¸šà¸šà¹à¸¥à¸°à¹‚à¸„à¸£à¸‡à¸ªà¸£à¹‰à¸²à¸‡à¹„à¸Ÿà¸¥à¹Œà¸ªà¹ˆà¸‡à¸­à¸­à¸ (Export Mode)
+              1. เลือกรูปแบบและโครงสร้างไฟล์ส่งออก (Export Mode)
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
               {[
                 {
                   id: 'full_matrix',
-                  label: 'ðŸ“Š à¸•à¸²à¸£à¸²à¸‡à¸£à¸§à¸¡à¸—à¸±à¹‰à¸‡à¹€à¸—à¸­à¸¡',
-                  desc: 'à¸£à¸§à¸¡à¸‡à¸²à¸™à¹€à¸à¹‡à¸š à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢ à¸ªà¸­à¸šà¸à¸¥à¸²à¸‡/à¸›à¸¥à¸²à¸¢à¸ à¸²à¸„ à¹ƒà¸™à¹à¸œà¹ˆà¸™à¸‡à¸²à¸™à¹€à¸”à¸µà¸¢à¸§',
-                  badge: 'à¸™à¸´à¸¢à¸¡à¸—à¸µà¹ˆà¸ªà¸¸à¸”'
+                  label: '📊 ตารางรวมทั้งเทอม',
+                  desc: 'รวมงานเก็บ สอบย่อย สอบกลาง/ปลายภาค ในแผ่นงานเดียว',
+                  badge: 'นิยมที่สุด'
                 },
                 {
                   id: 'multi_sheet',
-                  label: 'ðŸ“‘ à¸ªà¸¡à¸¸à¸”à¸‡à¸²à¸™à¹à¸¢à¸à¹à¸œà¹ˆà¸™',
-                  desc: 'à¸ªà¸£à¹‰à¸²à¸‡ 4 à¸Šà¸µà¸•à¹ƒà¸™ 1 à¹„à¸Ÿà¸¥à¹Œ (à¸•à¸²à¸£à¸²à¸‡à¸£à¸§à¸¡, à¸‡à¸²à¸™, à¸ªà¸­à¸š, à¸ªà¸–à¸´à¸•à¸´)',
-                  badge: 'âœ¨ à¹à¸™à¸°à¸™à¸³'
+                  label: '📑 สมุดงานแยกแผ่น',
+                  desc: 'สร้าง 4 ชีตใน 1 ไฟล์ (ตารางรวม, งาน, สอบ, สถิติ)',
+                  badge: '✨ แนะนำ'
                 },
                 {
                   id: 'assignments_only',
-                  label: 'ðŸ“ à¹€à¸‰à¸žà¸²à¸°à¸‡à¸²à¸™à¹€à¸à¹‡à¸š',
-                  desc: 'à¹à¸ªà¸”à¸‡à¸„à¸°à¹à¸™à¸™à¸‡à¸²à¸™à¹€à¸à¹‡à¸šà¸—à¸¸à¸à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ + à¸£à¸§à¸¡à¸‡à¸²à¸™à¹€à¸à¹‡à¸š',
+                  label: '📝 เฉพาะงานเก็บ',
+                  desc: 'แสดงคะแนนงานเก็บทุกสัปดาห์ + รวมงานเก็บ',
                   badge: null
                 },
                 {
                   id: 'post_tests_only',
-                  label: 'ðŸŽ¯ à¹€à¸‰à¸žà¸²à¸°à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢',
-                  desc: 'à¹à¸ªà¸”à¸‡à¸„à¸°à¹à¸™à¸™à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢à¸—à¸¸à¸à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ + à¸£à¸§à¸¡à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢',
+                  label: '🎯 เฉพาะสอบย่อย',
+                  desc: 'แสดงคะแนนสอบย่อยทุกสัปดาห์ + รวมสอบย่อย',
                   badge: null
                 },
                 {
                   id: 'single_week',
-                  label: 'ðŸ“Œ à¹€à¸‰à¸žà¸²à¸°à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ',
-                  desc: 'à¹€à¸¥à¸·à¸­à¸à¹€à¸ˆà¸²à¸°à¸ˆà¸‡à¸”à¸¹à¹€à¸‰à¸žà¸²à¸°à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¹ƒà¸”à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¸«à¸™à¸¶à¹ˆà¸‡',
+                  label: '📌 เฉพาะสัปดาห์',
+                  desc: 'เลือกเจาะจงดูเฉพาะสัปดาห์ใดสัปดาห์หนึ่ง',
                   badge: null
                 },
               ].map(mode => (
@@ -780,7 +780,7 @@ export default function ScoreExcelModal({
                   </div>
                   <div className="mt-2 flex items-center gap-1.5 text-[10px] font-medium text-emerald-700">
                     <span className={`w-2 h-2 rounded-full ${exportMode === mode.id ? 'bg-emerald-600' : 'bg-slate-300'}`} />
-                    {exportMode === mode.id ? 'à¹€à¸¥à¸·à¸­à¸à¸­à¸¢à¸¹à¹ˆ' : 'à¸„à¸¥à¸´à¸à¹€à¸žà¸·à¹ˆà¸­à¹€à¸¥à¸·à¸­à¸'}
+                    {exportMode === mode.id ? 'เลือกอยู่' : 'คลิกเพื่อเลือก'}
                   </div>
                 </button>
               ))}
@@ -792,7 +792,7 @@ export default function ScoreExcelModal({
             <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between gap-4 animate-fade-in">
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-emerald-700" />
-                <span className="text-xs font-bold text-emerald-900">à¹€à¸¥à¸·à¸­à¸à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¸—à¸µà¹ˆà¸•à¹‰à¸­à¸‡à¸à¸²à¸£à¸ªà¹ˆà¸‡à¸­à¸­à¸:</span>
+                <span className="text-xs font-bold text-emerald-900">เลือกสัปดาห์ที่ต้องการส่งออก:</span>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 {structures.map(st => (
@@ -818,10 +818,10 @@ export default function ScoreExcelModal({
             <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-100 pb-2">
               <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                 <TableProperties className="w-4 h-4 text-emerald-600" />
-                2. à¸•à¸±à¸§à¹€à¸¥à¸·à¸­à¸à¸„à¸­à¸¥à¸±à¸¡à¸™à¹Œà¹à¸¥à¸°à¸à¸²à¸£à¸ˆà¸±à¸”à¸£à¸¹à¸›à¹à¸šà¸š
+                2. ตัวเลือกคอลัมน์และการจัดรูปแบบ
               </span>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-500 font-medium">à¸à¸£à¸­à¸‡à¸£à¸²à¸¢à¸Šà¸·à¹ˆà¸­:</span>
+                <span className="text-xs text-slate-500 font-medium">กรองรายชื่อ:</span>
                 <button
                   type="button"
                   onClick={() => setStudentFilter('all')}
@@ -831,7 +831,7 @@ export default function ScoreExcelModal({
                       : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
                   }`}
                 >
-                  à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸” ({students.length})
+                  ทั้งหมด ({students.length})
                 </button>
                 <button
                   type="button"
@@ -842,7 +842,7 @@ export default function ScoreExcelModal({
                       : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
                   }`}
                 >
-                  à¹€à¸‰à¸žà¸²à¸°à¸¡à¸µà¸›à¸£à¸°à¸§à¸±à¸•à¸´à¹€à¸‚à¹‰à¸²à¹€à¸£à¸µà¸¢à¸™ ({targetStudents.length})
+                  เฉพาะมีประวัติเข้าเรียน ({targetStudents.length})
                 </button>
               </div>
             </div>
@@ -856,7 +856,7 @@ export default function ScoreExcelModal({
                   onChange={e => setIncludeMaxScoreRow(e.target.checked)}
                   className="rounded text-emerald-600 focus:ring-emerald-500"
                 />
-                <span>à¹à¸ªà¸”à¸‡à¹à¸–à¸§ &quot;à¸„à¸°à¹à¸™à¸™à¹€à¸•à¹‡à¸¡&quot; (Max Score)</span>
+                <span>แสดงแถว &quot;คะแนนเต็ม&quot; (Max Score)</span>
               </label>
 
               <label className="flex items-center gap-1.5 cursor-pointer text-slate-700 hover:text-emerald-700 select-none">
@@ -866,7 +866,7 @@ export default function ScoreExcelModal({
                   onChange={e => setIncludeDatesInHeader(e.target.checked)}
                   className="rounded text-emerald-600 focus:ring-emerald-500"
                 />
-                <span>à¹à¸ªà¸”à¸‡à¸§à¸±à¸™à¸—à¸µà¹ˆà¸ªà¸­à¸™à¸à¸³à¸à¸±à¸šà¹à¸•à¹ˆà¸¥à¸°à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ</span>
+                <span>แสดงวันที่สอนกำกับแต่ละสัปดาห์</span>
               </label>
 
               <label className="flex items-center gap-1.5 cursor-pointer text-slate-700 hover:text-emerald-700 select-none">
@@ -876,7 +876,7 @@ export default function ScoreExcelModal({
                   onChange={e => setIncludeHeaderSummary(e.target.checked)}
                   className="rounded text-emerald-600 focus:ring-emerald-500"
                 />
-                <span>à¹ƒà¸ªà¹ˆà¸«à¸±à¸§à¸£à¸²à¸¢à¸‡à¸²à¸™à¸”à¹‰à¸²à¸™à¸šà¸™ (à¸Šà¸·à¹ˆà¸­à¸§à¸´à¸Šà¸²/à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™/à¸§à¸±à¸™à¸—à¸µà¹ˆ)</span>
+                <span>ใส่หัวรายงานด้านบน (ชื่อวิชา/ห้องเรียน/วันที่)</span>
               </label>
 
               {exportMode === 'full_matrix' && (
@@ -889,7 +889,7 @@ export default function ScoreExcelModal({
                       onChange={e => setIncludeMidterm(e.target.checked)}
                       className="rounded text-emerald-600 focus:ring-emerald-500"
                     />
-                    <span>à¸à¸¥à¸²à¸‡à¸ à¸²à¸„</span>
+                    <span>กลางภาค</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer text-slate-700 hover:text-emerald-700 select-none">
                     <input
@@ -898,7 +898,7 @@ export default function ScoreExcelModal({
                       onChange={e => setIncludeFinal(e.target.checked)}
                       className="rounded text-emerald-600 focus:ring-emerald-500"
                     />
-                    <span>à¸›à¸¥à¸²à¸¢à¸ à¸²à¸„</span>
+                    <span>ปลายภาค</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer text-slate-700 hover:text-emerald-700 select-none">
                     <input
@@ -907,7 +907,7 @@ export default function ScoreExcelModal({
                       onChange={e => setIncludeAffective(e.target.checked)}
                       className="rounded text-emerald-600 focus:ring-emerald-500"
                     />
-                    <span>à¸ˆà¸´à¸•à¸žà¸´à¸ªà¸±à¸¢</span>
+                    <span>จิตพิสัย</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer text-slate-700 hover:text-emerald-700 select-none">
                     <input
@@ -916,7 +916,7 @@ export default function ScoreExcelModal({
                       onChange={e => setIncludeTotalScore(e.target.checked)}
                       className="rounded text-emerald-600 focus:ring-emerald-500"
                     />
-                    <span className="font-bold text-indigo-700">à¸£à¸§à¸¡à¸„à¸°à¹à¸™à¸™à¸ªà¸¸à¸—à¸˜à¸´</span>
+                    <span className="font-bold text-indigo-700">รวมคะแนนสุทธิ</span>
                   </label>
                 </>
               )}
@@ -925,24 +925,24 @@ export default function ScoreExcelModal({
             {/* File & Sheet Name Inputs */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
               <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-1">à¸Šà¸·à¹ˆà¸­à¹„à¸Ÿà¸¥à¹Œà¹€à¸¡à¸·à¹ˆà¸­à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸” (.xlsx / .csv)</label>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">ชื่อไฟล์เมื่อดาวน์โหลด (.xlsx / .csv)</label>
                 <input
                   type="text"
                   value={fileName}
                   onChange={e => setFileName(e.target.value)}
                   className="form-input text-xs w-full py-1.5 px-2.5 bg-slate-50 border-slate-300 rounded-lg focus:bg-white"
-                  placeholder="à¸£à¸°à¸šà¸¸à¸Šà¸·à¹ˆà¸­à¹„à¸Ÿà¸¥à¹Œ..."
+                  placeholder="ระบุชื่อไฟล์..."
                 />
               </div>
               {exportMode !== 'multi_sheet' && (
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">à¸Šà¸·à¹ˆà¸­à¹à¸œà¹ˆà¸™à¸‡à¸²à¸™ (Sheet Name à¹ƒà¸™ Excel)</label>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">ชื่อแผ่นงาน (Sheet Name ใน Excel)</label>
                   <input
                     type="text"
                     value={sheetName}
                     onChange={e => setSheetName(e.target.value)}
                     className="form-input text-xs w-full py-1.5 px-2.5 bg-slate-50 border-slate-300 rounded-lg focus:bg-white"
-                    placeholder="à¹€à¸Šà¹ˆà¸™ à¸•à¸²à¸£à¸²à¸‡à¸„à¸°à¹à¸™à¸™à¸£à¸§à¸¡..."
+                    placeholder="เช่น ตารางคะแนนรวม..."
                   />
                 </div>
               )}
@@ -955,7 +955,7 @@ export default function ScoreExcelModal({
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                   <Eye className="w-4 h-4 text-emerald-600" />
-                  <span>à¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡à¸•à¸²à¸£à¸²à¸‡ Excel à¸ˆà¸£à¸´à¸‡ (Live Spreadsheet Preview)</span>
+                  <span>ตัวอย่างตาราง Excel จริง (Live Spreadsheet Preview)</span>
                 </div>
 
                 {/* Multi-sheet preview switcher tabs */}
@@ -968,7 +968,7 @@ export default function ScoreExcelModal({
                         activePreviewSheet === 'matrix' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-emerald-700'
                       }`}
                     >
-                      à¸Šà¸µà¸• 1: à¸•à¸²à¸£à¸²à¸‡à¸£à¸§à¸¡
+                      ชีต 1: ตารางรวม
                     </button>
                     <button
                       type="button"
@@ -977,7 +977,7 @@ export default function ScoreExcelModal({
                         activePreviewSheet === 'assignments' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-emerald-700'
                       }`}
                     >
-                      à¸Šà¸µà¸• 2: à¸‡à¸²à¸™à¹€à¸à¹‡à¸š
+                      ชีต 2: งานเก็บ
                     </button>
                     <button
                       type="button"
@@ -986,7 +986,7 @@ export default function ScoreExcelModal({
                         activePreviewSheet === 'tests' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-emerald-700'
                       }`}
                     >
-                      à¸Šà¸µà¸• 3: à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢
+                      ชีต 3: สอบย่อย
                     </button>
                     <button
                       type="button"
@@ -995,7 +995,7 @@ export default function ScoreExcelModal({
                         activePreviewSheet === 'summary' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-emerald-700'
                       }`}
                     >
-                      à¸Šà¸µà¸• 4: à¸ªà¸£à¸¸à¸›à¸œà¸¥
+                      ชีต 4: สรุปผล
                     </button>
                   </div>
                 )}
@@ -1008,7 +1008,7 @@ export default function ScoreExcelModal({
                   type="text"
                   value={searchPreview}
                   onChange={e => setSearchPreview(e.target.value)}
-                  placeholder="à¸„à¹‰à¸™à¸«à¸²à¸Šà¸·à¹ˆà¸­ à¸«à¸£à¸·à¸­ à¸£à¸«à¸±à¸ªà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™..."
+                  placeholder="ค้นหาชื่อ หรือ รหัสนักเรียน..."
                   className="w-full pl-8 pr-3 py-1 bg-white border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-emerald-500 shadow-2xs"
                 />
               </div>
@@ -1021,7 +1021,7 @@ export default function ScoreExcelModal({
                 <thead className="sticky top-0 z-30 bg-slate-200 text-slate-600 font-bold border-b border-slate-300">
                   <tr>
                     <th className="p-1.5 w-10 text-center bg-slate-300 border-r border-slate-300 sticky left-0 z-40 text-[10px]">
-                      â—¢
+                      ◢
                     </th>
                     {activePreviewData.headers.map((_, idx) => (
                       <th key={idx} className="p-1 text-center border-r border-slate-300 min-w-[80px] font-semibold text-[10px] bg-slate-200">
@@ -1070,7 +1070,7 @@ export default function ScoreExcelModal({
                   {filteredPreviewRows.length === 0 ? (
                     <tr>
                       <td colSpan={activePreviewData.headers.length + 1} className="p-8 text-center text-slate-400">
-                        à¹„à¸¡à¹ˆà¸žà¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸—à¸µà¹ˆà¸„à¹‰à¸™à¸«à¸²
+                        ไม่พบข้อมูลนักเรียนที่ค้นหา
                       </td>
                     </tr>
                   ) : (
@@ -1125,24 +1125,24 @@ export default function ScoreExcelModal({
               <div className="flex items-center gap-4 flex-wrap">
                 <span className="flex items-center gap-1.5 font-medium">
                   <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  à¹à¸ªà¸”à¸‡à¸œà¸¥: <strong>{filteredPreviewRows.length}</strong> / {targetStudents.length} à¸„à¸™
+                  แสดงผล: <strong>{filteredPreviewRows.length}</strong> / {targetStudents.length} คน
                 </span>
-                <span>â€¢</span>
-                <span>à¸ˆà¸³à¸™à¸§à¸™à¸„à¸­à¸¥à¸±à¸¡à¸™à¹Œ: <strong>{activePreviewData.headers.length}</strong> à¸„à¸­à¸¥à¸±à¸¡à¸™à¹Œ</span>
-                <span>â€¢</span>
-                <span>à¹‚à¸„à¸£à¸‡à¸ªà¸£à¹‰à¸²à¸‡: <strong>{structures.length} à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ</strong></span>
+                <span>•</span>
+                <span>จำนวนคอลัมน์: <strong>{activePreviewData.headers.length}</strong> คอลัมน์</span>
+                <span>•</span>
+                <span>โครงสร้าง: <strong>{structures.length} สัปดาห์</strong></span>
                 {analyticsSummary && (
                   <>
-                    <span>â€¢</span>
+                    <span>•</span>
                     <span className="text-emerald-700 font-semibold">
-                      à¸„à¸°à¹à¸™à¸™à¹€à¸‰à¸¥à¸µà¹ˆà¸¢: {analyticsSummary.avgScore} / {analyticsSummary.totalMaxScore}
+                      คะแนนเฉลี่ย: {analyticsSummary.avgScore} / {analyticsSummary.totalMaxScore}
                     </span>
                   </>
                 )}
               </div>
 
               <div className="text-[11px] text-slate-500 italic">
-                * à¸•à¸²à¸£à¸²à¸‡à¸žà¸£à¸µà¸§à¸´à¸§à¹€à¸ªà¸¡à¸·à¸­à¸™à¸ˆà¸£à¸´à¸‡ à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸•à¸±à¸§à¹€à¸¥à¸‚à¸ªà¹ˆà¸‡à¸­à¸­à¸à¹€à¸›à¹‡à¸™ Number à¸žà¸£à¹‰à¸­à¸¡à¹ƒà¸Šà¹‰à¸ªà¸¹à¸•à¸£ SUM / AVERAGE à¹ƒà¸™ Excel à¹„à¸”à¹‰à¸—à¸±à¸™à¸—à¸µ
+                * ตารางพรีวิวเสมือนจริง ข้อมูลตัวเลขส่งออกเป็น Number พร้อมใช้สูตร SUM / AVERAGE ใน Excel ได้ทันที
               </div>
             </div>
           </div>
@@ -1151,7 +1151,7 @@ export default function ScoreExcelModal({
         {/* Modal Footer Controls */}
         <div className="px-6 py-4 bg-white border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 shadow-lg">
           <div className="flex items-center gap-2 text-xs text-slate-500">
-            <span>à¸à¸”à¸›à¸¸à¹ˆà¸¡ <strong>Esc</strong> à¹€à¸žà¸·à¹ˆà¸­à¸›à¸´à¸”</span>
+            <span>กดปุ่ม <strong>Esc</strong> เพื่อปิด</span>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto justify-end">
@@ -1160,7 +1160,7 @@ export default function ScoreExcelModal({
               onClick={onClose}
               className="btn bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-4"
             >
-              à¸¢à¸à¹€à¸¥à¸´à¸
+              ยกเลิก
             </button>
 
             {/* Copy to Clipboard */}
@@ -1172,10 +1172,10 @@ export default function ScoreExcelModal({
                   ? 'bg-emerald-600 text-white border-emerald-600'
                   : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300 shadow-2xs'
               }`}
-              title="à¸„à¸±à¸”à¸¥à¸­à¸à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸•à¸²à¸£à¸²à¸‡à¸ªà¸³à¸«à¸£à¸±à¸šà¸§à¸²à¸‡à¸¥à¸‡ Excel à¸«à¸£à¸·à¸­ Google Sheets à¸”à¹‰à¸§à¸¢ Ctrl+V"
+              title="คัดลอกข้อมูลตารางสำหรับวางลง Excel หรือ Google Sheets ด้วย Ctrl+V"
             >
               {copied ? <Check className="w-4 h-4 text-white" /> : <Copy className="w-4 h-4 text-slate-500" />}
-              {copied ? 'à¸„à¸±à¸”à¸¥à¸­à¸à¸ªà¸³à¹€à¸£à¹‡à¸ˆ!' : 'à¸„à¸±à¸”à¸¥à¸­à¸à¸¥à¸‡à¸„à¸¥à¸´à¸›à¸šà¸­à¸£à¹Œà¸”'}
+              {copied ? 'คัดลอกสำเร็จ!' : 'คัดลอกลงคลิปบอร์ด'}
             </button>
 
             {/* Download CSV */}
@@ -1183,10 +1183,10 @@ export default function ScoreExcelModal({
               type="button"
               onClick={handleDownloadCsv}
               className="btn bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-xs px-3.5 flex items-center gap-1.5 shadow-2xs"
-              title="à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œ CSV (UTF-8 à¸žà¸£à¹‰à¸­à¸¡ BOM à¸ à¸²à¸©à¸²à¹„à¸—à¸¢à¹„à¸¡à¹ˆà¹€à¸žà¸µà¹‰à¸¢à¸™)"
+              title="ดาวน์โหลดไฟล์ CSV (UTF-8 พร้อม BOM ภาษาไทยไม่เพี้ยน)"
             >
               <Download className="w-4 h-4 text-slate-600" />
-              à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸” CSV (.csv)
+              ดาวน์โหลด CSV (.csv)
             </button>
 
             {/* Download Excel (.xlsx) */}
@@ -1196,7 +1196,7 @@ export default function ScoreExcelModal({
               className="btn bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs px-5 flex items-center gap-2 shadow-md shadow-emerald-600/25 font-bold"
             >
               <Download className="w-4 h-4 text-white" />
-              {exportMode === 'multi_sheet' ? 'à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸” Excel (4 à¹à¸œà¹ˆà¸™à¸‡à¸²à¸™)' : 'à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸” Excel (.xlsx)'}
+              {exportMode === 'multi_sheet' ? 'ดาวน์โหลด Excel (4 แผ่นงาน)' : 'ดาวน์โหลด Excel (.xlsx)'}
             </button>
           </div>
         </div>

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState } from 'react';
 import {
@@ -13,7 +13,7 @@ import {
   Sparkles,
   RefreshCw,
 } from 'lucide-react';
-import toast from '@/lib/toast';
+import toast from 'react-hot-toast';
 
 export interface Criterion {
   grade: string;
@@ -99,7 +99,7 @@ export default function GradesSettingsDrawer({
       midterm_weight: preset.midterm,
       final_weight: preset.final,
     }));
-    toast.success('à¸›à¸£à¸±à¸šà¸„à¹ˆà¸²à¸™à¹‰à¸³à¸«à¸™à¸±à¸à¸•à¸²à¸¡à¸£à¸¹à¸›à¹à¸šà¸šà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
+    toast.success('ปรับค่าน้ำหนักตามรูปแบบสำเร็จ');
   };
 
   // Auto-balance to 100% proportionally or fix delta
@@ -127,20 +127,20 @@ export default function GradesSettingsDrawer({
       final_weight: balancedFinal,
       post_test_weight: balancedPostTest,
     }));
-    toast.success('à¹€à¸‰à¸¥à¸µà¹ˆà¸¢à¸ªà¸±à¸”à¸ªà¹ˆà¸§à¸™à¹ƒà¸«à¹‰à¸„à¸£à¸š 100% à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢');
+    toast.success('เฉลี่ยสัดส่วนให้ครบ 100% เรียบร้อย');
   };
 
   const handleValidateAndSave = () => {
     if (totalWeightSum <= 0) {
-      toast.error('à¸œà¸¥à¸£à¸§à¸¡à¸„à¹ˆà¸²à¸™à¹‰à¸³à¸«à¸™à¸±à¸à¸•à¹‰à¸­à¸‡à¸¡à¸²à¸à¸à¸§à¹ˆà¸² 0%');
+      toast.error('ผลรวมค่าน้ำหนักต้องมากกว่า 0%');
       return;
     }
 
     if (!isExact100) {
       const confirmSave = window.confirm(
-        `à¸„à¸³à¹€à¸•à¸·à¸­à¸™: à¸œà¸¥à¸£à¸§à¸¡à¸„à¹ˆà¸²à¸™à¹‰à¸³à¸«à¸™à¸±à¸à¸›à¸±à¸ˆà¸ˆà¸¸à¸šà¸±à¸™à¸„à¸·à¸­ ${totalWeightSum}% (à¹„à¸¡à¹ˆà¹€à¸—à¹ˆà¸²à¸à¸±à¸š 100%)\n` +
-          `à¸£à¸°à¸šà¸šà¸ˆà¸°à¹ƒà¸Šà¹‰ ${totalWeightSum}% à¹€à¸›à¹‡à¸™à¸à¸²à¸™à¸«à¸²à¸£à¹€à¸‰à¸¥à¸µà¹ˆà¸¢à¸„à¸°à¹à¸™à¸™à¸‚à¸­à¸‡à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™\n\n` +
-          `à¸„à¸¸à¸“à¸•à¹‰à¸­à¸‡à¸à¸²à¸£à¸šà¸±à¸™à¸—à¸¶à¸à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸«à¸£à¸·à¸­à¹„à¸¡à¹ˆ?`
+        `คำเตือน: ผลรวมค่าน้ำหนักปัจจุบันคือ ${totalWeightSum}% (ไม่เท่ากับ 100%)\n` +
+          `ระบบจะใช้ ${totalWeightSum}% เป็นฐานหารเฉลี่ยคะแนนของนักเรียน\n\n` +
+          `คุณต้องการบันทึกข้อมูลหรือไม่?`
       );
       if (!confirmSave) return;
     }
@@ -155,17 +155,17 @@ export default function GradesSettingsDrawer({
         <div>
           <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
             <Settings className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-            à¸•à¸±à¹‰à¸‡à¸„à¹ˆà¸²à¸™à¹‰à¸³à¸«à¸™à¸±à¸à¸„à¸°à¹à¸™à¸™ & à¹€à¸à¸“à¸‘à¹Œà¸•à¸±à¸”à¹€à¸à¸£à¸”
+            ตั้งค่าน้ำหนักคะแนน & เกณฑ์ตัดเกรด
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            à¸à¸³à¸«à¸™à¸”à¸ªà¸±à¸”à¸ªà¹ˆà¸§à¸™à¸„à¸°à¹à¸™à¸™à¸£à¸§à¸¡ 100% à¹à¸¥à¸°à¸à¸³à¸«à¸™à¸”à¸Šà¹ˆà¸§à¸‡à¸„à¸°à¹à¸™à¸™à¸ªà¸³à¸«à¸£à¸±à¸šà¸£à¸°à¸”à¸±à¸šà¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™
+            กำหนดสัดส่วนคะแนนรวม 100% และกำหนดช่วงคะแนนสำหรับระดับผลการเรียน
           </p>
         </div>
         <button
           onClick={onClose}
           className="btn bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700 text-xs rounded-xl px-3.5 py-1.5"
         >
-          à¸›à¸´à¸”
+          ปิด
         </button>
       </div>
 
@@ -174,15 +174,15 @@ export default function GradesSettingsDrawer({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h4 className="font-bold text-slate-800 dark:text-slate-100 text-sm">
-              à¸ªà¸±à¸”à¸ªà¹ˆà¸§à¸™à¸™à¹‰à¸³à¸«à¸™à¸±à¸à¸„à¸°à¹à¸™à¸™ (à¸£à¸§à¸¡ 5 à¸ªà¹ˆà¸§à¸™à¸•à¹‰à¸­à¸‡à¹€à¸—à¹ˆà¸²à¸à¸±à¸š 100%)
+              สัดส่วนน้ำหนักคะแนน (รวม 5 ส่วนต้องเท่ากับ 100%)
             </h4>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              à¸£à¸°à¸šà¸šà¸ˆà¸°à¹à¸›à¸¥à¸‡à¸„à¸°à¹à¸™à¸™à¸”à¸´à¸šà¸ªà¸°à¸ªà¸¡à¹€à¸‚à¹‰à¸²à¸ªà¸¹à¹ˆà¸™à¹‰à¸³à¸«à¸™à¸±à¸à¹€à¸›à¸­à¸£à¹Œà¹€à¸‹à¹‡à¸™à¸•à¹Œà¸­à¸±à¸•à¹‚à¸™à¸¡à¸±à¸•à¸´
+              ระบบจะแปลงคะแนนดิบสะสมเข้าสู่น้ำหนักเปอร์เซ็นต์อัตโนมัติ
             </p>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-600">à¸œà¸¥à¸£à¸§à¸¡:</span>
+            <span className="text-xs font-semibold text-slate-600">ผลรวม:</span>
             <span
               className={`px-3 py-1 rounded-full text-xs font-extrabold flex items-center gap-1.5 ${
                 isExact100
@@ -207,10 +207,10 @@ export default function GradesSettingsDrawer({
               <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
               <div>
                 <p className="font-bold">
-                  à¸œà¸¥à¸£à¸§à¸¡à¸ªà¸±à¸”à¸ªà¹ˆà¸§à¸™à¸™à¹‰à¸³à¸«à¸™à¸±à¸à¸›à¸±à¸ˆà¸ˆà¸¸à¸šà¸±à¸™à¸„à¸·à¸­ {totalWeightSum}% (à¹„à¸¡à¹ˆà¹€à¸—à¹ˆà¸²à¸à¸±à¸š 100%)
+                  ผลรวมสัดส่วนน้ำหนักปัจจุบันคือ {totalWeightSum}% (ไม่เท่ากับ 100%)
                 </p>
                 <p className="text-[11px] text-amber-700 mt-0.5">
-                  à¹à¸™à¸°à¸™à¸³à¹ƒà¸«à¹‰à¸›à¸£à¸±à¸šà¸ªà¸±à¸”à¸ªà¹ˆà¸§à¸™à¸£à¸§à¸¡à¹ƒà¸«à¹‰à¹„à¸”à¹‰ 100% à¹€à¸žà¸·à¹ˆà¸­à¸„à¸§à¸²à¸¡à¹à¸¡à¹ˆà¸™à¸¢à¸³à¹ƒà¸™à¸à¸²à¸£à¹à¸›à¸¥à¸‡à¹€à¸à¸£à¸”à¸•à¸²à¸¡à¸£à¸°à¹€à¸šà¸µà¸¢à¸šà¸§à¸±à¸”à¸œà¸¥
+                  แนะนำให้ปรับสัดส่วนรวมให้ได้ 100% เพื่อความแม่นยำในการแปลงเกรดตามระเบียบวัดผล
                 </p>
               </div>
             </div>
@@ -219,14 +219,14 @@ export default function GradesSettingsDrawer({
               onClick={autoBalanceTo100}
               className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 shrink-0 shadow-xs transition-colors cursor-pointer"
             >
-              <RefreshCw className="w-3 h-3" /> à¸›à¸£à¸±à¸šà¹ƒà¸«à¹‰à¸„à¸£à¸š 100% à¸­à¸±à¸•à¹‚à¸™à¸¡à¸±à¸•à¸´
+              <RefreshCw className="w-3 h-3" /> ปรับให้ครบ 100% อัตโนมัติ
             </button>
           </div>
         )}
 
         {/* Quick Presets */}
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          <span className="text-[11px] font-semibold text-slate-500">à¸£à¸¹à¸›à¹à¸šà¸šà¹à¸™à¸°à¸™à¸³:</span>
+          <span className="text-[11px] font-semibold text-slate-500">รูปแบบแนะนำ:</span>
           {weights.is_pws ? (
             <>
               <button
@@ -236,7 +236,7 @@ export default function GradesSettingsDrawer({
                 }
                 className="px-2.5 py-1 text-[11px] font-medium rounded-lg bg-white border border-slate-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 text-slate-700 transition-colors cursor-pointer"
               >
-                à¸›à¸§à¸ª. à¹„à¸¡à¹ˆà¸¡à¸µà¸à¸¥à¸²à¸‡à¸ à¸²à¸„ (20-60-10-0-10)
+                ปวส. ไม่มีกลางภาค (20-60-10-0-10)
               </button>
               <button
                 type="button"
@@ -245,7 +245,7 @@ export default function GradesSettingsDrawer({
                 }
                 className="px-2.5 py-1 text-[11px] font-medium rounded-lg bg-white border border-slate-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 text-slate-700 transition-colors cursor-pointer"
               >
-                à¸›à¸§à¸ª. à¸›à¸à¸´à¸šà¸±à¸•à¸´à¸¥à¹‰à¸§à¸™ (20-70-10-0-0)
+                ปวส. ปฏิบัติล้วน (20-70-10-0-0)
               </button>
             </>
           ) : (
@@ -257,7 +257,7 @@ export default function GradesSettingsDrawer({
                 }
                 className="px-2.5 py-1 text-[11px] font-medium rounded-lg bg-white border border-slate-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 text-slate-700 transition-colors cursor-pointer"
               >
-                à¸›à¸§à¸Š. à¸¡à¸µà¸ªà¸­à¸šà¸à¸¥à¸²à¸‡à¸ à¸²à¸„ (20-30-20-15-15)
+                ปวช. มีสอบกลางภาค (20-30-20-15-15)
               </button>
               <button
                 type="button"
@@ -266,7 +266,7 @@ export default function GradesSettingsDrawer({
                 }
                 className="px-2.5 py-1 text-[11px] font-medium rounded-lg bg-white border border-slate-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 text-slate-700 transition-colors cursor-pointer"
               >
-                à¸›à¸§à¸Š. à¹„à¸¡à¹ˆà¸¡à¸µà¸ªà¸­à¸šà¸à¸¥à¸²à¸‡à¸ à¸²à¸„ (20-50-20-0-10)
+                ปวช. ไม่มีสอบกลางภาค (20-50-20-0-10)
               </button>
               <button
                 type="button"
@@ -275,7 +275,7 @@ export default function GradesSettingsDrawer({
                 }
                 className="px-2.5 py-1 text-[11px] font-medium rounded-lg bg-white border border-slate-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 text-slate-700 transition-colors cursor-pointer"
               >
-                à¸¡à¸²à¸•à¸£à¸à¸²à¸™ à¸ªà¸­à¸¨. à¸›à¸£à¸°à¹€à¸¡à¸´à¸™à¸ªà¸ à¸²à¸žà¸ˆà¸£à¸´à¸‡ (20-70-10-0-0)
+                มาตรฐาน สอศ. ประเมินสภาพจริง (20-70-10-0-0)
               </button>
             </>
           )}
@@ -286,27 +286,27 @@ export default function GradesSettingsDrawer({
           <div
             style={{ width: `${Math.min(100, ((weights.affective_weight || 0) / 100) * 100)}%` }}
             className="bg-pink-500 transition-all"
-            title={`à¸ˆà¸´à¸•à¸žà¸´à¸ªà¸±à¸¢ ${weights.affective_weight}%`}
+            title={`จิตพิสัย ${weights.affective_weight}%`}
           />
           <div
             style={{ width: `${Math.min(100, ((weights.post_test_weight || 0) / 100) * 100)}%` }}
             className="bg-amber-500 transition-all"
-            title={`à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢ ${weights.post_test_weight}%`}
+            title={`สอบย่อย ${weights.post_test_weight}%`}
           />
           <div
             style={{ width: `${Math.min(100, ((weights.assignment_weight || 0) / 100) * 100)}%` }}
             className="bg-emerald-500 transition-all"
-            title={`à¸‡à¸²à¸™à¹€à¸à¹‡à¸š ${weights.assignment_weight}%`}
+            title={`งานเก็บ ${weights.assignment_weight}%`}
           />
           <div
             style={{ width: `${Math.min(100, ((weights.midterm_weight || 0) / 100) * 100)}%` }}
             className="bg-cyan-500 transition-all"
-            title={`à¸à¸¥à¸²à¸‡à¸ à¸²à¸„ ${weights.midterm_weight}%`}
+            title={`กลางภาค ${weights.midterm_weight}%`}
           />
           <div
             style={{ width: `${Math.min(100, ((weights.final_weight || 0) / 100) * 100)}%` }}
             className="bg-blue-500 transition-all"
-            title={`à¸›à¸¥à¸²à¸¢à¸ à¸²à¸„ ${weights.final_weight}%`}
+            title={`ปลายภาค ${weights.final_weight}%`}
           />
         </div>
 
@@ -314,7 +314,7 @@ export default function GradesSettingsDrawer({
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2">
           <div className="bg-white p-3 rounded-2xl border border-pink-100 shadow-xs">
             <label className="block text-[11px] font-bold text-pink-700 uppercase mb-1">
-              à¸ˆà¸´à¸•à¸žà¸´à¸ªà¸±à¸¢ (%)
+              จิตพิสัย (%)
             </label>
             <input
               type="number"
@@ -330,7 +330,7 @@ export default function GradesSettingsDrawer({
           </div>
           <div className="bg-white p-3 rounded-2xl border border-amber-100 shadow-xs">
             <label className="block text-[11px] font-bold text-amber-700 uppercase mb-1">
-              à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢ (%)
+              สอบย่อย (%)
             </label>
             <input
               type="number"
@@ -346,7 +346,7 @@ export default function GradesSettingsDrawer({
           </div>
           <div className="bg-white p-3 rounded-2xl border border-emerald-100 shadow-xs">
             <label className="block text-[11px] font-bold text-emerald-700 uppercase mb-1">
-              à¸‡à¸²à¸™à¹€à¸à¹‡à¸š (%)
+              งานเก็บ (%)
             </label>
             <input
               type="number"
@@ -363,10 +363,10 @@ export default function GradesSettingsDrawer({
           <div className={`p-3 rounded-2xl border shadow-xs ${weights.is_pws ? 'bg-slate-50 border-slate-200 opacity-60' : 'bg-white border-cyan-100'}`}>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-[11px] font-bold text-cyan-700 uppercase">
-                à¸à¸¥à¸²à¸‡à¸ à¸²à¸„ (%)
+                กลางภาค (%)
               </label>
               {weights.is_pws && (
-                <span className="text-[9px] font-bold text-slate-500 bg-slate-200 px-1 rounded">à¸›à¸§à¸ª. à¹„à¸¡à¹ˆà¸¡à¸µà¸à¸¥à¸²à¸‡à¸ à¸²à¸„</span>
+                <span className="text-[9px] font-bold text-slate-500 bg-slate-200 px-1 rounded">ปวส. ไม่มีกลางภาค</span>
               )}
             </div>
             <input
@@ -384,7 +384,7 @@ export default function GradesSettingsDrawer({
           </div>
           <div className="bg-white p-3 rounded-2xl border border-blue-100 shadow-xs">
             <label className="block text-[11px] font-bold text-blue-700 uppercase mb-1">
-              à¸›à¸¥à¸²à¸¢à¸ à¸²à¸„ (%)
+              ปลายภาค (%)
             </label>
             <input
               type="number"
@@ -403,12 +403,12 @@ export default function GradesSettingsDrawer({
         {/* Max Scores for Exams */}
         <div className="pt-3 border-t border-indigo-100/60">
           <h5 className="font-bold text-slate-700 mb-2 text-xs">
-            à¸à¸³à¸«à¸™à¸”à¸„à¸°à¹à¸™à¸™à¹€à¸•à¹‡à¸¡à¸ªà¸³à¸«à¸£à¸±à¸šà¸‚à¹‰à¸­à¸ªà¸­à¸š (à¹€à¸žà¸·à¹ˆà¸­à¹ƒà¸Šà¹‰à¹à¸›à¸¥à¸‡à¸­à¸±à¸•à¸£à¸²à¸ªà¹ˆà¸§à¸™)
+            กำหนดคะแนนเต็มสำหรับข้อสอบ (เพื่อใช้แปลงอัตราส่วน)
           </h5>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg">
             <div className="flex items-center gap-3 bg-white p-2.5 rounded-2xl border border-indigo-100">
               <label className="text-xs font-semibold text-cyan-800 w-28 shrink-0">
-                à¹€à¸•à¹‡à¸¡ à¸à¸¥à¸²à¸‡à¸ à¸²à¸„:
+                เต็ม กลางภาค:
               </label>
               <input
                 type="number"
@@ -423,7 +423,7 @@ export default function GradesSettingsDrawer({
             </div>
             <div className="flex items-center gap-3 bg-white p-2.5 rounded-2xl border border-indigo-100">
               <label className="text-xs font-semibold text-blue-800 w-28 shrink-0">
-                à¹€à¸•à¹‡à¸¡ à¸›à¸¥à¸²à¸¢à¸ à¸²à¸„:
+                เต็ม ปลายภาค:
               </label>
               <input
                 type="number"
@@ -444,8 +444,8 @@ export default function GradesSettingsDrawer({
       <div>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
           <div>
-            <h4 className="font-bold text-slate-800 text-sm">à¹€à¸à¸“à¸‘à¹Œà¸„à¸°à¹à¸™à¸™à¸‚à¸±à¹‰à¸™à¸•à¹ˆà¸³ (%) à¸ªà¸³à¸«à¸£à¸±à¸šà¹à¸•à¹ˆà¸¥à¸°à¸£à¸°à¸”à¸±à¸šà¹€à¸à¸£à¸”</h4>
-            <p className="text-xs text-slate-500">à¹€à¸£à¸µà¸¢à¸‡à¸ˆà¸²à¸à¸„à¸°à¹à¸™à¸™à¸ªà¸¹à¸‡à¸¥à¸‡à¸¡à¸²à¸•à¹ˆà¸³</p>
+            <h4 className="font-bold text-slate-800 text-sm">เกณฑ์คะแนนขั้นต่ำ (%) สำหรับแต่ละระดับเกรด</h4>
+            <p className="text-xs text-slate-500">เรียงจากคะแนนสูงลงมาต่ำ</p>
           </div>
           <div className="flex gap-2">
             <button
@@ -464,14 +464,14 @@ export default function GradesSettingsDrawer({
               }
               className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors border border-indigo-200 cursor-pointer"
             >
-              à¹ƒà¸Šà¹‰à¹€à¸à¸£à¸”à¸­à¸±à¸à¸©à¸£ (A-F)
+              ใช้เกรดอักษร (A-F)
             </button>
             <button
               type="button"
               onClick={() => setCriteria([...defaultCriteria])}
               className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors border border-emerald-200 cursor-pointer"
             >
-              à¹ƒà¸Šà¹‰à¹€à¸à¸£à¸”à¸•à¸±à¸§à¹€à¸¥à¸‚ (4-0)
+              ใช้เกรดตัวเลข (4-0)
             </button>
           </div>
         </div>
@@ -488,11 +488,11 @@ export default function GradesSettingsDrawer({
                   value={c.grade}
                   onChange={(e) => handleCriteriaChange(i, 'grade', e.target.value)}
                   className="form-input py-1.5 text-center font-bold text-slate-800 text-xs rounded-xl"
-                  placeholder="à¹€à¸Šà¹ˆà¸™ 4, A"
+                  placeholder="เช่น 4, A"
                 />
               </div>
               <div className="col-span-5 flex items-center gap-2">
-                <span className="text-slate-500 text-xs shrink-0 font-bold">â‰¥</span>
+                <span className="text-slate-500 text-xs shrink-0 font-bold">≥</span>
                 <input
                   type="number"
                   value={c.min_score}
@@ -518,7 +518,7 @@ export default function GradesSettingsDrawer({
             onClick={addCriteriaRow}
             className="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-800 text-xs font-bold p-2 rounded-xl hover:bg-indigo-50 transition-all cursor-pointer"
           >
-            <Plus className="w-4 h-4" /> à¹€à¸žà¸´à¹ˆà¸¡à¸£à¸°à¸”à¸±à¸šà¹€à¸à¸£à¸”
+            <Plus className="w-4 h-4" /> เพิ่มระดับเกรด
           </button>
         </div>
 
@@ -530,14 +530,14 @@ export default function GradesSettingsDrawer({
             className="btn btn-primary rounded-xl text-xs flex items-center gap-2 shadow-md shadow-indigo-500/20 cursor-pointer"
           >
             {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            à¸šà¸±à¸™à¸—à¸¶à¸à¸à¸²à¸£à¸•à¸±à¹‰à¸‡à¸„à¹ˆà¸²
+            บันทึกการตั้งค่า
           </button>
           <button
             type="button"
             onClick={onClose}
             className="btn bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl text-xs cursor-pointer"
           >
-            à¸¢à¸à¹€à¸¥à¸´à¸
+            ยกเลิก
           </button>
         </div>
       </div>
