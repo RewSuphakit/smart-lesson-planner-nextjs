@@ -41,6 +41,7 @@ interface UserAvatarProps {
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'huge' | 'custom';
   className?: string;
   imgClassName?: string;
+  priority?: boolean;
 }
 
 export default function UserAvatar({
@@ -50,6 +51,7 @@ export default function UserAvatar({
   size = 'md',
   className = '',
   imgClassName = '',
+  priority = false,
 }: UserAvatarProps) {
   const [imgError, setImgError] = useState(false);
 
@@ -77,8 +79,9 @@ export default function UserAvatar({
           alt={name || 'User avatar'}
           className={`w-full h-full object-cover ${imgClassName}`}
           referrerPolicy="no-referrer"
-          loading="lazy"
-          decoding="async"
+          loading={priority ? 'eager' : 'lazy'}
+          decoding={priority ? 'sync' : 'async'}
+          fetchPriority={priority ? 'high' : 'auto'}
           onError={() => setImgError(true)}
         />
       ) : (

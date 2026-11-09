@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Sarabun } from 'next/font/google';
 import './globals.css';
-import { Toaster as HotToaster } from 'react-hot-toast';
+import { Toaster } from 'sonner';
 
 import { AuthProvider } from '@/context/AuthContext';
 import QueryProvider from '@/components/QueryProvider';
@@ -80,20 +80,7 @@ export default async function RootLayout({
           <AuthProvider initialUser={initialUser}>
             <SemesterProvider initialSemesters={initialSemesters}>
               <ThemeProvider>
-                <HotToaster
-                  position="top-right"
-                  toastOptions={{
-                    style: {
-                      background: 'var(--toast-bg, #ffffff)',
-                      color: 'var(--toast-color, #334155)',
-                      border: '1px solid var(--toast-border, rgba(165, 180, 252, 0.4))',
-                      borderRadius: '12px',
-                      boxShadow: '0 4px 12px rgba(99, 102, 241, 0.08)',
-                    },
-                    success: { iconTheme: { primary: '#10b981', secondary: '#fff' } },
-                    error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
-                  }}
-                />
+                <Toaster position="top-right" richColors closeButton />
 
                 <PwaRegister />
                 {children}

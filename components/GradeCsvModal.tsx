@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
@@ -6,7 +6,7 @@ import {
   FileSpreadsheet, X, Download, Copy, Check, Filter, Search, 
   CheckSquare, Square, Eye, FileText, ArrowUpDown
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 
 import type { Classroom, ReportStudent, Weights } from '@/components/pages/Grades';
 
@@ -63,80 +63,80 @@ export default function GradeCsvModal({
   }, [isOpen, onClose]);
 
   const isPws: boolean = useMemo(() => {
-    return Boolean(weights.is_pws || classroom?.name?.includes('ปวส') || classroom?.name?.includes('ปวส.'));
+    return Boolean(weights.is_pws || classroom?.name?.includes('à¸›à¸§à¸ª') || classroom?.name?.includes('à¸›à¸§à¸ª.'));
   }, [weights, classroom]);
 
   // Define available CSV columns
   const availableColumns: ColumnOption[] = useMemo(() => [
     {
       id: 'student_code',
-      label: 'รหัสประจำตัว',
+      label: 'à¸£à¸«à¸±à¸ªà¸›à¸£à¸°à¸ˆà¸³à¸•à¸±à¸§',
       defaultChecked: true,
       getValue: s => s.student_code || '-'
     },
     {
       id: 'name',
-      label: 'ชื่อ-นามสกุล',
+      label: 'à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥',
       defaultChecked: true,
       getValue: s => s.name
     },
     {
       id: 'affective',
-      label: `จิตพิสัย (${weights.affective_weight}%)`,
+      label: `à¸ˆà¸´à¸•à¸žà¸´à¸ªà¸±à¸¢ (${weights.affective_weight}%)`,
       defaultChecked: true,
       getValue: s => Number(s.affective_score || 0).toFixed(1)
     },
     {
       id: 'post_scaled',
-      label: `สอบย่อย (${weights.post_test_weight}%)`,
+      label: `à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢ (${weights.post_test_weight}%)`,
       defaultChecked: true,
       getValue: s => Number(s.precise_scaled_post_test || s.scaled_post_test || 0).toFixed(1)
     },
     {
       id: 'post_raw',
-      label: `สอบย่อยดิบ (เต็ม ${weights.max_post_test_raw || (isPws ? 150 : 180)})`,
+      label: `à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢à¸”à¸´à¸š (à¹€à¸•à¹‡à¸¡ ${weights.max_post_test_raw || (isPws ? 150 : 180)})`,
       defaultChecked: true,
       getValue: s => Number(s.raw_post_test || 0).toFixed(1)
     },
     {
       id: 'assign_scaled',
-      label: `งานเก็บ (${weights.assignment_weight}%)`,
+      label: `à¸‡à¸²à¸™à¹€à¸à¹‡à¸š (${weights.assignment_weight}%)`,
       defaultChecked: true,
       getValue: s => Number(s.precise_scaled_assign || s.scaled_assign || 0).toFixed(1)
     },
     {
       id: 'assign_raw',
-      label: `งานเก็บดิบ (เต็ม ${weights.max_assign_raw || (isPws ? 150 : 180)})`,
+      label: `à¸‡à¸²à¸™à¹€à¸à¹‡à¸šà¸”à¸´à¸š (à¹€à¸•à¹‡à¸¡ ${weights.max_assign_raw || (isPws ? 150 : 180)})`,
       defaultChecked: true,
       getValue: s => Number(s.raw_assign || 0).toFixed(1)
     },
     {
       id: 'midterm',
-      label: `กลางภาค (${weights.midterm_weight}%)`,
+      label: `à¸à¸¥à¸²à¸‡à¸ à¸²à¸„ (${weights.midterm_weight}%)`,
       defaultChecked: weights.midterm_weight > 0,
       getValue: s => Number(s.precise_scaled_midterm || s.scaled_midterm || 0).toFixed(1)
     },
     {
       id: 'final',
-      label: `ปลายภาค (${weights.final_weight}%)`,
+      label: `à¸›à¸¥à¸²à¸¢à¸ à¸²à¸„ (${weights.final_weight}%)`,
       defaultChecked: true,
-      getValue: s => s.is_absent_final ? 'ข.ส.' : s.is_incomplete ? 'ม.ส.' : Number(s.precise_scaled_final || s.scaled_final || 0).toFixed(1)
+      getValue: s => s.is_absent_final ? 'à¸‚.à¸ª.' : s.is_incomplete ? 'à¸¡.à¸ª.' : Number(s.precise_scaled_final || s.scaled_final || 0).toFixed(1)
     },
     {
       id: 'total_score',
-      label: 'รวมคะแนน (100)',
+      label: 'à¸£à¸§à¸¡à¸„à¸°à¹à¸™à¸™ (100)',
       defaultChecked: true,
       getValue: s => (s.is_absent_final || s.is_incomplete) ? '-' : Number(s.total_score_precise ?? s.total_score ?? 0).toFixed(1)
     },
     {
       id: 'attendance',
-      label: 'เวลาเรียน (%)',
+      label: 'à¹€à¸§à¸¥à¸²à¹€à¸£à¸µà¸¢à¸™ (%)',
       defaultChecked: true,
       getValue: s => `${s.attendance_percent ?? 100}%`
     },
     {
       id: 'grade',
-      label: 'ระดับเกรด',
+      label: 'à¸£à¸°à¸”à¸±à¸šà¹€à¸à¸£à¸”',
       defaultChecked: true,
       getValue: s => s.grade || '-'
     }
@@ -200,13 +200,13 @@ export default function GradeCsvModal({
     const link = document.createElement('a');
     link.href = url;
     
-    const className = classroom?.name ? classroom.name.replace(/[^a-zA-Z0-9ก-๙_-]/g, '_') : 'Classroom';
-    link.setAttribute('download', `ตารางคะแนน_${className}_${new Date().toISOString().split('T')[0]}.csv`);
+    const className = classroom?.name ? classroom.name.replace(/[^a-zA-Z0-9à¸-à¹™_-]/g, '_') : 'Classroom';
+    link.setAttribute('download', `à¸•à¸²à¸£à¸²à¸‡à¸„à¸°à¹à¸™à¸™_${className}_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    toast.success('ดาวน์โหลดไฟล์ CSV เรียบร้อยแล้ว');
+    toast.success('à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œ CSV à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢à¹à¸¥à¹‰à¸§');
   };
 
   // Copy CSV to Clipboard
@@ -220,10 +220,10 @@ export default function GradeCsvModal({
       const fullText = `${headers}\n${rows}`;
       await navigator.clipboard.writeText(fullText);
       setCopied(true);
-      toast.success('คัดลอกข้อมูลลง Clipboard เรียบร้อย (สามารถวางใน Excel ได้ทันที)');
+      toast.success('à¸„à¸±à¸”à¸¥à¸­à¸à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸¥à¸‡ Clipboard à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢ (à¸ªà¸²à¸¡à¸²à¸£à¸–à¸§à¸²à¸‡à¹ƒà¸™ Excel à¹„à¸”à¹‰à¸—à¸±à¸™à¸—à¸µ)');
       setTimeout(() => setCopied(false), 2500);
     } catch {
-      toast.error('ไม่สามารถคัดลอกข้อมูลได้');
+      toast.error('à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸„à¸±à¸”à¸¥à¸­à¸à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¹„à¸”à¹‰');
     }
   };
 
@@ -249,12 +249,12 @@ export default function GradeCsvModal({
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
-                พรีวิวและเลือกคอลัมน์ส่งออก CSV (Excel)
+                à¸žà¸£à¸µà¸§à¸´à¸§à¹à¸¥à¸°à¹€à¸¥à¸·à¸­à¸à¸„à¸­à¸¥à¸±à¸¡à¸™à¹Œà¸ªà¹ˆà¸‡à¸­à¸­à¸ CSV (Excel)
                 <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  {report.length} คน
+                  {report.length} à¸„à¸™
                 </span>
               </h2>
-              <p className="text-xs text-slate-500">ตรวจสอบตารางข้อมูล เลือกคอลัมน์ที่ต้องการ และดาวน์โหลดไฟล์ CSV สำหรับเปิดใน Microsoft Excel</p>
+              <p className="text-xs text-slate-500">à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¸•à¸²à¸£à¸²à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥ à¹€à¸¥à¸·à¸­à¸à¸„à¸­à¸¥à¸±à¸¡à¸™à¹Œà¸—à¸µà¹ˆà¸•à¹‰à¸­à¸‡à¸à¸²à¸£ à¹à¸¥à¸°à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œ CSV à¸ªà¸³à¸«à¸£à¸±à¸šà¹€à¸›à¸´à¸”à¹ƒà¸™ Microsoft Excel</p>
             </div>
           </div>
 
@@ -264,13 +264,13 @@ export default function GradeCsvModal({
               className="btn bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all"
             >
               {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-slate-500" />}
-              {copied ? 'คัดลอกแล้ว' : 'คัดลอกลง Excel'}
+              {copied ? 'à¸„à¸±à¸”à¸¥à¸­à¸à¹à¸¥à¹‰à¸§' : 'à¸„à¸±à¸”à¸¥à¸­à¸à¸¥à¸‡ Excel'}
             </button>
             <button
               onClick={handleDownloadCsv}
               className="btn bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl shadow-md shadow-emerald-500/25 transition-all"
             >
-              <Download className="w-4 h-4" /> ดาวน์โหลดไฟล์ CSV
+              <Download className="w-4 h-4" /> à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œ CSV
             </button>
             <button
               onClick={onClose}
@@ -286,20 +286,20 @@ export default function GradeCsvModal({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                <CheckSquare className="w-3.5 h-3.5 text-emerald-600" /> เลือกคอลัมน์ที่จะ Export ({activeColumns.length}/{availableColumns.length}):
+                <CheckSquare className="w-3.5 h-3.5 text-emerald-600" /> à¹€à¸¥à¸·à¸­à¸à¸„à¸­à¸¥à¸±à¸¡à¸™à¹Œà¸—à¸µà¹ˆà¸ˆà¸° Export ({activeColumns.length}/{availableColumns.length}):
               </span>
               <button
                 onClick={selectAllColumns}
                 className="text-[11px] text-indigo-600 hover:underline font-semibold"
               >
-                เลือกทั้งหมด
+                à¹€à¸¥à¸·à¸­à¸à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”
               </button>
               <span className="text-slate-300">|</span>
               <button
                 onClick={selectStandardColumns}
                 className="text-[11px] text-slate-600 hover:underline font-medium"
               >
-                เฉพาะคอลัมน์มาตรฐาน
+                à¹€à¸‰à¸žà¸²à¸°à¸„à¸­à¸¥à¸±à¸¡à¸™à¹Œà¸¡à¸²à¸•à¸£à¸à¸²à¸™
               </button>
             </div>
 
@@ -310,7 +310,7 @@ export default function GradeCsvModal({
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder="ค้นหาชื่อ หรือ รหัสนักศึกษา..."
+                placeholder="à¸„à¹‰à¸™à¸«à¸²à¸Šà¸·à¹ˆà¸­ à¸«à¸£à¸·à¸­ à¸£à¸«à¸±à¸ªà¸™à¸±à¸à¸¨à¸¶à¸à¸©à¸²..."
                 className="form-input text-xs pl-8 py-1 w-full bg-slate-50 border-slate-200"
               />
             </div>
@@ -344,7 +344,7 @@ export default function GradeCsvModal({
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-100 border-b border-slate-200 text-slate-700 font-bold">
-                  <th className="p-2.5 w-12 text-center">ลำดับ</th>
+                  <th className="p-2.5 w-12 text-center">à¸¥à¸³à¸”à¸±à¸š</th>
                   {activeColumns.map(col => (
                     <th key={col.id} className="p-2.5 whitespace-nowrap">
                       {col.label}
@@ -356,7 +356,7 @@ export default function GradeCsvModal({
                 {filteredReport.length === 0 ? (
                   <tr>
                     <td colSpan={activeColumns.length + 1} className="p-8 text-center text-slate-400">
-                      ไม่พบข้อมูลนักเรียนที่ตรงกับคำค้นหา
+                      à¹„à¸¡à¹ˆà¸žà¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸—à¸µà¹ˆà¸•à¸£à¸‡à¸à¸±à¸šà¸„à¸³à¸„à¹‰à¸™à¸«à¸²
                     </td>
                   </tr>
                 ) : (
@@ -396,22 +396,22 @@ export default function GradeCsvModal({
         {/* Modal Footer */}
         <div className="px-6 py-3 bg-white border-t border-slate-200 flex items-center justify-between text-xs text-slate-500 shrink-0">
           <div className="flex items-center gap-3">
-            <span>แสดงผล <strong className="text-slate-800">{filteredReport.length}</strong> จาก {report.length} แถว</span>
-            <span className="text-slate-300">•</span>
-            <span>รูปแบบ: <strong className="text-slate-800">CSV (UTF-8 with BOM)</strong> รองรับ Excel 100%</span>
+            <span>à¹à¸ªà¸”à¸‡à¸œà¸¥ <strong className="text-slate-800">{filteredReport.length}</strong> à¸ˆà¸²à¸ {report.length} à¹à¸–à¸§</span>
+            <span className="text-slate-300">â€¢</span>
+            <span>à¸£à¸¹à¸›à¹à¸šà¸š: <strong className="text-slate-800">CSV (UTF-8 with BOM)</strong> à¸£à¸­à¸‡à¸£à¸±à¸š Excel 100%</span>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
               className="btn bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-4 py-1.5 rounded-xl"
             >
-              ปิดหน้าต่าง
+              à¸›à¸´à¸”à¸«à¸™à¹‰à¸²à¸•à¹ˆà¸²à¸‡
             </button>
             <button
               onClick={handleDownloadCsv}
               className="btn bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-1.5 rounded-xl flex items-center gap-1.5"
             >
-              <Download className="w-3.5 h-3.5" /> ดาวน์โหลด CSV
+              <Download className="w-3.5 h-3.5" /> à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸” CSV
             </button>
           </div>
         </div>

@@ -396,7 +396,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   alt="Smart Planner Logo"
                   width={isCollapsed ? 36 : 40}
                   height={isCollapsed ? 36 : 40}
-                  loading="eager"
+                  priority
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -516,6 +516,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       name={user?.name}
                       userId={user?.id}
                       size={isCollapsed ? 'sm' : 'md'}
+                      priority={true}
                       className="transition-transform duration-300 group-hover:scale-105 shadow-xs shrink-0"
                     />
                     <div className={`min-w-0 overflow-hidden transition-all duration-300 ease-in-out ${

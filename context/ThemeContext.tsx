@@ -17,6 +17,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>('light');
   const [isMounted, setIsMounted] = useState(false);
 
+  const applyTheme = (targetTheme: Theme) => {
+    const root = document.documentElement;
+    if (targetTheme === 'dark') {
+      root.classList.add('dark');
+      root.style.colorScheme = 'dark';
+    } else {
+      root.classList.remove('dark');
+      root.style.colorScheme = 'light';
+    }
+  };
+
   useEffect(() => {
     try {
       const stored = localStorage.getItem('smart_planner_theme') as Theme | null;
@@ -34,17 +45,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
     setIsMounted(true);
   }, []);
-
-  const applyTheme = (targetTheme: Theme) => {
-    const root = document.documentElement;
-    if (targetTheme === 'dark') {
-      root.classList.add('dark');
-      root.style.colorScheme = 'dark';
-    } else {
-      root.classList.remove('dark');
-      root.style.colorScheme = 'light';
-    }
-  };
 
   const setTheme = (targetTheme: Theme) => {
     setThemeState(targetTheme);

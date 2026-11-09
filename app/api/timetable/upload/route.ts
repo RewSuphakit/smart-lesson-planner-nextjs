@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { EntryType } from '@prisma/client';
-import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
+import { withAuth } from '@/lib/apiHandler';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { PERIOD_TIMES, parseTimeToUtc } from '@/lib/constants';
 import { protectRequest, aiLimiter } from '@/lib/arcjet';
@@ -446,10 +446,9 @@ async function parseImageWithAI(buffer: Buffer, mimeType: string, userId: number
   }
 }
 
-export async function POST(request: NextRequest) {
+// Keeps its own try/catch inside the handler: parse errors map to 400 with the error message.
+export const POST = withAuth(async (request, user) => {
   try {
-    const user = requireAuth(request);
-
     // Arcjet Rate Limiting & Bot/Abuse Protection for AI Quota (15 uploads / hour)
     const arcjetCheck = await protectRequest(request, aiLimiter, { userId: String(user.id) });
     if (!arcjetCheck.allowed) {
@@ -560,7 +559,6 @@ export async function POST(request: NextRequest) {
       data: { count: createdCount },
     }, { status: 201 });
   } catch (error: unknown) {
-    if (error instanceof AuthError) return handleAuthError();
     console.error('Timetable upload error:', error);
     const msg = error instanceof Error ? error.message : 'อัพโหลดไม่สำเร็จ';
     const isUserError =
@@ -575,4 +573,4 @@ export async function POST(request: NextRequest) {
       msg.includes('Google Gemini API');
     return NextResponse.json({ message: msg }, { status: isUserError ? 400 : 500 });
   }
-}
+});

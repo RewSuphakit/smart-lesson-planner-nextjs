@@ -1,107 +1,95 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
+import { withAuth } from '@/lib/apiHandler';
 import { PERIOD_TIMES, parseTimeToUtc } from '@/lib/constants';
 import { invalidateCache, userCacheKey } from '@/lib/cache';
 
-export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try {
-    const user = requireAuth(request);
-    const { id } = await params;
-    const body = await request.json();
+export const PUT = withAuth<{ id: string }>(async (request, user, { params }) => {
+  const { id } = await params;
+  const body = await request.json();
 
-    // Check ownership
-    const entry = await prisma.weeklySchedule.findFirst({
-      where: { id: Number(id), userId: user.id },
-    });
-    if (!entry) return NextResponse.json({ message: 'Entry not found' }, { status: 404 });
+  // Check ownership
+  const entry = await prisma.weeklySchedule.findFirst({
+    where: { id: Number(id), userId: user.id },
+  });
+  if (!entry) return NextResponse.json({ message: 'Entry not found' }, { status: 404 });
 
-    const updateData: Record<string, unknown> = {};
-    const fieldMap: Record<string, string> = {
-      timetable_name: 'timetableName', semester: 'semester', day_of_week: 'dayOfWeek',
-      start_period: 'startPeriod', end_period: 'endPeriod',
-      subject_code: 'subjectCode', subject_name: 'subjectName',
-      room: 'room', instructor: 'instructor', group_name: 'groupName',
-      entry_type: 'entryType', color: 'color',
-      classroom_id: 'classroomId',
-    };
+  const updateData: Record<string, unknown> = {};
+  const fieldMap: Record<string, string> = {
+    timetable_name: 'timetableName', semester: 'semester', day_of_week: 'dayOfWeek',
+    start_period: 'startPeriod', end_period: 'endPeriod',
+    subject_code: 'subjectCode', subject_name: 'subjectName',
+    room: 'room', instructor: 'instructor', group_name: 'groupName',
+    entry_type: 'entryType', color: 'color',
+    classroom_id: 'classroomId',
+  };
 
-    for (const [key, prismaKey] of Object.entries(fieldMap)) {
-      if (body[key] !== undefined) {
-        if (prismaKey === 'classroomId') {
-          if (body[key]) {
-            const ownedClassroom = await prisma.classroom.findFirst({
-              where: { id: Number(body[key]), userId: user.id },
-            });
-            if (!ownedClassroom) {
-              return NextResponse.json({ message: 'Target classroom not found or unauthorized' }, { status: 403 });
-            }
-            updateData[prismaKey] = Number(body[key]);
-          } else {
-            updateData[prismaKey] = null;
+  for (const [key, prismaKey] of Object.entries(fieldMap)) {
+    if (body[key] !== undefined) {
+      if (prismaKey === 'classroomId') {
+        if (body[key]) {
+          const ownedClassroom = await prisma.classroom.findFirst({
+            where: { id: Number(body[key]), userId: user.id },
+          });
+          if (!ownedClassroom) {
+            return NextResponse.json({ message: 'Target classroom not found or unauthorized' }, { status: 403 });
           }
-        } else if (prismaKey === 'entryType') {
-          const lower = String(body[key] || '').toLowerCase().trim();
-          if (lower === 'lab' || lower === 'ปฏิบัติ') updateData[prismaKey] = 'lab';
-          else if (lower === 'activity' || lower === 'กิจกรรม') updateData[prismaKey] = 'activity';
-          else if (lower === 'homeroom' || lower === 'โฮมรูม' || lower === 'เข้าแถว') updateData[prismaKey] = 'homeroom';
-          else updateData[prismaKey] = 'lecture';
+          updateData[prismaKey] = Number(body[key]);
         } else {
-          updateData[prismaKey] = body[key];
+          updateData[prismaKey] = null;
         }
+      } else if (prismaKey === 'entryType') {
+        const lower = String(body[key] || '').toLowerCase().trim();
+        if (lower === 'lab' || lower === 'ปฏิบัติ') updateData[prismaKey] = 'lab';
+        else if (lower === 'activity' || lower === 'กิจกรรม') updateData[prismaKey] = 'activity';
+        else if (lower === 'homeroom' || lower === 'โฮมรูม' || lower === 'เข้าแถว') updateData[prismaKey] = 'homeroom';
+        else updateData[prismaKey] = 'lecture';
+      } else {
+        updateData[prismaKey] = body[key];
       }
     }
-
-    const rawStart = body.start_period !== undefined ? Number(body.start_period) : entry.startPeriod;
-    const rawEnd = body.end_period !== undefined ? Number(body.end_period) : entry.endPeriod;
-    const finalStartPeriod = Math.max(0, Math.min(12, isNaN(rawStart) ? 1 : rawStart));
-    const finalEndPeriod = Math.max(finalStartPeriod, Math.min(12, isNaN(rawEnd) ? finalStartPeriod : rawEnd));
-    
-    updateData.startPeriod = finalStartPeriod;
-    updateData.endPeriod = finalEndPeriod;
-    updateData.hours = finalStartPeriod === 0 ? 0 : (finalEndPeriod - finalStartPeriod + 1);
-
-    if (body.start_time !== undefined) {
-      updateData.startTime = parseTimeToUtc(body.start_time);
-    } else if (body.start_period !== undefined) {
-      const startTimeStr = PERIOD_TIMES[finalStartPeriod]?.start;
-      updateData.startTime = parseTimeToUtc(startTimeStr);
-    }
-
-    if (body.end_time !== undefined) {
-      updateData.endTime = parseTimeToUtc(body.end_time);
-    } else if (body.end_period !== undefined) {
-      const endTimeStr = PERIOD_TIMES[finalEndPeriod]?.end;
-      updateData.endTime = parseTimeToUtc(endTimeStr);
-    }
-
-    await prisma.weeklySchedule.update({ where: { id: Number(id) }, data: updateData });
-    invalidateCache(userCacheKey(user.id, 'timetable'));
-    invalidateCache(userCacheKey(user.id, 'dashboard'));
-    return NextResponse.json({ message: 'Entry updated' });
-  } catch (error) {
-    if (error instanceof AuthError) return handleAuthError();
-    return NextResponse.json({ message: 'Failed to update entry' }, { status: 500 });
   }
-}
 
-export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try {
-    const user = requireAuth(request);
-    const { id } = await params;
+  const rawStart = body.start_period !== undefined ? Number(body.start_period) : entry.startPeriod;
+  const rawEnd = body.end_period !== undefined ? Number(body.end_period) : entry.endPeriod;
+  const finalStartPeriod = Math.max(0, Math.min(12, isNaN(rawStart) ? 1 : rawStart));
+  const finalEndPeriod = Math.max(finalStartPeriod, Math.min(12, isNaN(rawEnd) ? finalStartPeriod : rawEnd));
+  
+  updateData.startPeriod = finalStartPeriod;
+  updateData.endPeriod = finalEndPeriod;
+  updateData.hours = finalStartPeriod === 0 ? 0 : (finalEndPeriod - finalStartPeriod + 1);
 
-    // Check ownership
-    const entry = await prisma.weeklySchedule.findFirst({
-      where: { id: Number(id), userId: user.id },
-    });
-    if (!entry) return NextResponse.json({ message: 'Entry not found' }, { status: 404 });
-
-    await prisma.weeklySchedule.delete({ where: { id: Number(id) } });
-    invalidateCache(userCacheKey(user.id, 'timetable'));
-    invalidateCache(userCacheKey(user.id, 'dashboard'));
-    return NextResponse.json({ message: 'Entry deleted' });
-  } catch (error) {
-    if (error instanceof AuthError) return handleAuthError();
-    return NextResponse.json({ message: 'Failed to delete entry' }, { status: 500 });
+  if (body.start_time !== undefined) {
+    updateData.startTime = parseTimeToUtc(body.start_time);
+  } else if (body.start_period !== undefined) {
+    const startTimeStr = PERIOD_TIMES[finalStartPeriod]?.start;
+    updateData.startTime = parseTimeToUtc(startTimeStr);
   }
-}
+
+  if (body.end_time !== undefined) {
+    updateData.endTime = parseTimeToUtc(body.end_time);
+  } else if (body.end_period !== undefined) {
+    const endTimeStr = PERIOD_TIMES[finalEndPeriod]?.end;
+    updateData.endTime = parseTimeToUtc(endTimeStr);
+  }
+
+  await prisma.weeklySchedule.update({ where: { id: Number(id) }, data: updateData });
+  invalidateCache(userCacheKey(user.id, 'timetable'));
+  invalidateCache(userCacheKey(user.id, 'dashboard'));
+  return NextResponse.json({ message: 'Entry updated' });
+}, 'Failed to update entry');
+
+export const DELETE = withAuth<{ id: string }>(async (request, user, { params }) => {
+  const { id } = await params;
+
+  // Check ownership
+  const entry = await prisma.weeklySchedule.findFirst({
+    where: { id: Number(id), userId: user.id },
+  });
+  if (!entry) return NextResponse.json({ message: 'Entry not found' }, { status: 404 });
+
+  await prisma.weeklySchedule.delete({ where: { id: Number(id) } });
+  invalidateCache(userCacheKey(user.id, 'timetable'));
+  invalidateCache(userCacheKey(user.id, 'dashboard'));
+  return NextResponse.json({ message: 'Entry deleted' });
+}, 'Failed to delete entry');

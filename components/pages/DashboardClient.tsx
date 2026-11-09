@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -98,25 +98,25 @@ interface DashboardData {
 
 const entryTypeConfig: Record<string, { label: string; badge: string; border: string; dot: string }> = {
   lecture: {
-    label: 'ทฤษฎี',
+    label: 'à¸—à¸¤à¸©à¸Žà¸µ',
     badge: 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200/80 dark:border-indigo-800/60',
     border: 'border-indigo-500',
     dot: 'bg-indigo-500'
   },
   lab: {
-    label: 'ปฏิบัติ',
+    label: 'à¸›à¸à¸´à¸šà¸±à¸•à¸´',
     badge: 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200/80 dark:border-emerald-800/60',
     border: 'border-emerald-500',
     dot: 'bg-emerald-500'
   },
   activity: {
-    label: 'กิจกรรม',
+    label: 'à¸à¸´à¸ˆà¸à¸£à¸£à¸¡',
     badge: 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200/80 dark:border-amber-800/60',
     border: 'border-amber-500',
     dot: 'bg-amber-500'
   },
   homeroom: {
-    label: 'โฮมรูม',
+    label: 'à¹‚à¸®à¸¡à¸£à¸¹à¸¡',
     badge: 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200/80 dark:border-purple-800/60',
     border: 'border-purple-500',
     dot: 'bg-purple-500'
@@ -124,10 +124,10 @@ const entryTypeConfig: Record<string, { label: string; badge: string; border: st
 };
 
 const teacherQuotes = [
-  '“การสอนที่ดีไม่ใช่แค่การถ่ายทอดความรู้ แต่คือการจุดประกายความคิด”',
-  '“ทุกความพยายามในการสอนของคุณครู กำลังสร้างอนาคตของเด็กทุกคน”',
-  '“เริ่มต้นวันใหม่ด้วยพลังบวก เพื่อชั้นเรียนที่มีความสุขและมีชีวิตชีวา”',
-  '“การจัดการชั้นเรียนที่ดี ช่วยสร้างบรรยากาศแห่งการเรียนรู้อย่างยั่งยืน”',
+  'â€œà¸à¸²à¸£à¸ªà¸­à¸™à¸—à¸µà¹ˆà¸”à¸µà¹„à¸¡à¹ˆà¹ƒà¸Šà¹ˆà¹à¸„à¹ˆà¸à¸²à¸£à¸–à¹ˆà¸²à¸¢à¸—à¸­à¸”à¸„à¸§à¸²à¸¡à¸£à¸¹à¹‰ à¹à¸•à¹ˆà¸„à¸·à¸­à¸à¸²à¸£à¸ˆà¸¸à¸”à¸›à¸£à¸°à¸à¸²à¸¢à¸„à¸§à¸²à¸¡à¸„à¸´à¸”â€',
+  'â€œà¸—à¸¸à¸à¸„à¸§à¸²à¸¡à¸žà¸¢à¸²à¸¢à¸²à¸¡à¹ƒà¸™à¸à¸²à¸£à¸ªà¸­à¸™à¸‚à¸­à¸‡à¸„à¸¸à¸“à¸„à¸£à¸¹ à¸à¸³à¸¥à¸±à¸‡à¸ªà¸£à¹‰à¸²à¸‡à¸­à¸™à¸²à¸„à¸•à¸‚à¸­à¸‡à¹€à¸”à¹‡à¸à¸—à¸¸à¸à¸„à¸™â€',
+  'â€œà¹€à¸£à¸´à¹ˆà¸¡à¸•à¹‰à¸™à¸§à¸±à¸™à¹ƒà¸«à¸¡à¹ˆà¸”à¹‰à¸§à¸¢à¸žà¸¥à¸±à¸‡à¸šà¸§à¸ à¹€à¸žà¸·à¹ˆà¸­à¸Šà¸±à¹‰à¸™à¹€à¸£à¸µà¸¢à¸™à¸—à¸µà¹ˆà¸¡à¸µà¸„à¸§à¸²à¸¡à¸ªà¸¸à¸‚à¹à¸¥à¸°à¸¡à¸µà¸Šà¸µà¸§à¸´à¸•à¸Šà¸µà¸§à¸²â€',
+  'â€œà¸à¸²à¸£à¸ˆà¸±à¸”à¸à¸²à¸£à¸Šà¸±à¹‰à¸™à¹€à¸£à¸µà¸¢à¸™à¸—à¸µà¹ˆà¸”à¸µ à¸Šà¹ˆà¸§à¸¢à¸ªà¸£à¹‰à¸²à¸‡à¸šà¸£à¸£à¸¢à¸²à¸à¸²à¸¨à¹à¸«à¹ˆà¸‡à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™à¸£à¸¹à¹‰à¸­à¸¢à¹ˆà¸²à¸‡à¸¢à¸±à¹ˆà¸‡à¸¢à¸·à¸™â€',
 ];
 
 function LiveClock() {
@@ -138,14 +138,14 @@ function LiveClock() {
       const hours = String(now.getHours()).padStart(2, '0');
       const mins = String(now.getMinutes()).padStart(2, '0');
       const secs = String(now.getSeconds()).padStart(2, '0');
-      setTime(`${hours}:${mins}:${secs} น.`);
+      setTime(`${hours}:${mins}:${secs} à¸™.`);
     };
     updateTime();
     const timer = setInterval(updateTime, 1000);
     return () => clearInterval(timer);
   }, []);
 
-  return <span className="min-w-[85px]">{time || '--:--:-- น.'}</span>;
+  return <span className="min-w-[85px]">{time || '--:--:-- à¸™.'}</span>;
 }
 
 export default function DashboardClient({
@@ -180,32 +180,32 @@ export default function DashboardClient({
     const hour = Number.parseInt(bangkokHourStr, 10) % 24;
     if (hour >= 5 && hour < 12) {
       return {
-        title: 'สวัสดีตอนเช้า',
-        subtext: 'ขอให้เป็นเช้าที่สดใส เปี่ยมด้วยพลังและความสุขในการจัดการเรียนรู้นะครับ',
-        icon: '☀️',
+        title: 'à¸ªà¸§à¸±à¸ªà¸”à¸µà¸•à¸­à¸™à¹€à¸Šà¹‰à¸²',
+        subtext: 'à¸‚à¸­à¹ƒà¸«à¹‰à¹€à¸›à¹‡à¸™à¹€à¸Šà¹‰à¸²à¸—à¸µà¹ˆà¸ªà¸”à¹ƒà¸ª à¹€à¸›à¸µà¹ˆà¸¢à¸¡à¸”à¹‰à¸§à¸¢à¸žà¸¥à¸±à¸‡à¹à¸¥à¸°à¸„à¸§à¸²à¸¡à¸ªà¸¸à¸‚à¹ƒà¸™à¸à¸²à¸£à¸ˆà¸±à¸”à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™à¸£à¸¹à¹‰à¸™à¸°à¸„à¸£à¸±à¸š',
+        icon: 'â˜€ï¸',
         quote: teacherQuotes[0],
       };
     }
     if (hour >= 12 && hour < 17) {
       return {
-        title: 'สวัสดีตอนบ่าย',
-        subtext: 'ช่วงบ่ายของการสอน ขอให้การจัดกิจกรรมในชั้นเรียนราบรื่นและมีชีวิตชีวา',
-        icon: '🌤️',
+        title: 'à¸ªà¸§à¸±à¸ªà¸”à¸µà¸•à¸­à¸™à¸šà¹ˆà¸²à¸¢',
+        subtext: 'à¸Šà¹ˆà¸§à¸‡à¸šà¹ˆà¸²à¸¢à¸‚à¸­à¸‡à¸à¸²à¸£à¸ªà¸­à¸™ à¸‚à¸­à¹ƒà¸«à¹‰à¸à¸²à¸£à¸ˆà¸±à¸”à¸à¸´à¸ˆà¸à¸£à¸£à¸¡à¹ƒà¸™à¸Šà¸±à¹‰à¸™à¹€à¸£à¸µà¸¢à¸™à¸£à¸²à¸šà¸£à¸·à¹ˆà¸™à¹à¸¥à¸°à¸¡à¸µà¸Šà¸µà¸§à¸´à¸•à¸Šà¸µà¸§à¸²',
+        icon: 'ðŸŒ¤ï¸',
         quote: teacherQuotes[1],
       };
     }
     if (hour >= 17 && hour < 20) {
       return {
-        title: 'สวัสดีตอนเย็น',
-        subtext: 'ใกล้หมดวันแล้ว อย่าลืมตรวจเช็คความเรียบร้อยของคะแนนและการเช็คชื่อนะครับ',
-        icon: '🌅',
+        title: 'à¸ªà¸§à¸±à¸ªà¸”à¸µà¸•à¸­à¸™à¹€à¸¢à¹‡à¸™',
+        subtext: 'à¹ƒà¸à¸¥à¹‰à¸«à¸¡à¸”à¸§à¸±à¸™à¹à¸¥à¹‰à¸§ à¸­à¸¢à¹ˆà¸²à¸¥à¸·à¸¡à¸•à¸£à¸§à¸ˆà¹€à¸Šà¹‡à¸„à¸„à¸§à¸²à¸¡à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢à¸‚à¸­à¸‡à¸„à¸°à¹à¸™à¸™à¹à¸¥à¸°à¸à¸²à¸£à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­à¸™à¸°à¸„à¸£à¸±à¸š',
+        icon: 'ðŸŒ…',
         quote: teacherQuotes[2],
       };
     }
     return {
-      title: 'สวัสดีตอนค่ำ',
-      subtext: 'พักผ่อนให้เต็มที่เพื่อเตรียมพร้อมสำหรับการจัดการเรียนรู้ในวันถัดไปนะครับ',
-      icon: '🌙',
+      title: 'à¸ªà¸§à¸±à¸ªà¸”à¸µà¸•à¸­à¸™à¸„à¹ˆà¸³',
+      subtext: 'à¸žà¸±à¸à¸œà¹ˆà¸­à¸™à¹ƒà¸«à¹‰à¹€à¸•à¹‡à¸¡à¸—à¸µà¹ˆà¹€à¸žà¸·à¹ˆà¸­à¹€à¸•à¸£à¸µà¸¢à¸¡à¸žà¸£à¹‰à¸­à¸¡à¸ªà¸³à¸«à¸£à¸±à¸šà¸à¸²à¸£à¸ˆà¸±à¸”à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™à¸£à¸¹à¹‰à¹ƒà¸™à¸§à¸±à¸™à¸–à¸±à¸”à¹„à¸›à¸™à¸°à¸„à¸£à¸±à¸š',
+      icon: 'ðŸŒ™',
       quote: teacherQuotes[3],
     };
   }, []);
@@ -241,7 +241,7 @@ export default function DashboardClient({
       if (exportData.schedules?.length) zipEntries.push({ name: 'schedules.csv', content: toCSV(exportData.schedules) });
       if (exportData.timetable?.length) zipEntries.push({ name: 'timetable.csv', content: toCSV(exportData.timetable) });
 
-      const summary = `ระบบวางแผนการสอนอัจฉริยะ (Smart Lesson Planner)\nExported: ${exportData.exported_at}\n\n` +
+      const summary = `à¸£à¸°à¸šà¸šà¸§à¸²à¸‡à¹à¸œà¸™à¸à¸²à¸£à¸ªà¸­à¸™à¸­à¸±à¸ˆà¸‰à¸£à¸´à¸¢à¸° (Smart Lesson Planner)\nExported: ${exportData.exported_at}\n\n` +
         Object.entries(exportData.total_counts || {}).map(([k, v]) => `${k}: ${v}`).join('\n');
       zipEntries.push({ name: 'summary.txt', content: summary });
 
@@ -253,16 +253,16 @@ export default function DashboardClient({
       a.click();
       URL.revokeObjectURL(url);
 
-      const { toast } = await import('react-hot-toast');
+      const { toast } = await import('@/lib/toast');
       const totalItems = Object.values((exportData.total_counts || {}) as Record<string, unknown>).reduce<number>(
         (sum, val) => sum + Number(val),
         0
       );
-      toast.success(`สำรองข้อมูลสำเร็จ! รวม ${totalItems} รายการ`);
+      toast.success(`à¸ªà¸³à¸£à¸­à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸ªà¸³à¹€à¸£à¹‡à¸ˆ! à¸£à¸§à¸¡ ${totalItems} à¸£à¸²à¸¢à¸à¸²à¸£`);
     } catch (err) {
       console.error('Export failed:', err);
-      const { toast } = await import('react-hot-toast');
-      toast.error('สำรองข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+      const { toast } = await import('@/lib/toast');
+      toast.error('à¸ªà¸³à¸£à¸­à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ à¸à¸£à¸¸à¸“à¸²à¸¥à¸­à¸‡à¹ƒà¸«à¸¡à¹ˆà¸­à¸µà¸à¸„à¸£à¸±à¹‰à¸‡');
     } finally {
       setExporting(false);
     }
@@ -303,65 +303,65 @@ export default function DashboardClient({
 
   const metricCards = [
     {
-      title: 'ห้องเรียนทั้งหมด',
+      title: 'à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”',
       value: data?.totalClassrooms || 0,
-      unit: 'ห้อง',
-      subtitle: 'จัดการกลุ่มเรียน & รายวิชา',
+      unit: 'à¸«à¹‰à¸­à¸‡',
+      subtitle: 'à¸ˆà¸±à¸”à¸à¸²à¸£à¸à¸¥à¸¸à¹ˆà¸¡à¹€à¸£à¸µà¸¢à¸™ & à¸£à¸²à¸¢à¸§à¸´à¸Šà¸²',
       icon: Presentation,
       gradient: 'from-indigo-500 to-indigo-700',
       iconBg: 'bg-indigo-50/90 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/60',
       accent: '#6366f1',
       link: '/classrooms',
-      badgeText: isSemesterEnded ? 'ครบภาคเรียน' : 'เปิดใช้งาน',
+      badgeText: isSemesterEnded ? 'à¸„à¸£à¸šà¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™' : 'à¹€à¸›à¸´à¸”à¹ƒà¸Šà¹‰à¸‡à¸²à¸™',
       badgeColor: 'text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 border-indigo-200/60 dark:border-indigo-800/60',
     },
     {
-      title: 'นักเรียนในระบบ',
+      title: 'à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¹ƒà¸™à¸£à¸°à¸šà¸š',
       value: data?.totalStudents || 0,
-      unit: 'คน',
-      subtitle: 'บันทึกเวลาเรียน & ผลการเรียน',
+      unit: 'à¸„à¸™',
+      subtitle: 'à¸šà¸±à¸™à¸—à¸¶à¸à¹€à¸§à¸¥à¸²à¹€à¸£à¸µà¸¢à¸™ & à¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™',
       icon: Users,
       gradient: 'from-emerald-500 to-teal-700',
       iconBg: 'bg-emerald-50/90 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/60',
       accent: '#10b981',
       link: '/students',
-      badgeText: 'ข้อมูลล่าสุด',
+      badgeText: 'à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸¥à¹ˆà¸²à¸ªà¸¸à¸”',
       badgeColor: 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200/60 dark:border-emerald-800/60',
     },
     {
-      title: 'คาบสอนวันนี้',
+      title: 'à¸„à¸²à¸šà¸ªà¸­à¸™à¸§à¸±à¸™à¸™à¸µà¹‰',
       value: todayClassesCount,
-      unit: 'คาบ',
+      unit: 'à¸„à¸²à¸š',
       subtitle: isSemesterEnded
-        ? 'สิ้นสุดการสอนประจำภาคเรียนแล้ว'
-        : `ภาระงานสอนรวม ${totalWeeklyHours} ชม./สัปดาห์`,
+        ? 'à¸ªà¸´à¹‰à¸™à¸ªà¸¸à¸”à¸à¸²à¸£à¸ªà¸­à¸™à¸›à¸£à¸°à¸ˆà¸³à¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™à¹à¸¥à¹‰à¸§'
+        : `à¸ à¸²à¸£à¸°à¸‡à¸²à¸™à¸ªà¸­à¸™à¸£à¸§à¸¡ ${totalWeeklyHours} à¸Šà¸¡./à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ`,
       icon: Clock,
       gradient: 'from-amber-500 to-orange-600',
       iconBg: 'bg-amber-50/90 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-800/60',
       accent: '#f59e0b',
       link: '/schedule',
-      badgeText: isSemesterEnded ? 'สิ้นสุดภาคเรียน' : (todayClassesCount > 0 ? 'มีตารางสอน' : 'ไม่มีสอน'),
+      badgeText: isSemesterEnded ? 'à¸ªà¸´à¹‰à¸™à¸ªà¸¸à¸”à¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™' : (todayClassesCount > 0 ? 'à¸¡à¸µà¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™' : 'à¹„à¸¡à¹ˆà¸¡à¸µà¸ªà¸­à¸™'),
       badgeColor: isSemesterEnded
         ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200/60 dark:border-emerald-800/60'
         : (todayClassesCount > 0 ? 'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border-amber-200/60 dark:border-amber-800/60' : 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'),
     },
     {
-      title: 'เช็คชื่อวันนี้',
-      value: isSemesterEnded ? 'เรียบร้อย' : (todayClassesCount > 0 ? `${checkedClassesCount}/${todayClassesCount}` : 'เรียบร้อย'),
-      unit: isSemesterEnded || todayClassesCount === 0 ? '🎉' : 'ห้อง',
+      title: 'à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­à¸§à¸±à¸™à¸™à¸µà¹‰',
+      value: isSemesterEnded ? 'à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢' : (todayClassesCount > 0 ? `${checkedClassesCount}/${todayClassesCount}` : 'à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢'),
+      unit: isSemesterEnded || todayClassesCount === 0 ? 'ðŸŽ‰' : 'à¸«à¹‰à¸­à¸‡',
       subtitle: isSemesterEnded
-        ? 'สิ้นสุดการเช็คชื่อของภาคเรียนนี้แล้ว'
+        ? 'à¸ªà¸´à¹‰à¸™à¸ªà¸¸à¸”à¸à¸²à¸£à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­à¸‚à¸­à¸‡à¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™à¸™à¸µà¹‰à¹à¸¥à¹‰à¸§'
         : (todayClassesCount > 0 && checkedClassesCount === todayClassesCount
-          ? 'เช็คชื่อครบถ้วนทุกคาบแล้ว'
+          ? 'à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­à¸„à¸£à¸šà¸–à¹‰à¸§à¸™à¸—à¸¸à¸à¸„à¸²à¸šà¹à¸¥à¹‰à¸§'
           : (todayClassesCount === 0
-            ? 'ไม่มีคาบสอนตามตารางวันนี้'
-            : `รอเช็คชื่ออีก ${todayClassesCount - checkedClassesCount} ห้องเรียน`)),
+            ? 'à¹„à¸¡à¹ˆà¸¡à¸µà¸„à¸²à¸šà¸ªà¸­à¸™à¸•à¸²à¸¡à¸•à¸²à¸£à¸²à¸‡à¸§à¸±à¸™à¸™à¸µà¹‰'
+            : `à¸£à¸­à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­à¸­à¸µà¸ ${todayClassesCount - checkedClassesCount} à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™`)),
       icon: CheckCircle2,
       gradient: 'from-violet-500 to-purple-600',
       iconBg: 'bg-violet-50/90 dark:bg-violet-950/60 text-violet-600 dark:text-violet-400 border border-violet-100 dark:border-violet-800/60',
       accent: '#8b5cf6',
       link: '/attendance',
-      badgeText: isSemesterEnded ? 'ครบถ้วน' : `${attendancePercent}%`,
+      badgeText: isSemesterEnded ? 'à¸„à¸£à¸šà¸–à¹‰à¸§à¸™' : `${attendancePercent}%`,
       badgeColor: (isSemesterEnded || (checkedClassesCount === todayClassesCount && todayClassesCount > 0))
         ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200/60 dark:border-emerald-800/60'
         : 'text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-950/60 border-violet-200/60 dark:border-violet-800/60',
@@ -373,7 +373,7 @@ export default function DashboardClient({
     <div className="space-y-7 pb-10">
       {/* ==================== HERO GREETING BANNER ==================== */}
       <section
-        aria-label="สรุปภาพรวมและข้อมูลต้อนรับ"
+        aria-label="à¸ªà¸£à¸¸à¸›à¸ à¸²à¸žà¸£à¸§à¸¡à¹à¸¥à¸°à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸•à¹‰à¸­à¸™à¸£à¸±à¸š"
         className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-900 via-indigo-800 to-purple-950 text-white shadow-xl shadow-indigo-950/15 p-6 sm:p-8 lg:p-10 border border-white/10"
       >
         {/* Ambient Decorative Light Orbs */}
@@ -388,7 +388,7 @@ export default function DashboardClient({
             <div className="inline-flex flex-wrap items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-xs font-medium text-indigo-100 shadow-xs">
               <div className="flex items-center gap-1.5">
                 <CalendarDays className="w-3.5 h-3.5 text-indigo-300" />
-                <span suppressHydrationWarning>{format(new Date(), 'EEEEที่ d MMMM yyyy', { locale: th })}</span>
+                <span suppressHydrationWarning>{format(new Date(), 'EEEEà¸—à¸µà¹ˆ d MMMM yyyy', { locale: th })}</span>
               </div>
               <span className="w-1 h-1 rounded-full bg-indigo-300/80" />
               <div className="flex items-center gap-1.5 font-mono tabular-nums text-indigo-200">
@@ -399,7 +399,7 @@ export default function DashboardClient({
                 <Link
                   href="/semesters"
                   className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/15 hover:bg-white/25 text-white text-[0.72rem] font-bold border border-white/20 transition-colors group/sem"
-                  title="จัดการภาคเรียน"
+                  title="à¸ˆà¸±à¸”à¸à¸²à¸£à¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™"
                 >
                   <Layers className="w-3 h-3 text-indigo-300" />
                   <span>{data.activeSemester.name}</span>
@@ -407,26 +407,26 @@ export default function DashboardClient({
                 </Link>
               ) : isSemesterEnded ? (
                 <span className="px-2 py-0.5 rounded-full bg-emerald-500/30 text-emerald-200 border border-emerald-400/40 text-[0.68rem] font-bold">
-                  สิ้นสุดภาคเรียนแล้ว 🎉
+                  à¸ªà¸´à¹‰à¸™à¸ªà¸¸à¸”à¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™à¹à¸¥à¹‰à¸§ ðŸŽ‰
                 </span>
               ) : (
-                <span className="text-white/80">ภาคเรียนปัจจุบัน</span>
+                <span className="text-white/80">à¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™à¸›à¸±à¸ˆà¸ˆà¸¸à¸šà¸±à¸™</span>
               )}
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" title="ระบบเชื่อมต่อปกติ" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" title="à¸£à¸°à¸šà¸šà¹€à¸Šà¸·à¹ˆà¸­à¸¡à¸•à¹ˆà¸­à¸›à¸à¸•à¸´" />
             </div>
 
             {/* Greeting Header */}
             <div className="flex items-center gap-3">
               <span className="text-3xl sm:text-4xl select-none animate-float">{greeting.icon}</span>
               <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-white drop-shadow-sm">
-                {greeting.title}, <span className="bg-gradient-to-r from-white via-indigo-100 to-indigo-200 bg-clip-text text-transparent inline-block min-w-[100px]">คุณครู{user?.name || 'ผู้สอน'}</span>
+                {greeting.title}, <span className="bg-gradient-to-r from-white via-indigo-100 to-indigo-200 bg-clip-text text-transparent inline-block min-w-[100px]">à¸„à¸¸à¸“à¸„à¸£à¸¹{user?.name || 'à¸œà¸¹à¹‰à¸ªà¸­à¸™'}</span>
               </h1>
             </div>
 
             {/* Teacher Subtitle & Motivational Quote */}
             <p className="text-sm sm:text-base text-indigo-100/90 leading-relaxed font-normal">
               {isSemesterEnded
-                ? 'ขอแสดงความยินดีกับคุณครูที่จัดการเรียนรู้และสอนเสร็จสิ้นครบถ้วนตลอดทั้งภาคเรียนแล้วครับ'
+                ? 'à¸‚à¸­à¹à¸ªà¸”à¸‡à¸„à¸§à¸²à¸¡à¸¢à¸´à¸™à¸”à¸µà¸à¸±à¸šà¸„à¸¸à¸“à¸„à¸£à¸¹à¸—à¸µà¹ˆà¸ˆà¸±à¸”à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™à¸£à¸¹à¹‰à¹à¸¥à¸°à¸ªà¸­à¸™à¹€à¸ªà¸£à¹‡à¸ˆà¸ªà¸´à¹‰à¸™à¸„à¸£à¸šà¸–à¹‰à¸§à¸™à¸•à¸¥à¸­à¸”à¸—à¸±à¹‰à¸‡à¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™à¹à¸¥à¹‰à¸§à¸„à¸£à¸±à¸š'
                 : greeting.subtext}
             </p>
             <p className="text-xs text-indigo-200/75 italic font-light">
@@ -438,38 +438,38 @@ export default function DashboardClient({
               {isSemesterEnded ? (
                 <div className="px-3 py-1.5 rounded-xl bg-emerald-500/25 backdrop-blur-sm border border-emerald-400/40 text-xs text-emerald-200 flex items-center gap-2 shadow-xs">
                   <Award className="w-3.5 h-3.5 text-emerald-300" />
-                  <span>สิ้นสุดการเรียนการสอนภาคเรียนนี้แล้ว</span>
+                  <span>à¸ªà¸´à¹‰à¸™à¸ªà¸¸à¸”à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™à¸à¸²à¸£à¸ªà¸­à¸™à¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™à¸™à¸µà¹‰à¹à¸¥à¹‰à¸§</span>
                 </div>
               ) : (
                 <div className="px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur-sm border border-white/15 text-xs text-white/95 flex items-center gap-2 shadow-xs transition-all hover:bg-white/15">
                   <Clock3 className="w-3.5 h-3.5 text-amber-300" />
-                  <span>วันนี้มี <strong>{todayClassesCount}</strong> คาบสอน</span>
+                  <span>à¸§à¸±à¸™à¸™à¸µà¹‰à¸¡à¸µ <strong>{todayClassesCount}</strong> à¸„à¸²à¸šà¸ªà¸­à¸™</span>
                 </div>
               )}
 
               {pendingTasksCount > 0 ? (
                 <div className="px-3 py-1.5 rounded-xl bg-amber-500/25 backdrop-blur-sm border border-amber-400/40 text-xs text-amber-200 flex items-center gap-2 shadow-xs transition-all hover:bg-amber-500/35">
                   <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                  <span>งานที่ต้องทำ <strong>{pendingTasksCount}</strong> รายการ</span>
+                  <span>à¸‡à¸²à¸™à¸—à¸µà¹ˆà¸•à¹‰à¸­à¸‡à¸—à¸³ <strong>{pendingTasksCount}</strong> à¸£à¸²à¸¢à¸à¸²à¸£</span>
                 </div>
               ) : (
                 <div className="px-3 py-1.5 rounded-xl bg-emerald-500/25 backdrop-blur-sm border border-emerald-400/40 text-xs text-emerald-200 flex items-center gap-2 shadow-xs">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
-                  <span>ไม่มีงานค้างวันนี้</span>
+                  <span>à¹„à¸¡à¹ˆà¸¡à¸µà¸‡à¸²à¸™à¸„à¹‰à¸²à¸‡à¸§à¸±à¸™à¸™à¸µà¹‰</span>
                 </div>
               )}
 
               {atRiskCount > 0 && (
                 <div className="px-3 py-1.5 rounded-xl bg-rose-500/25 backdrop-blur-sm border border-rose-400/40 text-xs text-rose-200 flex items-center gap-2 shadow-xs transition-all hover:bg-rose-500/35">
                   <AlertTriangle className="w-3.5 h-3.5 text-rose-300" />
-                  <span>เฝ้าระวัง <strong>{atRiskCount}</strong> คน</span>
+                  <span>à¹€à¸à¹‰à¸²à¸£à¸°à¸§à¸±à¸‡ <strong>{atRiskCount}</strong> à¸„à¸™</span>
                 </div>
               )}
 
               {attendanceRate !== null && !isSemesterEnded && (
                 <div className="px-3 py-1.5 rounded-xl bg-violet-500/25 backdrop-blur-sm border border-violet-400/40 text-xs text-violet-200 flex items-center gap-2 shadow-xs">
                   <TrendingUp className="w-3.5 h-3.5 text-violet-300" />
-                  <span>เข้าเรียนวันนี้ <strong>{attendanceRate}%</strong></span>
+                  <span>à¹€à¸‚à¹‰à¸²à¹€à¸£à¸µà¸¢à¸™à¸§à¸±à¸™à¸™à¸µà¹‰ <strong>{attendanceRate}%</strong></span>
                 </div>
               )}
             </div>
@@ -483,7 +483,7 @@ export default function DashboardClient({
                 className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white text-indigo-950 hover:bg-indigo-50 font-bold text-xs transition-all duration-300 shadow-md hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 group"
               >
                 <Award className="w-4 h-4 text-purple-600 transition-transform duration-300 group-hover:scale-110" />
-                <span>ตัดเกรด & ประเมินผล</span>
+                <span>à¸•à¸±à¸”à¹€à¸à¸£à¸” & à¸›à¸£à¸°à¹€à¸¡à¸´à¸™à¸œà¸¥</span>
                 <ChevronRight className="w-3.5 h-3.5 text-indigo-400 transition-transform duration-300 group-hover:translate-x-0.5" />
               </Link>
             ) : (
@@ -492,7 +492,7 @@ export default function DashboardClient({
                 className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white text-indigo-950 hover:bg-indigo-50 font-bold text-xs transition-all duration-300 shadow-md hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 group"
               >
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 transition-transform duration-300 group-hover:scale-110" />
-                <span>เช็คชื่อด่วน</span>
+                <span>à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­à¸”à¹ˆà¸§à¸™</span>
                 <ChevronRight className="w-3.5 h-3.5 text-indigo-400 transition-transform duration-300 group-hover:translate-x-0.5" />
               </Link>
             )}
@@ -502,13 +502,13 @@ export default function DashboardClient({
               className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs border border-white/20 backdrop-blur-md transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 group"
             >
               <Calendar className="w-4 h-4 text-indigo-200 transition-transform duration-300 group-hover:scale-110" />
-              <span>ดูตารางสอน</span>
+              <span>à¸”à¸¹à¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™</span>
             </Link>
 
             <button
               onClick={exportAllData}
               disabled={exporting}
-              aria-label="สำรองข้อมูลทั้งระบบเป็นไฟล์ ZIP"
+              aria-label="à¸ªà¸³à¸£à¸­à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸—à¸±à¹‰à¸‡à¸£à¸°à¸šà¸šà¹€à¸›à¹‡à¸™à¹„à¸Ÿà¸¥à¹Œ ZIP"
               className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs border border-white/20 backdrop-blur-md transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:pointer-events-none"
             >
               {exporting ? (
@@ -516,7 +516,7 @@ export default function DashboardClient({
               ) : (
                 <Download className="w-4 h-4 text-indigo-200" />
               )}
-              <span>{exporting ? 'กำลังสำรองข้อมูล...' : 'สำรองข้อมูล (ZIP)'}</span>
+              <span>{exporting ? 'à¸à¸³à¸¥à¸±à¸‡à¸ªà¸³à¸£à¸­à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥...' : 'à¸ªà¸³à¸£à¸­à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥ (ZIP)'}</span>
             </button>
           </div>
         </div>
@@ -524,7 +524,7 @@ export default function DashboardClient({
 
       {/* ==================== 4 METRIC BENTO CARDS ==================== */}
       <section
-        aria-label="ตัวชี้วัดสำคัญของระบบ"
+        aria-label="à¸•à¸±à¸§à¸Šà¸µà¹‰à¸§à¸±à¸”à¸ªà¸³à¸„à¸±à¸à¸‚à¸­à¸‡à¸£à¸°à¸šà¸š"
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5"
       >
         {metricCards.map((card, i) => (
@@ -563,7 +563,7 @@ export default function DashboardClient({
             {card.progressBar !== null && card.progressBar !== undefined && (
               <div className="mt-3 pt-2.5 border-t border-slate-100/80 dark:border-slate-800">
                 <div className="flex items-center justify-between text-[0.68rem] text-slate-600 dark:text-slate-400 font-medium mb-1">
-                  <span>ความก้าวหน้า</span>
+                  <span>à¸„à¸§à¸²à¸¡à¸à¹‰à¸²à¸§à¸«à¸™à¹‰à¸²</span>
                   <span className="font-bold text-violet-700 dark:text-violet-300">{card.progressBar}%</span>
                 </div>
                 <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
@@ -580,7 +580,7 @@ export default function DashboardClient({
 
       {/* ==================== TODAY'S TEACHING SCHEDULE ==================== */}
       <section
-        aria-label="ตารางสอนประจำวันนี้"
+        aria-label="à¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™à¸›à¸£à¸°à¸ˆà¸³à¸§à¸±à¸™à¸™à¸µà¹‰"
         className="glass p-6 sm:p-7 rounded-3xl border border-indigo-100/60 dark:border-slate-800 shadow-xs hover:shadow-md transition-all duration-300"
       >
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
@@ -591,19 +591,19 @@ export default function DashboardClient({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">
-                  ตารางสอนประจำวันนี้
+                  à¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™à¸›à¸£à¸°à¸ˆà¸³à¸§à¸±à¸™à¸™à¸µà¹‰
                 </h2>
                 <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-100/80 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
                   {format(new Date(), 'EEEE', { locale: th })}
                 </span>
                 {todayClassesCount > 0 && (
                   <span className="hidden sm:inline-block text-xs font-medium text-slate-600 dark:text-slate-400">
-                    ({todayClassesCount} คาบ)
+                    ({todayClassesCount} à¸„à¸²à¸š)
                   </span>
                 )}
               </div>
               <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                รายการคาบเรียนตามตารางสอนสำหรับวันนี้ พร้อมสถานะการเช็คชื่อ
+                à¸£à¸²à¸¢à¸à¸²à¸£à¸„à¸²à¸šà¹€à¸£à¸µà¸¢à¸™à¸•à¸²à¸¡à¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™à¸ªà¸³à¸«à¸£à¸±à¸šà¸§à¸±à¸™à¸™à¸µà¹‰ à¸žà¸£à¹‰à¸­à¸¡à¸ªà¸–à¸²à¸™à¸°à¸à¸²à¸£à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­
               </p>
             </div>
           </div>
@@ -612,7 +612,7 @@ export default function DashboardClient({
             href="/schedule"
             className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 px-3 py-1.5 rounded-xl hover:bg-indigo-50/80 dark:hover:bg-slate-800 transition-all duration-200 group"
           >
-            <span>ดูตารางสอนเต็มสัปดาห์</span>
+            <span>à¸”à¸¹à¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™à¹€à¸•à¹‡à¸¡à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ</span>
             <ChevronRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
           </Link>
         </div>
@@ -638,10 +638,10 @@ export default function DashboardClient({
                     <div className="flex items-center justify-between">
                       <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold">
                         <Clock className="w-3 h-3 text-slate-500 dark:text-slate-400" />
-                        <span>คาบที่ {entry.start_period === entry.end_period ? entry.start_period : `${entry.start_period}-${entry.end_period}`}</span>
+                        <span>à¸„à¸²à¸šà¸—à¸µà¹ˆ {entry.start_period === entry.end_period ? entry.start_period : `${entry.start_period}-${entry.end_period}`}</span>
                       </div>
                       <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 font-mono tabular-nums">
-                        {entry.start_time} - {entry.end_time} น.
+                        {entry.start_time} - {entry.end_time} à¸™.
                       </span>
                     </div>
 
@@ -661,9 +661,9 @@ export default function DashboardClient({
                         {entry.subject_name}
                       </h3>
                       <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 flex flex-wrap items-center gap-2">
-                        <span>🏫 {entry.room ? `ห้อง ${entry.room}` : 'ไม่ระบุห้อง'}</span>
-                        {entry.group_name && <span>• 👥 {entry.group_name}</span>}
-                        {entry.classroom_name && <span>• {entry.classroom_name}</span>}
+                        <span>ðŸ« {entry.room ? `à¸«à¹‰à¸­à¸‡ ${entry.room}` : 'à¹„à¸¡à¹ˆà¸£à¸°à¸šà¸¸à¸«à¹‰à¸­à¸‡'}</span>
+                        {entry.group_name && <span>â€¢ ðŸ‘¥ {entry.group_name}</span>}
+                        {entry.classroom_name && <span>â€¢ {entry.classroom_name}</span>}
                       </p>
                     </div>
                   </div>
@@ -673,12 +673,12 @@ export default function DashboardClient({
                     {entry.is_attendance_checked ? (
                       <div className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-3 py-1 rounded-xl border border-emerald-200/80 dark:border-emerald-800/60">
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                        <span>เช็คชื่อแล้ว</span>
+                        <span>à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­à¹à¸¥à¹‰à¸§</span>
                       </div>
                     ) : (
                       <div className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-3 py-1 rounded-xl border border-amber-200/80 dark:border-amber-800/60">
                         <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                        <span>รอเช็คชื่อ</span>
+                        <span>à¸£à¸­à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­</span>
                       </div>
                     )}
 
@@ -690,11 +690,11 @@ export default function DashboardClient({
                             : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm shadow-indigo-600/20 hover:shadow-indigo-600/30 hover:scale-[1.02]'
                           }`}
                       >
-                        <span>{entry.is_attendance_checked ? 'ดูข้อมูล' : 'เช็คชื่อทันที'}</span>
+                        <span>{entry.is_attendance_checked ? 'à¸”à¸¹à¸‚à¹‰à¸­à¸¡à¸¹à¸¥' : 'à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­à¸—à¸±à¸™à¸—à¸µ'}</span>
                         <ChevronRight className="w-3.5 h-3.5" />
                       </Link>
                     ) : (
-                      <span className="text-[0.7rem] text-slate-500 dark:text-slate-400">ยังไม่ผูกห้องเรียน</span>
+                      <span className="text-[0.7rem] text-slate-500 dark:text-slate-400">à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¸œà¸¹à¸à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™</span>
                     )}
                   </div>
                 </div>
@@ -705,17 +705,17 @@ export default function DashboardClient({
           /* Celebratory Semester Concluded Card */
           <div className="text-center py-10 px-6 bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/70 dark:from-slate-900/90 dark:via-slate-900/90 dark:to-indigo-950/40 rounded-2xl border border-indigo-100/90 dark:border-slate-800 shadow-xs min-h-[190px] flex flex-col items-center justify-center">
             <div className="w-16 h-16 mx-auto rounded-3xl bg-gradient-to-br from-emerald-400 via-teal-500 to-indigo-600 text-white shadow-md shadow-emerald-500/20 flex items-center justify-center mb-3 text-3xl animate-float">
-              🎓
+              ðŸŽ“
             </div>
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-100/80 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 text-xs font-bold mb-2 border border-emerald-200 dark:border-emerald-800/70 shadow-2xs">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              <span>สิ้นสุดการเรียนการสอนประจำภาคเรียนนี้แล้ว</span>
+              <span>à¸ªà¸´à¹‰à¸™à¸ªà¸¸à¸”à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™à¸à¸²à¸£à¸ªà¸­à¸™à¸›à¸£à¸°à¸ˆà¸³à¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™à¸™à¸µà¹‰à¹à¸¥à¹‰à¸§</span>
             </div>
             <h3 className="text-base sm:text-lg font-extrabold text-slate-800 dark:text-slate-100">
-              ยินดีด้วยครับคุณครู การสอนตามตารางเสร็จสิ้นสมบูรณ์แล้ว 🎉
+              à¸¢à¸´à¸™à¸”à¸µà¸”à¹‰à¸§à¸¢à¸„à¸£à¸±à¸šà¸„à¸¸à¸“à¸„à¸£à¸¹ à¸à¸²à¸£à¸ªà¸­à¸™à¸•à¸²à¸¡à¸•à¸²à¸£à¸²à¸‡à¹€à¸ªà¸£à¹‡à¸ˆà¸ªà¸´à¹‰à¸™à¸ªà¸¡à¸šà¸¹à¸£à¸“à¹Œà¹à¸¥à¹‰à¸§ ðŸŽ‰
             </h3>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-1 max-w-lg mx-auto leading-relaxed">
-              ขณะนี้สิ้นสุดช่วงเวลาการสอนตามตารางของภาคเรียนเรียบร้อยแล้ว คุณครูสามารถใช้เวลานี้ในการตรวจสอบคะแนนเก็บ บันทึกคะแนนจิตพิสัย และดำเนินการตัดเกรดเพื่อออกรายงานผลการเรียนครับ
+              à¸‚à¸“à¸°à¸™à¸µà¹‰à¸ªà¸´à¹‰à¸™à¸ªà¸¸à¸”à¸Šà¹ˆà¸§à¸‡à¹€à¸§à¸¥à¸²à¸à¸²à¸£à¸ªà¸­à¸™à¸•à¸²à¸¡à¸•à¸²à¸£à¸²à¸‡à¸‚à¸­à¸‡à¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢à¹à¸¥à¹‰à¸§ à¸„à¸¸à¸“à¸„à¸£à¸¹à¸ªà¸²à¸¡à¸²à¸£à¸–à¹ƒà¸Šà¹‰à¹€à¸§à¸¥à¸²à¸™à¸µà¹‰à¹ƒà¸™à¸à¸²à¸£à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¸„à¸°à¹à¸™à¸™à¹€à¸à¹‡à¸š à¸šà¸±à¸™à¸—à¸¶à¸à¸„à¸°à¹à¸™à¸™à¸ˆà¸´à¸•à¸žà¸´à¸ªà¸±à¸¢ à¹à¸¥à¸°à¸”à¸³à¹€à¸™à¸´à¸™à¸à¸²à¸£à¸•à¸±à¸”à¹€à¸à¸£à¸”à¹€à¸žà¸·à¹ˆà¸­à¸­à¸­à¸à¸£à¸²à¸¢à¸‡à¸²à¸™à¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™à¸„à¸£à¸±à¸š
             </p>
             <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
               <Link
@@ -723,21 +723,21 @@ export default function DashboardClient({
                 className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0"
               >
                 <Award className="w-4 h-4" />
-                <span>ไปที่ระบบตัดเกรด & ประเมินผล</span>
+                <span>à¹„à¸›à¸—à¸µà¹ˆà¸£à¸°à¸šà¸šà¸•à¸±à¸”à¹€à¸à¸£à¸” & à¸›à¸£à¸°à¹€à¸¡à¸´à¸™à¸œà¸¥</span>
               </Link>
               <Link
                 href="/scores"
                 className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-indigo-200 dark:border-slate-700 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-slate-700 text-xs font-bold transition-all shadow-xs hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0"
               >
                 <CheckSquare className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                <span>ตรวจสอบคะแนนเก็บ</span>
+                <span>à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¸„à¸°à¹à¸™à¸™à¹€à¸à¹‡à¸š</span>
               </Link>
               <Link
                 href="/schedule"
                 className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-all hover:-translate-y-0.5 active:translate-y-0 border border-transparent dark:border-slate-700"
               >
                 <Calendar className="w-3.5 h-3.5" />
-                <span>ดูตารางสอนภาพรวม</span>
+                <span>à¸”à¸¹à¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™à¸ à¸²à¸žà¸£à¸§à¸¡</span>
               </Link>
             </div>
           </div>
@@ -745,11 +745,11 @@ export default function DashboardClient({
           /* Normal Daily Coffee Break State */
           <div className="text-center py-10 px-4 bg-gradient-to-br from-indigo-50/50 via-white to-purple-50/50 dark:from-slate-900/90 dark:via-slate-900/90 dark:to-indigo-950/40 rounded-2xl border border-indigo-100/70 dark:border-slate-800 min-h-[180px] flex flex-col items-center justify-center">
             <div className="w-14 h-14 mx-auto rounded-2xl bg-white dark:bg-slate-800 shadow-sm border border-indigo-100 dark:border-slate-700 flex items-center justify-center mb-3 text-2xl animate-float">
-              ☕
+              â˜•
             </div>
-            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">วันนี้ไม่มีคาบสอนตามตาราง</h3>
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">à¸§à¸±à¸™à¸™à¸µà¹‰à¹„à¸¡à¹ˆà¸¡à¸µà¸„à¸²à¸šà¸ªà¸­à¸™à¸•à¸²à¸¡à¸•à¸²à¸£à¸²à¸‡</h3>
             <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 max-w-sm mx-auto">
-              คุณครูสามารถใช้เวลานี้ในการเตรียมแผนการสอน บันทึกคะแนนจิตพิสัย หรือตรวจเช็คงานของนักเรียนได้ครับ
+              à¸„à¸¸à¸“à¸„à¸£à¸¹à¸ªà¸²à¸¡à¸²à¸£à¸–à¹ƒà¸Šà¹‰à¹€à¸§à¸¥à¸²à¸™à¸µà¹‰à¹ƒà¸™à¸à¸²à¸£à¹€à¸•à¸£à¸µà¸¢à¸¡à¹à¸œà¸™à¸à¸²à¸£à¸ªà¸­à¸™ à¸šà¸±à¸™à¸—à¸¶à¸à¸„à¸°à¹à¸™à¸™à¸ˆà¸´à¸•à¸žà¸´à¸ªà¸±à¸¢ à¸«à¸£à¸·à¸­à¸•à¸£à¸§à¸ˆà¹€à¸Šà¹‡à¸„à¸‡à¸²à¸™à¸‚à¸­à¸‡à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¹„à¸”à¹‰à¸„à¸£à¸±à¸š
             </p>
             <div className="mt-4">
               <Link
@@ -757,7 +757,7 @@ export default function DashboardClient({
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white dark:bg-slate-800 border border-indigo-200 dark:border-slate-700 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-700 text-xs font-bold transition-all shadow-xs hover:shadow-sm"
               >
                 <Calendar className="w-3.5 h-3.5" />
-                <span>จัดการตารางสอนประจำสัปดาห์</span>
+                <span>à¸ˆà¸±à¸”à¸à¸²à¸£à¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™à¸›à¸£à¸°à¸ˆà¸³à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ</span>
               </Link>
             </div>
           </div>
@@ -766,7 +766,7 @@ export default function DashboardClient({
 
       {/* ==================== ACTION CENTER: PENDING TASKS & AT-RISK STUDENTS ==================== */}
       <section
-        aria-label="ศูนย์การแจ้งเตือนและนักเรียนกลุ่มเสี่ยง"
+        aria-label="à¸¨à¸¹à¸™à¸¢à¹Œà¸à¸²à¸£à¹à¸ˆà¹‰à¸‡à¹€à¸•à¸·à¸­à¸™à¹à¸¥à¸°à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸à¸¥à¸¸à¹ˆà¸¡à¹€à¸ªà¸µà¹ˆà¸¢à¸‡"
         className="grid grid-cols-1 lg:grid-cols-2 gap-6"
       >
         {/* Card 1: Pending Tasks */}
@@ -779,14 +779,14 @@ export default function DashboardClient({
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                    งานที่ต้องทำวันนี้
+                    à¸‡à¸²à¸™à¸—à¸µà¹ˆà¸•à¹‰à¸­à¸‡à¸—à¸³à¸§à¸±à¸™à¸™à¸µà¹‰
                     {pendingTasksCount > 0 && (
                       <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60">
                         {pendingTasksCount}
                       </span>
                     )}
                   </h2>
-                  <p className="text-xs text-slate-600 dark:text-slate-400">การเช็คชื่อและงานที่ยังค้างอยู่ในระบบ</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">à¸à¸²à¸£à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­à¹à¸¥à¸°à¸‡à¸²à¸™à¸—à¸µà¹ˆà¸¢à¸±à¸‡à¸„à¹‰à¸²à¸‡à¸­à¸¢à¸¹à¹ˆà¹ƒà¸™à¸£à¸°à¸šà¸š</p>
                 </div>
               </div>
             </div>
@@ -807,11 +807,11 @@ export default function DashboardClient({
                           <p className="text-xs font-bold text-amber-900 dark:text-amber-200 group-hover:text-amber-950 dark:group-hover:text-amber-100 truncate">
                             {task.message}
                           </p>
-                          <p className="text-[0.68rem] text-amber-700 dark:text-amber-400">คลิกเพื่อดำเนินการทันที</p>
+                          <p className="text-[0.68rem] text-amber-700 dark:text-amber-400">à¸„à¸¥à¸´à¸à¹€à¸žà¸·à¹ˆà¸­à¸”à¸³à¹€à¸™à¸´à¸™à¸à¸²à¸£à¸—à¸±à¸™à¸—à¸µ</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-1 text-xs font-bold text-amber-800 dark:text-amber-300 group-hover:translate-x-1 transition-transform shrink-0 ml-2">
-                        <span>ทำเลย</span>
+                        <span>à¸—à¸³à¹€à¸¥à¸¢</span>
                         <ChevronRight className="w-4 h-4" />
                       </div>
                     </Link>
@@ -822,11 +822,11 @@ export default function DashboardClient({
                   <div className="w-12 h-12 mx-auto rounded-2xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-2 shadow-xs">
                     <CheckCircle2 className="w-6 h-6" />
                   </div>
-                  <p className="text-xs font-bold text-emerald-900 dark:text-emerald-300">ไม่มีงานค้างในวันนี้ 🎉</p>
+                  <p className="text-xs font-bold text-emerald-900 dark:text-emerald-300">à¹„à¸¡à¹ˆà¸¡à¸µà¸‡à¸²à¸™à¸„à¹‰à¸²à¸‡à¹ƒà¸™à¸§à¸±à¸™à¸™à¸µà¹‰ ðŸŽ‰</p>
                   <p className="text-[0.72rem] text-emerald-700 dark:text-emerald-400 mt-1 max-w-xs">
                     {isSemesterEnded
-                      ? 'คุณครูได้ตรวจสอบการเช็คชื่อและทำงานเรียบร้อยตลอดทั้งภาคเรียนแล้วครับ'
-                      : 'คุณครูเช็คชื่อและทำงานเรียบร้อยครบทุกรายการแล้วครับ'}
+                      ? 'à¸„à¸¸à¸“à¸„à¸£à¸¹à¹„à¸”à¹‰à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¸à¸²à¸£à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­à¹à¸¥à¸°à¸—à¸³à¸‡à¸²à¸™à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢à¸•à¸¥à¸­à¸”à¸—à¸±à¹‰à¸‡à¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™à¹à¸¥à¹‰à¸§à¸„à¸£à¸±à¸š'
+                      : 'à¸„à¸¸à¸“à¸„à¸£à¸¹à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­à¹à¸¥à¸°à¸—à¸³à¸‡à¸²à¸™à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢à¸„à¸£à¸šà¸—à¸¸à¸à¸£à¸²à¸¢à¸à¸²à¸£à¹à¸¥à¹‰à¸§à¸„à¸£à¸±à¸š'}
                   </p>
                 </div>
               )}
@@ -838,7 +838,7 @@ export default function DashboardClient({
               href="/attendance"
               className="w-full inline-flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50/80 dark:hover:bg-slate-800/80 transition-all"
             >
-              <span>เปิดหน้าระบบเช็คชื่อทั้งหมด</span>
+              <span>à¹€à¸›à¸´à¸”à¸«à¸™à¹‰à¸²à¸£à¸°à¸šà¸šà¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -854,14 +854,14 @@ export default function DashboardClient({
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                    นักเรียนกลุ่มเฝ้าระวัง
+                    à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸à¸¥à¸¸à¹ˆà¸¡à¹€à¸à¹‰à¸²à¸£à¸°à¸§à¸±à¸‡
                     {atRiskCount > 0 && (
                       <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/70 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60">
-                        {atRiskCount} คน
+                        {atRiskCount} à¸„à¸™
                       </span>
                     )}
                   </h2>
-                  <p className="text-xs text-slate-600 dark:text-slate-400">เวลาเรียนไม่ถึงเกณฑ์ หรือ เสี่ยงหมดสิทธิ์สอบ</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">à¹€à¸§à¸¥à¸²à¹€à¸£à¸µà¸¢à¸™à¹„à¸¡à¹ˆà¸–à¸¶à¸‡à¹€à¸à¸“à¸‘à¹Œ à¸«à¸£à¸·à¸­ à¹€à¸ªà¸µà¹ˆà¸¢à¸‡à¸«à¸¡à¸”à¸ªà¸´à¸—à¸˜à¸´à¹Œà¸ªà¸­à¸š</p>
                 </div>
               </div>
             </div>
@@ -877,7 +877,7 @@ export default function DashboardClient({
                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
                       }`}
                   >
-                    ทั้งหมด ({atRiskCount})
+                    à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸” ({atRiskCount})
                   </button>
                   <button
                     onClick={() => setRiskFilter('attendance_f')}
@@ -886,7 +886,7 @@ export default function DashboardClient({
                         : 'text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50'
                       }`}
                   >
-                    หมดสิทธิ์ ({fRiskCount})
+                    à¸«à¸¡à¸”à¸ªà¸´à¸—à¸˜à¸´à¹Œ ({fRiskCount})
                   </button>
                   <button
                     onClick={() => setRiskFilter('attendance_warning')}
@@ -895,7 +895,7 @@ export default function DashboardClient({
                         : 'text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/50'
                       }`}
                   >
-                    เสี่ยง ({warningRiskCount})
+                    à¹€à¸ªà¸µà¹ˆà¸¢à¸‡ ({warningRiskCount})
                   </button>
                 </div>
 
@@ -905,7 +905,7 @@ export default function DashboardClient({
                     type="text"
                     value={searchRisk}
                     onChange={(e) => setSearchRisk(e.target.value)}
-                    placeholder="ค้นหาชื่อนักเรียน หรือห้องเรียน..."
+                    placeholder="à¸„à¹‰à¸™à¸«à¸²à¸Šà¸·à¹ˆà¸­à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™ à¸«à¸£à¸·à¸­à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™..."
                     className="w-full pl-8 pr-8 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-indigo-400 focus:bg-white dark:focus:bg-slate-800 transition-all"
                   />
                   {searchRisk && (
@@ -952,7 +952,7 @@ export default function DashboardClient({
                               )}
                             </p>
                             <p className="text-[0.68rem] text-slate-600 dark:text-slate-400 truncate">
-                              {student.classroom_name} • <span className={`font-semibold ${isF ? 'text-rose-700 dark:text-rose-400' : 'text-amber-700 dark:text-amber-400'}`}>{student.reason}</span>
+                              {student.classroom_name} â€¢ <span className={`font-semibold ${isF ? 'text-rose-700 dark:text-rose-400' : 'text-amber-700 dark:text-amber-400'}`}>{student.reason}</span>
                             </p>
                           </div>
                         </div>
@@ -960,7 +960,7 @@ export default function DashboardClient({
                         <div className="shrink-0">
                           <span className={`text-[0.65rem] font-bold px-2 py-0.5 rounded-full ${isF ? 'bg-rose-600 text-white' : 'bg-amber-500 text-white'
                             }`}>
-                            {isF ? 'หมดสิทธิ์สอบ' : 'เตือน'}
+                            {isF ? 'à¸«à¸¡à¸”à¸ªà¸´à¸—à¸˜à¸´à¹Œà¸ªà¸­à¸š' : 'à¹€à¸•à¸·à¸­à¸™'}
                           </span>
                         </div>
                       </div>
@@ -970,16 +970,16 @@ export default function DashboardClient({
               ) : atRiskCount > 0 ? (
                 <div className="h-full min-h-[200px] flex flex-col items-center justify-center text-xs text-slate-500 dark:text-slate-400">
                   <Search className="w-5 h-5 text-slate-300 dark:text-slate-600 mb-1" />
-                  <span>ไม่พบนักเรียนตามคำค้นหา</span>
+                  <span>à¹„à¸¡à¹ˆà¸žà¸šà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸•à¸²à¸¡à¸„à¸³à¸„à¹‰à¸™à¸«à¸²</span>
                 </div>
               ) : (
                 <div className="h-full min-h-[200px] flex flex-col items-center justify-center text-center p-4 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-2xl border border-emerald-100 dark:border-emerald-900/40">
                   <div className="w-12 h-12 mx-auto rounded-2xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-2 shadow-xs">
                     <CheckCircle2 className="w-6 h-6" />
                   </div>
-                  <p className="text-xs font-bold text-emerald-900 dark:text-emerald-300">ยอดเยี่ยมมาก! ไม่มีนักเรียนกลุ่มเสี่ยง</p>
+                  <p className="text-xs font-bold text-emerald-900 dark:text-emerald-300">à¸¢à¸­à¸”à¹€à¸¢à¸µà¹ˆà¸¢à¸¡à¸¡à¸²à¸! à¹„à¸¡à¹ˆà¸¡à¸µà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸à¸¥à¸¸à¹ˆà¸¡à¹€à¸ªà¸µà¹ˆà¸¢à¸‡</p>
                   <p className="text-[0.72rem] text-emerald-700 dark:text-emerald-400 mt-1 max-w-xs">
-                    นักเรียนทุกคนมีเวลาเรียนครบถ้วนตามเกณฑ์ที่กำหนด
+                    à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸—à¸¸à¸à¸„à¸™à¸¡à¸µà¹€à¸§à¸¥à¸²à¹€à¸£à¸µà¸¢à¸™à¸„à¸£à¸šà¸–à¹‰à¸§à¸™à¸•à¸²à¸¡à¹€à¸à¸“à¸‘à¹Œà¸—à¸µà¹ˆà¸à¸³à¸«à¸™à¸”
                   </p>
                 </div>
               )}
@@ -991,7 +991,7 @@ export default function DashboardClient({
               href="/grades"
               className="w-full inline-flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50/80 dark:hover:bg-slate-800/80 transition-all"
             >
-              <span>ดูรายงานผลการเรียนและการตัดเกรด</span>
+              <span>à¸”à¸¹à¸£à¸²à¸¢à¸‡à¸²à¸™à¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™à¹à¸¥à¸°à¸à¸²à¸£à¸•à¸±à¸”à¹€à¸à¸£à¸”</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -1000,7 +1000,7 @@ export default function DashboardClient({
 
       {/* ==================== QUICK ACTIONS ==================== */}
       <section
-        aria-label="ทางลัดระบบงาน"
+        aria-label="à¸—à¸²à¸‡à¸¥à¸±à¸”à¸£à¸°à¸šà¸šà¸‡à¸²à¸™"
         className="glass p-6 sm:p-7 rounded-3xl border border-indigo-100/60 dark:border-slate-800 shadow-xs hover:shadow-md transition-all duration-300"
       >
         <div className="flex items-center justify-between mb-5">
@@ -1010,9 +1010,9 @@ export default function DashboardClient({
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">
-                ทางลัดระบบงาน
+                à¸—à¸²à¸‡à¸¥à¸±à¸”à¸£à¸°à¸šà¸šà¸‡à¸²à¸™
               </h2>
-              <p className="text-xs text-slate-600 dark:text-slate-400">เข้าถึงเครื่องมือหลักได้อย่างรวดเร็ว</p>
+              <p className="text-xs text-slate-600 dark:text-slate-400">à¹€à¸‚à¹‰à¸²à¸–à¸¶à¸‡à¹€à¸„à¸£à¸·à¹ˆà¸­à¸‡à¸¡à¸·à¸­à¸«à¸¥à¸±à¸à¹„à¸”à¹‰à¸­à¸¢à¹ˆà¸²à¸‡à¸£à¸§à¸”à¹€à¸£à¹‡à¸§</p>
             </div>
           </div>
         </div>
@@ -1027,8 +1027,8 @@ export default function DashboardClient({
                 <Layers className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-bold text-slate-800 dark:text-slate-100 group-hover:text-indigo-700 dark:group-hover:text-indigo-300 transition-colors truncate">ภาคเรียน & ปีการศึกษา</p>
-                <p className="text-[0.68rem] text-slate-500 dark:text-slate-400 truncate">จัดการเทอมและปีการศึกษา</p>
+                <p className="text-xs font-bold text-slate-800 dark:text-slate-100 group-hover:text-indigo-700 dark:group-hover:text-indigo-300 transition-colors truncate">à¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™ & à¸›à¸µà¸à¸²à¸£à¸¨à¸¶à¸à¸©à¸²</p>
+                <p className="text-[0.68rem] text-slate-500 dark:text-slate-400 truncate">à¸ˆà¸±à¸”à¸à¸²à¸£à¹€à¸—à¸­à¸¡à¹à¸¥à¸°à¸›à¸µà¸à¸²à¸£à¸¨à¸¶à¸à¸©à¸²</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-slate-400 dark:text-slate-500 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
@@ -1043,8 +1043,8 @@ export default function DashboardClient({
                 <CheckCircle2 className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-bold text-slate-800 dark:text-slate-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-300 transition-colors truncate">ระบบเช็คชื่อ</p>
-                <p className="text-[0.68rem] text-slate-500 dark:text-slate-400 truncate">บันทึกเวลาเรียน ขาด ลา มา สาย</p>
+                <p className="text-xs font-bold text-slate-800 dark:text-slate-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-300 transition-colors truncate">à¸£à¸°à¸šà¸šà¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­</p>
+                <p className="text-[0.68rem] text-slate-500 dark:text-slate-400 truncate">à¸šà¸±à¸™à¸—à¸¶à¸à¹€à¸§à¸¥à¸²à¹€à¸£à¸µà¸¢à¸™ à¸‚à¸²à¸” à¸¥à¸² à¸¡à¸² à¸ªà¸²à¸¢</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-slate-400 dark:text-slate-500 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
@@ -1059,8 +1059,8 @@ export default function DashboardClient({
                 <CheckSquare className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-bold text-slate-800 dark:text-slate-100 group-hover:text-indigo-700 dark:group-hover:text-indigo-300 transition-colors truncate">คะแนนเก็บรายสัปดาห์</p>
-                <p className="text-[0.68rem] text-slate-500 dark:text-slate-400 truncate">บันทึกคะแนนเก็บและแบบทดสอบ</p>
+                <p className="text-xs font-bold text-slate-800 dark:text-slate-100 group-hover:text-indigo-700 dark:group-hover:text-indigo-300 transition-colors truncate">à¸„à¸°à¹à¸™à¸™à¹€à¸à¹‡à¸šà¸£à¸²à¸¢à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ</p>
+                <p className="text-[0.68rem] text-slate-500 dark:text-slate-400 truncate">à¸šà¸±à¸™à¸—à¸¶à¸à¸„à¸°à¹à¸™à¸™à¹€à¸à¹‡à¸šà¹à¸¥à¸°à¹à¸šà¸šà¸—à¸”à¸ªà¸­à¸š</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-slate-400 dark:text-slate-500 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
@@ -1075,8 +1075,8 @@ export default function DashboardClient({
                 <Smile className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-bold text-slate-800 dark:text-slate-100 group-hover:text-amber-700 dark:group-hover:text-amber-300 transition-colors truncate">คะแนนจิตพิสัย</p>
-                <p className="text-[0.68rem] text-slate-500 dark:text-slate-400 truncate">ประเมินพฤติกรรมและการมีส่วนร่วม</p>
+                <p className="text-xs font-bold text-slate-800 dark:text-slate-100 group-hover:text-amber-700 dark:group-hover:text-amber-300 transition-colors truncate">à¸„à¸°à¹à¸™à¸™à¸ˆà¸´à¸•à¸žà¸´à¸ªà¸±à¸¢</p>
+                <p className="text-[0.68rem] text-slate-500 dark:text-slate-400 truncate">à¸›à¸£à¸°à¹€à¸¡à¸´à¸™à¸žà¸¤à¸•à¸´à¸à¸£à¸£à¸¡à¹à¸¥à¸°à¸à¸²à¸£à¸¡à¸µà¸ªà¹ˆà¸§à¸™à¸£à¹ˆà¸§à¸¡</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-slate-400 dark:text-slate-500 group-hover:text-amber-600 dark:group-hover:text-amber-400 group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
@@ -1091,8 +1091,8 @@ export default function DashboardClient({
                 <Award className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-bold text-slate-800 dark:text-slate-100 group-hover:text-purple-700 dark:group-hover:text-purple-300 transition-colors truncate">ตัดเกรด & ประเมินผล</p>
-                <p className="text-[0.68rem] text-slate-500 dark:text-slate-400 truncate">คำนวณเกรดเฉลี่ยและส่งออกรายงาน</p>
+                <p className="text-xs font-bold text-slate-800 dark:text-slate-100 group-hover:text-purple-700 dark:group-hover:text-purple-300 transition-colors truncate">à¸•à¸±à¸”à¹€à¸à¸£à¸” & à¸›à¸£à¸°à¹€à¸¡à¸´à¸™à¸œà¸¥</p>
+                <p className="text-[0.68rem] text-slate-500 dark:text-slate-400 truncate">à¸„à¸³à¸™à¸§à¸“à¹€à¸à¸£à¸”à¹€à¸‰à¸¥à¸µà¹ˆà¸¢à¹à¸¥à¸°à¸ªà¹ˆà¸‡à¸­à¸­à¸à¸£à¸²à¸¢à¸‡à¸²à¸™</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-slate-400 dark:text-slate-500 group-hover:text-purple-600 dark:group-hover:text-purple-400 group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
@@ -1108,7 +1108,7 @@ export default function DashboardClient({
 // to ensure Cumulative Layout Shift (CLS) = 0!
 function DashboardSkeleton() {
   return (
-    <div className="space-y-7 pb-10 animate-fade-in-up" aria-busy="true" aria-label="กำลังโหลดข้อมูลแดชบอร์ด">
+    <div className="space-y-7 pb-10 animate-fade-in-up" aria-busy="true" aria-label="à¸à¸³à¸¥à¸±à¸‡à¹‚à¸«à¸¥à¸”à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¹à¸”à¸Šà¸šà¸­à¸£à¹Œà¸”">
       {/* 1. Hero Skeleton */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-900/90 via-indigo-800/90 to-purple-950/90 p-6 sm:p-8 lg:p-10 border border-white/10 min-h-[260px] flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
         <div className="space-y-3.5 max-w-2xl w-full">

@@ -1,324 +1,310 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
+import { withAuth } from '@/lib/apiHandler';
 import { calculateAffectiveScore } from '@/lib/affective';
 import { resolveTargetWeeks } from '@/lib/semester';
 import { getOrSetCache, userCacheKey, invalidateCache, memoryCache } from '@/lib/cache';
 import { getAttendanceConfig, computeAbsentConversion } from '@/lib/formatters';
 
-export async function GET(request: NextRequest) {
-  try {
-    const user = requireAuth(request);
-    const { searchParams } = new URL(request.url);
-    const classroomId = searchParams.get('classroom_id');
+export const GET = withAuth(async (request, user) => {
+  const { searchParams } = new URL(request.url);
+  const classroomId = searchParams.get('classroom_id');
 
-    if (!classroomId) {
-      return NextResponse.json({ message: 'classroom_id required' }, { status: 400 });
-    }
-
-    const numericClassroomId = Number(classroomId);
-
-    // Verify classroom ownership
-    const classroom = await prisma.classroom.findFirst({
-      where: { id: numericClassroomId, userId: user.id }
-    });
-    if (!classroom) return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
-
-    // Get criteria
-    if (searchParams.get('type') === 'criteria') {
-      const mappedCriteria = await getOrSetCache(
-        userCacheKey(user.id, 'grades:criteria', numericClassroomId),
-        120,
-        async () => {
-          const criteria = await prisma.gradeCriteria.findMany({
-            where: { classroomId: numericClassroomId },
-            orderBy: { minScore: 'desc' },
-          });
-          return criteria.map(c => ({
-            id: c.id,
-            classroom_id: c.classroomId,
-            grade: c.grade,
-            min_score: Number(c.minScore),
-            created_at: c.createdAt,
-            updated_at: c.updatedAt
-          }));
-        }
-      );
-      return NextResponse.json({ data: mappedCriteria });
-    }
-
-    // Report cache (45s). Invalidated via the broad `grades` prefix on attendance/score/student/classroom writes.
-    const reportCacheKey = userCacheKey(user.id, 'grades:report', numericClassroomId, searchParams.get('weeks') ?? '');
-    const cachedReport = memoryCache.get<Record<string, unknown>>(reportCacheKey);
-    if (cachedReport) return NextResponse.json(cachedReport);
-
-    // Get report weights & settings
-    const weightAssign = Number(classroom.assignmentWeight ?? 10);
-    const weightPostTest = Number(classroom.postTestWeight ?? 70);
-    const weightAffective = Number(classroom.affectiveWeight ?? 20);
-    const lateDeduction = classroom.lateDeductionScore !== null && classroom.lateDeductionScore !== undefined ? Number(classroom.lateDeductionScore) : 1;
-    const absentDeduction = classroom.absentDeductionScore !== null && classroom.absentDeductionScore !== undefined ? Number(classroom.absentDeductionScore) : 2;
-    const weightMidterm = Number(classroom.midtermWeight ?? 0);
-    const weightFinal = Number(classroom.finalWeight ?? 0);
-    const maxMidtermScore = Number(classroom.midtermMaxScore ?? 100);
-    const maxFinalScore = Number(classroom.finalMaxScore ?? 100);
-
-    // Resolve target weeks from classroom settings (replaces old name-guessing logic)
-    const weeksParam = searchParams.get('weeks');
-    let targetWeeks: number;
-
-    if (weeksParam && !isNaN(Number(weeksParam))) {
-      targetWeeks = Number(weeksParam);
-    } else {
-      targetWeeks = resolveTargetWeeks(classroom);
-    }
-
-    // Parallelize independent queries: structure aggregates, students with scores/attendance, criteria
-    // Aggregate in the database (groupBy) instead of loading every attendance/score row per student.
-    const [structureAgg, students, dbCriteria, attendanceGrouped, scoreSums] = await Promise.all([
-      prisma.scoreStructure.aggregate({
-        where: { 
-          classroomId: numericClassroomId,
-          lessonNumber: { lte: targetWeeks }
-        },
-        _sum: { maxAssignmentScore: true, maxPostTestScore: true },
-      }),
-      prisma.student.findMany({
-        where: { classroomId: numericClassroomId },
-        select: {
-          id: true,
-          name: true,
-          studentCode: true,
-          gradeLevel: true,
-          branch: true,
-          avatar: true,
-          updatedAt: true,
-          midtermScore: true,
-          finalScore: true,
-          affectiveScore: true,
-        },
-        orderBy: [{ gradeLevel: 'asc' }, { studentCode: 'asc' }, { name: 'asc' }],
-      }),
-      prisma.gradeCriteria.findMany({
-        where: { classroomId: numericClassroomId },
-        select: { grade: true, minScore: true },
-        orderBy: { minScore: 'desc' },
-      }),
-      prisma.attendance.groupBy({
-        by: ['studentId', 'status'],
-        where: { classroomId: numericClassroomId, status: { in: ['late', 'absent', 'leave'] } },
-        _count: true,
-      }),
-      prisma.studentScore.groupBy({
-        by: ['studentId'],
-        where: { classroomId: numericClassroomId, lessonNumber: { lte: targetWeeks } },
-        _sum: { assignmentScore: true, postTestScore: true },
-      }),
-    ]);
-
-    const attByStudent = new Map<number, { late: number; absent: number; leave: number }>();
-    for (const row of attendanceGrouped) {
-      const e = attByStudent.get(row.studentId) ?? { late: 0, absent: 0, leave: 0 };
-      if (row.status === 'late') e.late = row._count;
-      else if (row.status === 'absent') e.absent = row._count;
-      else if (row.status === 'leave') e.leave = row._count;
-      attByStudent.set(row.studentId, e);
-    }
-    const scoreByStudent = new Map(scoreSums.map((r) => [r.studentId, r._sum]));
-
-    let maxAssignRaw = Number(structureAgg._sum.maxAssignmentScore ?? 0);
-    let maxPostTestRaw = Number(structureAgg._sum.maxPostTestScore ?? 0);
-
-    // Fallback if no structures exist in DB yet: standard 10 points per week
-    if (maxAssignRaw === 0) {
-      maxAssignRaw = targetWeeks * 10;
-    }
-    if (maxPostTestRaw === 0) {
-      maxPostTestRaw = targetWeeks * 10;
-    }
-
-    const criteria = dbCriteria.length > 0 ? dbCriteria.map(c => ({ grade: c.grade, minScore: Number(c.minScore) })) : [
-      { grade: '4', minScore: 80 },
-      { grade: '3.5', minScore: 75 },
-      { grade: '3', minScore: 70 },
-      { grade: '2.5', minScore: 65 },
-      { grade: '2', minScore: 60 },
-      { grade: '1.5', minScore: 55 },
-      { grade: '1', minScore: 50 },
-      { grade: '0', minScore: 0 },
-    ];
-
-    // Get attendance config
-    const attConfig = getAttendanceConfig(classroom);
-
-    const totalWeightSum = weightAssign + weightPostTest + weightAffective + weightMidterm + weightFinal;
-
-    const report = students.map((s) => {
-      // Attendance stats
-      const att = attByStudent.get(s.id);
-      const lateCount = att?.late ?? 0;
-      const absentCount = att?.absent ?? 0;
-      const leaveCount = att?.leave ?? 0;
-      const attConv = computeAbsentConversion({ absent: absentCount, late: lateCount, leave: leaveCount }, attConfig);
-      const isF = attConv.isF;
-      const attendancePercent = attConv.attendancePercent;
-
-      // Single-pass score calculation up to targetWeeks (optimized from dual filter+reduce)
-      const sums = scoreByStudent.get(s.id);
-      const sumAssignRaw = Number(sums?.assignmentScore ?? 0);
-      const sumPostTestRaw = Number(sums?.postTestScore ?? 0);
-      const midtermScore = Number(s.midtermScore ?? 0);
-      
-      const rawFinalScore = s.finalScore !== null ? Number(s.finalScore) : null;
-      const isAbsentFinal = rawFinalScore === -1;
-      const isIncomplete = rawFinalScore === -2;
-      const finalScore = (rawFinalScore === null || rawFinalScore < 0) ? 0 : rawFinalScore;
-
-      const preciseScaledAssign = maxAssignRaw > 0 ? (sumAssignRaw / maxAssignRaw) * weightAssign : 0;
-      const preciseScaledPostTest = maxPostTestRaw > 0 ? (sumPostTestRaw / maxPostTestRaw) * weightPostTest : 0;
-      const preciseScaledMidterm = maxMidtermScore > 0 ? (midtermScore / maxMidtermScore) * weightMidterm : 0;
-      const preciseScaledFinal = maxFinalScore > 0 ? (finalScore / maxFinalScore) * weightFinal : 0;
-
-      // Affective score calculation via shared helper
-      const affectiveScore = calculateAffectiveScore({
-        baseScore: s.affectiveScore ? Number(s.affectiveScore) : null,
-        maxWeight: weightAffective,
-        absentCount,
-        lateCount,
-        absentDeduction,
-        lateDeduction,
-      });
-
-      const totalScorePrecise = preciseScaledAssign + preciseScaledPostTest + affectiveScore + preciseScaledMidterm + preciseScaledFinal;
-      const percentage = totalWeightSum > 0 ? (totalScorePrecise / totalWeightSum) * 100 : 0;
-
-      // Determine final grade according to official vocational education (สอศ.) rules
-      let finalGrade: string | null = null;
-      if (isF) {
-        finalGrade = 'ข.ร.';
-      } else if (isAbsentFinal) {
-        finalGrade = 'ข.ส.';
-      } else if (isIncomplete) {
-        finalGrade = 'ม.ส.';
-      } else {
-        for (const c of criteria) {
-          if (percentage >= Number(c.minScore)) {
-            finalGrade = c.grade;
-            break;
-          }
-        }
-      }
-
-      return {
-        id: s.id,
-        student_id: s.id,
-        name: s.name,
-        student_code: s.studentCode,
-        grade_level: s.gradeLevel,
-        branch: s.branch,
-        avatar:
-          typeof s.avatar === 'string' && s.avatar.startsWith('data:image/')
-            ? `/api/students/${s.id}/avatar?v=${s.updatedAt ? s.updatedAt.getTime() : 0}`
-            : s.avatar ?? null,
-        midterm_score: midtermScore,
-        final_score: rawFinalScore,
-        is_absent_final: isAbsentFinal,
-        is_incomplete: isIncomplete,
-        raw_assign: sumAssignRaw,
-        max_assign: maxAssignRaw,
-        precise_scaled_assign: preciseScaledAssign,
-        scaled_assign: Math.round(preciseScaledAssign),
-        raw_post_test: sumPostTestRaw,
-        max_post_test: maxPostTestRaw,
-        precise_scaled_post_test: preciseScaledPostTest,
-        scaled_post_test: Math.round(preciseScaledPostTest),
-        precise_scaled_midterm: preciseScaledMidterm,
-        scaled_midterm: Math.round(preciseScaledMidterm),
-        precise_scaled_final: preciseScaledFinal,
-        scaled_final: Math.round(preciseScaledFinal),
-        total_score_precise: totalScorePrecise,
-        total_score: Math.round(totalScorePrecise),
-        affective_score: affectiveScore,
-        percentage: percentage.toFixed(2),
-        attendance_percent: attendancePercent,
-        grade: finalGrade || 'ไม่มีเกรด',
-        is_f: isF,
-        absent_count: absentCount,
-        late_count: lateCount,
-        max_allowed_absences: attConv.maxAllowedAbsences,
-        remaining_absences: attConv.remaining,
-      };
-    });
-
-    const responseBody = {
-      data: report,
-      criteria: criteria.map(c => ({ grade: c.grade, min_score: c.minScore })),
-      weights: {
-        assignment_weight: weightAssign,
-        post_test_weight: weightPostTest,
-        affective_weight: weightAffective,
-        late_deduction_score: lateDeduction,
-        absent_deduction_score: absentDeduction,
-        midterm_weight: weightMidterm,
-        final_weight: weightFinal,
-        midterm_max_score: maxMidtermScore,
-        final_max_score: maxFinalScore,
-        total_weight_sum: totalWeightSum,
-        target_weeks: targetWeeks,
-        is_pws: (classroom.curriculumType ?? 'pvch') === 'pvs',
-        max_assign_raw: maxAssignRaw,
-        max_post_test_raw: maxPostTestRaw,
-      }
-    };
-    memoryCache.set(reportCacheKey, responseBody, 45);
-    return NextResponse.json(responseBody);
-  } catch (error) {
-    if (error instanceof AuthError) return handleAuthError();
-    console.error('Get grades error:', error);
-    return NextResponse.json({ message: 'Failed to get grades' }, { status: 500 });
+  if (!classroomId) {
+    return NextResponse.json({ message: 'classroom_id required' }, { status: 400 });
   }
-}
 
-export async function POST(request: NextRequest) {
-  try {
-    const user = requireAuth(request);
-    const { searchParams } = new URL(request.url);
-    const body = await request.json();
+  const numericClassroomId = Number(classroomId);
 
-    const classroomId = Number(body.classroom_id || searchParams.get('classroom_id'));
-    if (!classroomId) {
-      return NextResponse.json({ message: 'classroom_id required' }, { status: 400 });
-    }
+  // Verify classroom ownership
+  const classroom = await prisma.classroom.findFirst({
+    where: { id: numericClassroomId, userId: user.id }
+  });
+  if (!classroom) return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
 
-    // Verify classroom ownership
-    const classroom = await prisma.classroom.findFirst({
-      where: { id: classroomId, userId: user.id }
-    });
-    if (!classroom) return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
-
-    // Save criteria atomically via interactive transaction
-    await prisma.$transaction(async (tx) => {
-      await tx.gradeCriteria.deleteMany({ where: { classroomId: Number(classroomId) } });
-
-      if (body.criteria && body.criteria.length > 0) {
-        await tx.gradeCriteria.createMany({
-          data: body.criteria.map((c: { grade: string; min_score: string | number }) => ({
-            classroomId: Number(classroomId),
-            grade: c.grade,
-            minScore: isNaN(Number(c.min_score)) ? 0 : Number(c.min_score),
-          })),
+  // Get criteria
+  if (searchParams.get('type') === 'criteria') {
+    const mappedCriteria = await getOrSetCache(
+      userCacheKey(user.id, 'grades:criteria', numericClassroomId),
+      120,
+      async () => {
+        const criteria = await prisma.gradeCriteria.findMany({
+          where: { classroomId: numericClassroomId },
+          orderBy: { minScore: 'desc' },
         });
+        return criteria.map(c => ({
+          id: c.id,
+          classroom_id: c.classroomId,
+          grade: c.grade,
+          min_score: Number(c.minScore),
+          created_at: c.createdAt,
+          updated_at: c.updatedAt
+        }));
       }
+    );
+    return NextResponse.json({ data: mappedCriteria });
+  }
+
+  // Report cache (45s). Invalidated via the broad `grades` prefix on attendance/score/student/classroom writes.
+  const reportCacheKey = userCacheKey(user.id, 'grades:report', numericClassroomId, searchParams.get('weeks') ?? '');
+  const cachedReport = memoryCache.get<Record<string, unknown>>(reportCacheKey);
+  if (cachedReport) return NextResponse.json(cachedReport);
+
+  // Get report weights & settings
+  const weightAssign = Number(classroom.assignmentWeight ?? 10);
+  const weightPostTest = Number(classroom.postTestWeight ?? 70);
+  const weightAffective = Number(classroom.affectiveWeight ?? 20);
+  const lateDeduction = classroom.lateDeductionScore !== null && classroom.lateDeductionScore !== undefined ? Number(classroom.lateDeductionScore) : 1;
+  const absentDeduction = classroom.absentDeductionScore !== null && classroom.absentDeductionScore !== undefined ? Number(classroom.absentDeductionScore) : 2;
+  const weightMidterm = Number(classroom.midtermWeight ?? 0);
+  const weightFinal = Number(classroom.finalWeight ?? 0);
+  const maxMidtermScore = Number(classroom.midtermMaxScore ?? 100);
+  const maxFinalScore = Number(classroom.finalMaxScore ?? 100);
+
+  // Resolve target weeks from classroom settings (replaces old name-guessing logic)
+  const weeksParam = searchParams.get('weeks');
+  let targetWeeks: number;
+
+  if (weeksParam && !isNaN(Number(weeksParam))) {
+    targetWeeks = Number(weeksParam);
+  } else {
+    targetWeeks = resolveTargetWeeks(classroom);
+  }
+
+  // Parallelize independent queries: structure aggregates, students with scores/attendance, criteria
+  // Aggregate in the database (groupBy) instead of loading every attendance/score row per student.
+  const [structureAgg, students, dbCriteria, attendanceGrouped, scoreSums] = await Promise.all([
+    prisma.scoreStructure.aggregate({
+      where: { 
+        classroomId: numericClassroomId,
+        lessonNumber: { lte: targetWeeks }
+      },
+      _sum: { maxAssignmentScore: true, maxPostTestScore: true },
+    }),
+    prisma.student.findMany({
+      where: { classroomId: numericClassroomId },
+      select: {
+        id: true,
+        name: true,
+        studentCode: true,
+        gradeLevel: true,
+        branch: true,
+        avatar: true,
+        updatedAt: true,
+        midtermScore: true,
+        finalScore: true,
+        affectiveScore: true,
+      },
+      orderBy: [{ gradeLevel: 'asc' }, { studentCode: 'asc' }, { name: 'asc' }],
+    }),
+    prisma.gradeCriteria.findMany({
+      where: { classroomId: numericClassroomId },
+      select: { grade: true, minScore: true },
+      orderBy: { minScore: 'desc' },
+    }),
+    prisma.attendance.groupBy({
+      by: ['studentId', 'status'],
+      where: { classroomId: numericClassroomId, status: { in: ['late', 'absent', 'leave'] } },
+      _count: true,
+    }),
+    prisma.studentScore.groupBy({
+      by: ['studentId'],
+      where: { classroomId: numericClassroomId, lessonNumber: { lte: targetWeeks } },
+      _sum: { assignmentScore: true, postTestScore: true },
+    }),
+  ]);
+
+  const attByStudent = new Map<number, { late: number; absent: number; leave: number }>();
+  for (const row of attendanceGrouped) {
+    const e = attByStudent.get(row.studentId) ?? { late: 0, absent: 0, leave: 0 };
+    if (row.status === 'late') e.late = row._count;
+    else if (row.status === 'absent') e.absent = row._count;
+    else if (row.status === 'leave') e.leave = row._count;
+    attByStudent.set(row.studentId, e);
+  }
+  const scoreByStudent = new Map(scoreSums.map((r) => [r.studentId, r._sum]));
+
+  let maxAssignRaw = Number(structureAgg._sum.maxAssignmentScore ?? 0);
+  let maxPostTestRaw = Number(structureAgg._sum.maxPostTestScore ?? 0);
+
+  // Fallback if no structures exist in DB yet: standard 10 points per week
+  if (maxAssignRaw === 0) {
+    maxAssignRaw = targetWeeks * 10;
+  }
+  if (maxPostTestRaw === 0) {
+    maxPostTestRaw = targetWeeks * 10;
+  }
+
+  const criteria = dbCriteria.length > 0 ? dbCriteria.map(c => ({ grade: c.grade, minScore: Number(c.minScore) })) : [
+    { grade: '4', minScore: 80 },
+    { grade: '3.5', minScore: 75 },
+    { grade: '3', minScore: 70 },
+    { grade: '2.5', minScore: 65 },
+    { grade: '2', minScore: 60 },
+    { grade: '1.5', minScore: 55 },
+    { grade: '1', minScore: 50 },
+    { grade: '0', minScore: 0 },
+  ];
+
+  // Get attendance config
+  const attConfig = getAttendanceConfig(classroom);
+
+  const totalWeightSum = weightAssign + weightPostTest + weightAffective + weightMidterm + weightFinal;
+
+  const report = students.map((s) => {
+    // Attendance stats
+    const att = attByStudent.get(s.id);
+    const lateCount = att?.late ?? 0;
+    const absentCount = att?.absent ?? 0;
+    const leaveCount = att?.leave ?? 0;
+    const attConv = computeAbsentConversion({ absent: absentCount, late: lateCount, leave: leaveCount }, attConfig);
+    const isF = attConv.isF;
+    const attendancePercent = attConv.attendancePercent;
+
+    // Single-pass score calculation up to targetWeeks (optimized from dual filter+reduce)
+    const sums = scoreByStudent.get(s.id);
+    const sumAssignRaw = Number(sums?.assignmentScore ?? 0);
+    const sumPostTestRaw = Number(sums?.postTestScore ?? 0);
+    const midtermScore = Number(s.midtermScore ?? 0);
+    
+    const rawFinalScore = s.finalScore !== null ? Number(s.finalScore) : null;
+    const isAbsentFinal = rawFinalScore === -1;
+    const isIncomplete = rawFinalScore === -2;
+    const finalScore = (rawFinalScore === null || rawFinalScore < 0) ? 0 : rawFinalScore;
+
+    const preciseScaledAssign = maxAssignRaw > 0 ? (sumAssignRaw / maxAssignRaw) * weightAssign : 0;
+    const preciseScaledPostTest = maxPostTestRaw > 0 ? (sumPostTestRaw / maxPostTestRaw) * weightPostTest : 0;
+    const preciseScaledMidterm = maxMidtermScore > 0 ? (midtermScore / maxMidtermScore) * weightMidterm : 0;
+    const preciseScaledFinal = maxFinalScore > 0 ? (finalScore / maxFinalScore) * weightFinal : 0;
+
+    // Affective score calculation via shared helper
+    const affectiveScore = calculateAffectiveScore({
+      baseScore: s.affectiveScore ? Number(s.affectiveScore) : null,
+      maxWeight: weightAffective,
+      absentCount,
+      lateCount,
+      absentDeduction,
+      lateDeduction,
     });
 
-    invalidateCache(userCacheKey(user.id, 'grades:criteria', classroomId));
-    invalidateCache(userCacheKey(user.id, 'grades:report', classroomId));
+    const totalScorePrecise = preciseScaledAssign + preciseScaledPostTest + affectiveScore + preciseScaledMidterm + preciseScaledFinal;
+    const percentage = totalWeightSum > 0 ? (totalScorePrecise / totalWeightSum) * 100 : 0;
 
-    return NextResponse.json({ message: 'Criteria saved' });
-  } catch (error) {
-    console.error('Save criteria error:', error);
-    if (error instanceof AuthError) return handleAuthError();
-    return NextResponse.json({ message: 'Failed to save criteria' }, { status: 500 });
+    // Determine final grade according to official vocational education (สอศ.) rules
+    let finalGrade: string | null = null;
+    if (isF) {
+      finalGrade = 'ข.ร.';
+    } else if (isAbsentFinal) {
+      finalGrade = 'ข.ส.';
+    } else if (isIncomplete) {
+      finalGrade = 'ม.ส.';
+    } else {
+      for (const c of criteria) {
+        if (percentage >= Number(c.minScore)) {
+          finalGrade = c.grade;
+          break;
+        }
+      }
+    }
+
+    return {
+      id: s.id,
+      student_id: s.id,
+      name: s.name,
+      student_code: s.studentCode,
+      grade_level: s.gradeLevel,
+      branch: s.branch,
+      avatar:
+        typeof s.avatar === 'string' && s.avatar.startsWith('data:image/')
+          ? `/api/students/${s.id}/avatar?v=${s.updatedAt ? s.updatedAt.getTime() : 0}`
+          : s.avatar ?? null,
+      midterm_score: midtermScore,
+      final_score: rawFinalScore,
+      is_absent_final: isAbsentFinal,
+      is_incomplete: isIncomplete,
+      raw_assign: sumAssignRaw,
+      max_assign: maxAssignRaw,
+      precise_scaled_assign: preciseScaledAssign,
+      scaled_assign: Math.round(preciseScaledAssign),
+      raw_post_test: sumPostTestRaw,
+      max_post_test: maxPostTestRaw,
+      precise_scaled_post_test: preciseScaledPostTest,
+      scaled_post_test: Math.round(preciseScaledPostTest),
+      precise_scaled_midterm: preciseScaledMidterm,
+      scaled_midterm: Math.round(preciseScaledMidterm),
+      precise_scaled_final: preciseScaledFinal,
+      scaled_final: Math.round(preciseScaledFinal),
+      total_score_precise: totalScorePrecise,
+      total_score: Math.round(totalScorePrecise),
+      affective_score: affectiveScore,
+      percentage: percentage.toFixed(2),
+      attendance_percent: attendancePercent,
+      grade: finalGrade || 'ไม่มีเกรด',
+      is_f: isF,
+      absent_count: absentCount,
+      late_count: lateCount,
+      max_allowed_absences: attConv.maxAllowedAbsences,
+      remaining_absences: attConv.remaining,
+    };
+  });
+
+  const responseBody = {
+    data: report,
+    criteria: criteria.map(c => ({ grade: c.grade, min_score: c.minScore })),
+    weights: {
+      assignment_weight: weightAssign,
+      post_test_weight: weightPostTest,
+      affective_weight: weightAffective,
+      late_deduction_score: lateDeduction,
+      absent_deduction_score: absentDeduction,
+      midterm_weight: weightMidterm,
+      final_weight: weightFinal,
+      midterm_max_score: maxMidtermScore,
+      final_max_score: maxFinalScore,
+      total_weight_sum: totalWeightSum,
+      target_weeks: targetWeeks,
+      is_pws: (classroom.curriculumType ?? 'pvch') === 'pvs',
+      max_assign_raw: maxAssignRaw,
+      max_post_test_raw: maxPostTestRaw,
+    }
+  };
+  memoryCache.set(reportCacheKey, responseBody, 45);
+  return NextResponse.json(responseBody);
+}, 'Failed to get grades');
+
+export const POST = withAuth(async (request, user) => {
+  const { searchParams } = new URL(request.url);
+  const body = await request.json();
+
+  const classroomId = Number(body.classroom_id || searchParams.get('classroom_id'));
+  if (!classroomId) {
+    return NextResponse.json({ message: 'classroom_id required' }, { status: 400 });
   }
-}
+
+  // Verify classroom ownership
+  const classroom = await prisma.classroom.findFirst({
+    where: { id: classroomId, userId: user.id }
+  });
+  if (!classroom) return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
+
+  // Save criteria atomically via interactive transaction
+  await prisma.$transaction(async (tx) => {
+    await tx.gradeCriteria.deleteMany({ where: { classroomId: Number(classroomId) } });
+
+    if (body.criteria && body.criteria.length > 0) {
+      await tx.gradeCriteria.createMany({
+        data: body.criteria.map((c: { grade: string; min_score: string | number }) => ({
+          classroomId: Number(classroomId),
+          grade: c.grade,
+          minScore: isNaN(Number(c.min_score)) ? 0 : Number(c.min_score),
+        })),
+      });
+    }
+  });
+
+  invalidateCache(userCacheKey(user.id, 'grades:criteria', classroomId));
+  invalidateCache(userCacheKey(user.id, 'grades:report', classroomId));
+
+  return NextResponse.json({ message: 'Criteria saved' });
+}, 'Failed to save criteria');
 

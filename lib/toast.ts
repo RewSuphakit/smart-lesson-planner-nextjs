@@ -18,6 +18,12 @@ export const notify = {
   warning: (message: string, description?: string) => {
     return toast.warning(message, { description });
   },
+  loading: (message: string) => {
+    return toast.loading(message);
+  },
+  dismiss: (id?: string | number) => {
+    return toast.dismiss(id);
+  },
   promise: <T>(
     promise: Promise<T>,
     messages: {

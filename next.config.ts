@@ -17,7 +17,6 @@ const nextConfig: NextConfig = {
       'date-fns',
       '@tanstack/react-query',
       'sonner',
-      'react-hot-toast',
       'axios',
     ],
   },

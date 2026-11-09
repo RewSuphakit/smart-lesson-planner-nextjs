@@ -1,9 +1,9 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import { syncOfflineAttendance, getOfflinePendingQueue } from '@/lib/offlineAttendance';
 import api from '@/services/api';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { Wifi, WifiOff, Download, X } from 'lucide-react';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -34,24 +34,24 @@ export default function PwaRegister() {
     const handleOnline = async () => {
       const queue = getOfflinePendingQueue();
       if (queue.length > 0) {
-        toast.loading(`กำลังซิงค์ข้อมูลการเช็คชื่อ ${queue.length} รายการขึ้นระบบ...`, { id: 'offline-sync' });
+        toast.loading(`à¸à¸³à¸¥à¸±à¸‡à¸‹à¸´à¸‡à¸„à¹Œà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸à¸²à¸£à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­ ${queue.length} à¸£à¸²à¸¢à¸à¸²à¸£à¸‚à¸¶à¹‰à¸™à¸£à¸°à¸šà¸š...`, { id: 'offline-sync' });
         const result = await syncOfflineAttendance(api);
         if (result.success && result.syncedCount > 0) {
-          toast.success(`ซิงค์ข้อมูลการเช็คชื่อ ${result.syncedCount} รายการเรียบร้อยแล้ว`, {
+          toast.success(`à¸‹à¸´à¸‡à¸„à¹Œà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸à¸²à¸£à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­ ${result.syncedCount} à¸£à¸²à¸¢à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢à¹à¸¥à¹‰à¸§`, {
             id: 'offline-sync',
-            icon: '✅',
+            icon: 'âœ…',
           });
         } else if (!result.success) {
-          toast.error('ซิงค์ข้อมูลไม่สำเร็จ จะลองใหม่อีกครั้งเมื่อการเชื่อมต่อเสถียร', { id: 'offline-sync' });
+          toast.error('à¸‹à¸´à¸‡à¸„à¹Œà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ à¸ˆà¸°à¸¥à¸­à¸‡à¹ƒà¸«à¸¡à¹ˆà¸­à¸µà¸à¸„à¸£à¸±à¹‰à¸‡à¹€à¸¡à¸·à¹ˆà¸­à¸à¸²à¸£à¹€à¸Šà¸·à¹ˆà¸­à¸¡à¸•à¹ˆà¸­à¹€à¸ªà¸–à¸µà¸¢à¸£', { id: 'offline-sync' });
         }
       } else {
-        toast.success('เชื่อมต่ออินเทอร์เน็ตแล้ว', { icon: '🟢', duration: 2500 });
+        toast.success('à¹€à¸Šà¸·à¹ˆà¸­à¸¡à¸•à¹ˆà¸­à¸­à¸´à¸™à¹€à¸—à¸­à¸£à¹Œà¹€à¸™à¹‡à¸•à¹à¸¥à¹‰à¸§', { icon: 'ðŸŸ¢', duration: 2500 });
       }
     };
 
     const handleOffline = () => {
-      toast('คุณอยู่ในโหมดออฟไลน์ — ระบบจะบันทึกข้อมูลลงเครื่องอัตโนมัติ', {
-        icon: '📡',
+      toast('à¸„à¸¸à¸“à¸­à¸¢à¸¹à¹ˆà¹ƒà¸™à¹‚à¸«à¸¡à¸”à¸­à¸­à¸Ÿà¹„à¸¥à¸™à¹Œ â€” à¸£à¸°à¸šà¸šà¸ˆà¸°à¸šà¸±à¸™à¸—à¸¶à¸à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸¥à¸‡à¹€à¸„à¸£à¸·à¹ˆà¸­à¸‡à¸­à¸±à¸•à¹‚à¸™à¸¡à¸±à¸•à¸´', {
+        icon: 'ðŸ“¡',
         duration: 4000,
         style: {
           background: '#1e293b',
@@ -90,7 +90,7 @@ export default function PwaRegister() {
     await deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
     if (outcome === 'accepted') {
-      toast.success('ติดตั้งแอปลงอุปกรณ์เรียบร้อยแล้ว', { icon: '📲' });
+      toast.success('à¸•à¸´à¸”à¸•à¸±à¹‰à¸‡à¹à¸­à¸›à¸¥à¸‡à¸­à¸¸à¸›à¸à¸£à¸“à¹Œà¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢à¹à¸¥à¹‰à¸§', { icon: 'ðŸ“²' });
     }
     setDeferredPrompt(null);
   };
@@ -110,8 +110,8 @@ export default function PwaRegister() {
             <Download className="w-5 h-5" />
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-bold text-slate-800 dark:text-slate-100">ติดตั้ง Smart Planner</p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">เปิดใช้งานได้เร็วและเช็คชื่อแบบออฟไลน์ได้</p>
+            <p className="text-xs font-bold text-slate-800 dark:text-slate-100">à¸•à¸´à¸”à¸•à¸±à¹‰à¸‡ Smart Planner</p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">à¹€à¸›à¸´à¸”à¹ƒà¸Šà¹‰à¸‡à¸²à¸™à¹„à¸”à¹‰à¹€à¸£à¹‡à¸§à¹à¸¥à¸°à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­à¹à¸šà¸šà¸­à¸­à¸Ÿà¹„à¸¥à¸™à¹Œà¹„à¸”à¹‰</p>
           </div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
@@ -119,12 +119,12 @@ export default function PwaRegister() {
             onClick={handleInstallClick}
             className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer"
           >
-            ติดตั้ง
+            à¸•à¸´à¸”à¸•à¸±à¹‰à¸‡
           </button>
           <button
             onClick={handleDismissBanner}
             className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg"
-            title="ปิด"
+            title="à¸›à¸´à¸”"
           >
             <X className="w-4 h-4" />
           </button>

@@ -1,496 +1,172 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { Prisma } from '@prisma/client';
-import prisma from '@/lib/prisma';
-import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
-import { formatAttendanceRecord, calculateAttendanceStatsFromGrouped, normalizeAttendanceDate } from '@/lib/formatters';
-import { getOrSetCache, invalidateCache, userCacheKey } from '@/lib/cache';
+import { NextResponse } from 'next/server';
+import { withAuth } from '@/lib/apiHandler';
+import { normalizeAttendanceDate } from '@/lib/formatters';
 import { validateData, BulkRecordAttendanceSchema, RecordAttendanceSchema } from '@/lib/validation';
+import {
+  getStudentAttendanceHistory,
+  getClassroomAttendanceRange,
+  getClassroomAttendanceByDate,
+  getClassroomAttendanceDates,
+  getClassroomAttendanceRecords,
+  getClassroomAttendanceStats,
+  processBulkAttendance,
+  processSingleAttendance,
+  deleteAttendanceById,
+  deleteAttendanceByFilter,
+} from '@/lib/attendanceService';
 
-export async function GET(request: NextRequest) {
-  try {
-    const user = requireAuth(request);
-    const { searchParams } = new URL(request.url);
-    const classroomId = searchParams.get('classroom_id');
-    const date = searchParams.get('date');
-    const studentId = searchParams.get('student_id');
-    const startDate = searchParams.get('start_date');
-    const endDate = searchParams.get('end_date');
+export const GET = withAuth(async (request, user) => {
+  const { searchParams } = new URL(request.url);
+  const classroomId = searchParams.get('classroom_id');
+  const date = searchParams.get('date');
+  const studentId = searchParams.get('student_id');
+  const startDate = searchParams.get('start_date');
+  const endDate = searchParams.get('end_date');
 
-    // Get attendance history for a student (supports /api/attendance/history/:studentId rewrite or explicit classroom_id)
-    if (studentId) {
-      // Validate ownership
-      const student = await prisma.student.findFirst({
-        where: { id: Number(studentId), userId: user.id },
-      });
-      if (!student) return NextResponse.json({ message: 'Student not found' }, { status: 404 });
-
-      const whereClause: { studentId: number; classroomId?: number } = { studentId: Number(studentId) };
-      if (classroomId) {
-        whereClause.classroomId = Number(classroomId);
-      }
-
-      const records = await prisma.attendance.findMany({
-        where: whereClause,
-        orderBy: { date: 'desc' },
-      });
-      return NextResponse.json({ data: records.map(formatAttendanceRecord) });
-    }
-
-    // Get all records in a date range for a classroom (Matrix view)
-    if (classroomId && startDate && endDate) {
-      const numericClassroomId = Number(classroomId);
-      const cachedRange = await getOrSetCache(
-        userCacheKey(user.id, 'attendance:range', `${numericClassroomId}:${startDate}:${endDate}`),
-        45,
-        async () => {
-          const [classroom, records] = await Promise.all([
-            prisma.classroom.findFirst({
-              where: { id: numericClassroomId, userId: user.id },
-              select: { id: true },
-            }),
-            prisma.attendance.findMany({
-              where: {
-                classroomId: numericClassroomId,
-                date: {
-                  gte: normalizeAttendanceDate(startDate),
-                  lte: normalizeAttendanceDate(endDate),
-                },
-              },
-              orderBy: { date: 'asc' },
-            }),
-          ]);
-          if (!classroom) return null;
-          return records.map(formatAttendanceRecord);
-        }
-      );
-
-      if (!cachedRange) return NextResponse.json({ message: 'Classroom not found' }, { status: 404 });
-      return NextResponse.json({ data: cachedRange });
-    }
-
-    // Get by date
-    if (classroomId && date) {
-      const numericClassroomId = Number(classroomId);
-      const cachedByDate = await getOrSetCache(
-        userCacheKey(user.id, 'attendance:date', `${numericClassroomId}:${date}`),
-        45,
-        async () => {
-          const [classroom, records] = await Promise.all([
-            prisma.classroom.findFirst({
-              where: { id: numericClassroomId, userId: user.id },
-              select: { id: true },
-            }),
-            prisma.attendance.findMany({
-              where: { classroomId: numericClassroomId, date: normalizeAttendanceDate(date) },
-            }),
-          ]);
-          if (!classroom) return null;
-          return records.map(formatAttendanceRecord);
-        }
-      );
-
-      if (!cachedByDate) return NextResponse.json({ message: 'Classroom not found' }, { status: 404 });
-      return NextResponse.json({ data: cachedByDate });
-    }
-
-    // Distinct attendance dates for a classroom (lightweight alternative to type=records)
-    if (classroomId && searchParams.get('type') === 'dates') {
-      const classroom = await prisma.classroom.findFirst({
-        where: { id: Number(classroomId), userId: user.id },
-        select: { id: true },
-      });
-      if (!classroom) return NextResponse.json({ message: 'Classroom not found' }, { status: 404 });
-
-      const grouped = await getOrSetCache(
-        userCacheKey(user.id, 'attendance:dates', Number(classroomId)),
-        45,
-        async () => {
-          const rows = await prisma.attendance.groupBy({
-            by: ['date'],
-            where: { classroomId: Number(classroomId) },
-            _count: true,
-            orderBy: { date: 'asc' },
-          });
-          return rows.map(r => ({ date: r.date.toISOString().split('T')[0], count: r._count }));
-        }
-      );
-      return NextResponse.json({ data: grouped });
-    }
-
-    // Get all individual attendance records for a classroom (e.g. for Scores matrix week-date mapping)
-    if (classroomId && (searchParams.get('type') === 'records' || searchParams.get('records') === 'true')) {
-      const classroom = await prisma.classroom.findFirst({
-        where: { id: Number(classroomId), userId: user.id },
-      });
-      if (!classroom) return NextResponse.json({ message: 'Classroom not found' }, { status: 404 });
-
-      const formatted = await getOrSetCache(
-        userCacheKey(user.id, 'attendance:records', Number(classroomId)),
-        45,
-        async () => {
-          const records = await prisma.attendance.findMany({
-            where: { classroomId: Number(classroomId) },
-            orderBy: { date: 'asc' },
-          });
-          return records.map(formatAttendanceRecord);
-        }
-      );
-      return NextResponse.json({ data: formatted });
-    }
-
-    // Get stats (cached for 45s)
-    if (classroomId) {
-      const stats = await getOrSetCache(
-        userCacheKey(user.id, 'attendance:stats', Number(classroomId)),
-        45,
-        async () => {
-          const classroom = await prisma.classroom.findFirst({
-            where: { id: Number(classroomId), userId: user.id },
-          });
-          if (!classroom) return [];
-
-          const groupedCounts = await prisma.attendance.groupBy({
-            by: ['studentId', 'status'],
-            where: { classroomId: Number(classroomId) },
-            _count: true,
-          });
-
-          return calculateAttendanceStatsFromGrouped(groupedCounts, classroom);
-        }
-      );
-      return NextResponse.json({ data: stats });
-    }
-
-    return NextResponse.json({ data: [] });
-  } catch (error) {
-    if (error instanceof AuthError) return handleAuthError();
-    return NextResponse.json({ message: 'Failed to get attendance' }, { status: 500 });
+  // Get attendance history for a student (supports /api/attendance/history/:studentId rewrite or explicit classroom_id)
+  if (studentId) {
+    const records = await getStudentAttendanceHistory(user.id, studentId, classroomId ?? undefined);
+    if (!records) return NextResponse.json({ message: 'Student not found' }, { status: 404 });
+    return NextResponse.json({ data: records });
   }
-}
 
-export async function POST(request: NextRequest) {
-  try {
-    const user = requireAuth(request);
-    const body = await request.json();
+  // Get all records in a date range for a classroom (Matrix view)
+  if (classroomId && startDate && endDate) {
+    const cachedRange = await getClassroomAttendanceRange(user.id, classroomId, startDate, endDate);
+    if (!cachedRange) return NextResponse.json({ message: 'Classroom not found' }, { status: 404 });
+    return NextResponse.json({ data: cachedRange });
+  }
 
-    // Bulk mark attendance
-    if (Array.isArray(body.records)) {
-      const validation = validateData(body, BulkRecordAttendanceSchema);
-      if (!validation.success) {
-        return validation.response;
-      }
-      const records = validation.data.records;
+  // Get by date
+  if (classroomId && date) {
+    const cachedByDate = await getClassroomAttendanceByDate(user.id, classroomId, date);
+    if (!cachedByDate) return NextResponse.json({ message: 'Classroom not found' }, { status: 404 });
+    return NextResponse.json({ data: cachedByDate });
+  }
 
-      // Find unique classroom IDs and verify ownership in a single query
-      const classroomIds = Array.from(new Set(records.map(r => r.classroom_id)));
-      if (classroomIds.length > 0) {
-        const ownedClassrooms = await prisma.classroom.findMany({
-          where: { id: { in: classroomIds }, userId: user.id },
-          select: { id: true },
-        });
-        const ownedClassroomIds = new Set(ownedClassrooms.map(c => c.id));
-        const hasUnauthorizedClassroom = classroomIds.some(cid => !ownedClassroomIds.has(cid));
-        if (hasUnauthorizedClassroom) {
-          return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
-        }
-      }
+  // Distinct attendance dates for a classroom (lightweight alternative to type=records)
+  if (classroomId && searchParams.get('type') === 'dates') {
+    const grouped = await getClassroomAttendanceDates(user.id, classroomId);
+    if (!grouped) return NextResponse.json({ message: 'Classroom not found' }, { status: 404 });
+    return NextResponse.json({ data: grouped });
+  }
 
-      // Verify student ownership for all students in the request
-      const studentIds = Array.from(new Set(records.map(r => r.student_id)));
-      const ownedStudents = await prisma.student.findMany({
-        where: { id: { in: studentIds }, userId: user.id },
-        select: { id: true },
-      });
-      const ownedStudentIds = new Set(ownedStudents.map(s => s.id));
-      const unauthorizedIds = studentIds.filter(id => !ownedStudentIds.has(id));
-      if (unauthorizedIds.length > 0) {
-        return NextResponse.json({ message: 'Some students not found or unauthorized' }, { status: 403 });
-      }
+  // Get all individual attendance records for a classroom (e.g. for Scores matrix week-date mapping)
+  if (classroomId && (searchParams.get('type') === 'records' || searchParams.get('records') === 'true')) {
+    const formatted = await getClassroomAttendanceRecords(user.id, classroomId);
+    if (!formatted) return NextResponse.json({ message: 'Classroom not found' }, { status: 404 });
+    return NextResponse.json({ data: formatted });
+  }
 
-      // Deduplicate incoming records by (student_id, classroom_id, date)
-      const dedupedMap = new Map<string, { studentId: number; classroomId: number; date: Date; status: (typeof records)[0]['status'] }>();
-      for (const r of records) {
-        const parsedDate = normalizeAttendanceDate(r.date);
-        const dateIso = parsedDate.toISOString().split('T')[0];
-        const key = `${r.student_id}_${r.classroom_id}_${dateIso}`;
-        dedupedMap.set(key, {
-          studentId: r.student_id,
-          classroomId: r.classroom_id,
-          date: parsedDate,
-          status: r.status,
-        });
-      }
-      const dedupedList = Array.from(dedupedMap.values());
+  // Get stats (cached for 45s)
+  if (classroomId) {
+    const stats = await getClassroomAttendanceStats(user.id, classroomId);
+    return NextResponse.json({ data: stats });
+  }
 
-      // Query existing records in a single batch query
-      const existingAttendance = await prisma.attendance.findMany({
-        where: {
-          classroomId: { in: classroomIds },
-          studentId: { in: studentIds },
-          // Dedupe by timestamp (Set of Date objects would compare by reference)
-          date: { in: Array.from(new Set(dedupedList.map(r => r.date.getTime()))).map(t => new Date(t)) },
-        },
-        select: { id: true, studentId: true, classroomId: true, date: true, status: true },
-      });
+  return NextResponse.json({ data: [] });
+}, 'Failed to get attendance');
 
-      const existingMap = new Map<string, { id: number; status: string }>();
-      for (const ea of existingAttendance) {
-        const key = `${ea.studentId}_${ea.classroomId}_${ea.date.toISOString().split('T')[0]}`;
-        existingMap.set(key, { id: ea.id, status: ea.status });
-      }
+export const POST = withAuth(async (request, user) => {
+  const body = await request.json();
 
-      const creates: Array<{ studentId: number; classroomId: number; date: Date; status: (typeof records)[0]['status'] }> = [];
-      const updates: Array<{ id: number; status: (typeof records)[0]['status'] }> = [];
-
-      for (const item of dedupedList) {
-        const key = `${item.studentId}_${item.classroomId}_${item.date.toISOString().split('T')[0]}`;
-        const existing = existingMap.get(key);
-        if (existing) {
-          // Only update if status has actually changed to save DB writes
-          if (existing.status !== item.status) {
-            updates.push({ id: existing.id, status: item.status });
-          }
-        } else {
-          creates.push({
-            studentId: item.studentId,
-            classroomId: item.classroomId,
-            date: item.date,
-            status: item.status,
-          });
-        }
-      }
-
-      if (creates.length > 0 || updates.length > 0) {
-        await prisma.$transaction(async (tx) => {
-          if (creates.length > 0) {
-            await tx.attendance.createMany({
-              data: creates,
-              skipDuplicates: true,
-            });
-          }
-
-          const BATCH_SIZE = 25;
-          for (let i = 0; i < updates.length; i += BATCH_SIZE) {
-            const batch = updates.slice(i, i + BATCH_SIZE);
-            await Promise.all(
-              batch.map((upd) =>
-                tx.attendance.update({
-                  where: { id: upd.id },
-                  data: { status: upd.status },
-                })
-              )
-            );
-          }
-        });
-      }
-
-      invalidateCache(userCacheKey(user.id, 'attendance'));
-      invalidateCache(userCacheKey(user.id, 'grades'));
-      invalidateCache(userCacheKey(user.id, 'dashboard'));
-      return NextResponse.json({ message: 'Attendance marked' });
+  // Bulk mark attendance
+  if (Array.isArray(body.records)) {
+    const validation = validateData(body, BulkRecordAttendanceSchema);
+    if (!validation.success) {
+      return validation.response;
     }
-
-    // Single mark
-    const singleValidation = validateData(body, RecordAttendanceSchema);
-    if (!singleValidation.success) {
-      return singleValidation.response;
+    const result = await processBulkAttendance(user.id, validation.data.records);
+    if (!result.success) {
+      return NextResponse.json({ message: result.message }, { status: result.status });
     }
-    const record = singleValidation.data;
-    const parsedDate = normalizeAttendanceDate(record.date);
-
-    // Verify classroom and student ownership
-    const [classroom, student] = await Promise.all([
-      prisma.classroom.findFirst({
-        where: { id: record.classroom_id, userId: user.id },
-      }),
-      prisma.student.findFirst({
-        where: { id: record.student_id, userId: user.id },
-      }),
-    ]);
-    if (!classroom) return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
-    if (!student) return NextResponse.json({ message: 'Student not found or unauthorized' }, { status: 404 });
-
-    try {
-      await prisma.attendance.upsert({
-        where: {
-          studentId_classroomId_date: {
-            studentId: record.student_id,
-            classroomId: record.classroom_id,
-            date: parsedDate,
-          },
-        },
-        update: { status: record.status },
-        create: {
-          studentId: record.student_id,
-          classroomId: record.classroom_id,
-          date: parsedDate,
-          status: record.status,
-        },
-      });
-    } catch (upsertError: unknown) {
-      const isUniqueConstraint =
-        (upsertError instanceof Prisma.PrismaClientKnownRequestError && upsertError.code === 'P2002') ||
-        (upsertError as { code?: string })?.code === 'P2002';
-
-      if (isUniqueConstraint) {
-        // Fallback for concurrent upserts (race condition):
-        // A parallel request inserted the record right after the where check.
-        // Safely update the existing record.
-        await prisma.attendance.updateMany({
-          where: {
-            studentId: record.student_id,
-            classroomId: record.classroom_id,
-            date: parsedDate,
-          },
-          data: { status: record.status },
-        });
-      } else {
-        throw upsertError;
-      }
-    }
-
-    invalidateCache(userCacheKey(user.id, 'attendance'));
-    invalidateCache(userCacheKey(user.id, 'grades'));
-    invalidateCache(userCacheKey(user.id, 'dashboard'));
     return NextResponse.json({ message: 'Attendance marked' });
-  } catch (error) {
-    if (error instanceof AuthError) return handleAuthError();
-    console.error('Mark attendance error:', error);
-    return NextResponse.json({ message: 'Failed to mark attendance' }, { status: 500 });
   }
-}
 
-export async function DELETE(request: NextRequest) {
-  try {
-    const user = requireAuth(request);
-    const { searchParams } = new URL(request.url);
-    const classroomId = searchParams.get('classroom_id');
-    const date = searchParams.get('date');
-    const studentId = searchParams.get('student_id');
-    const studentIdsParam = searchParams.get('student_ids');
-    const id = searchParams.get('id');
+  // Single mark
+  const singleValidation = validateData(body, RecordAttendanceSchema);
+  if (!singleValidation.success) {
+    return singleValidation.response;
+  }
+  const result = await processSingleAttendance(user.id, singleValidation.data);
+  if (!result.success) {
+    return NextResponse.json({ message: result.message }, { status: result.status });
+  }
+  return NextResponse.json({ message: 'Attendance marked' });
+}, 'Failed to mark attendance');
 
-    if (!id && !classroomId) {
-      return NextResponse.json({ message: 'Missing required parameters (id or classroom_id required)' }, { status: 400 });
+export const DELETE = withAuth(async (request, user) => {
+  const { searchParams } = new URL(request.url);
+  const classroomId = searchParams.get('classroom_id');
+  const date = searchParams.get('date');
+  const studentId = searchParams.get('student_id');
+  const studentIdsParam = searchParams.get('student_ids');
+  const id = searchParams.get('id');
+
+  if (!id && !classroomId) {
+    return NextResponse.json({ message: 'Missing required parameters (id or classroom_id required)' }, { status: 400 });
+  }
+
+  if (id) {
+    const numericId = Number(id);
+    if (isNaN(numericId) || numericId <= 0) {
+      return NextResponse.json({ message: 'Invalid attendance ID' }, { status: 400 });
     }
 
-    if (id) {
-      const numericId = Number(id);
-      if (isNaN(numericId) || numericId <= 0) {
-        return NextResponse.json({ message: 'Invalid attendance ID' }, { status: 400 });
-      }
-
-      // Verify ownership of the attendance record
-      const attendance = await prisma.attendance.findFirst({
-        where: { id: numericId, classroom: { userId: user.id } },
-      });
-      if (!attendance) return NextResponse.json({ message: 'Attendance record not found' }, { status: 404 });
-
-      await prisma.attendance.delete({ where: { id: numericId } });
-      invalidateCache(userCacheKey(user.id, 'attendance'));
-      invalidateCache(userCacheKey(user.id, 'grades'));
-      invalidateCache(userCacheKey(user.id, 'dashboard'));
-      return NextResponse.json({ message: 'Attendance deleted' });
+    const result = await deleteAttendanceById(user.id, numericId);
+    if (!result.success) {
+      return NextResponse.json({ message: result.message }, { status: result.status });
     }
-
-    const numericClassroomId = Number(classroomId);
-    if (isNaN(numericClassroomId) || numericClassroomId <= 0) {
-      return NextResponse.json({ message: 'Invalid classroom ID' }, { status: 400 });
-    }
-
-    if (!date) {
-      return NextResponse.json({ message: 'Date is required when deleting by classroom' }, { status: 400 });
-    }
-
-    let parsedDate: Date;
-    try {
-      parsedDate = normalizeAttendanceDate(date);
-    } catch {
-      return NextResponse.json({ message: 'Invalid date format' }, { status: 400 });
-    }
-
-    if (studentIdsParam) {
-      const targetIds = Array.from(
-        new Set(
-          studentIdsParam
-            .split(',')
-            .map(s => Number(s.trim()))
-            .filter(n => !isNaN(n) && n > 0)
-        )
-      );
-      if (targetIds.length === 0) {
-        return NextResponse.json({ message: 'Invalid student_ids parameter' }, { status: 400 });
-      }
-
-      const [classroom, ownedStudents] = await Promise.all([
-        prisma.classroom.findFirst({
-          where: { id: numericClassroomId, userId: user.id },
-          select: { id: true },
-        }),
-        prisma.student.findMany({
-          where: { id: { in: targetIds }, userId: user.id },
-          select: { id: true },
-        }),
-      ]);
-      if (!classroom) return NextResponse.json({ message: 'Classroom not found' }, { status: 404 });
-      const ownedIds = ownedStudents.map(s => s.id);
-      if (ownedIds.length === 0) {
-        return NextResponse.json({ message: 'No matching authorized students found' }, { status: 404 });
-      }
-
-      await prisma.attendance.deleteMany({
-        where: {
-          studentId: { in: ownedIds },
-          classroomId: numericClassroomId,
-          date: parsedDate,
-        },
-      });
-    } else if (studentId) {
-      const numericStudentId = Number(studentId);
-      if (isNaN(numericStudentId) || numericStudentId <= 0) {
-        return NextResponse.json({ message: 'Invalid student ID' }, { status: 400 });
-      }
-
-      // Verify classroom and student ownership in parallel
-      const [classroom, student] = await Promise.all([
-        prisma.classroom.findFirst({
-          where: { id: numericClassroomId, userId: user.id },
-          select: { id: true },
-        }),
-        prisma.student.findFirst({
-          where: { id: numericStudentId, userId: user.id },
-          select: { id: true },
-        }),
-      ]);
-      if (!classroom) return NextResponse.json({ message: 'Classroom not found' }, { status: 404 });
-      if (!student) return NextResponse.json({ message: 'Student not found or unauthorized' }, { status: 404 });
-
-      await prisma.attendance.deleteMany({
-        where: {
-          studentId: numericStudentId,
-          classroomId: numericClassroomId,
-          date: parsedDate,
-        },
-      });
-    } else {
-      // Verify classroom ownership
-      const classroom = await prisma.classroom.findFirst({
-        where: { id: numericClassroomId, userId: user.id },
-        select: { id: true },
-      });
-      if (!classroom) return NextResponse.json({ message: 'Classroom not found' }, { status: 404 });
-
-      await prisma.attendance.deleteMany({
-        where: { classroomId: numericClassroomId, date: parsedDate },
-      });
-    }
-
-    invalidateCache(userCacheKey(user.id, 'attendance'));
-    invalidateCache(userCacheKey(user.id, 'grades'));
-    invalidateCache(userCacheKey(user.id, 'dashboard'));
     return NextResponse.json({ message: 'Attendance deleted' });
-  } catch (error) {
-    if (error instanceof AuthError) return handleAuthError();
-    return NextResponse.json({ message: 'Failed to delete attendance' }, { status: 500 });
   }
-}
+
+  const numericClassroomId = Number(classroomId);
+  if (isNaN(numericClassroomId) || numericClassroomId <= 0) {
+    return NextResponse.json({ message: 'Invalid classroom ID' }, { status: 400 });
+  }
+
+  if (!date) {
+    return NextResponse.json({ message: 'Date is required when deleting by classroom' }, { status: 400 });
+  }
+
+  try {
+    normalizeAttendanceDate(date);
+  } catch {
+    return NextResponse.json({ message: 'Invalid date format' }, { status: 400 });
+  }
+
+  let studentIds: number[] | undefined;
+  if (studentIdsParam) {
+    studentIds = Array.from(
+      new Set(
+        studentIdsParam
+          .split(',')
+          .map(s => Number(s.trim()))
+          .filter(n => !isNaN(n) && n > 0)
+      )
+    );
+    if (studentIds.length === 0) {
+      return NextResponse.json({ message: 'Invalid student_ids parameter' }, { status: 400 });
+    }
+  }
+
+  let numericStudentId: number | undefined;
+  if (!studentIds && studentId) {
+    numericStudentId = Number(studentId);
+    if (isNaN(numericStudentId) || numericStudentId <= 0) {
+      return NextResponse.json({ message: 'Invalid student ID' }, { status: 400 });
+    }
+  }
+
+  const result = await deleteAttendanceByFilter(user.id, {
+    classroomId: numericClassroomId,
+    date,
+    studentId: numericStudentId,
+    studentIds,
+  });
+
+  if (!result.success) {
+    return NextResponse.json({ message: result.message }, { status: result.status });
+  }
+  return NextResponse.json({ message: 'Attendance deleted' });
+}, 'Failed to delete attendance');

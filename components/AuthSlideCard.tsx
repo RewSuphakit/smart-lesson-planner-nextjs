@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -11,7 +11,7 @@ import {
 import Image from 'next/image';
 import Link from 'next/link';
 import logoImg from '@/public/logo.png';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import GoogleSignInButton from '@/components/GoogleSignInButton';
 import Turnstile, { TurnstileRef } from '@/components/Turnstile';
 
@@ -26,7 +26,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
 
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
 
-  // ─── Login States ───
+  // â”€â”€â”€ Login States â”€â”€â”€
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [showLoginPassword, setShowLoginPassword] = useState(false);
@@ -35,7 +35,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileRef = useRef<TurnstileRef>(null);
 
-  // ─── Register States ───
+  // â”€â”€â”€ Register States â”€â”€â”€
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
@@ -114,7 +114,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
     }
   };
 
-  // ─── Submit Login ───
+  // â”€â”€â”€ Submit Login â”€â”€â”€
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginLoading(true);
@@ -130,36 +130,36 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
       }
 
       await login(loginEmail, loginPassword, rememberMe, turnstileToken || undefined);
-      toast.success('เข้าสู่ระบบสำเร็จ!');
+      toast.success('à¹€à¸‚à¹‰à¸²à¸ªà¸¹à¹ˆà¸£à¸°à¸šà¸šà¸ªà¸³à¹€à¸£à¹‡à¸ˆ!');
       router.push('/');
     } catch (error: unknown) {
       turnstileRef.current?.reset();
       setTurnstileToken(null);
       const err = error as { response?: { data?: { message?: string; requireVerification?: boolean; email?: string } } };
       if (err.response?.data?.requireVerification) {
-        toast('กรุณายืนยันอีเมลก่อนเข้าใช้งาน', {
-          icon: '📧',
+        toast('à¸à¸£à¸¸à¸“à¸²à¸¢à¸·à¸™à¸¢à¸±à¸™à¸­à¸µà¹€à¸¡à¸¥à¸à¹ˆà¸­à¸™à¹€à¸‚à¹‰à¸²à¹ƒà¸Šà¹‰à¸‡à¸²à¸™', {
+          icon: 'ðŸ“§',
           duration: 3000,
         });
         const targetEmail = err.response.data.email || loginEmail;
         router.push(`/verify-email?email=${encodeURIComponent(targetEmail)}`);
       } else {
-        toast.error(err.response?.data?.message || 'เข้าสู่ระบบไม่สำเร็จ');
+        toast.error(err.response?.data?.message || 'à¹€à¸‚à¹‰à¸²à¸ªà¸¹à¹ˆà¸£à¸°à¸šà¸šà¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
       }
     } finally {
       setLoginLoading(false);
     }
   };
 
-  // ─── Submit Registration Form ───
+  // â”€â”€â”€ Submit Registration Form â”€â”€â”€
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (regPassword !== regConfirmPassword) {
-      toast.error('รหัสผ่านไม่ตรงกัน กรุณาตรวจสอบอีกครั้ง');
+      toast.error('à¸£à¸«à¸±à¸ªà¸œà¹ˆà¸²à¸™à¹„à¸¡à¹ˆà¸•à¸£à¸‡à¸à¸±à¸™ à¸à¸£à¸¸à¸“à¸²à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¸­à¸µà¸à¸„à¸£à¸±à¹‰à¸‡');
       return;
     }
     if (regPassword.length < 6) {
-      toast.error('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
+      toast.error('à¸£à¸«à¸±à¸ªà¸œà¹ˆà¸²à¸™à¸•à¹‰à¸­à¸‡à¸¡à¸µà¸­à¸¢à¹ˆà¸²à¸‡à¸™à¹‰à¸­à¸¢ 6 à¸•à¸±à¸§à¸­à¸±à¸à¸©à¸£');
       return;
     }
     setRegLoading(true);
@@ -175,44 +175,44 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
         if (res.devCode) {
           setDevOtp(res.devCode);
         }
-        toast.success(res.message || 'ส่งรหัสยืนยันไปยังอีเมลแล้ว');
+        toast.success(res.message || 'à¸ªà¹ˆà¸‡à¸£à¸«à¸±à¸ªà¸¢à¸·à¸™à¸¢à¸±à¸™à¹„à¸›à¸¢à¸±à¸‡à¸­à¸µà¹€à¸¡à¸¥à¹à¸¥à¹‰à¸§');
       } else {
-        toast.success('สมัครสมาชิกสำเร็จ!');
+        toast.success('à¸ªà¸¡à¸±à¸„à¸£à¸ªà¸¡à¸²à¸Šà¸´à¸à¸ªà¸³à¹€à¸£à¹‡à¸ˆ!');
         router.push('/');
       }
     } catch (error: unknown) {
       regTurnstileRef.current?.reset();
       setRegTurnstileToken(null);
       const err = error as { response?: { data?: { message?: string } } };
-      toast.error(err.response?.data?.message || 'สมัครสมาชิกไม่สำเร็จ');
+      toast.error(err.response?.data?.message || 'à¸ªà¸¡à¸±à¸„à¸£à¸ªà¸¡à¸²à¸Šà¸´à¸à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
     } finally {
       setRegLoading(false);
     }
   };
 
-  // ─── Submit OTP Verification ───
+  // â”€â”€â”€ Submit OTP Verification â”€â”€â”€
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanCode = otp.trim();
     if (cleanCode.length !== 6) {
-      toast.error('กรุณากรอกรหัสยืนยัน 6 หลัก');
+      toast.error('à¸à¸£à¸¸à¸“à¸²à¸à¸£à¸­à¸à¸£à¸«à¸±à¸ªà¸¢à¸·à¸™à¸¢à¸±à¸™ 6 à¸«à¸¥à¸±à¸');
       return;
     }
 
     setRegLoading(true);
     try {
       await verifyEmail(regEmail, cleanCode);
-      toast.success('ยืนยันอีเมลสำเร็จ กำลังเข้าสู่ระบบ...');
+      toast.success('à¸¢à¸·à¸™à¸¢à¸±à¸™à¸­à¸µà¹€à¸¡à¸¥à¸ªà¸³à¹€à¸£à¹‡à¸ˆ à¸à¸³à¸¥à¸±à¸‡à¹€à¸‚à¹‰à¸²à¸ªà¸¹à¹ˆà¸£à¸°à¸šà¸š...');
       router.push('/');
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
-      toast.error(err.response?.data?.message || 'รหัสยืนยันไม่ถูกต้อง');
+      toast.error(err.response?.data?.message || 'à¸£à¸«à¸±à¸ªà¸¢à¸·à¸™à¸¢à¸±à¸™à¹„à¸¡à¹ˆà¸–à¸¹à¸à¸•à¹‰à¸­à¸‡');
     } finally {
       setRegLoading(false);
     }
   };
 
-  // ─── Resend OTP Code ───
+  // â”€â”€â”€ Resend OTP Code â”€â”€â”€
   const handleResendOtp = async () => {
     if (countdown > 0 || resending) return;
     setResending(true);
@@ -222,10 +222,10 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
       if (res.devCode) {
         setDevOtp(res.devCode);
       }
-      toast.success(res.message || 'ส่งรหัสใหม่เรียบร้อยแล้ว');
+      toast.success(res.message || 'à¸ªà¹ˆà¸‡à¸£à¸«à¸±à¸ªà¹ƒà¸«à¸¡à¹ˆà¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢à¹à¸¥à¹‰à¸§');
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
-      toast.error(err.response?.data?.message || 'การส่งรหัสล้มเหลว');
+      toast.error(err.response?.data?.message || 'à¸à¸²à¸£à¸ªà¹ˆà¸‡à¸£à¸«à¸±à¸ªà¸¥à¹‰à¸¡à¹€à¸«à¸¥à¸§');
     } finally {
       setResending(false);
     }
@@ -235,10 +235,10 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
 
   return (
     <div className="w-full max-w-4xl mx-auto">
-      {/* ─── Main Card Container ─── */}
+      {/* â”€â”€â”€ Main Card Container â”€â”€â”€ */}
       <div className="relative bg-white/95 backdrop-blur-2xl border border-slate-200/80 shadow-2xl shadow-indigo-950/5 rounded-3xl overflow-hidden min-h-[630px] flex flex-col md:flex-row transition-all duration-500">
 
-        {/* ─── Mobile Segmented Control Tab (Visible only on < md) ─── */}
+        {/* â”€â”€â”€ Mobile Segmented Control Tab (Visible only on < md) â”€â”€â”€ */}
         <div className="md:hidden p-4 pb-0 z-30">
           <div className="relative bg-slate-100/90 p-1 rounded-2xl flex items-center">
             <div
@@ -251,7 +251,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
               className={`relative z-10 flex-1 py-2 text-xs font-semibold text-center transition-colors ${!isRegisterMode ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-800'
                 }`}
             >
-              เข้าสู่ระบบ
+              à¹€à¸‚à¹‰à¸²à¸ªà¸¹à¹ˆà¸£à¸°à¸šà¸š
             </button>
             <button
               type="button"
@@ -259,19 +259,19 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
               className={`relative z-10 flex-1 py-2 text-xs font-semibold text-center transition-colors ${isRegisterMode ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-800'
                 }`}
             >
-              สมัครสมาชิก
+              à¸ªà¸¡à¸±à¸„à¸£à¸ªà¸¡à¸²à¸Šà¸´à¸
             </button>
           </div>
         </div>
 
-        {/* ─── Forms Area (Desktop: 50% width, sliding smoothly) ─── */}
+        {/* â”€â”€â”€ Forms Area (Desktop: 50% width, sliding smoothly) â”€â”€â”€ */}
         <div
           className={`w-full md:w-1/2 p-6 sm:p-10 z-10 transition-transform duration-700 ease-in-out md:absolute md:top-0 md:bottom-0 ${isRegisterMode ? 'md:translate-x-full' : 'md:translate-x-0'
             }`}
         >
           <div className="h-full flex flex-col justify-center">
 
-            {/* ────── LOGIN FORM VIEW ────── */}
+            {/* â”€â”€â”€â”€â”€â”€ LOGIN FORM VIEW â”€â”€â”€â”€â”€â”€ */}
             <div
               className={`transition-all duration-500 ${!isRegisterMode
                 ? 'opacity-100 translate-x-0 pointer-events-auto block'
@@ -282,7 +282,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
               <div className="mb-6">
 
                 <h1 className="text-center text-3xl font-bold text-slate-800 tracking-tight">
-                  เข้าสู่ระบบ
+                  à¹€à¸‚à¹‰à¸²à¸ªà¸¹à¹ˆà¸£à¸°à¸šà¸š
                 </h1>
 
               </div>
@@ -292,7 +292,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
                 {/* Email Field */}
                 <div>
                   <label className="text-xs font-medium text-slate-600 mb-1.5 block">
-                    อีเมล
+                    à¸­à¸µà¹€à¸¡à¸¥
                   </label>
                   <div className="relative">
                     <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
@@ -313,13 +313,13 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="text-xs font-medium text-slate-600">
-                      รหัสผ่าน
+                      à¸£à¸«à¸±à¸ªà¸œà¹ˆà¸²à¸™
                     </label>
                     <Link
                       href="/forgot-password"
                       className="text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline transition-colors"
                     >
-                      ลืมรหัสผ่าน?
+                      à¸¥à¸·à¸¡à¸£à¸«à¸±à¸ªà¸œà¹ˆà¸²à¸™?
                     </Link>
                   </div>
                   <div className="relative">
@@ -329,7 +329,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
                     <input
                       type={showLoginPassword ? 'text' : 'password'}
                       className="form-input pl-10 pr-10 py-2.5 text-sm rounded-xl bg-slate-50/70 focus:bg-white border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all w-full"
-                      placeholder="••••••••"
+                      placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
                       required
@@ -338,7 +338,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
                       type="button"
                       onClick={() => setShowLoginPassword(!showLoginPassword)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 transition-colors"
-                      aria-label={showLoginPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+                      aria-label={showLoginPassword ? 'à¸‹à¹ˆà¸­à¸™à¸£à¸«à¸±à¸ªà¸œà¹ˆà¸²à¸™' : 'à¹à¸ªà¸”à¸‡à¸£à¸«à¸±à¸ªà¸œà¹ˆà¸²à¸™'}
                     >
                       {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -354,7 +354,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
                       onChange={(e) => setRememberMe(e.target.checked)}
                       className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                     />
-                    <span>จดจำการเข้าสู่ระบบ</span>
+                    <span>à¸ˆà¸”à¸ˆà¸³à¸à¸²à¸£à¹€à¸‚à¹‰à¸²à¸ªà¸¹à¹ˆà¸£à¸°à¸šà¸š</span>
                   </label>
                 </div>
 
@@ -379,7 +379,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <>
-                      <span>เข้าสู่ระบบ</span>
+                      <span>à¹€à¸‚à¹‰à¸²à¸ªà¸¹à¹ˆà¸£à¸°à¸šà¸š</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
@@ -389,7 +389,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
                 <div className="relative flex items-center justify-center my-3">
                   <div className="border-t border-slate-200 w-full" />
                   <span className="bg-white/95 px-3 text-[11px] text-slate-400 font-normal shrink-0">
-                    หรือ
+                    à¸«à¸£à¸·à¸­
                   </span>
                   <div className="border-t border-slate-200 w-full" />
                 </div>
@@ -401,19 +401,19 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
               {/* Mobile Switch Link */}
               <div className="mt-5 pt-4 border-t border-slate-100 text-center md:hidden">
                 <p className="text-xs text-slate-500">
-                  ยังไม่มีบัญชี?{' '}
+                  à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¸¡à¸µà¸šà¸±à¸à¸Šà¸µ?{' '}
                   <button
                     type="button"
                     onClick={() => handleSwitchMode('register')}
                     className="text-indigo-600 hover:text-indigo-700 font-semibold transition-colors hover:underline"
                   >
-                    สมัครสมาชิก
+                    à¸ªà¸¡à¸±à¸„à¸£à¸ªà¸¡à¸²à¸Šà¸´à¸
                   </button>
                 </p>
               </div>
             </div>
 
-            {/* ────── REGISTER FORM VIEW ────── */}
+            {/* â”€â”€â”€â”€â”€â”€ REGISTER FORM VIEW â”€â”€â”€â”€â”€â”€ */}
             <div
               className={`transition-all duration-500 ${isRegisterMode
                 ? 'opacity-100 translate-x-0 pointer-events-auto block'
@@ -426,7 +426,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
                   <div className="mb-5">
 
                     <h2 className=" text-center  text-3xl font-bold text-slate-800 tracking-tight">
-                      สร้างบัญชีใหม่
+                      à¸ªà¸£à¹‰à¸²à¸‡à¸šà¸±à¸à¸Šà¸µà¹ƒà¸«à¸¡à¹ˆ
                     </h2>
 
                   </div>
@@ -436,7 +436,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
                     {/* Name */}
                     <div>
                       <label className="text-xs font-medium text-slate-600 mb-1 block">
-                        ชื่อ-นามสกุล
+                        à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥
                       </label>
                       <div className="relative">
                         <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
@@ -456,7 +456,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
                     {/* Email */}
                     <div>
                       <label className="text-xs font-medium text-slate-600 mb-1 block">
-                        อีเมล
+                        à¸­à¸µà¹€à¸¡à¸¥
                       </label>
                       <div className="relative">
                         <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
@@ -478,7 +478,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
                       {/* Password */}
                       <div>
                         <label className="text-xs font-medium text-slate-600 mb-1 block">
-                          รหัสผ่าน
+                          à¸£à¸«à¸±à¸ªà¸œà¹ˆà¸²à¸™
                         </label>
                         <div className="relative">
                           <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
@@ -487,7 +487,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
                           <input
                             type={showRegPassword ? 'text' : 'password'}
                             className="form-input pl-9 pr-8 py-2 text-sm rounded-xl bg-slate-50/70 focus:bg-white border-slate-200 focus:border-indigo-500 transition-all w-full"
-                            placeholder="6 ตัวขึ้นไป"
+                            placeholder="6 à¸•à¸±à¸§à¸‚à¸¶à¹‰à¸™à¹„à¸›"
                             value={regPassword}
                             onChange={(e) => setRegPassword(e.target.value)}
                             required
@@ -506,7 +506,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <label className="text-xs font-medium text-slate-600 block">
-                            ยืนยันรหัส
+                            à¸¢à¸·à¸™à¸¢à¸±à¸™à¸£à¸«à¸±à¸ª
                           </label>
                           {isMatch && <Check className="w-3.5 h-3.5 text-emerald-500" />}
                         </div>
@@ -522,7 +522,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
                                 ? 'border-emerald-300 focus:border-emerald-500'
                                 : 'border-slate-200 focus:border-indigo-500'
                               }`}
-                            placeholder="พิมพ์ซ้ำอีกครั้ง"
+                            placeholder="à¸žà¸´à¸¡à¸žà¹Œà¸‹à¹‰à¸³à¸­à¸µà¸à¸„à¸£à¸±à¹‰à¸‡"
                             value={regConfirmPassword}
                             onChange={(e) => setRegConfirmPassword(e.target.value)}
                             required
@@ -568,7 +568,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
                         <>
-                          <span>สร้างบัญชีและรับรหัส OTP</span>
+                          <span>à¸ªà¸£à¹‰à¸²à¸‡à¸šà¸±à¸à¸Šà¸µà¹à¸¥à¸°à¸£à¸±à¸šà¸£à¸«à¸±à¸ª OTP</span>
                           <ArrowRight className="w-4 h-4" />
                         </>
                       )}
@@ -578,7 +578,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
                     <div className="relative flex items-center justify-center my-2.5">
                       <div className="border-t border-slate-200 w-full" />
                       <span className="bg-white/95 px-3 text-[11px] text-slate-400 font-normal shrink-0">
-                        หรือ
+                        à¸«à¸£à¸·à¸­
                       </span>
                       <div className="border-t border-slate-200 w-full" />
                     </div>
@@ -590,19 +590,19 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
                   {/* Mobile Switch Link */}
                   <div className="mt-4 pt-3 border-t border-slate-100 text-center md:hidden">
                     <p className="text-xs text-slate-500">
-                      มีบัญชีอยู่แล้ว?{' '}
+                      à¸¡à¸µà¸šà¸±à¸à¸Šà¸µà¸­à¸¢à¸¹à¹ˆà¹à¸¥à¹‰à¸§?{' '}
                       <button
                         type="button"
                         onClick={() => handleSwitchMode('login')}
                         className="text-indigo-600 hover:text-indigo-700 font-semibold transition-colors hover:underline"
                       >
-                        เข้าสู่ระบบ
+                        à¹€à¸‚à¹‰à¸²à¸ªà¸¹à¹ˆà¸£à¸°à¸šà¸š
                       </button>
                     </p>
                   </div>
                 </>
               ) : (
-                /* ────── STEP 2: EMAIL OTP VERIFICATION ────── */
+                /* â”€â”€â”€â”€â”€â”€ STEP 2: EMAIL OTP VERIFICATION â”€â”€â”€â”€â”€â”€ */
                 <div className="py-2">
                   <button
                     type="button"
@@ -610,7 +610,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
                     className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-indigo-600 font-medium mb-4 transition-colors"
                   >
                     <ArrowLeft className="w-3.5 h-3.5" />
-                    <span>แก้ไขข้อมูล</span>
+                    <span>à¹à¸à¹‰à¹„à¸‚à¸‚à¹‰à¸­à¸¡à¸¹à¸¥</span>
                   </button>
 
                   <div className="text-center mb-6">
@@ -618,24 +618,24 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
                       <Mail className="w-5 h-5" />
                     </div>
                     <h2 className="text-xl font-bold text-slate-800 tracking-tight">
-                      ยืนยันอีเมล
+                      à¸¢à¸·à¸™à¸¢à¸±à¸™à¸­à¸µà¹€à¸¡à¸¥
                     </h2>
                     <p className="text-xs text-slate-400 mt-1">
-                      กรอกรหัส 6 หลักที่ส่งไปที่ <span className="font-medium text-slate-700">{regEmail}</span>
+                      à¸à¸£à¸­à¸à¸£à¸«à¸±à¸ª 6 à¸«à¸¥à¸±à¸à¸—à¸µà¹ˆà¸ªà¹ˆà¸‡à¹„à¸›à¸—à¸µà¹ˆ <span className="font-medium text-slate-700">{regEmail}</span>
                     </p>
                   </div>
 
                   {devOtp && (
                     <div className="mb-4 py-2 px-3 bg-amber-50 border border-amber-200/70 rounded-xl text-xs flex items-center justify-between">
                       <span className="text-amber-800">
-                        รหัสทดสอบ: <strong className="font-mono">{devOtp}</strong>
+                        à¸£à¸«à¸±à¸ªà¸—à¸”à¸ªà¸­à¸š: <strong className="font-mono">{devOtp}</strong>
                       </span>
                       <button
                         type="button"
                         onClick={() => setOtp(devOtp)}
                         className="text-amber-700 hover:text-amber-900 underline font-medium"
                       >
-                        ใส่รหัส
+                        à¹ƒà¸ªà¹ˆà¸£à¸«à¸±à¸ª
                       </button>
                     </div>
                   )}
@@ -652,7 +652,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
                         maxLength={6}
                         autoFocus
                         className="form-input pl-10 py-3 text-center text-2xl font-mono tracking-[0.4em] font-bold rounded-xl bg-slate-50/70 focus:bg-white border-slate-200 focus:border-indigo-500 transition-all text-indigo-900 w-full"
-                        placeholder="······"
+                        placeholder="Â·Â·Â·Â·Â·Â·"
                         value={otp}
                         onChange={(e) => {
                           const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 6);
@@ -671,7 +671,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
                         <>
-                          <span>ยืนยันรหัส OTP</span>
+                          <span>à¸¢à¸·à¸™à¸¢à¸±à¸™à¸£à¸«à¸±à¸ª OTP</span>
                           <Check className="w-4 h-4" />
                         </>
                       )}
@@ -686,13 +686,13 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
                       className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 disabled:text-slate-400 transition-colors"
                     >
                       {resending ? (
-                        <span>กำลังส่งรหัสใหม่...</span>
+                        <span>à¸à¸³à¸¥à¸±à¸‡à¸ªà¹ˆà¸‡à¸£à¸«à¸±à¸ªà¹ƒà¸«à¸¡à¹ˆ...</span>
                       ) : countdown > 0 ? (
-                        <span>ส่งรหัสใหม่อีกครั้งได้ใน ({countdown}s)</span>
+                        <span>à¸ªà¹ˆà¸‡à¸£à¸«à¸±à¸ªà¹ƒà¸«à¸¡à¹ˆà¸­à¸µà¸à¸„à¸£à¸±à¹‰à¸‡à¹„à¸”à¹‰à¹ƒà¸™ ({countdown}s)</span>
                       ) : (
                         <>
                           <RotateCcw className="w-3.5 h-3.5" />
-                          <span>กดส่งรหัสใหม่อีกครั้ง</span>
+                          <span>à¸à¸”à¸ªà¹ˆà¸‡à¸£à¸«à¸±à¸ªà¹ƒà¸«à¸¡à¹ˆà¸­à¸µà¸à¸„à¸£à¸±à¹‰à¸‡</span>
                         </>
                       )}
                     </button>
@@ -704,7 +704,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
           </div>
         </div>
 
-        {/* ─── Desktop Sliding Welcome Overlay Panel (50% width, minimal & elegant) ─── */}
+        {/* â”€â”€â”€ Desktop Sliding Welcome Overlay Panel (50% width, minimal & elegant) â”€â”€â”€ */}
         <div
           className={`hidden md:flex absolute top-0 bottom-0 w-1/2 z-20 transition-transform duration-700 ease-in-out ${isRegisterMode ? 'translate-x-0' : 'translate-x-full'
             }`}
@@ -732,7 +732,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
               {isRegisterMode ? (
                 <div className="animate-fade-in-up">
                   <h3 className="text-2xl font-bold mb-2.5 tracking-tight text-white">
-                    มีบัญชีอยู่แล้ว?
+                    à¸¡à¸µà¸šà¸±à¸à¸Šà¸µà¸­à¸¢à¸¹à¹ˆà¹à¸¥à¹‰à¸§?
                   </h3>
                   <p className="text-xs text-indigo-100/80 leading-relaxed mb-7 font-normal">
 
@@ -743,14 +743,14 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
                     onClick={() => handleSwitchMode('login')}
                     className="px-7 py-2.5 rounded-full bg-white text-slate-800 hover:bg-indigo-50 font-semibold text-xs shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-300 inline-flex items-center gap-2"
                   >
-                    <span>เข้าสู่ระบบ</span>
+                    <span>à¹€à¸‚à¹‰à¸²à¸ªà¸¹à¹ˆà¸£à¸°à¸šà¸š</span>
                     <ArrowRight className="w-3.5 h-3.5 text-indigo-600" />
                   </button>
                 </div>
               ) : (
                 <div className="animate-fade-in-up">
                   <h3 className="text-2xl font-bold mb-2.5 tracking-tight text-white">
-                    ยังไม่มีบัญชีผู้ใช้?
+                    à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¸¡à¸µà¸šà¸±à¸à¸Šà¸µà¸œà¸¹à¹‰à¹ƒà¸Šà¹‰?
                   </h3>
                   <p className="text-xs text-indigo-100/80 leading-relaxed mb-7 font-normal">
 
@@ -761,7 +761,7 @@ export default function AuthSlideCard({ initialMode = 'login' }: AuthSlideCardPr
                     onClick={() => handleSwitchMode('register')}
                     className="px-7 py-2.5 rounded-full bg-white text-slate-800 hover:bg-indigo-50 font-semibold text-xs shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-300 inline-flex items-center gap-2"
                   >
-                    <span>สมัครสมาชิกใหม่</span>
+                    <span>à¸ªà¸¡à¸±à¸„à¸£à¸ªà¸¡à¸²à¸Šà¸´à¸à¹ƒà¸«à¸¡à¹ˆ</span>
                     <ArrowRight className="w-3.5 h-3.5 text-indigo-600" />
                   </button>
                 </div>

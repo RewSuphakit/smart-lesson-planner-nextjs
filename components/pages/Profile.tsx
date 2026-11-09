@@ -1,10 +1,10 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/services/api';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import {
   User, Mail, Lock, Shield, Sparkles, Check,
   Eye, EyeOff, Save, KeyRound, Calendar,
@@ -90,18 +90,18 @@ export default function ProfilePage() {
     if (e) e.preventDefault();
     const cleanEmail = newEmail.trim().toLowerCase();
     if (!cleanEmail) {
-      toast.error('กรุณาระบุที่อยู่อีเมลใหม่');
+      toast.error('à¸à¸£à¸¸à¸“à¸²à¸£à¸°à¸šà¸¸à¸—à¸µà¹ˆà¸­à¸¢à¸¹à¹ˆà¸­à¸µà¹€à¸¡à¸¥à¹ƒà¸«à¸¡à¹ˆ');
       return;
     }
     if (cleanEmail === user?.email?.toLowerCase()) {
-      toast.error('อีเมลนี้ตรงกับอีเมลปัจจุบันของคุณแล้ว');
+      toast.error('à¸­à¸µà¹€à¸¡à¸¥à¸™à¸µà¹‰à¸•à¸£à¸‡à¸à¸±à¸šà¸­à¸µà¹€à¸¡à¸¥à¸›à¸±à¸ˆà¸ˆà¸¸à¸šà¸±à¸™à¸‚à¸­à¸‡à¸„à¸¸à¸“à¹à¸¥à¹‰à¸§');
       return;
     }
 
     setEmailLoading(true);
     try {
       const res = await api.post('/auth/profile/email/request', { newEmail: cleanEmail });
-      toast.success(res.data.message || 'ส่งรหัส OTP เรียบร้อยแล้ว');
+      toast.success(res.data.message || 'à¸ªà¹ˆà¸‡à¸£à¸«à¸±à¸ª OTP à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢à¹à¸¥à¹‰à¸§');
       if (res.data.isDevMode && res.data.devCode) {
         setDevOtpNotice(res.data.devCode);
       } else {
@@ -111,7 +111,7 @@ export default function ProfilePage() {
       setCountdown(60);
     } catch (err: unknown) {
       const apiErr = err as ApiError;
-      toast.error(apiErr.response?.data?.message || 'ไม่สามารถส่งรหัส OTP ได้');
+      toast.error(apiErr.response?.data?.message || 'à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸ªà¹ˆà¸‡à¸£à¸«à¸±à¸ª OTP à¹„à¸”à¹‰');
     } finally {
       setEmailLoading(false);
     }
@@ -121,7 +121,7 @@ export default function ProfilePage() {
     e.preventDefault();
     const cleanCode = emailOtp.trim();
     if (!cleanCode || cleanCode.length !== 6) {
-      toast.error('กรุณากรอกรหัส OTP 6 หลัก');
+      toast.error('à¸à¸£à¸¸à¸“à¸²à¸à¸£à¸­à¸à¸£à¸«à¸±à¸ª OTP 6 à¸«à¸¥à¸±à¸');
       return;
     }
 
@@ -131,11 +131,11 @@ export default function ProfilePage() {
       if (res.data.user) {
         updateUser(res.data.user);
       }
-      toast.success(res.data.message || 'เปลี่ยนที่อยู่อีเมลสำเร็จเรียบร้อย 🎉');
+      toast.success(res.data.message || 'à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¸—à¸µà¹ˆà¸­à¸¢à¸¹à¹ˆà¸­à¸µà¹€à¸¡à¸¥à¸ªà¸³à¹€à¸£à¹‡à¸ˆà¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢ ðŸŽ‰');
       setIsEmailModalOpen(false);
     } catch (err: unknown) {
       const apiErr = err as ApiError;
-      toast.error(apiErr.response?.data?.message || 'การยืนยันรหัส OTP ล้มเหลว');
+      toast.error(apiErr.response?.data?.message || 'à¸à¸²à¸£à¸¢à¸·à¸™à¸¢à¸±à¸™à¸£à¸«à¸±à¸ª OTP à¸¥à¹‰à¸¡à¹€à¸«à¸¥à¸§');
     } finally {
       setEmailLoading(false);
     }
@@ -187,12 +187,12 @@ export default function ProfilePage() {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      toast.error('กรุณาเลือกไฟล์รูปภาพ (JPG, PNG, WEBP, GIF)');
+      toast.error('à¸à¸£à¸¸à¸“à¸²à¹€à¸¥à¸·à¸­à¸à¹„à¸Ÿà¸¥à¹Œà¸£à¸¹à¸›à¸ à¸²à¸ž (JPG, PNG, WEBP, GIF)');
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('ไฟล์รูปภาพต้องมีขนาดไม่เกิน 5MB');
+      toast.error('à¹„à¸Ÿà¸¥à¹Œà¸£à¸¹à¸›à¸ à¸²à¸žà¸•à¹‰à¸­à¸‡à¸¡à¸µà¸‚à¸™à¸²à¸”à¹„à¸¡à¹ˆà¹€à¸à¸´à¸™ 5MB');
       return;
     }
 
@@ -216,7 +216,7 @@ export default function ProfilePage() {
         const compressedDataUrl = canvas.toDataURL('image/webp', 0.88);
         setSelectedAvatar(compressedDataUrl);
         setAvatarType('upload');
-        toast.success('เลือกรูปภาพสำเร็จ กด "บันทึกการเปลี่ยนแปลง" เพื่อใช้งาน');
+        toast.success('à¹€à¸¥à¸·à¸­à¸à¸£à¸¹à¸›à¸ à¸²à¸žà¸ªà¸³à¹€à¸£à¹‡à¸ˆ à¸à¸” "à¸šà¸±à¸™à¸—à¸¶à¸à¸à¸²à¸£à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¹à¸›à¸¥à¸‡" à¹€à¸žà¸·à¹ˆà¸­à¹ƒà¸Šà¹‰à¸‡à¸²à¸™');
       };
       img.src = event.target?.result as string;
     };
@@ -227,7 +227,7 @@ export default function ProfilePage() {
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      toast.error('กรุณากรอกชื่อ-นามสกุล');
+      toast.error('à¸à¸£à¸¸à¸“à¸²à¸à¸£à¸­à¸à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥');
       return;
     }
 
@@ -246,10 +246,10 @@ export default function ProfilePage() {
       if (res.data.user) {
         updateUser(res.data.user);
       }
-      toast.success('อัปเดตข้อมูลส่วนตัวสำเร็จ 🎉');
+      toast.success('à¸­à¸±à¸›à¹€à¸”à¸•à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸ªà¹ˆà¸§à¸™à¸•à¸±à¸§à¸ªà¸³à¹€à¸£à¹‡à¸ˆ ðŸŽ‰');
     } catch (err: unknown) {
       const apiErr = err as ApiError;
-      toast.error(apiErr.response?.data?.message || 'ไม่สามารถอัปเดตข้อมูลได้');
+      toast.error(apiErr.response?.data?.message || 'à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸­à¸±à¸›à¹€à¸”à¸•à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¹„à¸”à¹‰');
     } finally {
       setSavingProfile(false);
     }
@@ -265,13 +265,13 @@ export default function ProfilePage() {
           confirmation: deleteConfirmation,
         },
       });
-      toast.success(res.data.message || 'ลบบัญชีผู้ใช้เรียบร้อยแล้ว');
+      toast.success(res.data.message || 'à¸¥à¸šà¸šà¸±à¸à¸Šà¸µà¸œà¸¹à¹‰à¹ƒà¸Šà¹‰à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢à¹à¸¥à¹‰à¸§');
       setIsDeleteModalOpen(false);
       logout();
       router.push('/login');
     } catch (err: unknown) {
       const apiErr = err as ApiError;
-      toast.error(apiErr.response?.data?.message || 'ไม่สามารถลบบัญชีได้');
+      toast.error(apiErr.response?.data?.message || 'à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸¥à¸šà¸šà¸±à¸à¸Šà¸µà¹„à¸”à¹‰');
     } finally {
       setDeletingAccount(false);
     }
@@ -281,17 +281,17 @@ export default function ProfilePage() {
     e.preventDefault();
 
     if (!newPassword) {
-      toast.error('กรุณากรอกรหัสผ่านใหม่');
+      toast.error('à¸à¸£à¸¸à¸“à¸²à¸à¸£à¸­à¸à¸£à¸«à¸±à¸ªà¸œà¹ˆà¸²à¸™à¹ƒà¸«à¸¡à¹ˆ');
       return;
     }
 
     if (newPassword.length < 6) {
-      toast.error('รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 6 ตัวอักษร');
+      toast.error('à¸£à¸«à¸±à¸ªà¸œà¹ˆà¸²à¸™à¹ƒà¸«à¸¡à¹ˆà¸•à¹‰à¸­à¸‡à¸¡à¸µà¸„à¸§à¸²à¸¡à¸¢à¸²à¸§à¸­à¸¢à¹ˆà¸²à¸‡à¸™à¹‰à¸­à¸¢ 6 à¸•à¸±à¸§à¸­à¸±à¸à¸©à¸£');
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      toast.error('รหัสผ่านใหม่และการยืนยันรหัสผ่านไม่ตรงกัน');
+      toast.error('à¸£à¸«à¸±à¸ªà¸œà¹ˆà¸²à¸™à¹ƒà¸«à¸¡à¹ˆà¹à¸¥à¸°à¸à¸²à¸£à¸¢à¸·à¸™à¸¢à¸±à¸™à¸£à¸«à¸±à¸ªà¸œà¹ˆà¸²à¸™à¹„à¸¡à¹ˆà¸•à¸£à¸‡à¸à¸±à¸™');
       return;
     }
 
@@ -302,13 +302,13 @@ export default function ProfilePage() {
         new_password: newPassword,
       });
 
-      toast.success('เปลี่ยนรหัสผ่านเรียบร้อยแล้ว 🔒');
+      toast.success('à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¸£à¸«à¸±à¸ªà¸œà¹ˆà¸²à¸™à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢à¹à¸¥à¹‰à¸§ ðŸ”’');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (err: unknown) {
       const apiErr = err as ApiError;
-      toast.error(apiErr.response?.data?.message || 'ไม่สามารถเปลี่ยนรหัสผ่านได้');
+      toast.error(apiErr.response?.data?.message || 'à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¸£à¸«à¸±à¸ªà¸œà¹ˆà¸²à¸™à¹„à¸”à¹‰');
     } finally {
       setSavingPassword(false);
     }
@@ -324,9 +324,9 @@ export default function ProfilePage() {
     if (/[0-9]/.test(pass)) score++;
     if (/[^A-Za-z0-9]/.test(pass)) score++;
 
-    if (score <= 2) return { score, label: 'ง่ายเกินไป', color: 'bg-rose-500' };
-    if (score <= 3) return { score, label: 'ปานกลาง', color: 'bg-amber-500' };
-    return { score, label: 'ปลอดภัยสูง', color: 'bg-emerald-500' };
+    if (score <= 2) return { score, label: 'à¸‡à¹ˆà¸²à¸¢à¹€à¸à¸´à¸™à¹„à¸›', color: 'bg-rose-500' };
+    if (score <= 3) return { score, label: 'à¸›à¸²à¸™à¸à¸¥à¸²à¸‡', color: 'bg-amber-500' };
+    return { score, label: 'à¸›à¸¥à¸­à¸”à¸ à¸±à¸¢à¸ªà¸¹à¸‡', color: 'bg-emerald-500' };
   };
 
   const currentAvatarDisplay = isCustomAvatar
@@ -339,7 +339,7 @@ export default function ProfilePage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
         <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
-        <p className="text-slate-500 text-sm">กำลังโหลดข้อมูลโปรไฟล์...</p>
+        <p className="text-slate-500 text-sm">à¸à¸³à¸¥à¸±à¸‡à¹‚à¸«à¸¥à¸”à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¹‚à¸›à¸£à¹„à¸Ÿà¸¥à¹Œ...</p>
       </div>
     );
   }
@@ -351,14 +351,14 @@ export default function ProfilePage() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="px-3 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700 inline-flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5" /> ตั้งค่าบัญชี
+              <Sparkles className="w-3.5 h-3.5" /> à¸•à¸±à¹‰à¸‡à¸„à¹ˆà¸²à¸šà¸±à¸à¸Šà¸µ
             </span>
             <span className="px-2.5 py-0.5 text-xs font-medium rounded-full bg-slate-100 text-slate-600 border border-slate-200">
-              {user?.role === 'admin' ? 'ผู้ดูแลระบบ (Admin)' : 'ครูผู้สอน (Teacher)'}
+              {user?.role === 'admin' ? 'à¸œà¸¹à¹‰à¸”à¸¹à¹à¸¥à¸£à¸°à¸šà¸š (Admin)' : 'à¸„à¸£à¸¹à¸œà¸¹à¹‰à¸ªà¸­à¸™ (Teacher)'}
             </span>
           </div>
           <h1 className="text-2xl lg:text-3xl font-bold gradient-text p-2">
-            ข้อมูลส่วนตัว & ความปลอดภัย
+            à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸ªà¹ˆà¸§à¸™à¸•à¸±à¸§ & à¸„à¸§à¸²à¸¡à¸›à¸¥à¸­à¸”à¸ à¸±à¸¢
           </h1>
         </div>
 
@@ -373,7 +373,7 @@ export default function ProfilePage() {
               }`}
           >
             <User className="w-4 h-4" />
-            ข้อมูลส่วนตัว
+            à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸ªà¹ˆà¸§à¸™à¸•à¸±à¸§
           </button>
           <button
             type="button"
@@ -384,7 +384,7 @@ export default function ProfilePage() {
               }`}
           >
             <Shield className="w-4 h-4" />
-            ความปลอดภัย & รหัสผ่าน
+            à¸„à¸§à¸²à¸¡à¸›à¸¥à¸­à¸”à¸ à¸±à¸¢ & à¸£à¸«à¸±à¸ªà¸œà¹ˆà¸²à¸™
           </button>
         </div>
       </div>
@@ -411,7 +411,7 @@ export default function ProfilePage() {
                 fileInputRef.current?.click();
               }}
               className="absolute -bottom-1 -right-1 bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-xl shadow-md border-2 border-white transition-transform hover:scale-110"
-              title="เปลี่ยนรูปภาพประจำตัว"
+              title="à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¸£à¸¹à¸›à¸ à¸²à¸žà¸›à¸£à¸°à¸ˆà¸³à¸•à¸±à¸§"
             >
               <Camera className="w-4 h-4" />
             </button>
@@ -431,19 +431,19 @@ export default function ProfilePage() {
           <div className="w-full space-y-2.5 text-left text-xs">
             <div className="flex items-center justify-between p-2.5 bg-indigo-50/60 rounded-xl border border-indigo-100/50">
               <span className="text-slate-600 font-medium flex items-center gap-1.5">
-                <Shield className="w-3.5 h-3.5 text-indigo-500" /> สิทธิ์ใช้งาน
+                <Shield className="w-3.5 h-3.5 text-indigo-500" /> à¸ªà¸´à¸—à¸˜à¸´à¹Œà¹ƒà¸Šà¹‰à¸‡à¸²à¸™
               </span>
               <span className="font-bold text-indigo-700 uppercase">
-                {user?.role === 'admin' ? 'ผู้ดูแลระบบ' : 'ครูผู้สอน'}
+                {user?.role === 'admin' ? 'à¸œà¸¹à¹‰à¸”à¸¹à¹à¸¥à¸£à¸°à¸šà¸š' : 'à¸„à¸£à¸¹à¸œà¸¹à¹‰à¸ªà¸­à¸™'}
               </span>
             </div>
 
             <div className="flex items-center justify-between p-2.5 bg-purple-50/60 rounded-xl border border-purple-100/50">
               <span className="text-slate-600 font-medium flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-purple-500" /> เริ่มใช้งานเมื่อ
+                <Calendar className="w-3.5 h-3.5 text-purple-500" /> à¹€à¸£à¸´à¹ˆà¸¡à¹ƒà¸Šà¹‰à¸‡à¸²à¸™à¹€à¸¡à¸·à¹ˆà¸­
               </span>
               <span className="font-semibold text-slate-700">
-                {createdAt ? new Date(createdAt).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' }) : 'ไม่ระบุ'}
+                {createdAt ? new Date(createdAt).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' }) : 'à¹„à¸¡à¹ˆà¸£à¸°à¸šà¸¸'}
               </span>
             </div>
           </div>
@@ -456,7 +456,7 @@ export default function ProfilePage() {
             <div className="glass p-6 sm:p-8 rounded-3xl border border-indigo-100 shadow-xl shadow-indigo-100/30 space-y-6">
               <div className="border-b border-indigo-100/60 pb-4">
                 <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                  <User className="w-5 h-5 text-indigo-600" /> แก้ไขข้อมูลส่วนตัว
+                  <User className="w-5 h-5 text-indigo-600" /> à¹à¸à¹‰à¹„à¸‚à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸ªà¹ˆà¸§à¸™à¸•à¸±à¸§
                 </h3>
               </div>
 
@@ -464,7 +464,7 @@ export default function ProfilePage() {
                 {/* Full Name Input */}
                 <div className="space-y-2">
                   <label htmlFor="fullname-input" className="block text-xs font-semibold text-slate-700">
-                    ชื่อ-นามสกุล <span className="text-rose-500">*</span>
+                    à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥ <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -475,7 +475,7 @@ export default function ProfilePage() {
                       type="text"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="เช่น ครูสมชาย ใจดี"
+                      placeholder="à¹€à¸Šà¹ˆà¸™ à¸„à¸£à¸¹à¸ªà¸¡à¸Šà¸²à¸¢ à¹ƒà¸ˆà¸”à¸µ"
                       required
                       className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/80 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm text-slate-800 font-medium shadow-sm transition-all"
                     />
@@ -486,7 +486,7 @@ export default function ProfilePage() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <label htmlFor="email-display" className="block text-xs font-semibold text-slate-700">
-                      ที่อยู่อีเมลเข้าสู่ระบบ
+                      à¸—à¸µà¹ˆà¸­à¸¢à¸¹à¹ˆà¸­à¸µà¹€à¸¡à¸¥à¹€à¸‚à¹‰à¸²à¸ªà¸¹à¹ˆà¸£à¸°à¸šà¸š
                     </label>
 
                   </div>
@@ -509,11 +509,11 @@ export default function ProfilePage() {
                       className="px-4 py-2.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium text-xs border border-indigo-200 shadow-sm transition-all flex items-center gap-1.5 shrink-0"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
-                      เปลี่ยนอีเมล
+                      à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¸­à¸µà¹€à¸¡à¸¥
                     </button>
                   </div>
                   <p className="text-[0.72rem] text-slate-500">
-                    อีเมลใช้สำหรับการเข้าสู่ระบบและกู้คืนรหัสผ่าน สามารถเปลี่ยนเป็นอีเมลจริงได้โดยข้อมูลเดิมยังคงอยู่ครบถ้วน
+                    à¸­à¸µà¹€à¸¡à¸¥à¹ƒà¸Šà¹‰à¸ªà¸³à¸«à¸£à¸±à¸šà¸à¸²à¸£à¹€à¸‚à¹‰à¸²à¸ªà¸¹à¹ˆà¸£à¸°à¸šà¸šà¹à¸¥à¸°à¸à¸¹à¹‰à¸„à¸·à¸™à¸£à¸«à¸±à¸ªà¸œà¹ˆà¸²à¸™ à¸ªà¸²à¸¡à¸²à¸£à¸–à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¹€à¸›à¹‡à¸™à¸­à¸µà¹€à¸¡à¸¥à¸ˆà¸£à¸´à¸‡à¹„à¸”à¹‰à¹‚à¸”à¸¢à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¹€à¸”à¸´à¸¡à¸¢à¸±à¸‡à¸„à¸‡à¸­à¸¢à¸¹à¹ˆà¸„à¸£à¸šà¸–à¹‰à¸§à¸™
                   </p>
                 </div>
 
@@ -521,9 +521,9 @@ export default function ProfilePage() {
                 <div className="space-y-3 pt-2">
                   <div className="flex items-center justify-between">
                     <label className="block text-xs font-semibold text-slate-700">
-                      รูปประจำตัวของคุณ (Avatar)
+                      à¸£à¸¹à¸›à¸›à¸£à¸°à¸ˆà¸³à¸•à¸±à¸§à¸‚à¸­à¸‡à¸„à¸¸à¸“ (Avatar)
                     </label>
-                    <span className="text-[11px] text-slate-400">เลือกอัปโหลดรูปถ่ายหรือใช้อิโมจิ</span>
+                    <span className="text-[11px] text-slate-400">à¹€à¸¥à¸·à¸­à¸à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¸£à¸¹à¸›à¸–à¹ˆà¸²à¸¢à¸«à¸£à¸·à¸­à¹ƒà¸Šà¹‰à¸­à¸´à¹‚à¸¡à¸ˆà¸´</span>
                   </div>
 
                   {/* Mode Selector Buttons */}
@@ -537,7 +537,7 @@ export default function ProfilePage() {
                         }`}
                     >
                       <Upload className="w-3.5 h-3.5" />
-                      อัปโหลดรูปภาพ
+                      à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¸£à¸¹à¸›à¸ à¸²à¸ž
                     </button>
                     <button
                       type="button"
@@ -548,7 +548,7 @@ export default function ProfilePage() {
                         }`}
                     >
                       <Sparkles className="w-3.5 h-3.5" />
-                      เลือกอิโมจิ
+                      à¹€à¸¥à¸·à¸­à¸à¸­à¸´à¹‚à¸¡à¸ˆà¸´
                     </button>
                     {googleAvatar && (
                       <button
@@ -562,8 +562,8 @@ export default function ProfilePage() {
                           : 'text-slate-600 hover:text-slate-900'
                           }`}
                       >
-                        <span>🌐</span>
-                        รูป Google
+                        <span>ðŸŒ</span>
+                        à¸£à¸¹à¸› Google
                       </button>
                     )}
                   </div>
@@ -589,9 +589,9 @@ export default function ProfilePage() {
                             className="border-2 border-indigo-200"
                           />
                           <div className="space-y-1.5 text-center sm:text-left flex-1 min-w-0">
-                            <p className="text-xs font-bold text-slate-800">รูปภาพโปรไฟล์ปัจจุบัน</p>
+                            <p className="text-xs font-bold text-slate-800">à¸£à¸¹à¸›à¸ à¸²à¸žà¹‚à¸›à¸£à¹„à¸Ÿà¸¥à¹Œà¸›à¸±à¸ˆà¸ˆà¸¸à¸šà¸±à¸™</p>
                             <p className="text-[11px] text-slate-500">
-                              รองรับไฟล์รูปภาพทั่วไป ระบบจะปรับขนาดและจัดกึ่งกลางให้อัตโนมัติ
+                              à¸£à¸­à¸‡à¸£à¸±à¸šà¹„à¸Ÿà¸¥à¹Œà¸£à¸¹à¸›à¸ à¸²à¸žà¸—à¸±à¹ˆà¸§à¹„à¸› à¸£à¸°à¸šà¸šà¸ˆà¸°à¸›à¸£à¸±à¸šà¸‚à¸™à¸²à¸”à¹à¸¥à¸°à¸ˆà¸±à¸”à¸à¸¶à¹ˆà¸‡à¸à¸¥à¸²à¸‡à¹ƒà¸«à¹‰à¸­à¸±à¸•à¹‚à¸™à¸¡à¸±à¸•à¸´
                             </p>
                             <div className="flex flex-wrap gap-2 pt-1 justify-center sm:justify-start">
                               <button
@@ -599,7 +599,7 @@ export default function ProfilePage() {
                                 onClick={() => fileInputRef.current?.click()}
                                 className="btn bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold px-3 py-1.5 rounded-xl border border-indigo-200 flex items-center gap-1.5"
                               >
-                                <Camera className="w-3.5 h-3.5" /> เปลี่ยนรูปภาพใหม่
+                                <Camera className="w-3.5 h-3.5" /> à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¸£à¸¹à¸›à¸ à¸²à¸žà¹ƒà¸«à¸¡à¹ˆ
                               </button>
                               <button
                                 type="button"
@@ -609,7 +609,7 @@ export default function ProfilePage() {
                                 }}
                                 className="btn bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 text-xs font-semibold px-3 py-1.5 rounded-xl border border-slate-200 flex items-center gap-1.5"
                               >
-                                <Trash2 className="w-3.5 h-3.5" /> ใช้อิโมจิแทน
+                                <Trash2 className="w-3.5 h-3.5" /> à¹ƒà¸Šà¹‰à¸­à¸´à¹‚à¸¡à¸ˆà¸´à¹à¸—à¸™
                               </button>
                             </div>
                           </div>
@@ -623,9 +623,9 @@ export default function ProfilePage() {
                             <Upload className="w-6 h-6" />
                           </div>
                           <div>
-                            <p className="text-xs font-bold text-indigo-900">คลิกที่นี่เพื่ออัปโหลดรูปภาพประจำตัวครู</p>
+                            <p className="text-xs font-bold text-indigo-900">à¸„à¸¥à¸´à¸à¸—à¸µà¹ˆà¸™à¸µà¹ˆà¹€à¸žà¸·à¹ˆà¸­à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¸£à¸¹à¸›à¸ à¸²à¸žà¸›à¸£à¸°à¸ˆà¸³à¸•à¸±à¸§à¸„à¸£à¸¹</p>
                             <p className="text-[11px] text-slate-500 mt-0.5">
-                              รองรับไฟล์ JPG, PNG, WEBP (ขนาดไม่เกิน 5MB)
+                              à¸£à¸­à¸‡à¸£à¸±à¸šà¹„à¸Ÿà¸¥à¹Œ JPG, PNG, WEBP (à¸‚à¸™à¸²à¸”à¹„à¸¡à¹ˆà¹€à¸à¸´à¸™ 5MB)
                             </p>
                           </div>
                         </div>
@@ -647,7 +647,7 @@ export default function ProfilePage() {
                               : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
                               }`}
                           >
-                            🐾 สัตว์น่ารัก
+                            ðŸ¾ à¸ªà¸±à¸•à¸§à¹Œà¸™à¹ˆà¸²à¸£à¸±à¸
                           </button>
                           <button
                             type="button"
@@ -657,7 +657,7 @@ export default function ProfilePage() {
                               : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
                               }`}
                           >
-                            🎓 ครู & การศึกษา
+                            ðŸŽ“ à¸„à¸£à¸¹ & à¸à¸²à¸£à¸¨à¸¶à¸à¸©à¸²
                           </button>
                         </div>
 
@@ -666,14 +666,14 @@ export default function ProfilePage() {
                           onClick={() => setIsCustomAvatar(!isCustomAvatar)}
                           className="text-xs font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
                         >
-                          {isCustomAvatar ? '← ดูรายการอิโมจิ' : 'พิมพ์อิโมจิเอง ✏️'}
+                          {isCustomAvatar ? 'â† à¸”à¸¹à¸£à¸²à¸¢à¸à¸²à¸£à¸­à¸´à¹‚à¸¡à¸ˆà¸´' : 'à¸žà¸´à¸¡à¸žà¹Œà¸­à¸´à¹‚à¸¡à¸ˆà¸´à¹€à¸­à¸‡ âœï¸'}
                         </button>
                       </div>
 
                       {isCustomAvatar ? (
                         <div className="space-y-2 p-3 bg-white rounded-2xl border border-indigo-100">
                           <p className="text-xs text-slate-600">
-                            พิมพ์หรือวางตัวการ์ตูน/อิโมจิที่คุณชอบ (เช่น 🎓, 💻, 🚀, 📚)
+                            à¸žà¸´à¸¡à¸žà¹Œà¸«à¸£à¸·à¸­à¸§à¸²à¸‡à¸•à¸±à¸§à¸à¸²à¸£à¹Œà¸•à¸¹à¸™/à¸­à¸´à¹‚à¸¡à¸ˆà¸´à¸—à¸µà¹ˆà¸„à¸¸à¸“à¸Šà¸­à¸š (à¹€à¸Šà¹ˆà¸™ ðŸŽ“, ðŸ’», ðŸš€, ðŸ“š)
                           </p>
                           <input
                             type="text"
@@ -685,7 +685,7 @@ export default function ProfilePage() {
                                 setSelectedAvatar(val.trim());
                               }
                             }}
-                            placeholder="วางหรือพิมพ์ Emoji ที่นี่..."
+                            placeholder="à¸§à¸²à¸‡à¸«à¸£à¸·à¸­à¸žà¸´à¸¡à¸žà¹Œ Emoji à¸—à¸µà¹ˆà¸™à¸µà¹ˆ..."
                             maxLength={6}
                             className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-3xl text-center shadow-sm"
                           />
@@ -731,11 +731,11 @@ export default function ProfilePage() {
                   >
                     {savingProfile ? (
                       <>
-                        <Loader2 className="w-4 h-4 animate-spin" /> กำลังบันทึก...
+                        <Loader2 className="w-4 h-4 animate-spin" /> à¸à¸³à¸¥à¸±à¸‡à¸šà¸±à¸™à¸—à¸¶à¸...
                       </>
                     ) : (
                       <>
-                        <Save className="w-4 h-4" /> บันทึกการเปลี่ยนแปลง
+                        <Save className="w-4 h-4" /> à¸šà¸±à¸™à¸—à¸¶à¸à¸à¸²à¸£à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¹à¸›à¸¥à¸‡
                       </>
                     )}
                   </button>
@@ -748,10 +748,10 @@ export default function ProfilePage() {
               <div className="glass p-6 sm:p-8 rounded-3xl border border-indigo-100 shadow-xl shadow-indigo-100/30 space-y-6">
                 <div className="border-b border-indigo-100/60 pb-4">
                   <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                    <KeyRound className="w-5 h-5 text-indigo-600" /> เปลี่ยนรหัสผ่านเข้าใช้งาน
+                    <KeyRound className="w-5 h-5 text-indigo-600" /> à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¸£à¸«à¸±à¸ªà¸œà¹ˆà¸²à¸™à¹€à¸‚à¹‰à¸²à¹ƒà¸Šà¹‰à¸‡à¸²à¸™
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    เพื่อความปลอดภัย แนะนำให้ใช้รหัสผ่านที่มีความยาวอย่างน้อย 8 ตัวอักษร
+                    à¹€à¸žà¸·à¹ˆà¸­à¸„à¸§à¸²à¸¡à¸›à¸¥à¸­à¸”à¸ à¸±à¸¢ à¹à¸™à¸°à¸™à¸³à¹ƒà¸«à¹‰à¹ƒà¸Šà¹‰à¸£à¸«à¸±à¸ªà¸œà¹ˆà¸²à¸™à¸—à¸µà¹ˆà¸¡à¸µà¸„à¸§à¸²à¸¡à¸¢à¸²à¸§à¸­à¸¢à¹ˆà¸²à¸‡à¸™à¹‰à¸­à¸¢ 8 à¸•à¸±à¸§à¸­à¸±à¸à¸©à¸£
                   </p>
                 </div>
 
@@ -759,7 +759,7 @@ export default function ProfilePage() {
                   {/* Current Password */}
                   <div className="space-y-2">
                     <label htmlFor="current-pass" className="block text-xs font-semibold text-slate-700">
-                      รหัสผ่านเดิม <span className="text-slate-400 font-normal">(ถ้ามี)</span>
+                      à¸£à¸«à¸±à¸ªà¸œà¹ˆà¸²à¸™à¹€à¸”à¸´à¸¡ <span className="text-slate-400 font-normal">(à¸–à¹‰à¸²à¸¡à¸µ)</span>
                     </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -770,7 +770,7 @@ export default function ProfilePage() {
                         type={showCurrentPassword ? 'text' : 'password'}
                         value={currentPassword}
                         onChange={(e) => setCurrentPassword(e.target.value)}
-                        placeholder="กรอกรหัสผ่านปัจจุบัน"
+                        placeholder="à¸à¸£à¸­à¸à¸£à¸«à¸±à¸ªà¸œà¹ˆà¸²à¸™à¸›à¸±à¸ˆà¸ˆà¸¸à¸šà¸±à¸™"
                         className="w-full pl-10 pr-11 py-2.5 rounded-xl bg-white/80 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm text-slate-800 font-medium shadow-sm transition-all"
                       />
                       <button
@@ -787,7 +787,7 @@ export default function ProfilePage() {
                   {/* New Password */}
                   <div className="space-y-2">
                     <label htmlFor="new-pass" className="block text-xs font-semibold text-slate-700">
-                      รหัสผ่านใหม่ <span className="text-rose-500">*</span>
+                      à¸£à¸«à¸±à¸ªà¸œà¹ˆà¸²à¸™à¹ƒà¸«à¸¡à¹ˆ <span className="text-rose-500">*</span>
                     </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -798,7 +798,7 @@ export default function ProfilePage() {
                         type={showNewPassword ? 'text' : 'password'}
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="กำหนดรหัสผ่านใหม่อย่างน้อย 6 ตัวอักษร"
+                        placeholder="à¸à¸³à¸«à¸™à¸”à¸£à¸«à¸±à¸ªà¸œà¹ˆà¸²à¸™à¹ƒà¸«à¸¡à¹ˆà¸­à¸¢à¹ˆà¸²à¸‡à¸™à¹‰à¸­à¸¢ 6 à¸•à¸±à¸§à¸­à¸±à¸à¸©à¸£"
                         required
                         minLength={6}
                         className="w-full pl-10 pr-11 py-2.5 rounded-xl bg-white/80 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm text-slate-800 font-medium shadow-sm transition-all"
@@ -817,7 +817,7 @@ export default function ProfilePage() {
                     {newPassword && (
                       <div className="space-y-1 pt-1">
                         <div className="flex items-center justify-between text-[0.68rem]">
-                          <span className="text-slate-500">ความปลอดภัยของรหัสผ่าน:</span>
+                          <span className="text-slate-500">à¸„à¸§à¸²à¸¡à¸›à¸¥à¸­à¸”à¸ à¸±à¸¢à¸‚à¸­à¸‡à¸£à¸«à¸±à¸ªà¸œà¹ˆà¸²à¸™:</span>
                           <span className="font-bold text-slate-700">{passStrength.label}</span>
                         </div>
                         <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden flex gap-1">
@@ -836,7 +836,7 @@ export default function ProfilePage() {
                   {/* Confirm New Password */}
                   <div className="space-y-2">
                     <label htmlFor="confirm-pass" className="block text-xs font-semibold text-slate-700">
-                      ยืนยันรหัสผ่านใหม่ <span className="text-rose-500">*</span>
+                      à¸¢à¸·à¸™à¸¢à¸±à¸™à¸£à¸«à¸±à¸ªà¸œà¹ˆà¸²à¸™à¹ƒà¸«à¸¡à¹ˆ <span className="text-rose-500">*</span>
                     </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -847,7 +847,7 @@ export default function ProfilePage() {
                         type={showConfirmPassword ? 'text' : 'password'}
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="กรอกรหัสผ่านใหม่อีกครั้ง"
+                        placeholder="à¸à¸£à¸­à¸à¸£à¸«à¸±à¸ªà¸œà¹ˆà¸²à¸™à¹ƒà¸«à¸¡à¹ˆà¸­à¸µà¸à¸„à¸£à¸±à¹‰à¸‡"
                         required
                         className="w-full pl-10 pr-11 py-2.5 rounded-xl bg-white/80 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm text-slate-800 font-medium shadow-sm transition-all"
                       />
@@ -862,7 +862,7 @@ export default function ProfilePage() {
                     </div>
                     {confirmPassword && newPassword !== confirmPassword && (
                       <p className="text-[0.7rem] text-rose-500 font-medium">
-                        ⚠️ รหัสผ่านไม่ตรงกัน กรุณาตรวจสอบอีกครั้ง
+                        âš ï¸ à¸£à¸«à¸±à¸ªà¸œà¹ˆà¸²à¸™à¹„à¸¡à¹ˆà¸•à¸£à¸‡à¸à¸±à¸™ à¸à¸£à¸¸à¸“à¸²à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¸­à¸µà¸à¸„à¸£à¸±à¹‰à¸‡
                       </p>
                     )}
                   </div>
@@ -876,11 +876,11 @@ export default function ProfilePage() {
                     >
                       {savingPassword ? (
                         <>
-                          <Loader2 className="w-4 h-4 animate-spin" /> กำลังเปลี่ยนรหัสผ่าน...
+                          <Loader2 className="w-4 h-4 animate-spin" /> à¸à¸³à¸¥à¸±à¸‡à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¸£à¸«à¸±à¸ªà¸œà¹ˆà¸²à¸™...
                         </>
                       ) : (
                         <>
-                          <Lock className="w-4 h-4" /> อัปเดตรหัสผ่าน
+                          <Lock className="w-4 h-4" /> à¸­à¸±à¸›à¹€à¸”à¸•à¸£à¸«à¸±à¸ªà¸œà¹ˆà¸²à¸™
                         </>
                       )}
                     </button>
@@ -894,10 +894,10 @@ export default function ProfilePage() {
                   <div className="space-y-1">
                     <h3 className="text-base font-bold text-rose-800 flex items-center gap-2">
                       <AlertTriangle className="w-5 h-5 text-rose-600" />
-                      พื้นที่อันตราย: ลบบัญชีผู้ใช้งาน (Delete ID)
+                      à¸žà¸·à¹‰à¸™à¸—à¸µà¹ˆà¸­à¸±à¸™à¸•à¸£à¸²à¸¢: à¸¥à¸šà¸šà¸±à¸à¸Šà¸µà¸œà¸¹à¹‰à¹ƒà¸Šà¹‰à¸‡à¸²à¸™ (Delete ID)
                     </h3>
                     <p className="text-xs text-rose-700/90 leading-relaxed max-w-xl">
-                      เมื่อลบบัญชี ข้อมูลทั้งหมดของคุณในระบบ เช่น ห้องเรียน ตารางสอน นักเรียน สถิติการเข้าเรียน และผลการเรียนทั้งหมดจะถูกลบออกจากระบบอย่างถาวรทันที และไม่สามารถกู้คืนได้อีก
+                      à¹€à¸¡à¸·à¹ˆà¸­à¸¥à¸šà¸šà¸±à¸à¸Šà¸µ à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”à¸‚à¸­à¸‡à¸„à¸¸à¸“à¹ƒà¸™à¸£à¸°à¸šà¸š à¹€à¸Šà¹ˆà¸™ à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™ à¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™ à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™ à¸ªà¸–à¸´à¸•à¸´à¸à¸²à¸£à¹€à¸‚à¹‰à¸²à¹€à¸£à¸µà¸¢à¸™ à¹à¸¥à¸°à¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”à¸ˆà¸°à¸–à¸¹à¸à¸¥à¸šà¸­à¸­à¸à¸ˆà¸²à¸à¸£à¸°à¸šà¸šà¸­à¸¢à¹ˆà¸²à¸‡à¸–à¸²à¸§à¸£à¸—à¸±à¸™à¸—à¸µ à¹à¸¥à¸°à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸à¸¹à¹‰à¸„à¸·à¸™à¹„à¸”à¹‰à¸­à¸µà¸
                     </p>
                   </div>
                   <button
@@ -910,7 +910,7 @@ export default function ProfilePage() {
                     className="btn bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md shadow-rose-500/20 flex items-center gap-1.5 shrink-0 transition-all hover:scale-105"
                   >
                     <Trash2 className="w-4 h-4" />
-                    ลบบัญชีผู้ใช้
+                    à¸¥à¸šà¸šà¸±à¸à¸Šà¸µà¸œà¸¹à¹‰à¹ƒà¸Šà¹‰
                   </button>
                 </div>
               </div>
@@ -931,12 +931,12 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   <h3 className="text-base sm:text-lg font-bold text-slate-800">
-                    เปลี่ยนที่อยู่อีเมลประจำบัญชี
+                    à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¸—à¸µà¹ˆà¸­à¸¢à¸¹à¹ˆà¸­à¸µà¹€à¸¡à¸¥à¸›à¸£à¸°à¸ˆà¸³à¸šà¸±à¸à¸Šà¸µ
                   </h3>
                   <p className="text-xs text-slate-500">
                     {emailStep === 'request'
-                      ? 'ขั้นตอนที่ 1/2: ระบุอีเมลใหม่เพื่อรับรหัสยืนยัน'
-                      : 'ขั้นตอนที่ 2/2: ยืนยันรหัส OTP 6 หลัก'}
+                      ? 'à¸‚à¸±à¹‰à¸™à¸•à¸­à¸™à¸—à¸µà¹ˆ 1/2: à¸£à¸°à¸šà¸¸à¸­à¸µà¹€à¸¡à¸¥à¹ƒà¸«à¸¡à¹ˆà¹€à¸žà¸·à¹ˆà¸­à¸£à¸±à¸šà¸£à¸«à¸±à¸ªà¸¢à¸·à¸™à¸¢à¸±à¸™'
+                      : 'à¸‚à¸±à¹‰à¸™à¸•à¸­à¸™à¸—à¸µà¹ˆ 2/2: à¸¢à¸·à¸™à¸¢à¸±à¸™à¸£à¸«à¸±à¸ª OTP 6 à¸«à¸¥à¸±à¸'}
                   </p>
                 </div>
               </div>
@@ -956,7 +956,7 @@ export default function ProfilePage() {
               <form onSubmit={handleRequestEmailOtp} className="mt-5 space-y-4">
                 {/* Current Email Card */}
                 <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 flex items-center justify-between text-xs">
-                  <span className="text-slate-500 font-medium">อีเมลปัจจุบัน:</span>
+                  <span className="text-slate-500 font-medium">à¸­à¸µà¹€à¸¡à¸¥à¸›à¸±à¸ˆà¸ˆà¸¸à¸šà¸±à¸™:</span>
                   <span className="font-bold text-slate-700">{user?.email}</span>
                 </div>
 
@@ -964,9 +964,9 @@ export default function ProfilePage() {
                 <div className="p-3.5 bg-indigo-50/70 rounded-2xl border border-indigo-100 text-xs text-indigo-900 flex items-start gap-2.5">
                   <Info className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
                   <div className="space-y-1">
-                    <p className="font-semibold text-indigo-950">ข้อมูลทั้งหมดจะคงอยู่ครบถ้วน</p>
+                    <p className="font-semibold text-indigo-950">à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”à¸ˆà¸°à¸„à¸‡à¸­à¸¢à¸¹à¹ˆà¸„à¸£à¸šà¸–à¹‰à¸§à¸™</p>
                     <p className="text-indigo-700 text-[0.72rem] leading-relaxed">
-                      ตารางสอน รายชื่อนักเรียน และผลคะแนนจะไม่หาย ระบบจะส่งรหัส OTP ไปยังอีเมลใหม่เพื่อยืนยันความเป็นเจ้าของ
+                      à¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™ à¸£à¸²à¸¢à¸Šà¸·à¹ˆà¸­à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™ à¹à¸¥à¸°à¸œà¸¥à¸„à¸°à¹à¸™à¸™à¸ˆà¸°à¹„à¸¡à¹ˆà¸«à¸²à¸¢ à¸£à¸°à¸šà¸šà¸ˆà¸°à¸ªà¹ˆà¸‡à¸£à¸«à¸±à¸ª OTP à¹„à¸›à¸¢à¸±à¸‡à¸­à¸µà¹€à¸¡à¸¥à¹ƒà¸«à¸¡à¹ˆà¹€à¸žà¸·à¹ˆà¸­à¸¢à¸·à¸™à¸¢à¸±à¸™à¸„à¸§à¸²à¸¡à¹€à¸›à¹‡à¸™à¹€à¸ˆà¹‰à¸²à¸‚à¸­à¸‡
                     </p>
                   </div>
                 </div>
@@ -974,7 +974,7 @@ export default function ProfilePage() {
                 {/* New Email Input */}
                 <div className="space-y-1.5">
                   <label htmlFor="modal-new-email" className="block text-xs font-semibold text-slate-700">
-                    ที่อยู่อีเมลใหม่ <span className="text-rose-500">*</span>
+                    à¸—à¸µà¹ˆà¸­à¸¢à¸¹à¹ˆà¸­à¸µà¹€à¸¡à¸¥à¹ƒà¸«à¸¡à¹ˆ <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -985,7 +985,7 @@ export default function ProfilePage() {
                       type="email"
                       value={newEmail}
                       onChange={(e) => setNewEmail(e.target.value)}
-                      placeholder="เช่น yourname@gmail.com หรืออีเมลวิทยาลัย"
+                      placeholder="à¹€à¸Šà¹ˆà¸™ yourname@gmail.com à¸«à¸£à¸·à¸­à¸­à¸µà¹€à¸¡à¸¥à¸§à¸´à¸—à¸¢à¸²à¸¥à¸±à¸¢"
                       required
                       autoFocus
                       className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50/60 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm text-slate-800 font-medium shadow-sm transition-all"
@@ -1001,7 +1001,7 @@ export default function ProfilePage() {
                     disabled={emailLoading}
                     className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
                   >
-                    ยกเลิก
+                    à¸¢à¸à¹€à¸¥à¸´à¸
                   </button>
                   <button
                     type="submit"
@@ -1010,11 +1010,11 @@ export default function ProfilePage() {
                   >
                     {emailLoading ? (
                       <>
-                        <Loader2 className="w-4 h-4 animate-spin" /> กำลังส่งรหัส...
+                        <Loader2 className="w-4 h-4 animate-spin" /> à¸à¸³à¸¥à¸±à¸‡à¸ªà¹ˆà¸‡à¸£à¸«à¸±à¸ª...
                       </>
                     ) : (
                       <>
-                        ส่งรหัส OTP ยืนยัน <ArrowRight className="w-3.5 h-3.5" />
+                        à¸ªà¹ˆà¸‡à¸£à¸«à¸±à¸ª OTP à¸¢à¸·à¸™à¸¢à¸±à¸™ <ArrowRight className="w-3.5 h-3.5" />
                       </>
                     )}
                   </button>
@@ -1026,7 +1026,7 @@ export default function ProfilePage() {
                 {/* Target email badge with change button */}
                 <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 flex items-center justify-between text-xs">
                   <div className="flex items-center gap-1.5 overflow-hidden">
-                    <span className="text-slate-500">ส่งรหัสไปที่:</span>
+                    <span className="text-slate-500">à¸ªà¹ˆà¸‡à¸£à¸«à¸±à¸ªà¹„à¸›à¸—à¸µà¹ˆ:</span>
                     <span className="font-bold text-slate-800 truncate">{newEmail}</span>
                   </div>
                   <button
@@ -1037,7 +1037,7 @@ export default function ProfilePage() {
                     }}
                     className="text-xs text-indigo-600 hover:text-indigo-700 font-semibold underline shrink-0 ml-2"
                   >
-                    แก้ไขอีเมล
+                    à¹à¸à¹‰à¹„à¸‚à¸­à¸µà¹€à¸¡à¸¥
                   </button>
                 </div>
 
@@ -1046,14 +1046,14 @@ export default function ProfilePage() {
                   <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-800 space-y-1.5">
                     <div className="flex items-center justify-between">
                       <span className="font-bold flex items-center gap-1">
-                        <AlertCircle className="w-3.5 h-3.5 text-amber-600" /> [โหมดทดสอบ] รหัส OTP:
+                        <AlertCircle className="w-3.5 h-3.5 text-amber-600" /> [à¹‚à¸«à¸¡à¸”à¸—à¸”à¸ªà¸­à¸š] à¸£à¸«à¸±à¸ª OTP:
                       </span>
                       <button
                         type="button"
                         onClick={() => setEmailOtp(devOtpNotice)}
                         className="px-2 py-0.5 bg-amber-200/60 hover:bg-amber-200 rounded-lg font-mono font-bold text-amber-900 text-xs transition-colors"
                       >
-                        กดเพื่อกรอกอัตโนมัติ
+                        à¸à¸”à¹€à¸žà¸·à¹ˆà¸­à¸à¸£à¸­à¸à¸­à¸±à¸•à¹‚à¸™à¸¡à¸±à¸•à¸´
                       </button>
                     </div>
                     <p className="font-mono text-base font-extrabold text-amber-900 tracking-widest text-center">
@@ -1065,7 +1065,7 @@ export default function ProfilePage() {
                 {/* OTP Input */}
                 <div className="space-y-1.5">
                   <label htmlFor="modal-otp-input" className="block text-xs font-semibold text-slate-700 text-center">
-                    กรอกรหัสยืนยัน OTP (6 หลัก) <span className="text-rose-500">*</span>
+                    à¸à¸£à¸­à¸à¸£à¸«à¸±à¸ªà¸¢à¸·à¸™à¸¢à¸±à¸™ OTP (6 à¸«à¸¥à¸±à¸) <span className="text-rose-500">*</span>
                   </label>
                   <input
                     id="modal-otp-input"
@@ -1080,7 +1080,7 @@ export default function ProfilePage() {
                     className="w-full py-3 text-center text-3xl font-mono tracking-[0.5em] rounded-2xl bg-slate-50 border-2 border-indigo-200 focus:outline-none focus:border-indigo-600 text-slate-900 font-bold shadow-inner"
                   />
                   <p className="text-[0.72rem] text-slate-400 text-center">
-                    รหัสยืนยันมีอายุ 15 นาที หากไม่พบในกล่องจดหมาย กรุณาตรวจสอบในโฟลเดอร์ Junk/Spam
+                    à¸£à¸«à¸±à¸ªà¸¢à¸·à¸™à¸¢à¸±à¸™à¸¡à¸µà¸­à¸²à¸¢à¸¸ 15 à¸™à¸²à¸—à¸µ à¸«à¸²à¸à¹„à¸¡à¹ˆà¸žà¸šà¹ƒà¸™à¸à¸¥à¹ˆà¸­à¸‡à¸ˆà¸”à¸«à¸¡à¸²à¸¢ à¸à¸£à¸¸à¸“à¸²à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¹ƒà¸™à¹‚à¸Ÿà¸¥à¹€à¸”à¸­à¸£à¹Œ Junk/Spam
                   </p>
                 </div>
 
@@ -1088,7 +1088,7 @@ export default function ProfilePage() {
                 <div className="text-center text-xs">
                   {countdown > 0 ? (
                     <span className="text-slate-400">
-                      ขอรหัสใหม่ได้ในอีก <strong className="text-indigo-600">{countdown}</strong> วินาที
+                      à¸‚à¸­à¸£à¸«à¸±à¸ªà¹ƒà¸«à¸¡à¹ˆà¹„à¸”à¹‰à¹ƒà¸™à¸­à¸µà¸ <strong className="text-indigo-600">{countdown}</strong> à¸§à¸´à¸™à¸²à¸—à¸µ
                     </span>
                   ) : (
                     <button
@@ -1098,7 +1098,7 @@ export default function ProfilePage() {
                       className="text-indigo-600 hover:text-indigo-700 font-semibold inline-flex items-center gap-1 hover:underline"
                     >
                       <RotateCw className={`w-3.5 h-3.5 ${emailLoading ? 'animate-spin' : ''}`} />
-                      ส่งรหัส OTP ใหม่อีกครั้ง
+                      à¸ªà¹ˆà¸‡à¸£à¸«à¸±à¸ª OTP à¹ƒà¸«à¸¡à¹ˆà¸­à¸µà¸à¸„à¸£à¸±à¹‰à¸‡
                     </button>
                   )}
                 </div>
@@ -1111,7 +1111,7 @@ export default function ProfilePage() {
                     disabled={emailLoading}
                     className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
                   >
-                    ยกเลิก
+                    à¸¢à¸à¹€à¸¥à¸´à¸
                   </button>
                   <button
                     type="submit"
@@ -1120,11 +1120,11 @@ export default function ProfilePage() {
                   >
                     {emailLoading ? (
                       <>
-                        <Loader2 className="w-4 h-4 animate-spin" /> กำลังตรวจสอบ...
+                        <Loader2 className="w-4 h-4 animate-spin" /> à¸à¸³à¸¥à¸±à¸‡à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸š...
                       </>
                     ) : (
                       <>
-                        <CheckCircle2 className="w-3.5 h-3.5" /> ยืนยันและเปลี่ยนอีเมล
+                        <CheckCircle2 className="w-3.5 h-3.5" /> à¸¢à¸·à¸™à¸¢à¸±à¸™à¹à¸¥à¸°à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¸­à¸µà¹€à¸¡à¸¥
                       </>
                     )}
                   </button>
@@ -1147,10 +1147,10 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-800">
-                    ยืนยันการลบบัญชีผู้ใช้งาน (Delete ID)
+                    à¸¢à¸·à¸™à¸¢à¸±à¸™à¸à¸²à¸£à¸¥à¸šà¸šà¸±à¸à¸Šà¸µà¸œà¸¹à¹‰à¹ƒà¸Šà¹‰à¸‡à¸²à¸™ (Delete ID)
                   </h3>
                   <p className="text-xs text-rose-600 font-semibold">
-                    การกระทำนี้ไม่สามารถย้อนกลับได้
+                    à¸à¸²à¸£à¸à¸£à¸°à¸—à¸³à¸™à¸µà¹‰à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸¢à¹‰à¸­à¸™à¸à¸¥à¸±à¸šà¹„à¸”à¹‰
                   </p>
                 </div>
               </div>
@@ -1168,12 +1168,12 @@ export default function ProfilePage() {
             <div className="p-4 bg-rose-50 rounded-2xl border border-rose-200 text-xs text-rose-800 space-y-2 leading-relaxed">
               <p className="font-bold flex items-center gap-1.5 text-rose-900">
                 <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
-                สิ่งที่จะถูกลบออกจากระบบอย่างถาวร:
+                à¸ªà¸´à¹ˆà¸‡à¸—à¸µà¹ˆà¸ˆà¸°à¸–à¸¹à¸à¸¥à¸šà¸­à¸­à¸à¸ˆà¸²à¸à¸£à¸°à¸šà¸šà¸­à¸¢à¹ˆà¸²à¸‡à¸–à¸²à¸§à¸£:
               </p>
               <ul className="list-disc list-inside space-y-1 text-[0.75rem] text-rose-700">
-                <li>ข้อมูลห้องเรียนและตารางสอนทั้งหมดของคุณ</li>
-                <li>รายชื่อนักเรียนและประวัติการเช็คชื่อทั้งหมด</li>
-                <li>คะแนนเก็บ โครงสร้างคะแนน และเกรดที่คำนวณไว้</li>
+                <li>à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™à¹à¸¥à¸°à¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”à¸‚à¸­à¸‡à¸„à¸¸à¸“</li>
+                <li>à¸£à¸²à¸¢à¸Šà¸·à¹ˆà¸­à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¹à¸¥à¸°à¸›à¸£à¸°à¸§à¸±à¸•à¸´à¸à¸²à¸£à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”</li>
+                <li>à¸„à¸°à¹à¸™à¸™à¹€à¸à¹‡à¸š à¹‚à¸„à¸£à¸‡à¸ªà¸£à¹‰à¸²à¸‡à¸„à¸°à¹à¸™à¸™ à¹à¸¥à¸°à¹€à¸à¸£à¸”à¸—à¸µà¹ˆà¸„à¸³à¸™à¸§à¸“à¹„à¸§à¹‰</li>
               </ul>
             </div>
 
@@ -1182,13 +1182,13 @@ export default function ProfilePage() {
               {hasPassword ? (
                 <div className="space-y-1.5">
                   <label className="block text-xs font-bold text-slate-700">
-                    กรอกรหัสผ่านของคุณเพื่อยืนยัน <span className="text-rose-500">*</span>
+                    à¸à¸£à¸­à¸à¸£à¸«à¸±à¸ªà¸œà¹ˆà¸²à¸™à¸‚à¸­à¸‡à¸„à¸¸à¸“à¹€à¸žà¸·à¹ˆà¸­à¸¢à¸·à¸™à¸¢à¸±à¸™ <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="password"
                     value={deletePassword}
                     onChange={(e) => setDeletePassword(e.target.value)}
-                    placeholder="รหัสผ่านปัจจุบันของคุณ"
+                    placeholder="à¸£à¸«à¸±à¸ªà¸œà¹ˆà¸²à¸™à¸›à¸±à¸ˆà¸ˆà¸¸à¸šà¸±à¸™à¸‚à¸­à¸‡à¸„à¸¸à¸“"
                     required
                     autoFocus
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500/30 focus:border-rose-500 text-sm"
@@ -1197,13 +1197,13 @@ export default function ProfilePage() {
               ) : (
                 <div className="space-y-1.5">
                   <label className="block text-xs font-bold text-slate-700">
-                    พิมพ์ยืนยันด้วยอีเมล <span className="text-rose-600 font-mono select-all font-extrabold">{user?.email}</span> หรือคำว่า <span className="text-rose-600 font-mono font-extrabold">ลบบัญชี</span> <span className="text-rose-500">*</span>
+                    à¸žà¸´à¸¡à¸žà¹Œà¸¢à¸·à¸™à¸¢à¸±à¸™à¸”à¹‰à¸§à¸¢à¸­à¸µà¹€à¸¡à¸¥ <span className="text-rose-600 font-mono select-all font-extrabold">{user?.email}</span> à¸«à¸£à¸·à¸­à¸„à¸³à¸§à¹ˆà¸² <span className="text-rose-600 font-mono font-extrabold">à¸¥à¸šà¸šà¸±à¸à¸Šà¸µ</span> <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={deleteConfirmation}
                     onChange={(e) => setDeleteConfirmation(e.target.value)}
-                    placeholder={user?.email || 'ลบบัญชี'}
+                    placeholder={user?.email || 'à¸¥à¸šà¸šà¸±à¸à¸Šà¸µ'}
                     required
                     autoFocus
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500/30 focus:border-rose-500 text-sm"
@@ -1219,7 +1219,7 @@ export default function ProfilePage() {
                   disabled={deletingAccount}
                   className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
                 >
-                  ยกเลิก
+                  à¸¢à¸à¹€à¸¥à¸´à¸
                 </button>
                 <button
                   type="submit"
@@ -1231,11 +1231,11 @@ export default function ProfilePage() {
                 >
                   {deletingAccount ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" /> กำลังลบบัญชี...
+                      <Loader2 className="w-4 h-4 animate-spin" /> à¸à¸³à¸¥à¸±à¸‡à¸¥à¸šà¸šà¸±à¸à¸Šà¸µ...
                     </>
                   ) : (
                     <>
-                      <Trash2 className="w-4 h-4" /> ยืนยันลบบัญชีถาวร
+                      <Trash2 className="w-4 h-4" /> à¸¢à¸·à¸™à¸¢à¸±à¸™à¸¥à¸šà¸šà¸±à¸à¸Šà¸µà¸–à¸²à¸§à¸£
                     </>
                   )}
                 </button>

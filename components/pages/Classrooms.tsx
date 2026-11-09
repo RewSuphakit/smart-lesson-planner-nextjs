@@ -5,11 +5,11 @@ import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
 import { Plus, Edit, Trash2, X, Loader2, Search, Calendar, ChevronDown, Users, Layers, Eye, EyeOff, Lock, Link2, ExternalLink } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { useSemester } from '@/context/SemesterContext';
 import { ANIMAL_AVATARS as animalAvatars } from '@/components/UserAvatar';
 
-interface Classroom {
+export interface Classroom {
   id: string;
   name: string;
   description?: string;
@@ -57,8 +57,8 @@ interface ClassroomCardProps {
 }
 
 const THAI_MONTHS_SHORT = [
-  'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
-  'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
+  'à¸¡.à¸„.', 'à¸.à¸ž.', 'à¸¡à¸µ.à¸„.', 'à¹€à¸¡.à¸¢.', 'à¸ž.à¸„.', 'à¸¡à¸´.à¸¢.',
+  'à¸.à¸„.', 'à¸ª.à¸„.', 'à¸.à¸¢.', 'à¸•.à¸„.', 'à¸ž.à¸¢.', 'à¸˜.à¸„.'
 ];
 
 function formatThaiShortDate(dateStr: string | null | undefined, includeYear = true): string {
@@ -115,24 +115,24 @@ function getSemesterStatus(
 
   if (currentWeek) {
     return {
-      label: `สัปดาห์ ${currentWeek}/${totalWeeks}`,
+      label: `à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ ${currentWeek}/${totalWeeks}`,
       color: 'text-indigo-600 bg-indigo-50 border-indigo-100/80',
     };
   }
   if (endDateStr && todayStr > endDateStr) {
     return {
-      label: 'สิ้นสุดภาคเรียน',
+      label: 'à¸ªà¸´à¹‰à¸™à¸ªà¸¸à¸”à¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™',
       color: 'text-slate-500 bg-slate-100 border-slate-200',
     };
   }
   if (todayStr < startDateStr) {
     return {
-      label: 'ยังไม่เปิดเรียน',
+      label: 'à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¹€à¸›à¸´à¸”à¹€à¸£à¸µà¸¢à¸™',
       color: 'text-amber-600 bg-amber-50 border-amber-200',
     };
   }
   return {
-    label: 'สิ้นสุดภาคเรียน',
+    label: 'à¸ªà¸´à¹‰à¸™à¸ªà¸¸à¸”à¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™',
     color: 'text-slate-500 bg-slate-100 border-slate-200',
   };
 }
@@ -156,16 +156,16 @@ function ClassroomCard({ c, onEdit, onDelete, onTogglePortal, isTogglingPortal }
             <button 
               onClick={() => onEdit(c)} 
               className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-indigo-600 transition-colors" 
-              title="แก้ไข"
-              aria-label={`แก้ไขห้องเรียน ${c.name}`}
+              title="à¹à¸à¹‰à¹„à¸‚"
+              aria-label={`à¹à¸à¹‰à¹„à¸‚à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™ ${c.name}`}
             >
               <Edit className="w-4 h-4" />
             </button>
             <button 
               onClick={() => onDelete(c.id)} 
               className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors" 
-              title="ลบ"
-              aria-label={`ลบห้องเรียน ${c.name}`}
+              title="à¸¥à¸š"
+              aria-label={`à¸¥à¸šà¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™ ${c.name}`}
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -182,7 +182,7 @@ function ClassroomCard({ c, onEdit, onDelete, onTogglePortal, isTogglingPortal }
                 ? 'bg-amber-50 text-amber-700'
                 : 'bg-emerald-50 text-emerald-700'
             }`}>
-              {isPvs ? 'ปวส. 15 สัปดาห์' : isCustom ? `กำหนดเอง ${weeks} สัปดาห์` : 'ปวช. 18 สัปดาห์'}
+              {isPvs ? 'à¸›à¸§à¸ª. 15 à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ' : isCustom ? `à¸à¸³à¸«à¸™à¸”à¹€à¸­à¸‡ ${weeks} à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ` : 'à¸›à¸§à¸Š. 18 à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ'}
             </span>
           </div>
           {c.description && <p className="text-xs text-slate-500 line-clamp-1">{c.description}</p>}
@@ -193,9 +193,9 @@ function ClassroomCard({ c, onEdit, onDelete, onTogglePortal, isTogglingPortal }
             <div className="flex items-center gap-1.5 min-w-0">
               <Calendar className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
               <div className="flex items-center gap-1 text-[11px] truncate">
-                <span>เปิด {formatThaiShortDate(c.semester_start_date)}</span>
-                <span className="text-slate-300">·</span>
-                <span className="text-slate-700 font-medium">ปิด {formatThaiShortDate(endDate)}</span>
+                <span>à¹€à¸›à¸´à¸” {formatThaiShortDate(c.semester_start_date)}</span>
+                <span className="text-slate-300">Â·</span>
+                <span className="text-slate-700 font-medium">à¸›à¸´à¸” {formatThaiShortDate(endDate)}</span>
               </div>
             </div>
             {status && (
@@ -206,7 +206,7 @@ function ClassroomCard({ c, onEdit, onDelete, onTogglePortal, isTogglingPortal }
           </div>
         )}
 
-        {/* สวิตช์เปิด-ปิดการเข้าดู Student Portal & LINE Bot */}
+        {/* à¸ªà¸§à¸´à¸•à¸Šà¹Œà¹€à¸›à¸´à¸”-à¸›à¸´à¸”à¸à¸²à¸£à¹€à¸‚à¹‰à¸²à¸”à¸¹ Student Portal & LINE Bot */}
         <div
           className={`mt-3 py-2 px-3 rounded-xl border flex items-center justify-between gap-2 transition-colors ${
             isPortalEnabled
@@ -225,7 +225,7 @@ function ClassroomCard({ c, onEdit, onDelete, onTogglePortal, isTogglingPortal }
                 isPortalEnabled ? 'text-emerald-800' : 'text-slate-600'
               }`}
             >
-              {isPortalEnabled ? 'Portal: เปิดให้นักเรียนดู' : 'Portal: ปิดการเข้าดู'}
+              {isPortalEnabled ? 'Portal: à¹€à¸›à¸´à¸”à¹ƒà¸«à¹‰à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸”à¸¹' : 'Portal: à¸›à¸´à¸”à¸à¸²à¸£à¹€à¸‚à¹‰à¸²à¸”à¸¹'}
             </span>
           </div>
 
@@ -233,8 +233,8 @@ function ClassroomCard({ c, onEdit, onDelete, onTogglePortal, isTogglingPortal }
             type="button"
             role="switch"
             aria-checked={isPortalEnabled}
-            aria-label={`${isPortalEnabled ? 'ปิด' : 'เปิด'}การเข้าดู Student Portal สำหรับวิชา ${c.name}`}
-            title={isPortalEnabled ? 'คลิกเพื่อปิดไม่ให้นักเรียนเข้าดูข้อมูลวิชานี้' : 'คลิกเพื่อเปิดให้นักเรียนเข้าดูข้อมูลวิชานี้'}
+            aria-label={`${isPortalEnabled ? 'à¸›à¸´à¸”' : 'à¹€à¸›à¸´à¸”'}à¸à¸²à¸£à¹€à¸‚à¹‰à¸²à¸”à¸¹ Student Portal à¸ªà¸³à¸«à¸£à¸±à¸šà¸§à¸´à¸Šà¸² ${c.name}`}
+            title={isPortalEnabled ? 'à¸„à¸¥à¸´à¸à¹€à¸žà¸·à¹ˆà¸­à¸›à¸´à¸”à¹„à¸¡à¹ˆà¹ƒà¸«à¹‰à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¹€à¸‚à¹‰à¸²à¸”à¸¹à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸§à¸´à¸Šà¸²à¸™à¸µà¹‰' : 'à¸„à¸¥à¸´à¸à¹€à¸žà¸·à¹ˆà¸­à¹€à¸›à¸´à¸”à¹ƒà¸«à¹‰à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¹€à¸‚à¹‰à¸²à¸”à¸¹à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸§à¸´à¸Šà¸²à¸™à¸µà¹‰'}
             disabled={isTogglingPortal}
             onClick={() => onTogglePortal(c)}
             className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-50 ${
@@ -253,19 +253,23 @@ function ClassroomCard({ c, onEdit, onDelete, onTogglePortal, isTogglingPortal }
       <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
         <div className="flex items-center gap-1.5">
           <Users className="w-3.5 h-3.5 text-slate-400" />
-          <span>{c.student_count || 0} คน</span>
+          <span>{c.student_count || 0} à¸„à¸™</span>
         </div>
         <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">
-          <span>{weeks} สัปดาห์</span>
-          <span>·</span>
-          <span>{c.total_classes || 0} คาบ</span>
+          <span>{weeks} à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ</span>
+          <span>Â·</span>
+          <span>{c.total_classes || 0} à¸„à¸²à¸š</span>
         </div>
       </div>
     </div>
   );
 }
 
-export default function Classrooms() {
+export default function Classrooms({
+  initialClassrooms,
+}: {
+  initialClassrooms?: Classroom[];
+} = {}) {
   const queryClient = useQueryClient();
   const { activeSemester } = useSemester();
 
@@ -298,16 +302,17 @@ export default function Classrooms() {
   const [selectedTimetableIds, setSelectedTimetableIds] = useState<number[]>([]);
   const [showAttendanceSettings, setShowAttendanceSettings] = useState(false);
 
-  // ─── Query: ดึงข้อมูลห้องเรียน ───
-  const { data: classrooms = [], isLoading } = useQuery<Classroom[]>({
+  // â”€â”€â”€ Query: à¸”à¸¶à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™ â”€â”€â”€
+  const { data: classrooms = initialClassrooms || [], isLoading } = useQuery<Classroom[]>({
     queryKey: ['classrooms'],
     queryFn: async () => {
       const res = await api.get('/classrooms');
       return res.data.data || [];
     },
+    initialData: initialClassrooms && initialClassrooms.length > 0 ? initialClassrooms : undefined,
   });
 
-  // ─── Query: ดึงข้อมูลตารางเรียนสำหรับทำตัวเลือก ───
+  // â”€â”€â”€ Query: à¸”à¸¶à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸•à¸²à¸£à¸²à¸‡à¹€à¸£à¸µà¸¢à¸™à¸ªà¸³à¸«à¸£à¸±à¸šà¸—à¸³à¸•à¸±à¸§à¹€à¸¥à¸·à¸­à¸ â”€â”€â”€
   const { data: rawTimetableData = [] } = useQuery<TimetableEntry[]>({
     queryKey: ['timetable-classroom-options'],
     queryFn: async () => {
@@ -331,7 +336,7 @@ export default function Classrooms() {
       if (e.start_period === 0) return false;
       if (e.entry_type === 'homeroom') return false;
       const name = `${e.subject_name || ''} ${e.subject_code || ''}`.toLowerCase();
-      if (name.includes('เสาธง') || name.includes('โฮมรูม') || name.includes('เข้าแถว')) return false;
+      if (name.includes('à¹€à¸ªà¸²à¸˜à¸‡') || name.includes('à¹‚à¸®à¸¡à¸£à¸¹à¸¡') || name.includes('à¹€à¸‚à¹‰à¸²à¹à¸–à¸§')) return false;
       return Boolean(e.subject_code || e.subject_name);
     });
 
@@ -346,7 +351,7 @@ export default function Classrooms() {
       timetable_ids: number[];
     }>();
 
-    const DAY_NAMES = ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์', 'อาทิตย์'];
+    const DAY_NAMES = ['à¸ˆà¸±à¸™à¸—à¸£à¹Œ', 'à¸­à¸±à¸‡à¸„à¸²à¸£', 'à¸žà¸¸à¸˜', 'à¸žà¸¤à¸«à¸±à¸ªà¸šà¸”à¸µ', 'à¸¨à¸¸à¸à¸£à¹Œ', 'à¹€à¸ªà¸²à¸£à¹Œ', 'à¸­à¸²à¸—à¸´à¸•à¸¢à¹Œ'];
 
     academicEntries.forEach(e => {
       const key = `${e.subject_code || ''}__${e.subject_name || ''}__${e.group_name || ''}`;
@@ -383,27 +388,27 @@ export default function Classrooms() {
     const opt = timetableOptions.find(o => o.key === key);
     if (!opt) return;
 
-    // 1. สร้างชื่อวิชา/ห้องเรียน
+    // 1. à¸ªà¸£à¹‰à¸²à¸‡à¸Šà¸·à¹ˆà¸­à¸§à¸´à¸Šà¸²/à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™
     const nameParts = [];
     if (opt.subject_code) nameParts.push(opt.subject_code);
     if (opt.subject_name) nameParts.push(opt.subject_name);
     if (opt.group_name) nameParts.push(opt.group_name);
     const name = nameParts.join(' ');
 
-    // 2. สร้างรายละเอียด
+    // 2. à¸ªà¸£à¹‰à¸²à¸‡à¸£à¸²à¸¢à¸¥à¸°à¹€à¸­à¸µà¸¢à¸”
     const descParts = [];
     if (opt.group_name) descParts.push(opt.group_name);
-    if (opt.room) descParts.push(`ห้อง ${opt.room}`);
-    if (opt.days.length > 0) descParts.push(`(เรียนวัน${opt.days.join(', ')})`);
+    if (opt.room) descParts.push(`à¸«à¹‰à¸­à¸‡ ${opt.room}`);
+    if (opt.days.length > 0) descParts.push(`(à¹€à¸£à¸µà¸¢à¸™à¸§à¸±à¸™${opt.days.join(', ')})`);
     const description = descParts.join(' ');
 
-    // 3. ตรวจสอบหลักสูตร (ถ้ามีคำว่า ปวส -> pvs 15 สัปดาห์, อื่นๆ -> pvch 18 สัปดาห์)
+    // 3. à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¸«à¸¥à¸±à¸à¸ªà¸¹à¸•à¸£ (à¸–à¹‰à¸²à¸¡à¸µà¸„à¸³à¸§à¹ˆà¸² à¸›à¸§à¸ª -> pvs 15 à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ, à¸­à¸·à¹ˆà¸™à¹† -> pvch 18 à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ)
     const fullText = `${name} ${description}`.toLowerCase();
-    const isPvs = fullText.includes('ปวส') || opt.group_name.toLowerCase().includes('ปวส');
+    const isPvs = fullText.includes('à¸›à¸§à¸ª') || opt.group_name.toLowerCase().includes('à¸›à¸§à¸ª');
     const curType: 'pvch' | 'pvs' = isPvs ? 'pvs' : 'pvch';
     const weeks = isPvs ? 15 : 18;
 
-    // 4. จำนวนคาบต่อสัปดาห์
+    // 4. à¸ˆà¸³à¸™à¸§à¸™à¸„à¸²à¸šà¸•à¹ˆà¸­à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ
     const periods = opt.total_hours || 2;
     setPeriodsPerWeek(periods);
     setTotalWeeks(weeks);
@@ -418,10 +423,10 @@ export default function Classrooms() {
     }));
 
     setSelectedTimetableIds(opt.timetable_ids);
-    toast.success(`ดึงข้อมูล "${opt.subject_name || opt.subject_code}" แล้ว`);
+    toast.success(`à¸”à¸¶à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥ "${opt.subject_name || opt.subject_code}" à¹à¸¥à¹‰à¸§`);
   };
 
-  // ─── Mutation: สร้าง/แก้ไขห้องเรียน ───
+  // â”€â”€â”€ Mutation: à¸ªà¸£à¹‰à¸²à¸‡/à¹à¸à¹‰à¹„à¸‚à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™ â”€â”€â”€
   const saveMutation = useMutation({
     mutationFn: async (payload: typeof form) => {
       const formattedPayload = {
@@ -438,9 +443,9 @@ export default function Classrooms() {
       }
     },
     onSuccess: async (res) => {
-      toast.success(editing ? 'อัปเดตข้อมูลห้องเรียนเรียบร้อย' : 'เพิ่มห้องเรียนเรียบร้อย');
+      toast.success(editing ? 'à¸­à¸±à¸›à¹€à¸”à¸•à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢' : 'à¹€à¸žà¸´à¹ˆà¸¡à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢');
 
-      // เชื่อมโยงคาบในตารางสอนอัตโนมัติหากเลือกมาจากตาราง
+      // à¹€à¸Šà¸·à¹ˆà¸­à¸¡à¹‚à¸¢à¸‡à¸„à¸²à¸šà¹ƒà¸™à¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™à¸­à¸±à¸•à¹‚à¸™à¸¡à¸±à¸•à¸´à¸«à¸²à¸à¹€à¸¥à¸·à¸­à¸à¸¡à¸²à¸ˆà¸²à¸à¸•à¸²à¸£à¸²à¸‡
       if (selectedTimetableIds.length > 0) {
         const classroomId = editing ? Number(editing) : res?.data?.data?.id;
         if (classroomId) {
@@ -454,7 +459,7 @@ export default function Classrooms() {
             queryClient.invalidateQueries({ queryKey: ['timetable-schedule'] });
             queryClient.invalidateQueries({ queryKey: ['timetable-classroom-options'] });
             queryClient.invalidateQueries({ queryKey: ['timetable-all'] });
-            toast.success('เชื่อมโยงคาบในตารางสอนกับห้องเรียนนี้เรียบร้อย');
+            toast.success('à¹€à¸Šà¸·à¹ˆà¸­à¸¡à¹‚à¸¢à¸‡à¸„à¸²à¸šà¹ƒà¸™à¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™à¸à¸±à¸šà¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™à¸™à¸µà¹‰à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢');
           } catch {
             // ignore linking error
           }
@@ -469,11 +474,11 @@ export default function Classrooms() {
       queryClient.invalidateQueries({ queryKey: ['classrooms'] });
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
-      toast.error(err.response?.data?.message || 'บันทึกไม่สำเร็จ');
+      toast.error(err.response?.data?.message || 'à¸šà¸±à¸™à¸—à¸¶à¸à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
     },
   });
 
-  // ─── Mutation: เปิด-ปิด Student Portal รายวิชา (Optimistic Update) ───
+  // â”€â”€â”€ Mutation: à¹€à¸›à¸´à¸”-à¸›à¸´à¸” Student Portal à¸£à¸²à¸¢à¸§à¸´à¸Šà¸² (Optimistic Update) â”€â”€â”€
   const togglePortalMutation = useMutation({
     mutationFn: ({ id, enabled }: { id: string | number; enabled: boolean }) =>
       api.put('/classrooms/' + id, { is_portal_enabled: enabled }),
@@ -488,15 +493,15 @@ export default function Classrooms() {
     onSuccess: (_res, { enabled }) => {
       toast.success(
         enabled
-          ? 'เปิดให้นักเรียนเข้าดูข้อมูลวิชานี้แล้ว'
-          : 'ปิดการเข้าดูของนักเรียนสำหรับวิชานี้แล้ว'
+          ? 'à¹€à¸›à¸´à¸”à¹ƒà¸«à¹‰à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¹€à¸‚à¹‰à¸²à¸”à¸¹à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸§à¸´à¸Šà¸²à¸™à¸µà¹‰à¹à¸¥à¹‰à¸§'
+          : 'à¸›à¸´à¸”à¸à¸²à¸£à¹€à¸‚à¹‰à¸²à¸”à¸¹à¸‚à¸­à¸‡à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸ªà¸³à¸«à¸£à¸±à¸šà¸§à¸´à¸Šà¸²à¸™à¸µà¹‰à¹à¸¥à¹‰à¸§'
       );
     },
     onError: (_err, _vars, context) => {
       if (context?.previous) {
         queryClient.setQueryData(['classrooms'], context.previous);
       }
-      toast.error('เปลี่ยนสถานะการเข้าดูไม่สำเร็จ');
+      toast.error('à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¸ªà¸–à¸²à¸™à¸°à¸à¸²à¸£à¹€à¸‚à¹‰à¸²à¸”à¸¹à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['classrooms'] });
@@ -512,21 +517,21 @@ export default function Classrooms() {
     const url = `${window.location.origin}/portal`;
     try {
       await navigator.clipboard.writeText(url);
-      toast.success('คัดลอกลิงก์ Student Portal แล้ว');
+      toast.success('à¸„à¸±à¸”à¸¥à¸­à¸à¸¥à¸´à¸‡à¸à¹Œ Student Portal à¹à¸¥à¹‰à¸§');
     } catch {
-      toast.error('คัดลอกลิงก์ไม่สำเร็จ กรุณาคัดลอกด้วยตนเอง: ' + url);
+      toast.error('à¸„à¸±à¸”à¸¥à¸­à¸à¸¥à¸´à¸‡à¸à¹Œà¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ à¸à¸£à¸¸à¸“à¸²à¸„à¸±à¸”à¸¥à¸­à¸à¸”à¹‰à¸§à¸¢à¸•à¸™à¹€à¸­à¸‡: ' + url);
     }
   };
 
-  // ─── Mutation: ลบห้องเรียน ───
+  // â”€â”€â”€ Mutation: à¸¥à¸šà¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™ â”€â”€â”€
   const deleteMutation = useMutation({
     mutationFn: (id: string | number) => api.delete('/classrooms/' + id),
     onSuccess: () => {
-      toast.success('ลบห้องเรียนแล้ว');
+      toast.success('à¸¥à¸šà¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™à¹à¸¥à¹‰à¸§');
       queryClient.invalidateQueries({ queryKey: ['classrooms'] });
     },
     onError: () => {
-      toast.error('ลบไม่สำเร็จ');
+      toast.error('à¸¥à¸šà¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
     },
   });
 
@@ -562,16 +567,16 @@ export default function Classrooms() {
   const [curriculumFilter, setCurriculumFilter] = useState<'all' | 'pvch' | 'pvs'>('all');
 
   const pvchCount = useMemo(() => {
-    return classrooms.filter(c => (c.curriculum_type || (c.name?.includes('ปวส') ? 'pvs' : 'pvch')) === 'pvch').length;
+    return classrooms.filter(c => (c.curriculum_type || (c.name?.includes('à¸›à¸§à¸ª') ? 'pvs' : 'pvch')) === 'pvch').length;
   }, [classrooms]);
 
   const pvsCount = useMemo(() => {
-    return classrooms.filter(c => (c.curriculum_type || (c.name?.includes('ปวส') ? 'pvs' : 'pvch')) === 'pvs').length;
+    return classrooms.filter(c => (c.curriculum_type || (c.name?.includes('à¸›à¸§à¸ª') ? 'pvs' : 'pvch')) === 'pvs').length;
   }, [classrooms]);
 
   const filtered = useMemo(() => {
     return classrooms.filter(c => {
-      const curType = c.curriculum_type || (c.name?.includes('ปวส') ? 'pvs' : 'pvch');
+      const curType = c.curriculum_type || (c.name?.includes('à¸›à¸§à¸ª') ? 'pvs' : 'pvch');
       const matchesCurriculum = curriculumFilter === 'all' || curType === curriculumFilter;
       const matchesSearch = c.name?.toLowerCase().includes(search.toLowerCase());
       return matchesCurriculum && matchesSearch;
@@ -579,7 +584,7 @@ export default function Classrooms() {
   }, [classrooms, curriculumFilter, search]);
 
   const handleEdit = (c: Classroom) => {
-    const curType = c.curriculum_type || (c.name?.includes('ปวส') ? 'pvs' : 'pvch');
+    const curType = c.curriculum_type || (c.name?.includes('à¸›à¸§à¸ª') ? 'pvs' : 'pvch');
     const weeks = c.total_weeks || (curType === 'pvs' ? 15 : 18);
     const total = c.total_classes || (weeks * 2);
     const periods = Math.round(total / weeks) || 2;
@@ -609,7 +614,7 @@ export default function Classrooms() {
   };
 
   const handleDelete = (id: string | number) => {
-    if (!confirm('ต้องการลบห้องเรียนนี้หรือไม่? ข้อมูลการเช็คชื่อจะถูกลบไปด้วย')) return;
+    if (!confirm('à¸•à¹‰à¸­à¸‡à¸à¸²à¸£à¸¥à¸šà¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™à¸™à¸µà¹‰à¸«à¸£à¸·à¸­à¹„à¸¡à¹ˆ? à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸à¸²à¸£à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­à¸ˆà¸°à¸–à¸¹à¸à¸¥à¸šà¹„à¸›à¸”à¹‰à¸§à¸¢')) return;
     deleteMutation.mutate(id);
   };
 
@@ -633,7 +638,7 @@ export default function Classrooms() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5 flex-wrap">
-            <h1 className="text-2xl font-bold text-slate-800">จัดการห้องเรียน</h1>
+            <h1 className="text-2xl font-bold text-slate-800">à¸ˆà¸±à¸”à¸à¸²à¸£à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™</h1>
             {activeSemester && (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200/80 text-indigo-700 text-xs font-bold shadow-xs">
                 <Layers className="w-3.5 h-3.5 text-indigo-600" />
@@ -642,7 +647,7 @@ export default function Classrooms() {
             )}
           </div>
           <p className="text-slate-500 text-sm mt-0.5">
-            ทั้งหมด {classrooms.length} ห้อง ({pvchCount > 0 ? `ปวช. ${pvchCount} ห้อง ` : ''}{pvsCount > 0 ? `· ปวส. ${pvsCount} ห้อง` : ''}) {activeSemester ? `ใน ${activeSemester.name}` : ''}
+            à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸” {classrooms.length} à¸«à¹‰à¸­à¸‡ ({pvchCount > 0 ? `à¸›à¸§à¸Š. ${pvchCount} à¸«à¹‰à¸­à¸‡ ` : ''}{pvsCount > 0 ? `Â· à¸›à¸§à¸ª. ${pvsCount} à¸«à¹‰à¸­à¸‡` : ''}) {activeSemester ? `à¹ƒà¸™ ${activeSemester.name}` : ''}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -650,20 +655,20 @@ export default function Classrooms() {
             type="button"
             onClick={handleCopyPortalLink}
             className="btn btn-ghost text-xs"
-            title="คัดลอกลิงก์ Student Portal เพื่อส่งให้นักเรียน"
-            aria-label="คัดลอกลิงก์ Student Portal"
+            title="à¸„à¸±à¸”à¸¥à¸­à¸à¸¥à¸´à¸‡à¸à¹Œ Student Portal à¹€à¸žà¸·à¹ˆà¸­à¸ªà¹ˆà¸‡à¹ƒà¸«à¹‰à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™"
+            aria-label="à¸„à¸±à¸”à¸¥à¸­à¸à¸¥à¸´à¸‡à¸à¹Œ Student Portal"
           >
-            <Link2 className="w-4 h-4" /> คัดลอกลิงก์ Portal
+            <Link2 className="w-4 h-4" /> à¸„à¸±à¸”à¸¥à¸­à¸à¸¥à¸´à¸‡à¸à¹Œ Portal
           </button>
           <a
             href="/portal"
             target="_blank"
             rel="noopener noreferrer"
             className="btn btn-ghost text-xs"
-            title="เปิดหน้า Student Portal ในแท็บใหม่"
-            aria-label="เปิดหน้า Student Portal ในแท็บใหม่"
+            title="à¹€à¸›à¸´à¸”à¸«à¸™à¹‰à¸² Student Portal à¹ƒà¸™à¹à¸—à¹‡à¸šà¹ƒà¸«à¸¡à¹ˆ"
+            aria-label="à¹€à¸›à¸´à¸”à¸«à¸™à¹‰à¸² Student Portal à¹ƒà¸™à¹à¸—à¹‡à¸šà¹ƒà¸«à¸¡à¹ˆ"
           >
-            <ExternalLink className="w-4 h-4" /> เปิดดู Portal
+            <ExternalLink className="w-4 h-4" /> à¹€à¸›à¸´à¸”à¸”à¸¹ Portal
           </a>
           <button
             onClick={() => {
@@ -678,7 +683,7 @@ export default function Classrooms() {
             }}
             className="btn btn-primary"
           >
-            <Plus className="w-4 h-4" /> สร้างห้องเรียน
+            <Plus className="w-4 h-4" /> à¸ªà¸£à¹‰à¸²à¸‡à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™
           </button>
         </div>
       </div>
@@ -690,13 +695,13 @@ export default function Classrooms() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="form-input pl-11"
-            placeholder="ค้นหาห้องเรียน..."
+            placeholder="à¸„à¹‰à¸™à¸«à¸²à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™..."
             id="search-classrooms"
-            aria-label="ค้นหาห้องเรียน"
+            aria-label="à¸„à¹‰à¸™à¸«à¸²à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™"
           />
         </div>
 
-        {/* Level Filter Tabs: ทั้งหมด / ปวช. / ปวส. */}
+        {/* Level Filter Tabs: à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸” / à¸›à¸§à¸Š. / à¸›à¸§à¸ª. */}
         <div className="inline-flex items-center p-1 rounded-xl bg-slate-100/90 border border-slate-200/80 self-start sm:self-auto gap-1">
           <button
             type="button"
@@ -707,7 +712,7 @@ export default function Classrooms() {
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            ทั้งหมด ({classrooms.length})
+            à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸” ({classrooms.length})
           </button>
           <button
             type="button"
@@ -718,7 +723,7 @@ export default function Classrooms() {
                 : 'text-slate-600 hover:text-emerald-700'
             }`}
           >
-            ปวช. ({pvchCount})
+            à¸›à¸§à¸Š. ({pvchCount})
           </button>
           <button
             type="button"
@@ -729,7 +734,7 @@ export default function Classrooms() {
                 : 'text-slate-600 hover:text-purple-700'
             }`}
           >
-            ปวส. ({pvsCount})
+            à¸›à¸§à¸ª. ({pvsCount})
           </button>
         </div>
       </div>
@@ -738,10 +743,10 @@ export default function Classrooms() {
         {filtered.length === 0 ? (
           <div className="col-span-full glass p-14 text-center rounded-2xl">
             <div className="w-16 h-16 mx-auto rounded-2xl bg-indigo-50 flex items-center justify-center mb-3 text-3xl">
-              🏫
+              ðŸ«
             </div>
-            <p className="text-slate-500 text-sm font-medium">ยังไม่มีข้อมูลห้องเรียน</p>
-            <p className="text-slate-600 text-xs mt-1">กดปุ่ม &quot;สร้างห้องเรียน&quot; เพื่อเริ่มต้น</p>
+            <p className="text-slate-500 text-sm font-medium">à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¸¡à¸µà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™</p>
+            <p className="text-slate-600 text-xs mt-1">à¸à¸”à¸›à¸¸à¹ˆà¸¡ &quot;à¸ªà¸£à¹‰à¸²à¸‡à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™&quot; à¹€à¸žà¸·à¹ˆà¸­à¹€à¸£à¸´à¹ˆà¸¡à¸•à¹‰à¸™</p>
           </div>
         ) : filtered.map((c, i) => (
           <ClassroomCard
@@ -767,12 +772,12 @@ export default function Classrooms() {
           >
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-bold text-slate-800">
-                {editing ? 'แก้ไขห้องเรียน' : 'สร้างห้องเรียน'}
+                {editing ? 'à¹à¸à¹‰à¹„à¸‚à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™' : 'à¸ªà¸£à¹‰à¸²à¸‡à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™'}
               </h2>
               <button 
                 onClick={() => setShowForm(false)} 
                 className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors" 
-                aria-label="ปิด"
+                aria-label="à¸›à¸´à¸”"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -781,17 +786,17 @@ export default function Classrooms() {
             {activeSemester && !editing && (
               <div className="mb-4 p-2.5 rounded-xl bg-indigo-50/80 border border-indigo-100 flex items-center gap-2 text-xs text-indigo-800">
                 <Layers className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                <span>จะถูกบันทึกลงใน: <strong>{activeSemester.name}</strong></span>
+                <span>à¸ˆà¸°à¸–à¸¹à¸à¸šà¸±à¸™à¸—à¸¶à¸à¸¥à¸‡à¹ƒà¸™: <strong>{activeSemester.name}</strong></span>
               </div>
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* ตารางสอน Presets */}
+              {/* à¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™ Presets */}
               {timetableOptions.length > 0 && !editing && (
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label htmlFor="timetable-preset" className="text-xs font-medium text-slate-600">
-                      ดึงข้อมูลจากตารางสอน
+                      à¸”à¸¶à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸ˆà¸²à¸à¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™
                     </label>
                     {selectedTimetableKey && (
                       <button
@@ -802,7 +807,7 @@ export default function Classrooms() {
                         }}
                         className="text-[11px] text-slate-400 hover:text-rose-500 transition-colors"
                       >
-                        ล้าง
+                        à¸¥à¹‰à¸²à¸‡
                       </button>
                     )}
                   </div>
@@ -813,10 +818,10 @@ export default function Classrooms() {
                       onChange={e => handleSelectTimetablePreset(e.target.value)}
                       className="form-input text-xs pr-8 py-2 bg-slate-50 border-slate-200 text-slate-700 rounded-xl focus:bg-white focus:border-indigo-500 transition-all font-medium appearance-none w-full"
                     >
-                      <option value="">เลือกรายวิชาในตารางสอน...</option>
+                      <option value="">à¹€à¸¥à¸·à¸­à¸à¸£à¸²à¸¢à¸§à¸´à¸Šà¸²à¹ƒà¸™à¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™...</option>
                       {timetableOptions.map(opt => (
                         <option key={opt.key} value={opt.key}>
-                          {opt.subject_code ? `${opt.subject_code} ` : ''}{opt.subject_name || 'ไม่ระบุชื่อ'}{opt.group_name ? ` (${opt.group_name})` : ''} · {opt.total_hours} คาบ
+                          {opt.subject_code ? `${opt.subject_code} ` : ''}{opt.subject_name || 'à¹„à¸¡à¹ˆà¸£à¸°à¸šà¸¸à¸Šà¸·à¹ˆà¸­'}{opt.group_name ? ` (${opt.group_name})` : ''} Â· {opt.total_hours} à¸„à¸²à¸š
                         </option>
                       ))}
                     </select>
@@ -827,7 +832,7 @@ export default function Classrooms() {
 
               <div>
                 <label htmlFor="classroom-name" className="text-xs font-medium text-slate-700 mb-1.5 block">
-                  ชื่อรายวิชา / ห้องเรียน <span className="text-rose-500">*</span>
+                  à¸Šà¸·à¹ˆà¸­à¸£à¸²à¸¢à¸§à¸´à¸Šà¸² / à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™ <span className="text-rose-500">*</span>
                 </label>
                 <input
                   id="classroom-name"
@@ -835,33 +840,33 @@ export default function Classrooms() {
                   onChange={e => setForm({ ...form, name: e.target.value })}
                   className="form-input text-sm rounded-xl"
                   required
-                  placeholder="เช่น การเขียนโปรแกรมเว็บ หรือ 20000-1101"
+                  placeholder="à¹€à¸Šà¹ˆà¸™ à¸à¸²à¸£à¹€à¸‚à¸µà¸¢à¸™à¹‚à¸›à¸£à¹à¸à¸£à¸¡à¹€à¸§à¹‡à¸š à¸«à¸£à¸·à¸­ 20000-1101"
                 />
               </div>
 
               <div>
                 <label htmlFor="classroom-desc" className="text-xs font-medium text-slate-700 mb-1.5 block">
-                  รายละเอียด
+                  à¸£à¸²à¸¢à¸¥à¸°à¹€à¸­à¸µà¸¢à¸”
                 </label>
                 <input
                   id="classroom-desc"
                   value={form.description}
                   onChange={e => setForm({ ...form, description: e.target.value })}
                   className="form-input text-sm rounded-xl"
-                  placeholder="เช่น ชค.2/1 หรือ ห้อง 735"
+                  placeholder="à¹€à¸Šà¹ˆà¸™ à¸Šà¸„.2/1 à¸«à¸£à¸·à¸­ à¸«à¹‰à¸­à¸‡ 735"
                 />
               </div>
 
-              {/* หลักสูตร Segmented Control */}
+              {/* à¸«à¸¥à¸±à¸à¸ªà¸¹à¸•à¸£ Segmented Control */}
               <div>
                 <label className="text-xs font-medium text-slate-700 mb-1.5 block">
-                  หลักสูตร
+                  à¸«à¸¥à¸±à¸à¸ªà¸¹à¸•à¸£
                 </label>
                 <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl">
                   {[
-                    { id: 'pvch', label: 'ปวช. 18 สัปดาห์' },
-                    { id: 'pvs', label: 'ปวส. 15 สัปดาห์' },
-                    { id: 'custom', label: 'กำหนดเอง' },
+                    { id: 'pvch', label: 'à¸›à¸§à¸Š. 18 à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ' },
+                    { id: 'pvs', label: 'à¸›à¸§à¸ª. 15 à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ' },
+                    { id: 'custom', label: 'à¸à¸³à¸«à¸™à¸”à¹€à¸­à¸‡' },
                   ].map(item => {
                     const isActive = form.curriculum_type === item.id;
                     return (
@@ -882,7 +887,7 @@ export default function Classrooms() {
                 </div>
                 {form.curriculum_type === 'custom' && (
                   <div className="mt-2 flex items-center gap-2">
-                    <span className="text-xs text-slate-500">จำนวนสัปดาห์:</span>
+                    <span className="text-xs text-slate-500">à¸ˆà¸³à¸™à¸§à¸™à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ:</span>
                     <input
                       type="number"
                       min="1"
@@ -895,11 +900,11 @@ export default function Classrooms() {
                 )}
               </div>
 
-              {/* วันเปิดเทอม & คาบต่อสัปดาห์ */}
+              {/* à¸§à¸±à¸™à¹€à¸›à¸´à¸”à¹€à¸—à¸­à¸¡ & à¸„à¸²à¸šà¸•à¹ˆà¸­à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label htmlFor="classroom-start-date" className="text-xs font-medium text-slate-700 mb-1.5 block">
-                    วันเปิดเทอม
+                    à¸§à¸±à¸™à¹€à¸›à¸´à¸”à¹€à¸—à¸­à¸¡
                   </label>
                   <input
                     id="classroom-start-date"
@@ -910,7 +915,7 @@ export default function Classrooms() {
                   />
                   {form.semester_start_date && (
                     <div className="mt-1.5 text-[11px] text-slate-500 flex items-center justify-between">
-                      <span>วันปิดเทอม:</span>
+                      <span>à¸§à¸±à¸™à¸›à¸´à¸”à¹€à¸—à¸­à¸¡:</span>
                       <span className="font-semibold text-indigo-600">
                         {formatThaiShortDate(calculateEndDate(form.semester_start_date, totalWeeks))}
                       </span>
@@ -919,8 +924,8 @@ export default function Classrooms() {
                 </div>
                 <div>
                   <label htmlFor="classroom-periods" className="text-xs font-medium text-slate-700 mb-1.5 flex items-center justify-between">
-                    <span>คาบ / สัปดาห์</span>
-                    <span className="text-[11px] text-slate-400 font-normal">รวม {form.total_classes} คาบ</span>
+                    <span>à¸„à¸²à¸š / à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ</span>
+                    <span className="text-[11px] text-slate-400 font-normal">à¸£à¸§à¸¡ {form.total_classes} à¸„à¸²à¸š</span>
                   </label>
                   <input
                     id="classroom-periods"
@@ -935,27 +940,27 @@ export default function Classrooms() {
                 </div>
               </div>
 
-              {/* เกณฑ์การเข้าเรียน (Collapsible) */}
+              {/* à¹€à¸à¸“à¸‘à¹Œà¸à¸²à¸£à¹€à¸‚à¹‰à¸²à¹€à¸£à¸µà¸¢à¸™ (Collapsible) */}
               <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50">
                 <button
                   type="button"
                   onClick={() => setShowAttendanceSettings(!showAttendanceSettings)}
                   className="w-full px-3.5 py-2.5 flex items-center justify-between text-xs text-slate-600 hover:bg-slate-100/60 transition-colors"
                 >
-                  <span className="font-medium text-slate-700">เกณฑ์การเข้าเรียน & จิตพิสัย</span>
+                  <span className="font-medium text-slate-700">à¹€à¸à¸“à¸‘à¹Œà¸à¸²à¸£à¹€à¸‚à¹‰à¸²à¹€à¸£à¸µà¸¢à¸™ & à¸ˆà¸´à¸•à¸žà¸´à¸ªà¸±à¸¢</span>
                   <span className="text-[11px] text-slate-400 flex items-center gap-1.5">
-                    สาย {form.late_to_absent_ratio}:1 · หักขาด {form.absent_deduction_score} · หักสาย {form.late_deduction_score}
+                    à¸ªà¸²à¸¢ {form.late_to_absent_ratio}:1 Â· à¸«à¸±à¸à¸‚à¸²à¸” {form.absent_deduction_score} Â· à¸«à¸±à¸à¸ªà¸²à¸¢ {form.late_deduction_score}
                     <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showAttendanceSettings ? 'rotate-180' : ''}`} />
                   </span>
                 </button>
                 {showAttendanceSettings && (
                   <div className="p-3 pt-1 space-y-3 border-t border-slate-200/60 bg-white">
                     <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">เกณฑ์ตัดสินสิทธิ์สอบ (มส.)</p>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">à¹€à¸à¸“à¸‘à¹Œà¸•à¸±à¸”à¸ªà¸´à¸™à¸ªà¸´à¸—à¸˜à¸´à¹Œà¸ªà¸­à¸š (à¸¡à¸ª.)</p>
                       <div className="grid grid-cols-3 gap-2.5">
                         <div>
                           <label htmlFor="classroom-late-ratio" className="text-[11px] text-slate-500 mb-1 block text-center">
-                            สาย (ครั้ง)
+                            à¸ªà¸²à¸¢ (à¸„à¸£à¸±à¹‰à¸‡)
                           </label>
                           <input
                             id="classroom-late-ratio"
@@ -970,7 +975,7 @@ export default function Classrooms() {
                         </div>
                         <div>
                           <label htmlFor="classroom-leave-ratio" className="text-[11px] text-slate-500 mb-1 block text-center">
-                            ลา (ครั้ง)
+                            à¸¥à¸² (à¸„à¸£à¸±à¹‰à¸‡)
                           </label>
                           <input
                             id="classroom-leave-ratio"
@@ -985,7 +990,7 @@ export default function Classrooms() {
                         </div>
                         <div>
                           <label htmlFor="classroom-min-attendance" className="text-[11px] text-slate-500 mb-1 block text-center">
-                            เวลาเรียน (%)
+                            à¹€à¸§à¸¥à¸²à¹€à¸£à¸µà¸¢à¸™ (%)
                           </label>
                           <input
                             id="classroom-min-attendance"
@@ -1002,11 +1007,11 @@ export default function Classrooms() {
                     </div>
 
                     <div className="pt-2 border-t border-slate-100">
-                      <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-1.5">สูตรหักคะแนนจิตพิสัย (ต่อครั้ง)</p>
+                      <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-1.5">à¸ªà¸¹à¸•à¸£à¸«à¸±à¸à¸„à¸°à¹à¸™à¸™à¸ˆà¸´à¸•à¸žà¸´à¸ªà¸±à¸¢ (à¸•à¹ˆà¸­à¸„à¸£à¸±à¹‰à¸‡)</p>
                       <div className="grid grid-cols-2 gap-2.5">
                         <div>
                           <label htmlFor="classroom-absent-deduction" className="text-[11px] text-slate-500 mb-1 block text-center">
-                            ขาด 1 ครั้ง หัก (คะแนน)
+                            à¸‚à¸²à¸” 1 à¸„à¸£à¸±à¹‰à¸‡ à¸«à¸±à¸ (à¸„à¸°à¹à¸™à¸™)
                           </label>
                           <input
                             id="classroom-absent-deduction"
@@ -1022,7 +1027,7 @@ export default function Classrooms() {
                         </div>
                         <div>
                           <label htmlFor="classroom-late-deduction" className="text-[11px] text-slate-500 mb-1 block text-center">
-                            สาย 1 ครั้ง หัก (คะแนน)
+                            à¸ªà¸²à¸¢ 1 à¸„à¸£à¸±à¹‰à¸‡ à¸«à¸±à¸ (à¸„à¸°à¹à¸™à¸™)
                           </label>
                           <input
                             id="classroom-late-deduction"
@@ -1042,7 +1047,7 @@ export default function Classrooms() {
                 )}
               </div>
 
-              {/* เปิด-ปิด Student Portal */}
+              {/* à¹€à¸›à¸´à¸”-à¸›à¸´à¸” Student Portal */}
               <div
                 className={`flex items-center justify-between gap-3 p-3 rounded-xl border transition-colors ${
                   form.is_portal_enabled
@@ -1057,20 +1062,20 @@ export default function Classrooms() {
                     ) : (
                       <EyeOff className="w-3.5 h-3.5 text-slate-500" />
                     )}
-                    เปิดให้นักเรียนดูข้อมูล (Student Portal / LINE Bot)
+                    à¹€à¸›à¸´à¸”à¹ƒà¸«à¹‰à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸”à¸¹à¸‚à¹‰à¸­à¸¡à¸¹à¸¥ (Student Portal / LINE Bot)
                   </p>
                   <p className="text-[11px] text-slate-500 mt-0.5">
                     {form.is_portal_enabled
-                      ? 'นักเรียนตรวจสอบเวลาเรียนและคะแนนวิชานี้ได้'
-                      : 'นักเรียนจะเห็นว่าครูปิดการเข้าดูชั่วคราว'}
+                      ? 'à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¹€à¸§à¸¥à¸²à¹€à¸£à¸µà¸¢à¸™à¹à¸¥à¸°à¸„à¸°à¹à¸™à¸™à¸§à¸´à¸Šà¸²à¸™à¸µà¹‰à¹„à¸”à¹‰'
+                      : 'à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸ˆà¸°à¹€à¸«à¹‡à¸™à¸§à¹ˆà¸²à¸„à¸£à¸¹à¸›à¸´à¸”à¸à¸²à¸£à¹€à¸‚à¹‰à¸²à¸”à¸¹à¸Šà¸±à¹ˆà¸§à¸„à¸£à¸²à¸§'}
                   </p>
                 </div>
                 <button
                   type="button"
                   role="switch"
                   aria-checked={form.is_portal_enabled}
-                  aria-label="เปิดหรือปิดการเข้าดู Student Portal"
-                  title={form.is_portal_enabled ? 'คลิกเพื่อปิด' : 'คลิกเพื่อเปิด'}
+                  aria-label="à¹€à¸›à¸´à¸”à¸«à¸£à¸·à¸­à¸›à¸´à¸”à¸à¸²à¸£à¹€à¸‚à¹‰à¸²à¸”à¸¹ Student Portal"
+                  title={form.is_portal_enabled ? 'à¸„à¸¥à¸´à¸à¹€à¸žà¸·à¹ˆà¸­à¸›à¸´à¸”' : 'à¸„à¸¥à¸´à¸à¹€à¸žà¸·à¹ˆà¸­à¹€à¸›à¸´à¸”'}
                   onClick={() => setForm({ ...form, is_portal_enabled: !form.is_portal_enabled })}
                   className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 ${
                     form.is_portal_enabled ? 'bg-emerald-500' : 'bg-slate-300'
@@ -1091,14 +1096,14 @@ export default function Classrooms() {
                   onClick={() => setShowForm(false)}
                   className="px-4 py-2 text-sm text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors font-medium"
                 >
-                  ยกเลิก
+                  à¸¢à¸à¹€à¸¥à¸´à¸
                 </button>
                 <button
                   type="submit"
                   disabled={saveMutation.isPending}
                   className="btn btn-primary px-5 py-2 text-sm rounded-xl font-medium shadow-sm transition-all"
                 >
-                  {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : (editing ? 'บันทึก' : 'สร้างห้องเรียน')}
+                  {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : (editing ? 'à¸šà¸±à¸™à¸—à¸¶à¸' : 'à¸ªà¸£à¹‰à¸²à¸‡à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™')}
                 </button>
               </div>
             </form>

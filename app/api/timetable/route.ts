@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
+import { withAuth } from '@/lib/apiHandler';
 import { PERIOD_TIMES, parseTimeToUtc } from '@/lib/constants';
 import { getActiveSemesterId } from '@/lib/semester';
 import { getOrSetCache, invalidateCache, userCacheKey } from '@/lib/cache';
@@ -13,247 +13,228 @@ function normalizeEntryType(type?: string | null): 'lecture' | 'lab' | 'activity
   return 'lecture';
 }
 
-export async function GET(request: NextRequest) {
-  try {
-    const user = requireAuth(request);
-    const { searchParams } = new URL(request.url);
-    const semesterIdParam = searchParams.get('semester_id');
-    const allSemesters = searchParams.get('all') === 'true';
+export const GET = withAuth(async (request, user) => {
+  const { searchParams } = new URL(request.url);
+  const semesterIdParam = searchParams.get('semester_id');
+  const allSemesters = searchParams.get('all') === 'true';
 
-    let targetSemesterId: number | null = null;
-    if (!allSemesters) {
-      if (semesterIdParam) {
-        const parsed = Number(semesterIdParam);
-        if (!isNaN(parsed) && parsed > 0) {
-          targetSemesterId = parsed;
-        }
-      } else {
-        targetSemesterId = await getActiveSemesterId(user.id);
+  let targetSemesterId: number | null = null;
+  if (!allSemesters) {
+    if (semesterIdParam) {
+      const parsed = Number(semesterIdParam);
+      if (!isNaN(parsed) && parsed > 0) {
+        targetSemesterId = parsed;
       }
+    } else {
+      targetSemesterId = await getActiveSemesterId(user.id);
     }
-
-    const cacheKey = userCacheKey(
-      user.id,
-      'timetable',
-      allSemesters ? 'all' : String(targetSemesterId ?? 'none')
-    );
-    const data = await getOrSetCache(cacheKey, 60, async () => {
-      // Build where clause with semester scoping
-      const where: Record<string, unknown> = { userId: user.id };
-      if (!allSemesters && targetSemesterId) {
-        where.semesterId = targetSemesterId;
-      }
-
-      const entries = await prisma.weeklySchedule.findMany({
-        where,
-        orderBy: [{ dayOfWeek: 'asc' }, { startPeriod: 'asc' }],
-      });
-      const mappedEntries = entries.map(e => {
-        const hours = e.startPeriod === 0 ? 0 : (e.endPeriod - e.startPeriod + 1);
-        return {
-          id: e.id,
-          day_of_week: e.dayOfWeek,
-          start_period: e.startPeriod,
-          end_period: e.endPeriod,
-          start_time: e.startTime ? e.startTime.toISOString().split('T')[1].slice(0, 5) : null,
-          end_time: e.endTime ? e.endTime.toISOString().split('T')[1].slice(0, 5) : null,
-          subject_code: e.subjectCode,
-          subject_name: e.subjectName,
-          room: e.room,
-          instructor: e.instructor,
-          group_name: e.groupName,
-          hours: hours,
-          entry_type: e.entryType,
-          color: e.color,
-          classroom_id: e.classroomId
-        };
-      });
-      const summaryMap = new Map();
-      mappedEntries.forEach(e => {
-        if (!e.subject_code) return;
-        if (!summaryMap.has(e.subject_code)) {
-          summaryMap.set(e.subject_code, { subject_code: e.subject_code, subject_name: e.subject_name, total_hours: 0 });
-        }
-        summaryMap.get(e.subject_code).total_hours += e.hours;
-      });
-      const summary = Array.from(summaryMap.values());
-
-      return { entries: mappedEntries, summary };
-    });
-
-    return NextResponse.json({ data });
-  } catch (error) {
-    if (error instanceof AuthError) return handleAuthError();
-    return NextResponse.json({ message: 'Failed to get timetable' }, { status: 500 });
   }
-}
 
-export async function POST(request: NextRequest) {
-  try {
-    const user = requireAuth(request);
-    const body = await request.json();
-
-    // Resolve semester for new entries
-    const activeSemesterId = await getActiveSemesterId(user.id);
-
-    // Bulk create
-    if (Array.isArray(body.entries)) {
-      const classroomIds: number[] = Array.from(
-        new Set(body.entries.map((e: Record<string, unknown>) => Number(e.classroom_id)).filter((id: number) => !isNaN(id) && id > 0))
-      );
-      if (classroomIds.length > 0) {
-        const ownedClassrooms = await prisma.classroom.findMany({
-          where: { id: { in: classroomIds }, userId: user.id },
-          select: { id: true },
-        });
-        const ownedSet = new Set(ownedClassrooms.map(c => c.id));
-        const hasUnauthorized = classroomIds.some(id => !ownedSet.has(id));
-        if (hasUnauthorized) {
-          return NextResponse.json({ message: 'One or more classrooms not found or unauthorized' }, { status: 403 });
-        }
-      }
-
-      const semesterIds: number[] = Array.from(
-        new Set(body.entries.map((e: Record<string, unknown>) => Number(e.semester_id)).filter((id: number) => !isNaN(id) && id > 0))
-      );
-      if (semesterIds.length > 0) {
-        const ownedSemesters = await prisma.semester.findMany({
-          where: { id: { in: semesterIds }, userId: user.id },
-          select: { id: true },
-        });
-        const ownedSemSet = new Set(ownedSemesters.map(s => s.id));
-        const hasUnauthorizedSem = semesterIds.some(id => !ownedSemSet.has(id));
-        if (hasUnauthorizedSem) {
-          return NextResponse.json({ message: 'One or more semesters not found or unauthorized' }, { status: 403 });
-        }
-      }
-
-      const data = body.entries.map((e: Record<string, unknown>) => {
-        const rawStart = Number(e.start_period);
-        const rawEnd = Number(e.end_period);
-        const startPeriod = Math.max(0, Math.min(12, isNaN(rawStart) ? 1 : rawStart));
-        const endPeriod = Math.max(startPeriod, Math.min(12, isNaN(rawEnd) ? startPeriod : rawEnd));
-        const hours = startPeriod === 0 ? 0 : (endPeriod - startPeriod + 1);
-        const startTimeStr = (e.start_time as string) || PERIOD_TIMES[startPeriod]?.start;
-        const endTimeStr = (e.end_time as string) || PERIOD_TIMES[endPeriod]?.end;
-
-        return {
-          userId: user.id,
-          timetableName: (e.timetable_name as string) || 'ตารางสอน',
-          semester: (e.semester as string) || null,
-          semesterId: e.semester_id ? Number(e.semester_id) : activeSemesterId,
-          dayOfWeek: Math.max(0, Math.min(6, Number(e.day_of_week) || 0)),
-          startPeriod,
-          endPeriod,
-          startTime: parseTimeToUtc(startTimeStr),
-          endTime: parseTimeToUtc(endTimeStr),
-          subjectCode: (e.subject_code as string) || null,
-          subjectName: (e.subject_name as string) || null,
-          room: (e.room as string) || null,
-          instructor: (e.instructor as string) || null,
-          groupName: (e.group_name as string) || null,
-          hours,
-          entryType: normalizeEntryType(e.entry_type as string),
-          color: (e.color as string) || null,
-          classroomId: e.classroom_id ? Number(e.classroom_id) : null,
-        };
-      });
-
-      await prisma.weeklySchedule.createMany({ data });
-      invalidateCache(userCacheKey(user.id, 'timetable'));
-      invalidateCache(userCacheKey(user.id, 'dashboard'));
-      return NextResponse.json({ message: 'Timetable entries created' }, { status: 201 });
+  const cacheKey = userCacheKey(
+    user.id,
+    'timetable',
+    allSemesters ? 'all' : String(targetSemesterId ?? 'none')
+  );
+  const data = await getOrSetCache(cacheKey, 60, async () => {
+    // Build where clause with semester scoping
+    const where: Record<string, unknown> = { userId: user.id };
+    if (!allSemesters && targetSemesterId) {
+      where.semesterId = targetSemesterId;
     }
 
-    // Single create
-    if (body.classroom_id) {
-      const ownedClassroom = await prisma.classroom.findFirst({
-        where: { id: Number(body.classroom_id), userId: user.id },
+    const entries = await prisma.weeklySchedule.findMany({
+      where,
+      orderBy: [{ dayOfWeek: 'asc' }, { startPeriod: 'asc' }],
+    });
+    const mappedEntries = entries.map(e => {
+      const hours = e.startPeriod === 0 ? 0 : (e.endPeriod - e.startPeriod + 1);
+      return {
+        id: e.id,
+        day_of_week: e.dayOfWeek,
+        start_period: e.startPeriod,
+        end_period: e.endPeriod,
+        start_time: e.startTime ? e.startTime.toISOString().split('T')[1].slice(0, 5) : null,
+        end_time: e.endTime ? e.endTime.toISOString().split('T')[1].slice(0, 5) : null,
+        subject_code: e.subjectCode,
+        subject_name: e.subjectName,
+        room: e.room,
+        instructor: e.instructor,
+        group_name: e.groupName,
+        hours: hours,
+        entry_type: e.entryType,
+        color: e.color,
+        classroom_id: e.classroomId
+      };
+    });
+    const summaryMap = new Map();
+    mappedEntries.forEach(e => {
+      if (!e.subject_code) return;
+      if (!summaryMap.has(e.subject_code)) {
+        summaryMap.set(e.subject_code, { subject_code: e.subject_code, subject_name: e.subject_name, total_hours: 0 });
+      }
+      summaryMap.get(e.subject_code).total_hours += e.hours;
+    });
+    const summary = Array.from(summaryMap.values());
+
+    return { entries: mappedEntries, summary };
+  });
+
+  return NextResponse.json({ data });
+}, 'Failed to get timetable');
+
+export const POST = withAuth(async (request, user) => {
+  const body = await request.json();
+
+  // Resolve semester for new entries
+  const activeSemesterId = await getActiveSemesterId(user.id);
+
+  // Bulk create
+  if (Array.isArray(body.entries)) {
+    const classroomIds: number[] = Array.from(
+      new Set(body.entries.map((e: Record<string, unknown>) => Number(e.classroom_id)).filter((id: number) => !isNaN(id) && id > 0))
+    );
+    if (classroomIds.length > 0) {
+      const ownedClassrooms = await prisma.classroom.findMany({
+        where: { id: { in: classroomIds }, userId: user.id },
+        select: { id: true },
       });
-      if (!ownedClassroom) {
-        return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 403 });
+      const ownedSet = new Set(ownedClassrooms.map(c => c.id));
+      const hasUnauthorized = classroomIds.some(id => !ownedSet.has(id));
+      if (hasUnauthorized) {
+        return NextResponse.json({ message: 'One or more classrooms not found or unauthorized' }, { status: 403 });
       }
     }
 
-    if (body.semester_id) {
-      const ownedSem = await prisma.semester.findFirst({
-        where: { id: Number(body.semester_id), userId: user.id },
+    const semesterIds: number[] = Array.from(
+      new Set(body.entries.map((e: Record<string, unknown>) => Number(e.semester_id)).filter((id: number) => !isNaN(id) && id > 0))
+    );
+    if (semesterIds.length > 0) {
+      const ownedSemesters = await prisma.semester.findMany({
+        where: { id: { in: semesterIds }, userId: user.id },
+        select: { id: true },
       });
-      if (!ownedSem) {
-        return NextResponse.json({ message: 'Semester not found or unauthorized' }, { status: 403 });
+      const ownedSemSet = new Set(ownedSemesters.map(s => s.id));
+      const hasUnauthorizedSem = semesterIds.some(id => !ownedSemSet.has(id));
+      if (hasUnauthorizedSem) {
+        return NextResponse.json({ message: 'One or more semesters not found or unauthorized' }, { status: 403 });
       }
     }
 
-    const rawStart = Number(body.start_period);
-    const rawEnd = Number(body.end_period);
-    const startPeriod = Math.max(0, Math.min(12, isNaN(rawStart) ? 1 : rawStart));
-    const endPeriod = Math.max(startPeriod, Math.min(12, isNaN(rawEnd) ? startPeriod : rawEnd));
-    const hours = startPeriod === 0 ? 0 : (endPeriod - startPeriod + 1);
-    const startTimeStr = body.start_time || PERIOD_TIMES[startPeriod]?.start;
-    const endTimeStr = body.end_time || PERIOD_TIMES[endPeriod]?.end;
+    const data = body.entries.map((e: Record<string, unknown>) => {
+      const rawStart = Number(e.start_period);
+      const rawEnd = Number(e.end_period);
+      const startPeriod = Math.max(0, Math.min(12, isNaN(rawStart) ? 1 : rawStart));
+      const endPeriod = Math.max(startPeriod, Math.min(12, isNaN(rawEnd) ? startPeriod : rawEnd));
+      const hours = startPeriod === 0 ? 0 : (endPeriod - startPeriod + 1);
+      const startTimeStr = (e.start_time as string) || PERIOD_TIMES[startPeriod]?.start;
+      const endTimeStr = (e.end_time as string) || PERIOD_TIMES[endPeriod]?.end;
 
-    const entry = await prisma.weeklySchedule.create({
-      data: {
+      return {
         userId: user.id,
-        timetableName: body.timetable_name || 'ตารางสอน',
-        semester: body.semester || null,
-        semesterId: body.semester_id ? Number(body.semester_id) : activeSemesterId,
-        dayOfWeek: Math.max(0, Math.min(6, Number(body.day_of_week) || 0)),
+        timetableName: (e.timetable_name as string) || 'ตารางสอน',
+        semester: (e.semester as string) || null,
+        semesterId: e.semester_id ? Number(e.semester_id) : activeSemesterId,
+        dayOfWeek: Math.max(0, Math.min(6, Number(e.day_of_week) || 0)),
         startPeriod,
         endPeriod,
         startTime: parseTimeToUtc(startTimeStr),
         endTime: parseTimeToUtc(endTimeStr),
-        subjectCode: body.subject_code || null,
-        subjectName: body.subject_name || null,
-        room: body.room || null,
-        instructor: body.instructor || null,
-        groupName: body.group_name || null,
+        subjectCode: (e.subject_code as string) || null,
+        subjectName: (e.subject_name as string) || null,
+        room: (e.room as string) || null,
+        instructor: (e.instructor as string) || null,
+        groupName: (e.group_name as string) || null,
         hours,
-        entryType: normalizeEntryType(body.entry_type),
-        color: body.color || null,
-        classroomId: body.classroom_id ? Number(body.classroom_id) : null,
-      },
+        entryType: normalizeEntryType(e.entry_type as string),
+        color: (e.color as string) || null,
+        classroomId: e.classroom_id ? Number(e.classroom_id) : null,
+      };
     });
 
+    await prisma.weeklySchedule.createMany({ data });
     invalidateCache(userCacheKey(user.id, 'timetable'));
     invalidateCache(userCacheKey(user.id, 'dashboard'));
-    return NextResponse.json({ data: entry }, { status: 201 });
-  } catch (error) {
-    if (error instanceof AuthError) return handleAuthError();
-    console.error('Create timetable error:', error);
-    return NextResponse.json({ message: 'Failed to create timetable' }, { status: 500 });
+    return NextResponse.json({ message: 'Timetable entries created' }, { status: 201 });
   }
-}
 
-export async function DELETE(request: NextRequest) {
-  try {
-    const user = requireAuth(request);
-    const { searchParams } = new URL(request.url);
-    const semesterIdParam = searchParams.get('semester_id');
-    const allSemesters = searchParams.get('all') === 'true';
+  // Single create
+  if (body.classroom_id) {
+    const ownedClassroom = await prisma.classroom.findFirst({
+      where: { id: Number(body.classroom_id), userId: user.id },
+    });
+    if (!ownedClassroom) {
+      return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 403 });
+    }
+  }
 
-    const deleteWhere: { userId: number; semesterId?: number } = { userId: user.id };
+  if (body.semester_id) {
+    const ownedSem = await prisma.semester.findFirst({
+      where: { id: Number(body.semester_id), userId: user.id },
+    });
+    if (!ownedSem) {
+      return NextResponse.json({ message: 'Semester not found or unauthorized' }, { status: 403 });
+    }
+  }
 
-    if (!allSemesters) {
-      if (semesterIdParam) {
-        const sid = Number(semesterIdParam);
-        if (!isNaN(sid) && sid > 0) {
-          deleteWhere.semesterId = sid;
-        }
-      } else {
-        const activeSemesterId = await getActiveSemesterId(user.id);
-        if (activeSemesterId) {
-          deleteWhere.semesterId = activeSemesterId;
-        }
+  const rawStart = Number(body.start_period);
+  const rawEnd = Number(body.end_period);
+  const startPeriod = Math.max(0, Math.min(12, isNaN(rawStart) ? 1 : rawStart));
+  const endPeriod = Math.max(startPeriod, Math.min(12, isNaN(rawEnd) ? startPeriod : rawEnd));
+  const hours = startPeriod === 0 ? 0 : (endPeriod - startPeriod + 1);
+  const startTimeStr = body.start_time || PERIOD_TIMES[startPeriod]?.start;
+  const endTimeStr = body.end_time || PERIOD_TIMES[endPeriod]?.end;
+
+  const entry = await prisma.weeklySchedule.create({
+    data: {
+      userId: user.id,
+      timetableName: body.timetable_name || 'ตารางสอน',
+      semester: body.semester || null,
+      semesterId: body.semester_id ? Number(body.semester_id) : activeSemesterId,
+      dayOfWeek: Math.max(0, Math.min(6, Number(body.day_of_week) || 0)),
+      startPeriod,
+      endPeriod,
+      startTime: parseTimeToUtc(startTimeStr),
+      endTime: parseTimeToUtc(endTimeStr),
+      subjectCode: body.subject_code || null,
+      subjectName: body.subject_name || null,
+      room: body.room || null,
+      instructor: body.instructor || null,
+      groupName: body.group_name || null,
+      hours,
+      entryType: normalizeEntryType(body.entry_type),
+      color: body.color || null,
+      classroomId: body.classroom_id ? Number(body.classroom_id) : null,
+    },
+  });
+
+  invalidateCache(userCacheKey(user.id, 'timetable'));
+  invalidateCache(userCacheKey(user.id, 'dashboard'));
+  return NextResponse.json({ data: entry }, { status: 201 });
+}, 'Failed to create timetable');
+
+export const DELETE = withAuth(async (request, user) => {
+  const { searchParams } = new URL(request.url);
+  const semesterIdParam = searchParams.get('semester_id');
+  const allSemesters = searchParams.get('all') === 'true';
+
+  const deleteWhere: { userId: number; semesterId?: number } = { userId: user.id };
+
+  if (!allSemesters) {
+    if (semesterIdParam) {
+      const sid = Number(semesterIdParam);
+      if (!isNaN(sid) && sid > 0) {
+        deleteWhere.semesterId = sid;
+      }
+    } else {
+      const activeSemesterId = await getActiveSemesterId(user.id);
+      if (activeSemesterId) {
+        deleteWhere.semesterId = activeSemesterId;
       }
     }
-
-    await prisma.weeklySchedule.deleteMany({ where: deleteWhere });
-    invalidateCache(userCacheKey(user.id, 'timetable'));
-    invalidateCache(userCacheKey(user.id, 'dashboard'));
-    return NextResponse.json({ message: 'Timetable cleared' });
-  } catch (error) {
-    if (error instanceof AuthError) return handleAuthError();
-    return NextResponse.json({ message: 'Failed to clear timetable' }, { status: 500 });
   }
-}
+
+  await prisma.weeklySchedule.deleteMany({ where: deleteWhere });
+  invalidateCache(userCacheKey(user.id, 'timetable'));
+  invalidateCache(userCacheKey(user.id, 'dashboard'));
+  return NextResponse.json({ message: 'Timetable cleared' });
+}, 'Failed to clear timetable');

@@ -35,6 +35,19 @@ function toLightweightAvatarUrl(student: { id: number; avatar?: string | null; u
   return student.avatar;
 }
 
+/**
+ * Loads the avatar of ONE already-verified student and converts it to the lightweight URL.
+ * Same output as toLightweightAvatarUrl, but the (potentially large) avatar column is read only
+ * for the student that is actually returned instead of for every student sharing the code.
+ */
+async function loadAvatarUrl(student: { id: number; updatedAt: Date }): Promise<string | null> {
+  const row = await prisma.student.findUnique({
+    where: { id: student.id },
+    select: { avatar: true },
+  });
+  return toLightweightAvatarUrl({ id: student.id, avatar: row?.avatar ?? null, updatedAt: student.updatedAt });
+}
+
 export async function GET(request: NextRequest) {
   try {
     // Arcjet Rate Limiting & Bot Protection against student ID scraping / enumeration
@@ -72,21 +85,58 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Look up students with matching studentCode
+    // Look up students with matching studentCode.
+    // Explicit `select` (instead of `include`): only the columns used below are loaded.
+    // `avatar` (MediumText, possibly base64) is deliberately NOT selected here: this query also returns
+    // students that fail name verification or belong to other classrooms/schools, so loading it would
+    // pull one blob per candidate. It is fetched afterwards only for the single student shown
+    // (see loadAvatarUrl). Schema note: an `avatarUpdatedAt DateTime?` column on Student would let us
+    // decide "has avatar" + build the cache-busting URL with no blob read at all (not approved yet).
     const rawMatchingStudents = await prisma.student.findMany({
       where: {
         studentCode: code,
       },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        studentCode: true,
+        gradeLevel: true,
+        midtermScore: true,
+        finalScore: true,
+        affectiveScore: true,
+        updatedAt: true,
         classroom: {
-          include: {
+          select: {
+            id: true,
+            userId: true,
+            name: true,
+            description: true,
+            isPortalEnabled: true,
+            curriculumType: true,
+            totalWeeks: true,
+            semesterStartDate: true,
+            assignmentWeight: true,
+            postTestWeight: true,
+            affectiveWeight: true,
+            midtermWeight: true,
+            finalWeight: true,
+            midtermMaxScore: true,
+            finalMaxScore: true,
+            lateToAbsentRatio: true,
+            leaveToAbsentRatio: true,
+            totalClasses: true,
+            minAttendancePercent: true,
             user: {
               select: {
-                id: true,
                 name: true,
               },
             },
-            semester: true,
+            // Only the start date is read (effectiveStartDate); resolveTargetWeeks uses the classroom's own fields.
+            semester: {
+              select: {
+                startDate: true,
+              },
+            },
           },
         },
       },
@@ -118,13 +168,14 @@ export async function GET(request: NextRequest) {
 
     // If multiple classrooms found and no classroom_id requested, return list for selection
     if (validClassrooms.length > 1 && !classroomIdParam) {
+      const firstStudentAvatar = await loadAvatarUrl(matchingStudents[0]);
       const resp = NextResponse.json({
         status: 'multiple_classrooms',
         student: {
           id: matchingStudents[0].id,
           name: matchingStudents[0].name,
           student_code: matchingStudents[0].studentCode,
-          avatar: toLightweightAvatarUrl(matchingStudents[0]),
+          avatar: firstStudentAvatar,
         },
         classrooms: validClassrooms.map((s) => ({
           student_id: s.id,
@@ -174,6 +225,7 @@ export async function GET(request: NextRequest) {
 
     // If subject teacher has disabled Student Portal for this classroom, return locked status without querying/exposing scores or attendance
     if (!classroom.isPortalEnabled) {
+      const targetAvatar = await loadAvatarUrl(targetStudent);
       const disabledResponse = NextResponse.json({
         status: 'portal_disabled',
         student: {
@@ -181,7 +233,7 @@ export async function GET(request: NextRequest) {
           name: targetStudent.name,
           student_code: targetStudent.studentCode,
           grade_level: targetStudent.gradeLevel,
-          avatar: toLightweightAvatarUrl(targetStudent),
+          avatar: targetAvatar,
         },
         classroom: {
           id: classroom.id,
@@ -247,21 +299,26 @@ export async function GET(request: NextRequest) {
       classroomAttendanceDates,
       classroomWeeklySchedules,
       activeSemester,
+      targetAvatarUrl,
     ] = await Promise.all([
       prisma.scoreStructure.findMany({
         where: { classroomId: numericClassroomId },
+        select: { lessonNumber: true, lessonName: true, maxAssignmentScore: true, maxPostTestScore: true },
         orderBy: { lessonNumber: 'asc' },
       }),
       prisma.studentScore.findMany({
         where: { studentId: studentId, classroomId: numericClassroomId },
+        select: { lessonNumber: true, assignmentScore: true, postTestScore: true },
         orderBy: { lessonNumber: 'asc' },
       }),
       prisma.attendance.findMany({
         where: { studentId: studentId, classroomId: numericClassroomId },
+        select: { id: true, date: true, status: true },
         orderBy: { date: 'desc' },
       }),
       prisma.gradeCriteria.findMany({
         where: { classroomId: numericClassroomId },
+        select: { grade: true, minScore: true },
         orderBy: { minScore: 'desc' },
       }),
       prisma.studentScore.findFirst({
@@ -289,6 +346,8 @@ export async function GET(request: NextRequest) {
         where: { userId: classroom.userId, isActive: true },
         select: { startDate: true },
       }),
+      // Avatar is read only for the returned student, in parallel with the other queries
+      loadAvatarUrl(targetStudent),
     ]);
 
     // Resolve current teaching week based on calendar, attendance, and recorded scores
@@ -469,7 +528,7 @@ export async function GET(request: NextRequest) {
         name: targetStudent.name,
         student_code: targetStudent.studentCode,
         grade_level: targetStudent.gradeLevel,
-        avatar: toLightweightAvatarUrl(targetStudent),
+        avatar: targetAvatarUrl,
       },
       classroom: {
         id: classroom.id,

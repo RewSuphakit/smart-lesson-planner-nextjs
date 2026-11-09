@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -10,7 +10,7 @@ import {
   Camera, Sparkles, Image as ImageIcon, GitBranch,
   Download, FileText, Info
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import dynamic from 'next/dynamic';
 import Pagination from '@/components/Pagination';
 const StudentExcelModal = dynamic(() => import('@/components/StudentExcelModal'), { ssr: false });
@@ -80,7 +80,7 @@ export default function Students() {
   const bulkPhotoInputRef = useRef<HTMLInputElement>(null);
   const [exampleFormatTab, setExampleFormatTab] = useState<'split' | 'single'>('split');
 
-  // ─── Query: ดึงข้อมูลนักเรียน ───
+  // â”€â”€â”€ Query: à¸”à¸¶à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™ â”€â”€â”€
   const { data: students = [], isLoading: loadingStudents } = useQuery<Student[]>({
     queryKey: ['students'],
     queryFn: async () => {
@@ -89,7 +89,7 @@ export default function Students() {
     },
   });
 
-  // ─── Query: ดึงข้อมูลห้องเรียน (shared cache) ───
+  // â”€â”€â”€ Query: à¸”à¸¶à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™ (shared cache) â”€â”€â”€
   const { data: classrooms = [], isLoading: loadingClassrooms } = useQuery<Classroom[]>({
     queryKey: ['classrooms'],
     queryFn: async () => {
@@ -98,7 +98,7 @@ export default function Students() {
     },
   });
 
-  // ─── Query: ดึงรายชื่อสาขาที่ไม่ซ้ำ ───
+  // â”€â”€â”€ Query: à¸”à¸¶à¸‡à¸£à¸²à¸¢à¸Šà¸·à¹ˆà¸­à¸ªà¸²à¸‚à¸²à¸—à¸µà¹ˆà¹„à¸¡à¹ˆà¸‹à¹‰à¸³ â”€â”€â”€
   const { data: branches = [] } = useQuery<string[]>({
     queryKey: ['student-branches'],
     queryFn: async () => {
@@ -107,7 +107,7 @@ export default function Students() {
     },
   });
 
-  // ─── Query: ดึงรายชื่อระดับชั้นที่ไม่ซ้ำ ───
+  // â”€â”€â”€ Query: à¸”à¸¶à¸‡à¸£à¸²à¸¢à¸Šà¸·à¹ˆà¸­à¸£à¸°à¸”à¸±à¸šà¸Šà¸±à¹‰à¸™à¸—à¸µà¹ˆà¹„à¸¡à¹ˆà¸‹à¹‰à¸³ â”€â”€â”€
   const { data: gradeLevels = [] } = useQuery<string[]>({
     queryKey: ['student-grade-levels'],
     queryFn: async () => {
@@ -118,7 +118,7 @@ export default function Students() {
 
   const isLoading = loadingStudents || loadingClassrooms;
 
-  // ─── Mutation: สร้าง/แก้ไขนักเรียน ───
+  // â”€â”€â”€ Mutation: à¸ªà¸£à¹‰à¸²à¸‡/à¹à¸à¹‰à¹„à¸‚à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™ â”€â”€â”€
   const saveMutation = useMutation({
     mutationFn: async (payload: typeof form) => {
       const formattedPayload = {
@@ -139,7 +139,7 @@ export default function Students() {
       }
     },
     onSuccess: () => {
-      toast.success(editing ? 'อัปเดตข้อมูลนักเรียนเรียบร้อย' : 'เพิ่มนักเรียนเรียบร้อย');
+      toast.success(editing ? 'à¸­à¸±à¸›à¹€à¸”à¸•à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢' : 'à¹€à¸žà¸´à¹ˆà¸¡à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢');
       setShowForm(false);
       setEditing(null);
       setForm(emptyForm);
@@ -153,15 +153,15 @@ export default function Students() {
     },
     onError: (err: { response?: { data?: { message?: string; errors?: Array<{ message: string }> } } }) => {
       const firstError = err.response?.data?.errors?.[0]?.message;
-      toast.error(firstError || err.response?.data?.message || 'บันทึกไม่สำเร็จ');
+      toast.error(firstError || err.response?.data?.message || 'à¸šà¸±à¸™à¸—à¸¶à¸à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
     },
   });
 
-  // ─── Mutation: ลบนักเรียนรายคน ───
+  // â”€â”€â”€ Mutation: à¸¥à¸šà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸£à¸²à¸¢à¸„à¸™ â”€â”€â”€
   const deleteMutation = useMutation({
     mutationFn: (id: string | number) => api.delete('/students/' + id),
     onSuccess: (res) => {
-      toast.success(res.data?.message || 'ลบนักเรียนเรียบร้อยแล้ว');
+      toast.success(res.data?.message || 'à¸¥à¸šà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢à¹à¸¥à¹‰à¸§');
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['student-branches'] });
       queryClient.invalidateQueries({ queryKey: ['student-grade-levels'] });
@@ -171,18 +171,18 @@ export default function Students() {
       queryClient.invalidateQueries({ queryKey: ['attendance-data'] });
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
-      toast.error(err.response?.data?.message || 'ลบไม่สำเร็จ');
+      toast.error(err.response?.data?.message || 'à¸¥à¸šà¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
     },
   });
 
-  // ─── Mutation: ย้ายห้องเรียนแบบ bulk ───
+  // â”€â”€â”€ Mutation: à¸¢à¹‰à¸²à¸¢à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™à¹à¸šà¸š bulk â”€â”€â”€
   const bulkAssignMutation = useMutation({
     mutationFn: () => api.put('/students/bulk-classroom', {
       studentIds: selectedStudents,
       classroomId: bulkAssignClassroomId === 'null' ? null : bulkAssignClassroomId
     }),
     onSuccess: () => {
-      toast.success('ย้ายห้องเรียนเรียบร้อย');
+      toast.success('à¸¢à¹‰à¸²à¸¢à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢');
       setSelectedStudents([]);
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['classrooms'] });
@@ -191,16 +191,16 @@ export default function Students() {
       queryClient.invalidateQueries({ queryKey: ['attendance-data'] });
     },
     onError: () => {
-      toast.error('ย้ายห้องเรียนไม่สำเร็จ');
+      toast.error('à¸¢à¹‰à¸²à¸¢à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
     },
   });
 
-  // ─── Mutation: กำหนดระดับชั้น/ห้องย่อย & สาขาแบบ bulk ───
+  // â”€â”€â”€ Mutation: à¸à¸³à¸«à¸™à¸”à¸£à¸°à¸”à¸±à¸šà¸Šà¸±à¹‰à¸™/à¸«à¹‰à¸­à¸‡à¸¢à¹ˆà¸­à¸¢ & à¸ªà¸²à¸‚à¸²à¹à¸šà¸š bulk â”€â”€â”€
   const bulkMetaMutation = useMutation({
     mutationFn: (payload: { student_ids: number[]; grade_level?: string | null; branch?: string | null }) =>
       api.patch('/students', payload),
     onSuccess: (res) => {
-      toast.success(res.data?.message || 'อัปเดตห้องย่อยและสาขาเรียบร้อย');
+      toast.success(res.data?.message || 'à¸­à¸±à¸›à¹€à¸”à¸•à¸«à¹‰à¸­à¸‡à¸¢à¹ˆà¸­à¸¢à¹à¸¥à¸°à¸ªà¸²à¸‚à¸²à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢');
       setSelectedStudents([]);
       setBulkGradeLevel('');
       setBulkBranch('');
@@ -213,15 +213,15 @@ export default function Students() {
       queryClient.invalidateQueries({ queryKey: ['attendance-data'] });
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
-      toast.error(err.response?.data?.message || 'อัปเดตห้องย่อย/สาขาไม่สำเร็จ');
+      toast.error(err.response?.data?.message || 'à¸­à¸±à¸›à¹€à¸”à¸•à¸«à¹‰à¸­à¸‡à¸¢à¹ˆà¸­à¸¢/à¸ªà¸²à¸‚à¸²à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
     },
   });
 
-  // ─── Mutation: ลบนักเรียนที่เลือก (bulk) ───
+  // â”€â”€â”€ Mutation: à¸¥à¸šà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸—à¸µà¹ˆà¹€à¸¥à¸·à¸­à¸ (bulk) â”€â”€â”€
   const bulkDeleteMutation = useMutation({
     mutationFn: () => api.delete(`/students?ids=${selectedStudents.join(',')}`),
     onSuccess: (res) => {
-      toast.success(res.data?.message || 'ลบนักเรียนที่เลือกเรียบร้อยแล้ว');
+      toast.success(res.data?.message || 'à¸¥à¸šà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸—à¸µà¹ˆà¹€à¸¥à¸·à¸­à¸à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢à¹à¸¥à¹‰à¸§');
       setSelectedStudents([]);
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['student-branches'] });
@@ -232,18 +232,18 @@ export default function Students() {
       queryClient.invalidateQueries({ queryKey: ['attendance-data'] });
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
-      toast.error(err.response?.data?.message || 'ลบไม่สำเร็จ');
+      toast.error(err.response?.data?.message || 'à¸¥à¸šà¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
     },
   });
 
-  // ─── Mutation: ลบทั้งหมด ───
+  // â”€â”€â”€ Mutation: à¸¥à¸šà¸—à¸±à¹‰à¸‡à¸«à¸¡à¸” â”€â”€â”€
   const deleteAllMutation = useMutation({
     mutationFn: (classroomId?: string) => {
       const url = classroomId ? `/students?classroom_id=${classroomId}` : '/students?all=true';
       return api.delete(url);
     },
     onSuccess: (res) => {
-      toast.success(res.data?.message || 'ลบนักเรียนเรียบร้อยแล้ว');
+      toast.success(res.data?.message || 'à¸¥à¸šà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢à¹à¸¥à¹‰à¸§');
       setSelectedStudents([]);
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['student-branches'] });
@@ -254,17 +254,17 @@ export default function Students() {
       queryClient.invalidateQueries({ queryKey: ['attendance-data'] });
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
-      toast.error(err.response?.data?.message || 'ลบไม่สำเร็จ');
+      toast.error(err.response?.data?.message || 'à¸¥à¸šà¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
     },
   });
 
-  // ─── Mutation: นำเข้า bulk ───
+  // â”€â”€â”€ Mutation: à¸™à¸³à¹€à¸‚à¹‰à¸² bulk â”€â”€â”€
   const importMutation = useMutation({
     mutationFn: async (payload: Array<ImportRow & { classroom_id: string | null }>) => {
       return api.post('/students/bulk', { students: payload });
     },
     onSuccess: (res) => {
-      toast.success(res.data.message || 'นำเข้านักเรียนสำเร็จ');
+      toast.success(res.data.message || 'à¸™à¸³à¹€à¸‚à¹‰à¸²à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
       setShowImportForm(false);
       setImportData([]);
       setImportClassroomId('');
@@ -277,7 +277,7 @@ export default function Students() {
       queryClient.invalidateQueries({ queryKey: ['attendance-data'] });
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
-      toast.error(err.response?.data?.message || 'นำเข้าไม่สำเร็จ');
+      toast.error(err.response?.data?.message || 'à¸™à¸³à¹€à¸‚à¹‰à¸²à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
     },
   });
 
@@ -285,29 +285,29 @@ export default function Students() {
 
   const _handleExport = async () => {
     if (filtered.length === 0) {
-      toast.error('ไม่มีข้อมูลนักเรียนสำหรับส่งออก');
+      toast.error('à¹„à¸¡à¹ˆà¸¡à¸µà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸ªà¸³à¸«à¸£à¸±à¸šà¸ªà¹ˆà¸‡à¸­à¸­à¸');
       return;
     }
 
     const XLSX = await import('xlsx');
     const exportData = filtered.map(s => ({
-      'รหัสนักเรียน': s.student_code || '',
-      'ชื่อ-นามสกุล': s.name || '',
-      'ระดับชั้น': s.grade_level || '',
-      'สาขา': s.branch || '',
-      'ห้องเรียน': classrooms.find(c => String(c.id) === String(s.classroom_id))?.name || s.classroom_name || 'ไม่ระบุ',
-      'อีเมล': s.email || ''
+      'à¸£à¸«à¸±à¸ªà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™': s.student_code || '',
+      'à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥': s.name || '',
+      'à¸£à¸°à¸”à¸±à¸šà¸Šà¸±à¹‰à¸™': s.grade_level || '',
+      'à¸ªà¸²à¸‚à¸²': s.branch || '',
+      'à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™': classrooms.find(c => String(c.id) === String(s.classroom_id))?.name || s.classroom_name || 'à¹„à¸¡à¹ˆà¸£à¸°à¸šà¸¸',
+      'à¸­à¸µà¹€à¸¡à¸¥': s.email || ''
     }));
 
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Students");
 
-    const className = filterClassroomId ? classrooms.find(c => String(c.id) === String(filterClassroomId))?.name : 'ทั้งหมด';
-    const fileName = `รายชื่อนักเรียน_${className}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    const className = filterClassroomId ? classrooms.find(c => String(c.id) === String(filterClassroomId))?.name : 'à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”';
+    const fileName = `à¸£à¸²à¸¢à¸Šà¸·à¹ˆà¸­à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™_${className}_${new Date().toISOString().split('T')[0]}.xlsx`;
 
     XLSX.writeFile(wb, fileName);
-    toast.success('ส่งออกไฟล์เรียบร้อย');
+    toast.success('à¸ªà¹ˆà¸‡à¸­à¸­à¸à¹„à¸Ÿà¸¥à¹Œà¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -320,7 +320,7 @@ export default function Students() {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      toast.error('กรุณาเลือกไฟล์รูปภาพ (JPG, PNG, WebP)');
+      toast.error('à¸à¸£à¸¸à¸“à¸²à¹€à¸¥à¸·à¸­à¸à¹„à¸Ÿà¸¥à¹Œà¸£à¸¹à¸›à¸ à¸²à¸ž (JPG, PNG, WebP)');
       return;
     }
 
@@ -328,9 +328,9 @@ export default function Students() {
     try {
       const compressed = await compressImageFile(file, 160, 0.78);
       setForm(prev => ({ ...prev, avatar: compressed, remove_avatar: false }));
-      toast.success('บีบอัดรูปภาพเรียบร้อย (~4KB)');
+      toast.success('à¸šà¸µà¸šà¸­à¸±à¸”à¸£à¸¹à¸›à¸ à¸²à¸žà¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢ (~4KB)');
     } catch {
-      toast.error('ไม่สามารถประมวลผลรูปภาพได้');
+      toast.error('à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸›à¸£à¸°à¸¡à¸§à¸¥à¸œà¸¥à¸£à¸¹à¸›à¸ à¸²à¸žà¹„à¸”à¹‰');
     } finally {
       setIsCompressingSingle(false);
       e.target.value = '';
@@ -366,12 +366,12 @@ export default function Students() {
 
       setImportData(updated);
       if (matchedCount > 0) {
-        toast.success(`จับคู่และบีบอัดรูปภาพนักเรียนสำเร็จ ${matchedCount} คน (~4KB/รูป) 🎉`);
+        toast.success(`à¸ˆà¸±à¸šà¸„à¸¹à¹ˆà¹à¸¥à¸°à¸šà¸µà¸šà¸­à¸±à¸”à¸£à¸¹à¸›à¸ à¸²à¸žà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸ªà¸³à¹€à¸£à¹‡à¸ˆ ${matchedCount} à¸„à¸™ (~4KB/à¸£à¸¹à¸›) ðŸŽ‰`);
       } else {
-        toast.error('ไม่พบชื่อไฟล์รูปที่ตรงกับรหัสนักเรียนหรือชื่อในรายการ');
+        toast.error('à¹„à¸¡à¹ˆà¸žà¸šà¸Šà¸·à¹ˆà¸­à¹„à¸Ÿà¸¥à¹Œà¸£à¸¹à¸›à¸—à¸µà¹ˆà¸•à¸£à¸‡à¸à¸±à¸šà¸£à¸«à¸±à¸ªà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸«à¸£à¸·à¸­à¸Šà¸·à¹ˆà¸­à¹ƒà¸™à¸£à¸²à¸¢à¸à¸²à¸£');
       }
     } catch {
-      toast.error('เกิดข้อผิดพลาดในการประมวลผลรูปภาพ');
+      toast.error('à¹€à¸à¸´à¸”à¸‚à¹‰à¸­à¸œà¸´à¸”à¸žà¸¥à¸²à¸”à¹ƒà¸™à¸à¸²à¸£à¸›à¸£à¸°à¸¡à¸§à¸¥à¸œà¸¥à¸£à¸¹à¸›à¸ à¸²à¸ž');
     } finally {
       setIsMatchingPhotos(false);
       e.target.value = '';
@@ -405,7 +405,7 @@ export default function Students() {
   };
 
   const handleDelete = (id: string | number) => {
-    if (!window.confirm('ต้องการลบนักเรียนคนนี้หรือไม่?')) return;
+    if (!window.confirm('à¸•à¹‰à¸­à¸‡à¸à¸²à¸£à¸¥à¸šà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸„à¸™à¸™à¸µà¹‰à¸«à¸£à¸·à¸­à¹„à¸¡à¹ˆ?')) return;
     deleteMutation.mutate(id);
   };
 
@@ -425,7 +425,7 @@ export default function Students() {
 
   const handleBulkAssign = () => {
     if (!bulkAssignClassroomId) {
-      toast.error('กรุณาเลือกห้องเรียนปลายทาง');
+      toast.error('à¸à¸£à¸¸à¸“à¸²à¹€à¸¥à¸·à¸­à¸à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™à¸›à¸¥à¸²à¸¢à¸—à¸²à¸‡');
       return;
     }
     bulkAssignMutation.mutate();
@@ -436,7 +436,7 @@ export default function Students() {
     const trimmedBranch = bulkBranch.trim();
 
     if (!trimmedGrade && !trimmedBranch) {
-      toast.error('กรุณากรอกระดับชั้น/ห้อง (เช่น ปวช.1/1) หรือสาขาที่ต้องการกำหนด');
+      toast.error('à¸à¸£à¸¸à¸“à¸²à¸à¸£à¸­à¸à¸£à¸°à¸”à¸±à¸šà¸Šà¸±à¹‰à¸™/à¸«à¹‰à¸­à¸‡ (à¹€à¸Šà¹ˆà¸™ à¸›à¸§à¸Š.1/1) à¸«à¸£à¸·à¸­à¸ªà¸²à¸‚à¸²à¸—à¸µà¹ˆà¸•à¹‰à¸­à¸‡à¸à¸²à¸£à¸à¸³à¸«à¸™à¸”');
       return;
     }
 
@@ -451,64 +451,64 @@ export default function Students() {
 
   const handleBulkDelete = () => {
     if (selectedStudents.length === 0) return;
-    if (!window.confirm(`ยืนยันการลบนักเรียนที่เลือกทั้งหมด ${selectedStudents.length} คนหรือไม่? (ข้อมูลคะแนนและการประเมินของนักเรียนจะถูกลบไปด้วย)`)) return;
+    if (!window.confirm(`à¸¢à¸·à¸™à¸¢à¸±à¸™à¸à¸²à¸£à¸¥à¸šà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸—à¸µà¹ˆà¹€à¸¥à¸·à¸­à¸à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸” ${selectedStudents.length} à¸„à¸™à¸«à¸£à¸·à¸­à¹„à¸¡à¹ˆ? (à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸„à¸°à¹à¸™à¸™à¹à¸¥à¸°à¸à¸²à¸£à¸›à¸£à¸°à¹€à¸¡à¸´à¸™à¸‚à¸­à¸‡à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸ˆà¸°à¸–à¸¹à¸à¸¥à¸šà¹„à¸›à¸”à¹‰à¸§à¸¢)`)) return;
     bulkDeleteMutation.mutate();
   };
 
   const handleDeleteAll = () => {
     const isFiltered = !!filterClassroomId;
-    const targetClassName = isFiltered ? classrooms.find(c => String(c.id) === String(filterClassroomId))?.name || 'ห้องเรียนที่เลือก' : 'ทั้งหมด';
+    const targetClassName = isFiltered ? classrooms.find(c => String(c.id) === String(filterClassroomId))?.name || 'à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™à¸—à¸µà¹ˆà¹€à¸¥à¸·à¸­à¸' : 'à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”';
     const msg = isFiltered
-      ? `ยืนยันการลบนักเรียนทั้งหมดในห้องเรียน "${targetClassName}" ใช่หรือไม่? (ข้อมูลคะแนนและประวัติการประเมินของนักเรียนจะถูกลบไปด้วย)`
-      : `ยืนยันการลบนักเรียนทั้งหมด (${students.length} คน) ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้!`;
+      ? `à¸¢à¸·à¸™à¸¢à¸±à¸™à¸à¸²à¸£à¸¥à¸šà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”à¹ƒà¸™à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™ "${targetClassName}" à¹ƒà¸Šà¹ˆà¸«à¸£à¸·à¸­à¹„à¸¡à¹ˆ? (à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸„à¸°à¹à¸™à¸™à¹à¸¥à¸°à¸›à¸£à¸°à¸§à¸±à¸•à¸´à¸à¸²à¸£à¸›à¸£à¸°à¹€à¸¡à¸´à¸™à¸‚à¸­à¸‡à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸ˆà¸°à¸–à¸¹à¸à¸¥à¸šà¹„à¸›à¸”à¹‰à¸§à¸¢)`
+      : `à¸¢à¸·à¸™à¸¢à¸±à¸™à¸à¸²à¸£à¸¥à¸šà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸” (${students.length} à¸„à¸™) à¹ƒà¸Šà¹ˆà¸«à¸£à¸·à¸­à¹„à¸¡à¹ˆ? à¸à¸²à¸£à¸à¸£à¸°à¸—à¸³à¸™à¸µà¹‰à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸¢à¹‰à¸­à¸™à¸à¸¥à¸±à¸šà¹„à¸”à¹‰!`;
 
     if (!window.confirm(msg)) return;
     deleteAllMutation.mutate(isFiltered ? filterClassroomId : undefined);
   };
 
-  // ─── Download Sample Excel (.xlsx) Template ───
+  // â”€â”€â”€ Download Sample Excel (.xlsx) Template â”€â”€â”€
   const handleDownloadExcelTemplate = async () => {
     try {
       const XLSX = await import('xlsx');
-      const headers = ['รหัสนักเรียน', 'คำนำหน้า', 'ชื่อ', 'นามสกุล', 'ระดับชั้น/ห้อง', 'สาขาวิชา', 'อีเมล'];
+      const headers = ['à¸£à¸«à¸±à¸ªà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™', 'à¸„à¸³à¸™à¸³à¸«à¸™à¹‰à¸²', 'à¸Šà¸·à¹ˆà¸­', 'à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥', 'à¸£à¸°à¸”à¸±à¸šà¸Šà¸±à¹‰à¸™/à¸«à¹‰à¸­à¸‡', 'à¸ªà¸²à¸‚à¸²à¸§à¸´à¸Šà¸²', 'à¸­à¸µà¹€à¸¡à¸¥'];
       const rows = [
-        ['67209010001', 'นาย', 'สมชาย', 'ใจดี', 'ปวช.1/1', 'เทคโนโลยีสารสนเทศ', 'somchai.jai@example.com'],
-        ['67209010002', 'นางสาว', 'สมหญิง', 'รักเรียน', 'ปวช.1/1', 'เทคโนโลยีสารสนเทศ', 'somying.rak@example.com'],
-        ['67209010003', 'นาย', 'กิตติศักดิ์', 'พากเพียร', 'ปวช.1/2', 'ช่างอิเล็กทรอนิกส์', 'kittisak.pak@example.com'],
-        ['67209010004', 'นางสาว', 'กมลวรรณ', 'สดใส', 'ปวช.1/2', 'ช่างอิเล็กทรอนิกส์', 'kamonwan.sod@example.com'],
-        ['66309010005', 'นาย', 'ธนากร', 'มั่นคง', 'ปวส.1/1', 'เทคโนโลยีธุรกิจดิจิทัล', 'thanakorn.man@example.com'],
+        ['67209010001', 'à¸™à¸²à¸¢', 'à¸ªà¸¡à¸Šà¸²à¸¢', 'à¹ƒà¸ˆà¸”à¸µ', 'à¸›à¸§à¸Š.1/1', 'à¹€à¸—à¸„à¹‚à¸™à¹‚à¸¥à¸¢à¸µà¸ªà¸²à¸£à¸ªà¸™à¹€à¸—à¸¨', 'somchai.jai@example.com'],
+        ['67209010002', 'à¸™à¸²à¸‡à¸ªà¸²à¸§', 'à¸ªà¸¡à¸«à¸à¸´à¸‡', 'à¸£à¸±à¸à¹€à¸£à¸µà¸¢à¸™', 'à¸›à¸§à¸Š.1/1', 'à¹€à¸—à¸„à¹‚à¸™à¹‚à¸¥à¸¢à¸µà¸ªà¸²à¸£à¸ªà¸™à¹€à¸—à¸¨', 'somying.rak@example.com'],
+        ['67209010003', 'à¸™à¸²à¸¢', 'à¸à¸´à¸•à¸•à¸´à¸¨à¸±à¸à¸”à¸´à¹Œ', 'à¸žà¸²à¸à¹€à¸žà¸µà¸¢à¸£', 'à¸›à¸§à¸Š.1/2', 'à¸Šà¹ˆà¸²à¸‡à¸­à¸´à¹€à¸¥à¹‡à¸à¸—à¸£à¸­à¸™à¸´à¸à¸ªà¹Œ', 'kittisak.pak@example.com'],
+        ['67209010004', 'à¸™à¸²à¸‡à¸ªà¸²à¸§', 'à¸à¸¡à¸¥à¸§à¸£à¸£à¸“', 'à¸ªà¸”à¹ƒà¸ª', 'à¸›à¸§à¸Š.1/2', 'à¸Šà¹ˆà¸²à¸‡à¸­à¸´à¹€à¸¥à¹‡à¸à¸—à¸£à¸­à¸™à¸´à¸à¸ªà¹Œ', 'kamonwan.sod@example.com'],
+        ['66309010005', 'à¸™à¸²à¸¢', 'à¸˜à¸™à¸²à¸à¸£', 'à¸¡à¸±à¹ˆà¸™à¸„à¸‡', 'à¸›à¸§à¸ª.1/1', 'à¹€à¸—à¸„à¹‚à¸™à¹‚à¸¥à¸¢à¸µà¸˜à¸¸à¸£à¸à¸´à¸ˆà¸”à¸´à¸ˆà¸´à¸—à¸±à¸¥', 'thanakorn.man@example.com'],
       ];
 
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
       ws['!cols'] = [
-        { wch: 16 }, // รหัสนักเรียน
-        { wch: 10 }, // คำนำหน้า
-        { wch: 18 }, // ชื่อ
-        { wch: 18 }, // นามสกุล
-        { wch: 16 }, // ระดับชั้น/ห้อง
-        { wch: 24 }, // สาขาวิชา
-        { wch: 28 }, // อีเมล
+        { wch: 16 }, // à¸£à¸«à¸±à¸ªà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™
+        { wch: 10 }, // à¸„à¸³à¸™à¸³à¸«à¸™à¹‰à¸²
+        { wch: 18 }, // à¸Šà¸·à¹ˆà¸­
+        { wch: 18 }, // à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥
+        { wch: 16 }, // à¸£à¸°à¸”à¸±à¸šà¸Šà¸±à¹‰à¸™/à¸«à¹‰à¸­à¸‡
+        { wch: 24 }, // à¸ªà¸²à¸‚à¸²à¸§à¸´à¸Šà¸²
+        { wch: 28 }, // à¸­à¸µà¹€à¸¡à¸¥
       ];
-      XLSX.utils.book_append_sheet(wb, ws, 'รายชื่อนักเรียน');
-      XLSX.writeFile(wb, 'เทมเพลต_รายชื่อนักเรียน.xlsx');
-      toast.success('ดาวน์โหลดไฟล์ตัวอย่าง Excel สำเร็จ');
+      XLSX.utils.book_append_sheet(wb, ws, 'à¸£à¸²à¸¢à¸Šà¸·à¹ˆà¸­à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™');
+      XLSX.writeFile(wb, 'à¹€à¸—à¸¡à¹€à¸žà¸¥à¸•_à¸£à¸²à¸¢à¸Šà¸·à¹ˆà¸­à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™.xlsx');
+      toast.success('à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œà¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡ Excel à¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
     } catch (err) {
       console.error('Download template error:', err);
-      toast.error('ดาวน์โหลดไฟล์ตัวอย่าง Excel ไม่สำเร็จ');
+      toast.error('à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œà¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡ Excel à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
     }
   };
 
-  // ─── Download Sample CSV (.csv) Template ───
+  // â”€â”€â”€ Download Sample CSV (.csv) Template â”€â”€â”€
   const handleDownloadCsvTemplate = () => {
     try {
-      const headers = ['รหัสนักเรียน', 'คำนำหน้า', 'ชื่อ', 'นามสกุล', 'ระดับชั้น/ห้อง', 'สาขาวิชา', 'อีเมล'];
+      const headers = ['à¸£à¸«à¸±à¸ªà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™', 'à¸„à¸³à¸™à¸³à¸«à¸™à¹‰à¸²', 'à¸Šà¸·à¹ˆà¸­', 'à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥', 'à¸£à¸°à¸”à¸±à¸šà¸Šà¸±à¹‰à¸™/à¸«à¹‰à¸­à¸‡', 'à¸ªà¸²à¸‚à¸²à¸§à¸´à¸Šà¸²', 'à¸­à¸µà¹€à¸¡à¸¥'];
       const rows = [
-        ['67209010001', 'นาย', 'สมชาย', 'ใจดี', 'ปวช.1/1', 'เทคโนโลยีสารสนเทศ', 'somchai.jai@example.com'],
-        ['67209010002', 'นางสาว', 'สมหญิง', 'รักเรียน', 'ปวช.1/1', 'เทคโนโลยีสารสนเทศ', 'somying.rak@example.com'],
-        ['67209010003', 'นาย', 'กิตติศักดิ์', 'พากเพียร', 'ปวช.1/2', 'ช่างอิเล็กทรอนิกส์', 'kittisak.pak@example.com'],
-        ['67209010004', 'นางสาว', 'กมลวรรณ', 'สดใส', 'ปวช.1/2', 'ช่างอิเล็กทรอนิกส์', 'kamonwan.sod@example.com'],
-        ['66309010005', 'นาย', 'ธนากร', 'มั่นคง', 'ปวส.1/1', 'เทคโนโลยีธุรกิจดิจิทัล', 'thanakorn.man@example.com'],
+        ['67209010001', 'à¸™à¸²à¸¢', 'à¸ªà¸¡à¸Šà¸²à¸¢', 'à¹ƒà¸ˆà¸”à¸µ', 'à¸›à¸§à¸Š.1/1', 'à¹€à¸—à¸„à¹‚à¸™à¹‚à¸¥à¸¢à¸µà¸ªà¸²à¸£à¸ªà¸™à¹€à¸—à¸¨', 'somchai.jai@example.com'],
+        ['67209010002', 'à¸™à¸²à¸‡à¸ªà¸²à¸§', 'à¸ªà¸¡à¸«à¸à¸´à¸‡', 'à¸£à¸±à¸à¹€à¸£à¸µà¸¢à¸™', 'à¸›à¸§à¸Š.1/1', 'à¹€à¸—à¸„à¹‚à¸™à¹‚à¸¥à¸¢à¸µà¸ªà¸²à¸£à¸ªà¸™à¹€à¸—à¸¨', 'somying.rak@example.com'],
+        ['67209010003', 'à¸™à¸²à¸¢', 'à¸à¸´à¸•à¸•à¸´à¸¨à¸±à¸à¸”à¸´à¹Œ', 'à¸žà¸²à¸à¹€à¸žà¸µà¸¢à¸£', 'à¸›à¸§à¸Š.1/2', 'à¸Šà¹ˆà¸²à¸‡à¸­à¸´à¹€à¸¥à¹‡à¸à¸—à¸£à¸­à¸™à¸´à¸à¸ªà¹Œ', 'kittisak.pak@example.com'],
+        ['67209010004', 'à¸™à¸²à¸‡à¸ªà¸²à¸§', 'à¸à¸¡à¸¥à¸§à¸£à¸£à¸“', 'à¸ªà¸”à¹ƒà¸ª', 'à¸›à¸§à¸Š.1/2', 'à¸Šà¹ˆà¸²à¸‡à¸­à¸´à¹€à¸¥à¹‡à¸à¸—à¸£à¸­à¸™à¸´à¸à¸ªà¹Œ', 'kamonwan.sod@example.com'],
+        ['66309010005', 'à¸™à¸²à¸¢', 'à¸˜à¸™à¸²à¸à¸£', 'à¸¡à¸±à¹ˆà¸™à¸„à¸‡', 'à¸›à¸§à¸ª.1/1', 'à¹€à¸—à¸„à¹‚à¸™à¹‚à¸¥à¸¢à¸µà¸˜à¸¸à¸£à¸à¸´à¸ˆà¸”à¸´à¸ˆà¸´à¸—à¸±à¸¥', 'thanakorn.man@example.com'],
       ];
 
       const escapeCsv = (val: string | number) => {
@@ -528,15 +528,15 @@ export default function Students() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'เทมเพลต_รายชื่อนักเรียน.csv';
+      a.download = 'à¹€à¸—à¸¡à¹€à¸žà¸¥à¸•_à¸£à¸²à¸¢à¸Šà¸·à¹ˆà¸­à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™.csv';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      toast.success('ดาวน์โหลดไฟล์ตัวอย่าง CSV สำเร็จ');
+      toast.success('à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œà¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡ CSV à¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
     } catch (err) {
       console.error('Download CSV template error:', err);
-      toast.error('ดาวน์โหลดไฟล์ตัวอย่าง CSV ไม่สำเร็จ');
+      toast.error('à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œà¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡ CSV à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
     }
   };
 
@@ -545,7 +545,7 @@ export default function Students() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('ขนาดไฟล์เกินกำหนด (สูงสุดไม่เกิน 5MB)');
+      toast.error('à¸‚à¸™à¸²à¸”à¹„à¸Ÿà¸¥à¹Œà¹€à¸à¸´à¸™à¸à¸³à¸«à¸™à¸” (à¸ªà¸¹à¸‡à¸ªà¸¸à¸”à¹„à¸¡à¹ˆà¹€à¸à¸´à¸™ 5MB)');
       e.target.value = '';
       return;
     }
@@ -562,32 +562,32 @@ export default function Students() {
         const data = XLSX.utils.sheet_to_json<Record<string, string>>(ws);
 
         const mappedData = data.map((row: Record<string, string>) => {
-          const prefix = row['คำนำหน้า'] || '';
-          const firstName = row['ชื่อ'] || row['name'] || '';
-          const lastName = row['นามสกุล'] || '';
+          const prefix = row['à¸„à¸³à¸™à¸³à¸«à¸™à¹‰à¸²'] || '';
+          const firstName = row['à¸Šà¸·à¹ˆà¸­'] || row['name'] || '';
+          const lastName = row['à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥'] || '';
 
-          let fullName = row['ชื่อ-นามสกุล'] || '';
+          let fullName = row['à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥'] || '';
           if (!fullName && firstName) {
             fullName = `${prefix} ${firstName} ${lastName}`.trim().replace(/\s+/g, ' ');
           }
 
-          const rawAvatar = row['รูปภาพ'] || row['รูปถ่าย'] || row['รูป'] || row['photo'] || row['image'] || row['avatar'] || row['picture'] || row['url'] || row['image_url'] || '';
-          const rawGrade = row['ระดับชั้น/ห้อง'] || row['ระดับชั้น'] || row['ชั้น'] || row['grade_level'] || '';
-          const rawRoom = row['ห้อง'] || row['กลุ่ม'] || row['กลุ่มเรียน'] || row['ห้องย่อย'] || row['ทับ'] || row['room'] || row['section'] || row['group'] || '';
+          const rawAvatar = row['à¸£à¸¹à¸›à¸ à¸²à¸ž'] || row['à¸£à¸¹à¸›à¸–à¹ˆà¸²à¸¢'] || row['à¸£à¸¹à¸›'] || row['photo'] || row['image'] || row['avatar'] || row['picture'] || row['url'] || row['image_url'] || '';
+          const rawGrade = row['à¸£à¸°à¸”à¸±à¸šà¸Šà¸±à¹‰à¸™/à¸«à¹‰à¸­à¸‡'] || row['à¸£à¸°à¸”à¸±à¸šà¸Šà¸±à¹‰à¸™'] || row['à¸Šà¸±à¹‰à¸™'] || row['grade_level'] || '';
+          const rawRoom = row['à¸«à¹‰à¸­à¸‡'] || row['à¸à¸¥à¸¸à¹ˆà¸¡'] || row['à¸à¸¥à¸¸à¹ˆà¸¡à¹€à¸£à¸µà¸¢à¸™'] || row['à¸«à¹‰à¸­à¸‡à¸¢à¹ˆà¸­à¸¢'] || row['à¸—à¸±à¸š'] || row['room'] || row['section'] || row['group'] || '';
 
           return {
-            student_code: String(row['รหัสนักเรียน'] || row['รหัสนักศึกษา'] || row['student_code'] || ''),
+            student_code: String(row['à¸£à¸«à¸±à¸ªà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™'] || row['à¸£à¸«à¸±à¸ªà¸™à¸±à¸à¸¨à¸¶à¸à¸©à¸²'] || row['student_code'] || ''),
             name: String(fullName),
             grade_level: combineGradeAndRoom(String(rawGrade), String(rawRoom)),
-            branch: String(row['สาขา'] || row['สาขาวิชา'] || row['แผนก'] || row['แผนกวิชา'] || row['branch'] || row['department'] || '').trim(),
-            email: String(row['อีเมล'] || row['email'] || ''),
+            branch: String(row['à¸ªà¸²à¸‚à¸²'] || row['à¸ªà¸²à¸‚à¸²à¸§à¸´à¸Šà¸²'] || row['à¹à¸œà¸™à¸'] || row['à¹à¸œà¸™à¸à¸§à¸´à¸Šà¸²'] || row['branch'] || row['department'] || '').trim(),
+            email: String(row['à¸­à¸µà¹€à¸¡à¸¥'] || row['email'] || ''),
             avatar: rawAvatar ? String(rawAvatar).trim() : null,
           };
         }).filter((item: { name: string }) => item.name);
 
         setImportData(mappedData);
       } catch {
-        toast.error('ไม่สามารถอ่านไฟล์ได้ กรุณาตรวจสอบรูปแบบไฟล์');
+        toast.error('à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸­à¹ˆà¸²à¸™à¹„à¸Ÿà¸¥à¹Œà¹„à¸”à¹‰ à¸à¸£à¸¸à¸“à¸²à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¸£à¸¹à¸›à¹à¸šà¸šà¹„à¸Ÿà¸¥à¹Œ');
       }
     };
     reader.readAsBinaryString(file);
@@ -617,7 +617,7 @@ export default function Students() {
   const branchGroups = useMemo(() => {
     const groups = new Map<string, number>();
     for (const s of students) {
-      const b = s.branch || 'ไม่ระบุสาขา';
+      const b = s.branch || 'à¹„à¸¡à¹ˆà¸£à¸°à¸šà¸¸à¸ªà¸²à¸‚à¸²';
       groups.set(b, (groups.get(b) || 0) + 1);
     }
     return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0], 'th'));
@@ -630,7 +630,7 @@ export default function Students() {
       : students;
     const groups = new Map<string, number>();
     for (const s of pool) {
-      const g = s.grade_level || 'ไม่ระบุระดับ';
+      const g = s.grade_level || 'à¹„à¸¡à¹ˆà¸£à¸°à¸šà¸¸à¸£à¸°à¸”à¸±à¸š';
       groups.set(g, (groups.get(g) || 0) + 1);
     }
     return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0], 'th'));
@@ -642,7 +642,7 @@ export default function Students() {
     return filtered.slice(start, start + itemsPerPage);
   }, [filtered, currentPage, itemsPerPage]);
 
-  // Reset to page 1 when filters change — derived from useMemo instead of useEffect
+  // Reset to page 1 when filters change â€” derived from useMemo instead of useEffect
   const prevFilterKey = `${search}|${filterClassroomId}|${filterBranch}|${filterGradeLevel}`;
   const [lastFilterKey, setLastFilterKey] = useState(prevFilterKey);
   if (prevFilterKey !== lastFilterKey) {
@@ -657,8 +657,8 @@ export default function Students() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 mb-1">นักเรียน</h1>
-          <p className="text-slate-500 text-sm">ทั้งหมด {students.length} คน</p>
+          <h1 className="text-2xl font-bold text-slate-800 mb-1">à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™</h1>
+          <p className="text-slate-500 text-sm">à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸” {students.length} à¸„à¸™</p>
         </div>
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           {students.length > 0 && (
@@ -668,25 +668,25 @@ export default function Students() {
               className="btn bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 flex-1 sm:flex-none flex items-center justify-center gap-1.5"
             >
               <Trash2 className="w-4 h-4" />
-              <span>ลบทั้งหมด</span>
+              <span>à¸¥à¸šà¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”</span>
             </button>
           )}
           <button
             onClick={() => setShowExportModal(true)}
             className="btn bg-emerald-600 hover:bg-emerald-700 text-white flex-1 sm:flex-none flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 font-bold text-xs"
-            title="พรีวิวตัวอย่างตาราง Excel ก่อนส่งออก"
+            title="à¸žà¸£à¸µà¸§à¸´à¸§à¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡à¸•à¸²à¸£à¸²à¸‡ Excel à¸à¹ˆà¸­à¸™à¸ªà¹ˆà¸‡à¸­à¸­à¸"
           >
-            <FileSpreadsheet className="w-4 h-4" /> พรีวิว & ส่งออก Excel
+            <FileSpreadsheet className="w-4 h-4" /> à¸žà¸£à¸µà¸§à¸´à¸§ & à¸ªà¹ˆà¸‡à¸­à¸­à¸ Excel
           </button>
           <button
             onClick={() => { setShowImportForm(true); setImportData([]); setImportClassroomId(''); }}
             className="btn bg-white hover:bg-indigo-50 text-slate-800 border border-slate-200/80 flex-1 sm:flex-none flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all font-bold text-xs"
-            title="นำเข้ารายชื่อนักเรียนจากไฟล์ Excel / CSV และดาวน์โหลดเทมเพลตตัวอย่าง"
+            title="à¸™à¸³à¹€à¸‚à¹‰à¸²à¸£à¸²à¸¢à¸Šà¸·à¹ˆà¸­à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸ˆà¸²à¸à¹„à¸Ÿà¸¥à¹Œ Excel / CSV à¹à¸¥à¸°à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹€à¸—à¸¡à¹€à¸žà¸¥à¸•à¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡"
           >
-            <Upload className="w-4 h-4 text-indigo-600" /> นำเข้าไฟล์ & ตัวอย่าง
+            <Upload className="w-4 h-4 text-indigo-600" /> à¸™à¸³à¹€à¸‚à¹‰à¸²à¹„à¸Ÿà¸¥à¹Œ & à¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡
           </button>
           <button onClick={() => { setForm(emptyForm); setEditing(null); setShowForm(true); }} className="btn btn-primary flex-1 sm:flex-none" id="add-student-btn">
-            <Plus className="w-4 h-4" /> เพิ่มนักเรียน
+            <Plus className="w-4 h-4" /> à¹€à¸žà¸´à¹ˆà¸¡à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™
           </button>
         </div>
       </div>
@@ -699,9 +699,9 @@ export default function Students() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="form-input pl-11"
-            placeholder="ค้นหานักเรียน..."
+            placeholder="à¸„à¹‰à¸™à¸«à¸²à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™..."
             id="student-search"
-            aria-label="ค้นหานักเรียน"
+            aria-label="à¸„à¹‰à¸™à¸«à¸²à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™"
           />
         </div>
         <select
@@ -709,9 +709,9 @@ export default function Students() {
           onChange={e => setFilterClassroomId(e.target.value)}
           className="form-input w-full sm:w-64"
           id="filter-classroom"
-          aria-label="กรองตามห้องเรียน"
+          aria-label="à¸à¸£à¸­à¸‡à¸•à¸²à¸¡à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™"
         >
-          <option value="">-- ทุกห้องเรียน --</option>
+          <option value="">-- à¸—à¸¸à¸à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™ --</option>
           {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
 
@@ -726,7 +726,7 @@ export default function Students() {
               <button
                 key={branch}
                 onClick={() => {
-                  setFilterBranch(branch === 'ไม่ระบุสาขา' ? '' : branch);
+                  setFilterBranch(branch === 'à¹„à¸¡à¹ˆà¸£à¸°à¸šà¸¸à¸ªà¸²à¸‚à¸²' ? '' : branch);
                   setFilterGradeLevel('');
                 }}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all hover:scale-105 hover:shadow-sm bg-white/80 border-indigo-100 text-slate-700 hover:bg-indigo-50 hover:border-indigo-300"
@@ -745,7 +745,7 @@ export default function Students() {
         <div className="glass p-3.5 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/70 via-purple-50/50 to-white space-y-2.5 animate-fade-in-up">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-slate-500 font-medium">สาขาที่เลือก:</span>
+              <span className="text-xs text-slate-500 font-medium">à¸ªà¸²à¸‚à¸²à¸—à¸µà¹ˆà¹€à¸¥à¸·à¸­à¸:</span>
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-indigo-600 text-white shadow-sm shadow-indigo-600/20">
                 <GitBranch className="w-3.5 h-3.5" />
                 {filterBranch}
@@ -756,15 +756,15 @@ export default function Students() {
                   setFilterGradeLevel('');
                 }}
                 className="text-xs text-slate-500 hover:text-red-500 underline transition-colors flex items-center gap-1"
-                title="ยกเลิกการเลือกสาขา"
+                title="à¸¢à¸à¹€à¸¥à¸´à¸à¸à¸²à¸£à¹€à¸¥à¸·à¸­à¸à¸ªà¸²à¸‚à¸²"
               >
-                <X className="w-3 h-3" /> แสดงทุกสาขา
+                <X className="w-3 h-3" /> à¹à¸ªà¸”à¸‡à¸—à¸¸à¸à¸ªà¸²à¸‚à¸²
               </button>
             </div>
 
             {filterGradeLevel && (
               <div className="flex items-center gap-1.5">
-                <span className="text-xs text-slate-500 font-medium">ระดับที่เลือก:</span>
+                <span className="text-xs text-slate-500 font-medium">à¸£à¸°à¸”à¸±à¸šà¸—à¸µà¹ˆà¹€à¸¥à¸·à¸­à¸:</span>
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-emerald-600 text-white shadow-sm shadow-emerald-600/20">
                   <GraduationCap className="w-3.5 h-3.5" />
                   {filterGradeLevel}
@@ -772,7 +772,7 @@ export default function Students() {
                 <button
                   onClick={() => setFilterGradeLevel('')}
                   className="text-xs text-slate-500 hover:text-red-500 transition-colors p-0.5"
-                  title="ล้างการเลือกระดับ"
+                  title="à¸¥à¹‰à¸²à¸‡à¸à¸²à¸£à¹€à¸¥à¸·à¸­à¸à¸£à¸°à¸”à¸±à¸š"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -780,11 +780,11 @@ export default function Students() {
             )}
           </div>
 
-          {/* Sub-level chips: "พอกดกรอกตามสาขาแล้วอยากให้มีกรอกตามระดับ อีก" */}
+          {/* Sub-level chips: "à¸žà¸­à¸à¸”à¸à¸£à¸­à¸à¸•à¸²à¸¡à¸ªà¸²à¸‚à¸²à¹à¸¥à¹‰à¸§à¸­à¸¢à¸²à¸à¹ƒà¸«à¹‰à¸¡à¸µà¸à¸£à¸­à¸à¸•à¸²à¸¡à¸£à¸°à¸”à¸±à¸š à¸­à¸µà¸" */}
           {gradeLevelGroups.length > 0 && (
             <div className="flex flex-wrap items-center gap-1.5 pt-1.5 border-t border-indigo-100/60">
               <span className="text-xs font-medium text-slate-600 mr-1 flex items-center gap-1">
-                <GraduationCap className="w-3.5 h-3.5 text-emerald-600" /> ระดับในสาขานี้:
+                <GraduationCap className="w-3.5 h-3.5 text-emerald-600" /> à¸£à¸°à¸”à¸±à¸šà¹ƒà¸™à¸ªà¸²à¸‚à¸²à¸™à¸µà¹‰:
               </span>
               <button
                 onClick={() => setFilterGradeLevel('')}
@@ -793,10 +793,10 @@ export default function Students() {
                   : 'bg-white/80 text-slate-600 hover:bg-purple-50 border border-slate-200'
                   }`}
               >
-                ทุกระดับ
+                à¸—à¸¸à¸à¸£à¸°à¸”à¸±à¸š
               </button>
               {gradeLevelGroups.map(([grade, count]) => {
-                const actualGrade = grade === 'ไม่ระบุระดับ' ? '' : grade;
+                const actualGrade = grade === 'à¹„à¸¡à¹ˆà¸£à¸°à¸šà¸¸à¸£à¸°à¸”à¸±à¸š' ? '' : grade;
                 const isSelected = filterGradeLevel === actualGrade;
                 return (
                   <button
@@ -826,13 +826,13 @@ export default function Students() {
         <div className="flex items-center gap-2 animate-fade-in-up">
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white">
             <GraduationCap className="w-3.5 h-3.5" />
-            ระดับ {filterGradeLevel}
+            à¸£à¸°à¸”à¸±à¸š {filterGradeLevel}
           </span>
           <button
             onClick={() => setFilterGradeLevel('')}
             className="text-xs text-slate-500 hover:text-emerald-600 underline transition-colors"
           >
-            แสดงทุกระดับ
+            à¹à¸ªà¸”à¸‡à¸—à¸¸à¸à¸£à¸°à¸”à¸±à¸š
           </button>
         </div>
       )}
@@ -843,13 +843,13 @@ export default function Students() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <span className="bg-indigo-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-xs">
-                เลือกแล้ว {selectedStudents.length} คน
+                à¹€à¸¥à¸·à¸­à¸à¹à¸¥à¹‰à¸§ {selectedStudents.length} à¸„à¸™
               </span>
               <button
                 onClick={() => setSelectedStudents([])}
                 className="text-slate-600 hover:text-slate-800 text-xs font-medium underline"
               >
-                ยกเลิกการเลือก
+                à¸¢à¸à¹€à¸¥à¸´à¸à¸à¸²à¸£à¹€à¸¥à¸·à¸­à¸
               </button>
             </div>
             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
@@ -858,10 +858,10 @@ export default function Students() {
                 onChange={e => setBulkAssignClassroomId(e.target.value)}
                 className="form-input py-1.5 text-xs flex-1 sm:flex-none sm:w-52"
                 id="bulk-assign-classroom"
-                aria-label="เลือกห้องเรียนเป้าหมายสำหรับนักเรียนที่เลือก"
+                aria-label="à¹€à¸¥à¸·à¸­à¸à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™à¹€à¸›à¹‰à¸²à¸«à¸¡à¸²à¸¢à¸ªà¸³à¸«à¸£à¸±à¸šà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸—à¸µà¹ˆà¹€à¸¥à¸·à¸­à¸"
               >
-                <option value="">-- ย้ายไปห้องเรียน/วิชา --</option>
-                <option value="null">ไม่มีห้องเรียน (ลอยแพ)</option>
+                <option value="">-- à¸¢à¹‰à¸²à¸¢à¹„à¸›à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™/à¸§à¸´à¸Šà¸² --</option>
+                <option value="null">à¹„à¸¡à¹ˆà¸¡à¸µà¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™ (à¸¥à¸­à¸¢à¹à¸ž)</option>
                 {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
               <button
@@ -869,7 +869,7 @@ export default function Students() {
                 disabled={isMutating}
                 className="btn btn-primary py-1.5 px-3 text-xs flex-1 sm:flex-none"
               >
-                {bulkAssignMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'ย้ายห้อง'}
+                {bulkAssignMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'à¸¢à¹‰à¸²à¸¢à¸«à¹‰à¸­à¸‡'}
               </button>
               <button
                 onClick={handleBulkDelete}
@@ -877,26 +877,26 @@ export default function Students() {
                 className="btn bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 py-1.5 px-3 text-xs flex-1 sm:flex-none flex items-center justify-center gap-1.5"
               >
                 {bulkDeleteMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                <span>ลบที่เลือก</span>
+                <span>à¸¥à¸šà¸—à¸µà¹ˆà¹€à¸¥à¸·à¸­à¸</span>
               </button>
             </div>
           </div>
 
-          {/* Bulk Assign Sub-room / Grade Level & Branch (สำหรับกรณีเรียนรวมหลายห้อง เช่น ปวช.1/1 กับ ปวช.1/2) */}
+          {/* Bulk Assign Sub-room / Grade Level & Branch (à¸ªà¸³à¸«à¸£à¸±à¸šà¸à¸£à¸“à¸µà¹€à¸£à¸µà¸¢à¸™à¸£à¸§à¸¡à¸«à¸¥à¸²à¸¢à¸«à¹‰à¸­à¸‡ à¹€à¸Šà¹ˆà¸™ à¸›à¸§à¸Š.1/1 à¸à¸±à¸š à¸›à¸§à¸Š.1/2) */}
           <div className="pt-2.5 border-t border-indigo-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
             <span className="text-xs font-semibold text-indigo-900 flex items-center gap-1.5 shrink-0">
               <GraduationCap className="w-4 h-4 text-emerald-600" />
-              <span>กำหนดห้องย่อย / สาขา (ใช้แยกห้องตอนเช็คชื่อ):</span>
+              <span>à¸à¸³à¸«à¸™à¸”à¸«à¹‰à¸­à¸‡à¸¢à¹ˆà¸­à¸¢ / à¸ªà¸²à¸‚à¸² (à¹ƒà¸Šà¹‰à¹à¸¢à¸à¸«à¹‰à¸­à¸‡à¸•à¸­à¸™à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­):</span>
             </span>
             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               <input
                 type="text"
                 value={bulkGradeLevel}
                 onChange={e => setBulkGradeLevel(e.target.value)}
-                placeholder="ระดับชั้น/ห้อง เช่น ปวช.1/1"
+                placeholder="à¸£à¸°à¸”à¸±à¸šà¸Šà¸±à¹‰à¸™/à¸«à¹‰à¸­à¸‡ à¹€à¸Šà¹ˆà¸™ à¸›à¸§à¸Š.1/1"
                 list="bulk-grade-suggestions"
                 className="form-input py-1.5 text-xs flex-1 sm:w-44 bg-white"
-                aria-label="กำหนดระดับชั้นหรือห้องย่อยแบบกลุ่ม"
+                aria-label="à¸à¸³à¸«à¸™à¸”à¸£à¸°à¸”à¸±à¸šà¸Šà¸±à¹‰à¸™à¸«à¸£à¸·à¸­à¸«à¹‰à¸­à¸‡à¸¢à¹ˆà¸­à¸¢à¹à¸šà¸šà¸à¸¥à¸¸à¹ˆà¸¡"
               />
               {gradeLevels.length > 0 && (
                 <datalist id="bulk-grade-suggestions">
@@ -907,10 +907,10 @@ export default function Students() {
                 type="text"
                 value={bulkBranch}
                 onChange={e => setBulkBranch(e.target.value)}
-                placeholder="สาขา เช่น คอมพิวเตอร์"
+                placeholder="à¸ªà¸²à¸‚à¸² à¹€à¸Šà¹ˆà¸™ à¸„à¸­à¸¡à¸žà¸´à¸§à¹€à¸•à¸­à¸£à¹Œ"
                 list="bulk-branch-suggestions"
                 className="form-input py-1.5 text-xs flex-1 sm:w-44 bg-white"
-                aria-label="กำหนดสาขาวิชาแบบกลุ่ม"
+                aria-label="à¸à¸³à¸«à¸™à¸”à¸ªà¸²à¸‚à¸²à¸§à¸´à¸Šà¸²à¹à¸šà¸šà¸à¸¥à¸¸à¹ˆà¸¡"
               />
               {branches.length > 0 && (
                 <datalist id="bulk-branch-suggestions">
@@ -924,7 +924,7 @@ export default function Students() {
                 className="btn bg-emerald-600 hover:bg-emerald-700 text-white py-1.5 px-3.5 text-xs font-bold shadow-xs flex items-center justify-center gap-1.5 w-full sm:w-auto"
               >
                 {bulkMetaMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
-                <span>บันทึกห้องย่อย/สาขา</span>
+                <span>à¸šà¸±à¸™à¸—à¸¶à¸à¸«à¹‰à¸­à¸‡à¸¢à¹ˆà¸­à¸¢/à¸ªà¸²à¸‚à¸²</span>
               </button>
             </div>
           </div>
@@ -940,12 +940,12 @@ export default function Students() {
               className="sr-only peer"
               checked={selectedStudents.length === filtered.length}
               onChange={handleSelectAll}
-              aria-label="เลือกทั้งหมดบนหน้าจอนี้"
+              aria-label="à¹€à¸¥à¸·à¸­à¸à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”à¸šà¸™à¸«à¸™à¹‰à¸²à¸ˆà¸­à¸™à¸µà¹‰"
             />
             <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all peer-focus:ring-2 peer-focus:ring-indigo-500 ${selectedStudents.length === filtered.length ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600 group-hover:border-indigo-400 bg-indigo-50'}`}>
               {selectedStudents.length === filtered.length && <CheckCircle className="w-3.5 h-3.5 text-slate-800" />}
             </div>
-            <span className="text-sm text-slate-600 group-hover:text-slate-700">เลือกทั้งหมดบนหน้าจอนี้</span>
+            <span className="text-sm text-slate-600 group-hover:text-slate-700">à¹€à¸¥à¸·à¸­à¸à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”à¸šà¸™à¸«à¸™à¹‰à¸²à¸ˆà¸­à¸™à¸µà¹‰</span>
           </label>
         </div>
       )}
@@ -957,8 +957,8 @@ export default function Students() {
             <div className="w-16 h-16 mx-auto rounded-2xl bg-indigo-50 flex items-center justify-center mb-3">
               <UsersIcon className="w-7 h-7 text-slate-700" />
             </div>
-            <p className="text-slate-500 text-sm font-medium">ยังไม่มีข้อมูลนักเรียน</p>
-            <p className="text-slate-600 text-xs mt-1">เพิ่มนักเรียนเพื่อเริ่มบันทึกผลการเรียน</p>
+            <p className="text-slate-500 text-sm font-medium">à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¸¡à¸µà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™</p>
+            <p className="text-slate-600 text-xs mt-1">à¹€à¸žà¸´à¹ˆà¸¡à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¹€à¸žà¸·à¹ˆà¸­à¹€à¸£à¸´à¹ˆà¸¡à¸šà¸±à¸™à¸—à¸¶à¸à¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™</p>
           </div>
         ) : paginatedStudents.map((student) => (
           <div
@@ -972,7 +972,7 @@ export default function Students() {
                   className="sr-only peer"
                   checked={selectedStudents.includes(student.id)}
                   onChange={() => handleToggleSelect(student.id)}
-                  aria-label={`เลือกนักเรียน ${student.name}`}
+                  aria-label={`à¹€à¸¥à¸·à¸­à¸à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™ ${student.name}`}
                 />
                 <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all peer-focus:ring-2 peer-focus:ring-indigo-500 ${selectedStudents.includes(student.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600 group-hover:border-indigo-400 bg-indigo-50'}`}>
                   {selectedStudents.includes(student.id) && <CheckCircle className="w-3.5 h-3.5 text-slate-800" />}
@@ -988,10 +988,10 @@ export default function Students() {
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-slate-800 text-[0.95rem]">{student.name}</p>
                 <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-0.5">
-                  {student.student_code && <span>รหัส: {student.student_code}</span>}
+                  {student.student_code && <span>à¸£à¸«à¸±à¸ª: {student.student_code}</span>}
                   {student.grade_level && (
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100 font-medium">
-                      <GraduationCap className="w-3 h-3" />ระดับ {student.grade_level}
+                      <GraduationCap className="w-3 h-3" />à¸£à¸°à¸”à¸±à¸š {student.grade_level}
                     </span>
                   )}
                   {student.branch && (
@@ -1001,7 +1001,7 @@ export default function Students() {
                   )}
                   {student.classroom_id && (() => {
                     const roomName = classrooms.find(c => String(c.id) === String(student.classroom_id))?.name || student.classroom_name;
-                    return roomName ? <span>ห้อง: {roomName}</span> : null;
+                    return roomName ? <span>à¸«à¹‰à¸­à¸‡: {roomName}</span> : null;
                   })()}
                   {student.email && <span>{student.email}</span>}
                 </div>
@@ -1010,16 +1010,16 @@ export default function Students() {
                 <button
                   onClick={() => handleEdit(student)}
                   className="p-2.5 rounded-xl hover:bg-indigo-500/10 text-slate-500 hover:text-indigo-700 transition-all"
-                  title="แก้ไข"
-                  aria-label={`แก้ไขข้อมูลของ ${student.name}`}
+                  title="à¹à¸à¹‰à¹„à¸‚"
+                  aria-label={`à¹à¸à¹‰à¹„à¸‚à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸‚à¸­à¸‡ ${student.name}`}
                 >
                   <Edit className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => handleDelete(student.id)}
                   className="p-2.5 rounded-xl hover:bg-red-500/10 text-slate-500 hover:text-red-400 transition-all"
-                  title="ลบ"
-                  aria-label={`ลบข้อมูลของ ${student.name}`}
+                  title="à¸¥à¸š"
+                  aria-label={`à¸¥à¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸‚à¸­à¸‡ ${student.name}`}
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -1049,7 +1049,7 @@ export default function Students() {
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
                   <GraduationCap className="w-5 h-5 text-white" />
                 </div>
-                <h2 className="text-lg font-bold text-slate-800">{editing ? 'แก้ไขข้อมูลนักเรียน' : 'เพิ่มนักเรียนใหม่'}</h2>
+                <h2 className="text-lg font-bold text-slate-800">{editing ? 'à¹à¸à¹‰à¹„à¸‚à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™' : 'à¹€à¸žà¸´à¹ˆà¸¡à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¹ƒà¸«à¸¡à¹ˆ'}</h2>
               </div>
               <button onClick={() => setShowForm(false)} className="p-2 hover:bg-indigo-50 rounded-xl"><X className="w-5 h-5 text-slate-500" /></button>
             </div>
@@ -1059,7 +1059,7 @@ export default function Students() {
               <div className="relative group">
                 <UserAvatar
                   avatar={form.avatar}
-                  name={form.name || 'นักเรียน'}
+                  name={form.name || 'à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™'}
                   userId={editing || 1}
                   size="xl"
                   className="rounded-3xl border-2 border-indigo-200 shadow-md transition-transform duration-200 group-hover:scale-105"
@@ -1069,7 +1069,7 @@ export default function Students() {
                   onClick={() => singlePhotoInputRef.current?.click()}
                   disabled={isCompressingSingle}
                   className="absolute -bottom-1 -right-1 bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-xl shadow-md border-2 border-white transition-transform hover:scale-110"
-                  title="เลือกรูปภาพนักเรียน"
+                  title="à¹€à¸¥à¸·à¸­à¸à¸£à¸¹à¸›à¸ à¸²à¸žà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™"
                 >
                   {isCompressingSingle ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
                 </button>
@@ -1092,23 +1092,23 @@ export default function Students() {
                   disabled={isCompressingSingle}
                   className="px-2.5 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold border border-indigo-200 inline-flex items-center gap-1 transition-colors"
                 >
-                  <Upload className="w-3 h-3" /> อัปโหลดรูปภาพ
+                  <Upload className="w-3 h-3" /> à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¸£à¸¹à¸›à¸ à¸²à¸ž
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                   className="px-2.5 py-1 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-semibold border border-purple-200 inline-flex items-center gap-1 transition-colors"
                 >
-                  <Sparkles className="w-3 h-3" /> เลือกอิโมจิ
+                  <Sparkles className="w-3 h-3" /> à¹€à¸¥à¸·à¸­à¸à¸­à¸´à¹‚à¸¡à¸ˆà¸´
                 </button>
                 {form.avatar && (
                   <button
                     type="button"
                     onClick={() => setForm(prev => ({ ...prev, avatar: '', remove_avatar: true }))}
                     className="px-2 py-1 rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 text-xs font-semibold transition-colors"
-                    title="ลบรูปและใช้อิโมจิตามลำดับ"
+                    title="à¸¥à¸šà¸£à¸¹à¸›à¹à¸¥à¸°à¹ƒà¸Šà¹‰à¸­à¸´à¹‚à¸¡à¸ˆà¸´à¸•à¸²à¸¡à¸¥à¸³à¸”à¸±à¸š"
                   >
-                    <Trash2 className="w-3 h-3" /> ลบรูป (ใช้อิโมจิเดิม)
+                    <Trash2 className="w-3 h-3" /> à¸¥à¸šà¸£à¸¹à¸› (à¹ƒà¸Šà¹‰à¸­à¸´à¹‚à¸¡à¸ˆà¸´à¹€à¸”à¸´à¸¡)
                   </button>
                 )}
               </div>
@@ -1117,7 +1117,7 @@ export default function Students() {
               {showEmojiPicker && (
                 <div className="w-full p-3 bg-slate-50 border border-indigo-100 rounded-2xl animate-fade-in-up space-y-2">
                   <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
-                    <span>เลือกอิโมจิประจำตัว:</span>
+                    <span>à¹€à¸¥à¸·à¸­à¸à¸­à¸´à¹‚à¸¡à¸ˆà¸´à¸›à¸£à¸°à¸ˆà¸³à¸•à¸±à¸§:</span>
                     <button
                       type="button"
                       onClick={() => setShowEmojiPicker(false)}
@@ -1147,38 +1147,38 @@ export default function Students() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="form-label" htmlFor="student-name">ชื่อ-นามสกุล</label>
+                <label className="form-label" htmlFor="student-name">à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥</label>
                 <input
                   value={form.name}
                   onChange={e => setForm({ ...form, name: e.target.value })}
                   className="form-input"
                   required
                   id="student-name"
-                  placeholder="กรอกชื่อ-นามสกุล"
+                  placeholder="à¸à¸£à¸­à¸à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥"
                 />
               </div>
               <div>
-                <label className="form-label" htmlFor="student-code">รหัสนักเรียน</label>
+                <label className="form-label" htmlFor="student-code">à¸£à¸«à¸±à¸ªà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™</label>
                 <input
                   value={form.student_code}
                   onChange={e => setForm({ ...form, student_code: e.target.value })}
                   className="form-input"
                   id="student-code"
-                  placeholder="เช่น 65010001"
+                  placeholder="à¹€à¸Šà¹ˆà¸™ 65010001"
                 />
               </div>
               <div>
-                <label className="form-label" htmlFor="student-grade">ระดับชั้น / ห้อง (กลุ่มเรียน)</label>
+                <label className="form-label" htmlFor="student-grade">à¸£à¸°à¸”à¸±à¸šà¸Šà¸±à¹‰à¸™ / à¸«à¹‰à¸­à¸‡ (à¸à¸¥à¸¸à¹ˆà¸¡à¹€à¸£à¸µà¸¢à¸™)</label>
                 <input
                   value={form.grade_level}
                   onChange={e => setForm({ ...form, grade_level: e.target.value })}
                   className="form-input"
                   id="student-grade"
-                  placeholder="เช่น ปวช.1/1, ปวช.1/2 หรือ ม.3/1"
+                  placeholder="à¹€à¸Šà¹ˆà¸™ à¸›à¸§à¸Š.1/1, à¸›à¸§à¸Š.1/2 à¸«à¸£à¸·à¸­ à¸¡.3/1"
                   list="grade-level-suggestions"
                 />
                 <p className="text-[11px] text-slate-500 mt-1">
-                  หากเรียนรวมหลายห้องในวิชาเดียวกัน ให้ระบุทับห้อง เช่น ปวช.1/1, ปวช.1/2 เพื่อแยกห้องตอนเช็คชื่อ
+                  à¸«à¸²à¸à¹€à¸£à¸µà¸¢à¸™à¸£à¸§à¸¡à¸«à¸¥à¸²à¸¢à¸«à¹‰à¸­à¸‡à¹ƒà¸™à¸§à¸´à¸Šà¸²à¹€à¸”à¸µà¸¢à¸§à¸à¸±à¸™ à¹ƒà¸«à¹‰à¸£à¸°à¸šà¸¸à¸—à¸±à¸šà¸«à¹‰à¸­à¸‡ à¹€à¸Šà¹ˆà¸™ à¸›à¸§à¸Š.1/1, à¸›à¸§à¸Š.1/2 à¹€à¸žà¸·à¹ˆà¸­à¹à¸¢à¸à¸«à¹‰à¸­à¸‡à¸•à¸­à¸™à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­
                 </p>
                 {gradeLevels.length > 0 && (
                   <datalist id="grade-level-suggestions">
@@ -1187,13 +1187,13 @@ export default function Students() {
                 )}
               </div>
               <div>
-                <label className="form-label" htmlFor="student-branch">สาขา</label>
+                <label className="form-label" htmlFor="student-branch">à¸ªà¸²à¸‚à¸²</label>
                 <input
                   value={form.branch}
                   onChange={e => setForm({ ...form, branch: e.target.value })}
                   className="form-input"
                   id="student-branch"
-                  placeholder="เช่น สาขาคอมพิวเตอร์, สาขาบัญชี"
+                  placeholder="à¹€à¸Šà¹ˆà¸™ à¸ªà¸²à¸‚à¸²à¸„à¸­à¸¡à¸žà¸´à¸§à¹€à¸•à¸­à¸£à¹Œ, à¸ªà¸²à¸‚à¸²à¸šà¸±à¸à¸Šà¸µ"
                   list="branch-suggestions"
                 />
                 {branches.length > 0 && (
@@ -1203,30 +1203,30 @@ export default function Students() {
                 )}
               </div>
               <div>
-                <label className="form-label" htmlFor="student-email">อีเมล</label>
+                <label className="form-label" htmlFor="student-email">à¸­à¸µà¹€à¸¡à¸¥</label>
                 <input
                   type="email"
                   value={form.email}
                   onChange={e => setForm({ ...form, email: e.target.value })}
                   className="form-input"
                   id="student-email"
-                  placeholder="student@email.com (ไม่บังคับ)"
+                  placeholder="student@email.com (à¹„à¸¡à¹ˆà¸šà¸±à¸‡à¸„à¸±à¸š)"
                 />
               </div>
               <div>
-                <label className="form-label" htmlFor="student-classroom">ห้องเรียน</label>
+                <label className="form-label" htmlFor="student-classroom">à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™</label>
                 <select
                   value={form.classroom_id}
                   onChange={e => setForm({ ...form, classroom_id: e.target.value })}
                   className="form-input"
                   id="student-classroom"
                 >
-                  <option value="">-- ไม่ระบุห้องเรียน --</option>
+                  <option value="">-- à¹„à¸¡à¹ˆà¸£à¸°à¸šà¸¸à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™ --</option>
                   {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
               <button type="submit" disabled={saveMutation.isPending || isCompressingSingle} className="btn btn-primary w-full py-3" id="student-save-btn">
-                {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : editing ? 'อัปเดต' : <><Plus className="w-4 h-4" /> เพิ่มนักเรียน</>}
+                {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : editing ? 'à¸­à¸±à¸›à¹€à¸”à¸•' : <><Plus className="w-4 h-4" /> à¹€à¸žà¸´à¹ˆà¸¡à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™</>}
               </button>
             </form>
           </div>
@@ -1245,14 +1245,14 @@ export default function Students() {
                   <Upload className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-slate-800">นำเข้ารายชื่อและรูปภาพนักเรียน</h2>
-                  <p className="text-xs text-slate-500">รองรับไฟล์ Excel (.xlsx, .xls) และ CSV พร้อมตัวอย่างรูปแบบไฟล์ที่ระบบตรวจจับได้ทันที</p>
+                  <h2 className="text-lg font-bold text-slate-800">à¸™à¸³à¹€à¸‚à¹‰à¸²à¸£à¸²à¸¢à¸Šà¸·à¹ˆà¸­à¹à¸¥à¸°à¸£à¸¹à¸›à¸ à¸²à¸žà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™</h2>
+                  <p className="text-xs text-slate-500">à¸£à¸­à¸‡à¸£à¸±à¸šà¹„à¸Ÿà¸¥à¹Œ Excel (.xlsx, .xls) à¹à¸¥à¸° CSV à¸žà¸£à¹‰à¸­à¸¡à¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡à¸£à¸¹à¸›à¹à¸šà¸šà¹„à¸Ÿà¸¥à¹Œà¸—à¸µà¹ˆà¸£à¸°à¸šà¸šà¸•à¸£à¸§à¸ˆà¸ˆà¸±à¸šà¹„à¸”à¹‰à¸—à¸±à¸™à¸—à¸µ</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowImportForm(false)}
                 className="p-2 hover:bg-indigo-50 rounded-xl text-slate-400 hover:text-slate-600 transition-colors"
-                aria-label="ปิดหน้าต่าง"
+                aria-label="à¸›à¸´à¸”à¸«à¸™à¹‰à¸²à¸•à¹ˆà¸²à¸‡"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1264,10 +1264,10 @@ export default function Students() {
                 <div className="space-y-0.5">
                   <h3 className="text-sm font-bold text-indigo-950 flex items-center gap-2">
                     <FileSpreadsheet className="w-4 h-4 text-indigo-600" />
-                    ตัวอย่างรูปแบบไฟล์ Excel / CSV ที่ระบบรองรับ
+                    à¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡à¸£à¸¹à¸›à¹à¸šà¸šà¹„à¸Ÿà¸¥à¹Œ Excel / CSV à¸—à¸µà¹ˆà¸£à¸°à¸šà¸šà¸£à¸­à¸‡à¸£à¸±à¸š
                   </h3>
                   <p className="text-xs text-slate-500">
-                    ดาวน์โหลดไฟล์เทมเพลตเพื่อนำไปกรอกข้อมูล หรือจัดรูปแบบคอลัมน์ตามตัวอย่างด้านล่าง
+                    à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œà¹€à¸—à¸¡à¹€à¸žà¸¥à¸•à¹€à¸žà¸·à¹ˆà¸­à¸™à¸³à¹„à¸›à¸à¸£à¸­à¸à¸‚à¹‰à¸­à¸¡à¸¹à¸¥ à¸«à¸£à¸·à¸­à¸ˆà¸±à¸”à¸£à¸¹à¸›à¹à¸šà¸šà¸„à¸­à¸¥à¸±à¸¡à¸™à¹Œà¸•à¸²à¸¡à¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡à¸”à¹‰à¸²à¸™à¸¥à¹ˆà¸²à¸‡
                   </p>
                 </div>
 
@@ -1277,26 +1277,26 @@ export default function Students() {
                     type="button"
                     onClick={handleDownloadExcelTemplate}
                     className="btn bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 shadow-2xs transition-all hover:border-emerald-300"
-                    title="ดาวน์โหลดไฟล์ตัวอย่างรูปแบบ Excel (.xlsx)"
+                    title="à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œà¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡à¸£à¸¹à¸›à¹à¸šà¸š Excel (.xlsx)"
                   >
                     <Download className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>เทมเพลต Excel (.xlsx)</span>
+                    <span>à¹€à¸—à¸¡à¹€à¸žà¸¥à¸• Excel (.xlsx)</span>
                   </button>
                   <button
                     type="button"
                     onClick={handleDownloadCsvTemplate}
                     className="btn bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 shadow-2xs transition-all hover:border-slate-300"
-                    title="ดาวน์โหลดไฟล์ตัวอย่างรูปแบบ CSV (.csv)"
+                    title="à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œà¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡à¸£à¸¹à¸›à¹à¸šà¸š CSV (.csv)"
                   >
                     <FileText className="w-3.5 h-3.5 text-slate-600" />
-                    <span>เทมเพลต CSV (.csv)</span>
+                    <span>à¹€à¸—à¸¡à¹€à¸žà¸¥à¸• CSV (.csv)</span>
                   </button>
                 </div>
               </div>
 
               {/* Format Tabs Switcher */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t border-indigo-100/60">
-                <span className="text-[11px] font-semibold text-slate-600">เลือกดูตัวอย่างคอลัมน์:</span>
+                <span className="text-[11px] font-semibold text-slate-600">à¹€à¸¥à¸·à¸­à¸à¸”à¸¹à¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡à¸„à¸­à¸¥à¸±à¸¡à¸™à¹Œ:</span>
                 <div className="inline-flex rounded-xl bg-slate-200/70 p-1 border border-slate-300/60 shadow-2xs">
                   <button
                     type="button"
@@ -1307,7 +1307,7 @@ export default function Students() {
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    แบบแยกคอลัมน์ (คำนำหน้า + ชื่อ + นามสกุล)
+                    à¹à¸šà¸šà¹à¸¢à¸à¸„à¸­à¸¥à¸±à¸¡à¸™à¹Œ (à¸„à¸³à¸™à¸³à¸«à¸™à¹‰à¸² + à¸Šà¸·à¹ˆà¸­ + à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥)
                   </button>
                   <button
                     type="button"
@@ -1318,7 +1318,7 @@ export default function Students() {
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    แบบรวมคอลัมน์ (ชื่อ-นามสกุล)
+                    à¹à¸šà¸šà¸£à¸§à¸¡à¸„à¸­à¸¥à¸±à¸¡à¸™à¹Œ (à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥)
                   </button>
                 </div>
               </div>
@@ -1328,24 +1328,24 @@ export default function Students() {
                 <table className="w-full text-xs text-left border-collapse">
                   <thead>
                     <tr className="bg-indigo-50/80 text-indigo-950 font-bold border-b border-indigo-100">
-                      <th className="p-2 border-r border-indigo-100/80 font-mono w-28 text-center">รหัสนักเรียน</th>
+                      <th className="p-2 border-r border-indigo-100/80 font-mono w-28 text-center">à¸£à¸«à¸±à¸ªà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™</th>
                       {exampleFormatTab === 'split' ? (
                         <>
-                          <th className="p-2 border-r border-indigo-100/80 w-20 text-center">คำนำหน้า</th>
-                          <th className="p-2 border-r border-indigo-100/80 w-28">ชื่อ</th>
-                          <th className="p-2 border-r border-indigo-100/80 w-28">นามสกุล</th>
+                          <th className="p-2 border-r border-indigo-100/80 w-20 text-center">à¸„à¸³à¸™à¸³à¸«à¸™à¹‰à¸²</th>
+                          <th className="p-2 border-r border-indigo-100/80 w-28">à¸Šà¸·à¹ˆà¸­</th>
+                          <th className="p-2 border-r border-indigo-100/80 w-28">à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥</th>
                         </>
                       ) : (
-                        <th className="p-2 border-r border-indigo-100/80 min-w-[150px]">ชื่อ-นามสกุล</th>
+                        <th className="p-2 border-r border-indigo-100/80 min-w-[150px]">à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥</th>
                       )}
                       <th className="p-2 border-r border-indigo-100/80 w-24 text-center">
-                        {exampleFormatTab === 'split' ? 'ระดับชั้น/ห้อง' : 'ระดับชั้น'}
+                        {exampleFormatTab === 'split' ? 'à¸£à¸°à¸”à¸±à¸šà¸Šà¸±à¹‰à¸™/à¸«à¹‰à¸­à¸‡' : 'à¸£à¸°à¸”à¸±à¸šà¸Šà¸±à¹‰à¸™'}
                       </th>
                       {exampleFormatTab === 'single' && (
-                        <th className="p-2 border-r border-indigo-100/80 w-16 text-center">ห้อง</th>
+                        <th className="p-2 border-r border-indigo-100/80 w-16 text-center">à¸«à¹‰à¸­à¸‡</th>
                       )}
-                      <th className="p-2 border-r border-indigo-100/80 min-w-[130px]">สาขาวิชา</th>
-                      <th className="p-2 text-slate-500 min-w-[140px]">อีเมล (ไม่บังคับ)</th>
+                      <th className="p-2 border-r border-indigo-100/80 min-w-[130px]">à¸ªà¸²à¸‚à¸²à¸§à¸´à¸Šà¸²</th>
+                      <th className="p-2 text-slate-500 min-w-[140px]">à¸­à¸µà¹€à¸¡à¸¥ (à¹„à¸¡à¹ˆà¸šà¸±à¸‡à¸„à¸±à¸š)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium">
@@ -1353,29 +1353,29 @@ export default function Students() {
                       <>
                         <tr className="bg-white hover:bg-indigo-50/20">
                           <td className="p-2 text-slate-700 border-r border-slate-100 font-mono text-center">67209010001</td>
-                          <td className="p-2 text-slate-600 border-r border-slate-100 text-center">นาย</td>
-                          <td className="p-2 text-slate-800 border-r border-slate-100 font-semibold">สมชาย</td>
-                          <td className="p-2 text-slate-800 border-r border-slate-100">ใจดี</td>
-                          <td className="p-2 text-slate-700 border-r border-slate-100 text-center font-mono">ปวช.1/1</td>
-                          <td className="p-2 text-slate-600 border-r border-slate-100">เทคโนโลยีสารสนเทศ</td>
+                          <td className="p-2 text-slate-600 border-r border-slate-100 text-center">à¸™à¸²à¸¢</td>
+                          <td className="p-2 text-slate-800 border-r border-slate-100 font-semibold">à¸ªà¸¡à¸Šà¸²à¸¢</td>
+                          <td className="p-2 text-slate-800 border-r border-slate-100">à¹ƒà¸ˆà¸”à¸µ</td>
+                          <td className="p-2 text-slate-700 border-r border-slate-100 text-center font-mono">à¸›à¸§à¸Š.1/1</td>
+                          <td className="p-2 text-slate-600 border-r border-slate-100">à¹€à¸—à¸„à¹‚à¸™à¹‚à¸¥à¸¢à¸µà¸ªà¸²à¸£à¸ªà¸™à¹€à¸—à¸¨</td>
                           <td className="p-2 text-slate-500 font-mono text-[11px]">somchai@example.com</td>
                         </tr>
                         <tr className="bg-slate-50/40 hover:bg-indigo-50/20">
                           <td className="p-2 text-slate-700 border-r border-slate-100 font-mono text-center">67209010002</td>
-                          <td className="p-2 text-slate-600 border-r border-slate-100 text-center">นางสาว</td>
-                          <td className="p-2 text-slate-800 border-r border-slate-100 font-semibold">สมหญิง</td>
-                          <td className="p-2 text-slate-800 border-r border-slate-100">รักเรียน</td>
-                          <td className="p-2 text-slate-700 border-r border-slate-100 text-center font-mono">ปวช.1/1</td>
-                          <td className="p-2 text-slate-600 border-r border-slate-100">เทคโนโลยีสารสนเทศ</td>
+                          <td className="p-2 text-slate-600 border-r border-slate-100 text-center">à¸™à¸²à¸‡à¸ªà¸²à¸§</td>
+                          <td className="p-2 text-slate-800 border-r border-slate-100 font-semibold">à¸ªà¸¡à¸«à¸à¸´à¸‡</td>
+                          <td className="p-2 text-slate-800 border-r border-slate-100">à¸£à¸±à¸à¹€à¸£à¸µà¸¢à¸™</td>
+                          <td className="p-2 text-slate-700 border-r border-slate-100 text-center font-mono">à¸›à¸§à¸Š.1/1</td>
+                          <td className="p-2 text-slate-600 border-r border-slate-100">à¹€à¸—à¸„à¹‚à¸™à¹‚à¸¥à¸¢à¸µà¸ªà¸²à¸£à¸ªà¸™à¹€à¸—à¸¨</td>
                           <td className="p-2 text-slate-500 font-mono text-[11px]">somying@example.com</td>
                         </tr>
                         <tr className="bg-white hover:bg-indigo-50/20">
                           <td className="p-2 text-slate-700 border-r border-slate-100 font-mono text-center">67209010003</td>
-                          <td className="p-2 text-slate-600 border-r border-slate-100 text-center">นาย</td>
-                          <td className="p-2 text-slate-800 border-r border-slate-100 font-semibold">กิตติศักดิ์</td>
-                          <td className="p-2 text-slate-800 border-r border-slate-100">พากเพียร</td>
-                          <td className="p-2 text-slate-700 border-r border-slate-100 text-center font-mono">ปวช.1/2</td>
-                          <td className="p-2 text-slate-600 border-r border-slate-100">ช่างอิเล็กทรอนิกส์</td>
+                          <td className="p-2 text-slate-600 border-r border-slate-100 text-center">à¸™à¸²à¸¢</td>
+                          <td className="p-2 text-slate-800 border-r border-slate-100 font-semibold">à¸à¸´à¸•à¸•à¸´à¸¨à¸±à¸à¸”à¸´à¹Œ</td>
+                          <td className="p-2 text-slate-800 border-r border-slate-100">à¸žà¸²à¸à¹€à¸žà¸µà¸¢à¸£</td>
+                          <td className="p-2 text-slate-700 border-r border-slate-100 text-center font-mono">à¸›à¸§à¸Š.1/2</td>
+                          <td className="p-2 text-slate-600 border-r border-slate-100">à¸Šà¹ˆà¸²à¸‡à¸­à¸´à¹€à¸¥à¹‡à¸à¸—à¸£à¸­à¸™à¸´à¸à¸ªà¹Œ</td>
                           <td className="p-2 text-slate-500 font-mono text-[11px]">kittisak@example.com</td>
                         </tr>
                       </>
@@ -1383,26 +1383,26 @@ export default function Students() {
                       <>
                         <tr className="bg-white hover:bg-indigo-50/20">
                           <td className="p-2 text-slate-700 border-r border-slate-100 font-mono text-center">67209010001</td>
-                          <td className="p-2 text-slate-800 border-r border-slate-100 font-semibold">นายสมชาย ใจดี</td>
-                          <td className="p-2 text-slate-700 border-r border-slate-100 text-center font-mono">ปวช.1</td>
+                          <td className="p-2 text-slate-800 border-r border-slate-100 font-semibold">à¸™à¸²à¸¢à¸ªà¸¡à¸Šà¸²à¸¢ à¹ƒà¸ˆà¸”à¸µ</td>
+                          <td className="p-2 text-slate-700 border-r border-slate-100 text-center font-mono">à¸›à¸§à¸Š.1</td>
                           <td className="p-2 text-slate-700 border-r border-slate-100 text-center font-mono">1</td>
-                          <td className="p-2 text-slate-600 border-r border-slate-100">เทคโนโลยีสารสนเทศ</td>
+                          <td className="p-2 text-slate-600 border-r border-slate-100">à¹€à¸—à¸„à¹‚à¸™à¹‚à¸¥à¸¢à¸µà¸ªà¸²à¸£à¸ªà¸™à¹€à¸—à¸¨</td>
                           <td className="p-2 text-slate-500 font-mono text-[11px]">somchai@example.com</td>
                         </tr>
                         <tr className="bg-slate-50/40 hover:bg-indigo-50/20">
                           <td className="p-2 text-slate-700 border-r border-slate-100 font-mono text-center">67209010002</td>
-                          <td className="p-2 text-slate-800 border-r border-slate-100 font-semibold">นางสาวสมหญิง รักเรียน</td>
-                          <td className="p-2 text-slate-700 border-r border-slate-100 text-center font-mono">ปวช.1</td>
+                          <td className="p-2 text-slate-800 border-r border-slate-100 font-semibold">à¸™à¸²à¸‡à¸ªà¸²à¸§à¸ªà¸¡à¸«à¸à¸´à¸‡ à¸£à¸±à¸à¹€à¸£à¸µà¸¢à¸™</td>
+                          <td className="p-2 text-slate-700 border-r border-slate-100 text-center font-mono">à¸›à¸§à¸Š.1</td>
                           <td className="p-2 text-slate-700 border-r border-slate-100 text-center font-mono">1</td>
-                          <td className="p-2 text-slate-600 border-r border-slate-100">เทคโนโลยีสารสนเทศ</td>
+                          <td className="p-2 text-slate-600 border-r border-slate-100">à¹€à¸—à¸„à¹‚à¸™à¹‚à¸¥à¸¢à¸µà¸ªà¸²à¸£à¸ªà¸™à¹€à¸—à¸¨</td>
                           <td className="p-2 text-slate-500 font-mono text-[11px]">somying@example.com</td>
                         </tr>
                         <tr className="bg-white hover:bg-indigo-50/20">
                           <td className="p-2 text-slate-700 border-r border-slate-100 font-mono text-center">67209010003</td>
-                          <td className="p-2 text-slate-800 border-r border-slate-100 font-semibold">นายกิตติศักดิ์ พากเพียร</td>
-                          <td className="p-2 text-slate-700 border-r border-slate-100 text-center font-mono">ปวช.1</td>
+                          <td className="p-2 text-slate-800 border-r border-slate-100 font-semibold">à¸™à¸²à¸¢à¸à¸´à¸•à¸•à¸´à¸¨à¸±à¸à¸”à¸´à¹Œ à¸žà¸²à¸à¹€à¸žà¸µà¸¢à¸£</td>
+                          <td className="p-2 text-slate-700 border-r border-slate-100 text-center font-mono">à¸›à¸§à¸Š.1</td>
                           <td className="p-2 text-slate-700 border-r border-slate-100 text-center font-mono">2</td>
-                          <td className="p-2 text-slate-600 border-r border-slate-100">ช่างอิเล็กทรอนิกส์</td>
+                          <td className="p-2 text-slate-600 border-r border-slate-100">à¸Šà¹ˆà¸²à¸‡à¸­à¸´à¹€à¸¥à¹‡à¸à¸—à¸£à¸­à¸™à¸´à¸à¸ªà¹Œ</td>
                           <td className="p-2 text-slate-500 font-mono text-[11px]">kittisak@example.com</td>
                         </tr>
                       </>
@@ -1415,23 +1415,23 @@ export default function Students() {
               <div className="pt-1 space-y-1">
                 <p className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
                   <Info className="w-3.5 h-3.5 text-indigo-600" />
-                  ชื่อหัวคอลัมน์ที่ระบบตรวจจับอัตโนมัติ:
+                  à¸Šà¸·à¹ˆà¸­à¸«à¸±à¸§à¸„à¸­à¸¥à¸±à¸¡à¸™à¹Œà¸—à¸µà¹ˆà¸£à¸°à¸šà¸šà¸•à¸£à¸§à¸ˆà¸ˆà¸±à¸šà¸­à¸±à¸•à¹‚à¸™à¸¡à¸±à¸•à¸´:
                 </p>
                 <div className="flex flex-wrap gap-1.5 text-[10px]">
                   <span className="px-2 py-0.5 rounded-md bg-white text-slate-700 border border-slate-200">
-                    <strong>รหัส:</strong> รหัสนักเรียน, รหัสนักศึกษา, student_code
+                    <strong>à¸£à¸«à¸±à¸ª:</strong> à¸£à¸«à¸±à¸ªà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™, à¸£à¸«à¸±à¸ªà¸™à¸±à¸à¸¨à¸¶à¸à¸©à¸², student_code
                   </span>
                   <span className="px-2 py-0.5 rounded-md bg-white text-slate-700 border border-slate-200">
-                    <strong>ชื่อ:</strong> ชื่อ-นามสกุล หรือแยก คำนำหน้า + ชื่อ + นามสกุล
+                    <strong>à¸Šà¸·à¹ˆà¸­:</strong> à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥ à¸«à¸£à¸·à¸­à¹à¸¢à¸ à¸„à¸³à¸™à¸³à¸«à¸™à¹‰à¸² + à¸Šà¸·à¹ˆà¸­ + à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥
                   </span>
                   <span className="px-2 py-0.5 rounded-md bg-white text-slate-700 border border-slate-200">
-                    <strong>ระดับชั้น/ห้อง:</strong> ระดับชั้น/ห้อง (เช่น ปวช.1/1) หรือแยก ระดับชั้น + ห้อง/กลุ่ม
+                    <strong>à¸£à¸°à¸”à¸±à¸šà¸Šà¸±à¹‰à¸™/à¸«à¹‰à¸­à¸‡:</strong> à¸£à¸°à¸”à¸±à¸šà¸Šà¸±à¹‰à¸™/à¸«à¹‰à¸­à¸‡ (à¹€à¸Šà¹ˆà¸™ à¸›à¸§à¸Š.1/1) à¸«à¸£à¸·à¸­à¹à¸¢à¸ à¸£à¸°à¸”à¸±à¸šà¸Šà¸±à¹‰à¸™ + à¸«à¹‰à¸­à¸‡/à¸à¸¥à¸¸à¹ˆà¸¡
                   </span>
                   <span className="px-2 py-0.5 rounded-md bg-white text-slate-700 border border-slate-200">
-                    <strong>สาขา:</strong> สาขาวิชา, สาขา, แผนกวิชา, แผนก
+                    <strong>à¸ªà¸²à¸‚à¸²:</strong> à¸ªà¸²à¸‚à¸²à¸§à¸´à¸Šà¸², à¸ªà¸²à¸‚à¸², à¹à¸œà¸™à¸à¸§à¸´à¸Šà¸², à¹à¸œà¸™à¸
                   </span>
                   <span className="px-2 py-0.5 rounded-md bg-white text-slate-700 border border-slate-200">
-                    <strong>รูปภาพ:</strong> URL ในคอลัมน์ รูปภาพ หรือเลือกไฟล์รูปด้านล่างเพื่อจับคู่อัตโนมัติ
+                    <strong>à¸£à¸¹à¸›à¸ à¸²à¸ž:</strong> URL à¹ƒà¸™à¸„à¸­à¸¥à¸±à¸¡à¸™à¹Œ à¸£à¸¹à¸›à¸ à¸²à¸ž à¸«à¸£à¸·à¸­à¹€à¸¥à¸·à¸­à¸à¹„à¸Ÿà¸¥à¹Œà¸£à¸¹à¸›à¸”à¹‰à¸²à¸™à¸¥à¹ˆà¸²à¸‡à¹€à¸žà¸·à¹ˆà¸­à¸ˆà¸±à¸šà¸„à¸¹à¹ˆà¸­à¸±à¸•à¹‚à¸™à¸¡à¸±à¸•à¸´
                   </span>
                 </div>
               </div>
@@ -1447,12 +1447,12 @@ export default function Students() {
                     onChange={handleFileUpload}
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                     id="import-file-input"
-                    aria-label="อัปโหลดไฟล์ Excel หรือ CSV"
+                    aria-label="à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œ Excel à¸«à¸£à¸·à¸­ CSV"
                   />
                   <FileSpreadsheet className="w-8 h-8 text-indigo-500 mx-auto mb-2" />
-                  <p className="text-slate-800 font-bold text-sm">คลิกเพื่อเลือกไฟล์ Excel / CSV หรือลากไฟล์มาวางที่นี่</p>
+                  <p className="text-slate-800 font-bold text-sm">à¸„à¸¥à¸´à¸à¹€à¸žà¸·à¹ˆà¸­à¹€à¸¥à¸·à¸­à¸à¹„à¸Ÿà¸¥à¹Œ Excel / CSV à¸«à¸£à¸·à¸­à¸¥à¸²à¸à¹„à¸Ÿà¸¥à¹Œà¸¡à¸²à¸§à¸²à¸‡à¸—à¸µà¹ˆà¸™à¸µà¹ˆ</p>
                   <p className="text-slate-500 text-xs mt-1">
-                    รองรับไฟล์ .xlsx, .xls, .csv (ขนาดไม่เกิน 5MB)
+                    à¸£à¸­à¸‡à¸£à¸±à¸šà¹„à¸Ÿà¸¥à¹Œ .xlsx, .xls, .csv (à¸‚à¸™à¸²à¸”à¹„à¸¡à¹ˆà¹€à¸à¸´à¸™ 5MB)
                   </p>
                 </div>
               ) : (
@@ -1462,8 +1462,8 @@ export default function Students() {
                       <CheckCircle className="w-4 h-4" />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-emerald-900">อ่านไฟล์สำเร็จ พร้อมนำเข้า</p>
-                      <p className="text-[11px] text-emerald-700">ตรวจพบข้อมูลนักเรียนทั้งหมด {importData.length} รายการ</p>
+                      <p className="text-xs font-bold text-emerald-900">à¸­à¹ˆà¸²à¸™à¹„à¸Ÿà¸¥à¹Œà¸ªà¸³à¹€à¸£à¹‡à¸ˆ à¸žà¸£à¹‰à¸­à¸¡à¸™à¸³à¹€à¸‚à¹‰à¸²</p>
+                      <p className="text-[11px] text-emerald-700">à¸•à¸£à¸§à¸ˆà¸žà¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸” {importData.length} à¸£à¸²à¸¢à¸à¸²à¸£</p>
                     </div>
                   </div>
                   <button
@@ -1471,7 +1471,7 @@ export default function Students() {
                     onClick={() => setImportData([])}
                     className="btn bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs px-3 py-1.5 rounded-xl font-semibold shadow-2xs"
                   >
-                    เลือกไฟล์ใหม่
+                    à¹€à¸¥à¸·à¸­à¸à¹„à¸Ÿà¸¥à¹Œà¹ƒà¸«à¸¡à¹ˆ
                   </button>
                 </div>
               )}
@@ -1483,10 +1483,10 @@ export default function Students() {
                     <div className="space-y-1">
                       <h4 className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
                         <ImageIcon className="w-4 h-4 text-indigo-600" />
-                        แนบไฟล์รูปภาพนักเรียน (หลายไฟล์พร้อมกัน)
+                        à¹à¸™à¸šà¹„à¸Ÿà¸¥à¹Œà¸£à¸¹à¸›à¸ à¸²à¸žà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™ (à¸«à¸¥à¸²à¸¢à¹„à¸Ÿà¸¥à¹Œà¸žà¸£à¹‰à¸­à¸¡à¸à¸±à¸™)
                       </h4>
                       <p className="text-[11px] text-slate-600 leading-relaxed">
-                        ระบบจะจับคู่อัตโนมัติจากชื่อไฟล์ (เช่น <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-indigo-200">65010001.jpg</span> หรือชื่อนักเรียน) พร้อมบีบอัดเป็น WebP (~4KB/รูป) ทันที
+                        à¸£à¸°à¸šà¸šà¸ˆà¸°à¸ˆà¸±à¸šà¸„à¸¹à¹ˆà¸­à¸±à¸•à¹‚à¸™à¸¡à¸±à¸•à¸´à¸ˆà¸²à¸à¸Šà¸·à¹ˆà¸­à¹„à¸Ÿà¸¥à¹Œ (à¹€à¸Šà¹ˆà¸™ <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-indigo-200">65010001.jpg</span> à¸«à¸£à¸·à¸­à¸Šà¸·à¹ˆà¸­à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™) à¸žà¸£à¹‰à¸­à¸¡à¸šà¸µà¸šà¸­à¸±à¸”à¹€à¸›à¹‡à¸™ WebP (~4KB/à¸£à¸¹à¸›) à¸—à¸±à¸™à¸—à¸µ
                       </p>
                     </div>
 
@@ -1507,11 +1507,11 @@ export default function Students() {
                       >
                         {isMatchingPhotos ? (
                           <>
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" /> กำลังบีบอัดภาพ...
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" /> à¸à¸³à¸¥à¸±à¸‡à¸šà¸µà¸šà¸­à¸±à¸”à¸ à¸²à¸ž...
                           </>
                         ) : (
                           <>
-                            <Upload className="w-3.5 h-3.5" /> เลือกไฟล์รูปภาพนักเรียน
+                            <Upload className="w-3.5 h-3.5" /> à¹€à¸¥à¸·à¸­à¸à¹„à¸Ÿà¸¥à¹Œà¸£à¸¹à¸›à¸ à¸²à¸žà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™
                           </>
                         )}
                       </button>
@@ -1522,20 +1522,20 @@ export default function Students() {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
                     <div className="flex items-center gap-2 text-xs">
                       <span className="font-bold text-emerald-600 flex items-center gap-1">
-                        <CheckCircle className="w-4 h-4" /> พบข้อมูล {importData.length} รายการ
+                        <CheckCircle className="w-4 h-4" /> à¸žà¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥ {importData.length} à¸£à¸²à¸¢à¸à¸²à¸£
                       </span>
                       <span className="text-slate-400">|</span>
                       <span className="font-medium text-indigo-700">
-                        มีรูปถ่ายแล้ว {importData.filter(d => d.avatar).length} คน
+                        à¸¡à¸µà¸£à¸¹à¸›à¸–à¹ˆà¸²à¸¢à¹à¸¥à¹‰à¸§ {importData.filter(d => d.avatar).length} à¸„à¸™
                       </span>
                       <span className="text-slate-500">
-                        (ไม่มีรูป {importData.filter(d => !d.avatar).length} คน จะใช้อิโมจิ)
+                        (à¹„à¸¡à¹ˆà¸¡à¸µà¸£à¸¹à¸› {importData.filter(d => !d.avatar).length} à¸„à¸™ à¸ˆà¸°à¹ƒà¸Šà¹‰à¸­à¸´à¹‚à¸¡à¸ˆà¸´)
                       </span>
                     </div>
 
                     <div className="flex items-center gap-2">
                       <label className="text-xs font-semibold text-slate-600 shrink-0" htmlFor="import-classroom">
-                        ห้องเรียน:
+                        à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™:
                       </label>
                       <select
                         value={importClassroomId}
@@ -1543,7 +1543,7 @@ export default function Students() {
                         className="form-input py-1.5 text-xs w-44"
                         id="import-classroom"
                       >
-                        <option value="">-- ไม่ระบุห้องเรียน --</option>
+                        <option value="">-- à¹„à¸¡à¹ˆà¸£à¸°à¸šà¸¸à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™ --</option>
                         {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </select>
                     </div>
@@ -1554,12 +1554,12 @@ export default function Students() {
                     <table className="w-full text-left text-xs border-collapse">
                       <thead className="sticky top-0 bg-slate-50 border-b border-indigo-100 z-10">
                         <tr>
-                          <th className="p-2.5 font-bold text-slate-700 w-14 text-center">รูป</th>
-                          <th className="p-2.5 font-bold text-slate-700 w-28">รหัสนักเรียน</th>
-                          <th className="p-2.5 font-bold text-slate-700">ชื่อ-นามสกุล</th>
-                          <th className="p-2.5 font-bold text-slate-700 w-28">ระดับชั้น/ห้อง</th>
-                          <th className="p-2.5 font-bold text-slate-700 w-28">สาขา</th>
-                          <th className="p-2.5 font-bold text-slate-700 w-24 text-center">สถานะรูป</th>
+                          <th className="p-2.5 font-bold text-slate-700 w-14 text-center">à¸£à¸¹à¸›</th>
+                          <th className="p-2.5 font-bold text-slate-700 w-28">à¸£à¸«à¸±à¸ªà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™</th>
+                          <th className="p-2.5 font-bold text-slate-700">à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥</th>
+                          <th className="p-2.5 font-bold text-slate-700 w-28">à¸£à¸°à¸”à¸±à¸šà¸Šà¸±à¹‰à¸™/à¸«à¹‰à¸­à¸‡</th>
+                          <th className="p-2.5 font-bold text-slate-700 w-28">à¸ªà¸²à¸‚à¸²</th>
+                          <th className="p-2.5 font-bold text-slate-700 w-24 text-center">à¸ªà¸–à¸²à¸™à¸°à¸£à¸¹à¸›</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -1581,11 +1581,11 @@ export default function Students() {
                             <td className="p-2 text-center">
                               {s.avatar ? (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
-                                  ✓ มีรูป
+                                  âœ“ à¸¡à¸µà¸£à¸¹à¸›
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500">
-                                  อิโมจิ
+                                  à¸­à¸´à¹‚à¸¡à¸ˆà¸´
                                 </span>
                               )}
                             </td>
@@ -1595,7 +1595,7 @@ export default function Students() {
                     </table>
                     {importData.length > 50 && (
                       <div className="p-2 text-center text-[11px] text-slate-500 bg-slate-50 border-t border-slate-100">
-                        แสดงตัวอย่าง 50 รายการแรก จากทั้งหมด {importData.length} รายการ
+                        à¹à¸ªà¸”à¸‡à¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡ 50 à¸£à¸²à¸¢à¸à¸²à¸£à¹à¸£à¸ à¸ˆà¸²à¸à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸” {importData.length} à¸£à¸²à¸¢à¸à¸²à¸£
                       </div>
                     )}
                   </div>
@@ -1607,10 +1607,10 @@ export default function Students() {
                   >
                     {importMutation.isPending ? (
                       <>
-                        <Loader2 className="w-4 h-4 animate-spin" /> กำลังนำเข้าข้อมูล...
+                        <Loader2 className="w-4 h-4 animate-spin" /> à¸à¸³à¸¥à¸±à¸‡à¸™à¸³à¹€à¸‚à¹‰à¸²à¸‚à¹‰à¸­à¸¡à¸¹à¸¥...
                       </>
                     ) : (
-                      `ยืนยันการนำเข้านักเรียน ${importData.length} คน`
+                      `à¸¢à¸·à¸™à¸¢à¸±à¸™à¸à¸²à¸£à¸™à¸³à¹€à¸‚à¹‰à¸²à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™ ${importData.length} à¸„à¸™`
                     )}
                   </button>
                 </div>

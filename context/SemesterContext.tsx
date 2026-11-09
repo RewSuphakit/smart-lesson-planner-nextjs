@@ -1,8 +1,8 @@
-'use client';
+﻿'use client';
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo, ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { useAuth } from '@/context/AuthContext';
 import semesterApi, {
   Semester,
@@ -141,15 +141,15 @@ export function SemesterProvider({
       // Invalidate queries so that pages immediately fetch data for the new active semester
       invalidateAllSemesterQueries();
 
-      toast.success(`เปลี่ยนเป็น "${target.name}" สำเร็จ`, {
-        icon: '🎓',
+      toast.success(`à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¹€à¸›à¹‡à¸™ "${target.name}" à¸ªà¸³à¹€à¸£à¹‡à¸ˆ`, {
+        icon: 'ðŸŽ“',
         duration: 3000,
       });
       return true;
     } catch (err: unknown) {
       console.error('[switchSemester] full error:', err);
       const axiosErr = err as { response?: { status?: number; data?: { message?: string } } };
-      const message = axiosErr?.response?.data?.message || 'ไม่สามารถเปลี่ยนภาคเรียนได้';
+      const message = axiosErr?.response?.data?.message || 'à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™à¹„à¸”à¹‰';
       toast.error(message);
       return false;
     }
@@ -163,10 +163,10 @@ export function SemesterProvider({
       if (data.is_active) {
         invalidateAllSemesterQueries();
       }
-      toast.success(`สร้าง "${created.name}" สำเร็จ`);
+      toast.success(`à¸ªà¸£à¹‰à¸²à¸‡ "${created.name}" à¸ªà¸³à¹€à¸£à¹‡à¸ˆ`);
       return created;
     } catch (err: unknown) {
-      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'ไม่สามารถสร้างภาคเรียนได้';
+      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸ªà¸£à¹‰à¸²à¸‡à¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™à¹„à¸”à¹‰';
       toast.error(message);
       return null;
     }
@@ -180,10 +180,10 @@ export function SemesterProvider({
       if (data.is_active || activeSemester?.id === id) {
         invalidateAllSemesterQueries();
       }
-      toast.success(`อัปเดตข้อมูล "${updated.name}" สำเร็จ`);
+      toast.success(`à¸­à¸±à¸›à¹€à¸”à¸•à¸‚à¹‰à¸­à¸¡à¸¹à¸¥ "${updated.name}" à¸ªà¸³à¹€à¸£à¹‡à¸ˆ`);
       return updated;
     } catch (err: unknown) {
-      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'ไม่สามารถอัปเดตภาคเรียนได้';
+      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸­à¸±à¸›à¹€à¸”à¸•à¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™à¹„à¸”à¹‰';
       toast.error(message);
       return null;
     }
@@ -194,10 +194,10 @@ export function SemesterProvider({
     try {
       await semesterApi.deleteSemester(id);
       await refreshSemesters();
-      toast.success('ลบภาคเรียนสำเร็จ');
+      toast.success('à¸¥à¸šà¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™à¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
       return true;
     } catch (err: unknown) {
-      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'ไม่สามารถลบภาคเรียนได้';
+      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸¥à¸šà¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™à¹„à¸”à¹‰';
       toast.error(message);
       return false;
     }
@@ -209,8 +209,8 @@ export function SemesterProvider({
       const res = await semesterApi.cloneSemester(sourceId, data);
       await refreshSemesters();
       invalidateAllSemesterQueries();
-      toast.success(res.message || 'คัดลอกข้อมูลภาคเรียนสำเร็จ', {
-        icon: '📋',
+      toast.success(res.message || 'à¸„à¸±à¸”à¸¥à¸­à¸à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™à¸ªà¸³à¹€à¸£à¹‡à¸ˆ', {
+        icon: 'ðŸ“‹',
         duration: 4000,
       });
       return { success: true };
@@ -234,7 +234,7 @@ export function SemesterProvider({
           existingClassrooms: resData.existing_classrooms,
         };
       }
-      const message = resData?.message || 'ไม่สามารถคัดลอกภาคเรียนได้';
+      const message = resData?.message || 'à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸„à¸±à¸”à¸¥à¸­à¸à¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™à¹„à¸”à¹‰';
       toast.error(message);
       return { success: false, message };
     }

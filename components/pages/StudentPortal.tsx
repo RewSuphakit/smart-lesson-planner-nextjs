@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -24,7 +24,7 @@ import {
   Trash2,
   Lock,
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import UserAvatar from '@/components/UserAvatar';
 import { compressImageFile } from '@/lib/avatarCompression';
 
@@ -176,11 +176,11 @@ export default function StudentPortal() {
     const trimmed = code.trim();
     const trimmedVerify = (verifyName ?? verifyNameInput).trim();
     if (!trimmed) {
-      setError('กรุณากรอกรหัสประจำตัวนักเรียน');
+      setError('à¸à¸£à¸¸à¸“à¸²à¸à¸£à¸­à¸à¸£à¸«à¸±à¸ªà¸›à¸£à¸°à¸ˆà¸³à¸•à¸±à¸§à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™');
       return;
     }
     if (!classroomId && trimmedVerify.length < 2) {
-      setError('กรุณากรอกชื่อหรือนามสกุล (อย่างน้อย 2 ตัวอักษร) เพื่อยืนยันตัวตน');
+      setError('à¸à¸£à¸¸à¸“à¸²à¸à¸£à¸­à¸à¸Šà¸·à¹ˆà¸­à¸«à¸£à¸·à¸­à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥ (à¸­à¸¢à¹ˆà¸²à¸‡à¸™à¹‰à¸­à¸¢ 2 à¸•à¸±à¸§à¸­à¸±à¸à¸©à¸£) à¹€à¸žà¸·à¹ˆà¸­à¸¢à¸·à¸™à¸¢à¸±à¸™à¸•à¸±à¸§à¸•à¸™');
       return;
     }
 
@@ -201,9 +201,9 @@ export default function StudentPortal() {
 
       if (!res.ok) {
         if (classroomId && data) {
-          toast.error(json.message || 'ไม่สามารถโหลดข้อมูลห้องเรียนนี้ได้');
+          toast.error(json.message || 'à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¹‚à¸«à¸¥à¸”à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™à¸™à¸µà¹‰à¹„à¸”à¹‰');
         } else {
-          setError(json.message || 'ไม่พบข้อมูลนักเรียน');
+          setError(json.message || 'à¹„à¸¡à¹ˆà¸žà¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™');
           setData(null);
         }
       } else {
@@ -219,9 +219,9 @@ export default function StudentPortal() {
       }
     } catch {
       if (classroomId && data) {
-        toast.error('เกิดข้อผิดพลาดในการโหลดข้อมูล กรุณาลองใหม่อีกครั้ง');
+        toast.error('à¹€à¸à¸´à¸”à¸‚à¹‰à¸­à¸œà¸´à¸”à¸žà¸¥à¸²à¸”à¹ƒà¸™à¸à¸²à¸£à¹‚à¸«à¸¥à¸”à¸‚à¹‰à¸­à¸¡à¸¹à¸¥ à¸à¸£à¸¸à¸“à¸²à¸¥à¸­à¸‡à¹ƒà¸«à¸¡à¹ˆà¸­à¸µà¸à¸„à¸£à¸±à¹‰à¸‡');
       } else {
-        setError('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์ กรุณาลองใหม่อีกครั้ง');
+        setError('à¹€à¸à¸´à¸”à¸‚à¹‰à¸­à¸œà¸´à¸”à¸žà¸¥à¸²à¸”à¹ƒà¸™à¸à¸²à¸£à¹€à¸Šà¸·à¹ˆà¸­à¸¡à¸•à¹ˆà¸­à¹€à¸‹à¸´à¸£à¹Œà¸Ÿà¹€à¸§à¸­à¸£à¹Œ à¸à¸£à¸¸à¸“à¸²à¸¥à¸­à¸‡à¹ƒà¸«à¸¡à¹ˆà¸­à¸µà¸à¸„à¸£à¸±à¹‰à¸‡');
         setData(null);
       }
     } finally {
@@ -261,12 +261,12 @@ export default function StudentPortal() {
     if (!file || !data) return;
 
     if (!file.type.startsWith('image/')) {
-      toast.error('กรุณาเลือกไฟล์รูปภาพ (JPG, PNG, WebP)');
+      toast.error('à¸à¸£à¸¸à¸“à¸²à¹€à¸¥à¸·à¸­à¸à¹„à¸Ÿà¸¥à¹Œà¸£à¸¹à¸›à¸ à¸²à¸ž (JPG, PNG, WebP)');
       return;
     }
 
     setIsUploadingAvatar(true);
-    const loadingToast = toast.loading('กำลังประมวลผลและอัพโหลดรูปภาพ...');
+    const loadingToast = toast.loading('à¸à¸³à¸¥à¸±à¸‡à¸›à¸£à¸°à¸¡à¸§à¸¥à¸œà¸¥à¹à¸¥à¸°à¸­à¸±à¸žà¹‚à¸«à¸¥à¸”à¸£à¸¹à¸›à¸ à¸²à¸ž...');
     try {
       // Compress client-side to compact WebP (200x200, ~4-8 KB)
       const compressed = await compressImageFile(file, 200, 0.8);
@@ -282,7 +282,7 @@ export default function StudentPortal() {
 
       const resData = await res.json();
       if (!res.ok) {
-        throw new Error(resData.message || 'ไม่สามารถอัพโหลดรูปภาพได้');
+        throw new Error(resData.message || 'à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸­à¸±à¸žà¹‚à¸«à¸¥à¸”à¸£à¸¹à¸›à¸ à¸²à¸žà¹„à¸”à¹‰');
       }
 
       setData((prev) => {
@@ -296,9 +296,9 @@ export default function StudentPortal() {
         };
       });
 
-      toast.success('อัพเดทรูปโปรไฟล์สำเร็จแล้ว', { id: loadingToast });
+      toast.success('à¸­à¸±à¸žà¹€à¸”à¸—à¸£à¸¹à¸›à¹‚à¸›à¸£à¹„à¸Ÿà¸¥à¹Œà¸ªà¸³à¹€à¸£à¹‡à¸ˆà¹à¸¥à¹‰à¸§', { id: loadingToast });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการอัพโหลดรูปภาพ';
+      const msg = err instanceof Error ? err.message : 'à¹€à¸à¸´à¸”à¸‚à¹‰à¸­à¸œà¸´à¸”à¸žà¸¥à¸²à¸”à¹ƒà¸™à¸à¸²à¸£à¸­à¸±à¸žà¹‚à¸«à¸¥à¸”à¸£à¸¹à¸›à¸ à¸²à¸ž';
       toast.error(msg, { id: loadingToast });
     } finally {
       setIsUploadingAvatar(false);
@@ -308,10 +308,10 @@ export default function StudentPortal() {
 
   const handleRemoveAvatar = async () => {
     if (!data || !data.student.avatar) return;
-    if (!window.confirm('คุณต้องการลบรูปโปรไฟล์นี้ใช่หรือไม่?')) return;
+    if (!window.confirm('à¸„à¸¸à¸“à¸•à¹‰à¸­à¸‡à¸à¸²à¸£à¸¥à¸šà¸£à¸¹à¸›à¹‚à¸›à¸£à¹„à¸Ÿà¸¥à¹Œà¸™à¸µà¹‰à¹ƒà¸Šà¹ˆà¸«à¸£à¸·à¸­à¹„à¸¡à¹ˆ?')) return;
 
     setIsUploadingAvatar(true);
-    const loadingToast = toast.loading('กำลังลบรูปโปรไฟล์...');
+    const loadingToast = toast.loading('à¸à¸³à¸¥à¸±à¸‡à¸¥à¸šà¸£à¸¹à¸›à¹‚à¸›à¸£à¹„à¸Ÿà¸¥à¹Œ...');
     try {
       const res = await fetch('/api/portal/student', {
         method: 'PATCH',
@@ -325,7 +325,7 @@ export default function StudentPortal() {
 
       const resData = await res.json();
       if (!res.ok) {
-        throw new Error(resData.message || 'ไม่สามารถลบรูปภาพได้');
+        throw new Error(resData.message || 'à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸¥à¸šà¸£à¸¹à¸›à¸ à¸²à¸žà¹„à¸”à¹‰');
       }
 
       setData((prev) => {
@@ -339,9 +339,9 @@ export default function StudentPortal() {
         };
       });
 
-      toast.success('ลบรูปโปรไฟล์เรียบร้อยแล้ว', { id: loadingToast });
+      toast.success('à¸¥à¸šà¸£à¸¹à¸›à¹‚à¸›à¸£à¹„à¸Ÿà¸¥à¹Œà¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢à¹à¸¥à¹‰à¸§', { id: loadingToast });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการลบรูปภาพ';
+      const msg = err instanceof Error ? err.message : 'à¹€à¸à¸´à¸”à¸‚à¹‰à¸­à¸œà¸´à¸”à¸žà¸¥à¸²à¸”à¹ƒà¸™à¸à¸²à¸£à¸¥à¸šà¸£à¸¹à¸›à¸ à¸²à¸ž';
       toast.error(msg, { id: loadingToast });
     } finally {
       setIsUploadingAvatar(false);
@@ -369,7 +369,7 @@ export default function StudentPortal() {
 
   return (
     <div className="min-h-screen bg-slate-50/70 text-slate-800 pb-16">
-      {/* ─── Top Brand Header ─── */}
+      {/* â”€â”€â”€ Top Brand Header â”€â”€â”€ */}
       <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 shadow-xs">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -380,11 +380,11 @@ export default function StudentPortal() {
               <h1 className="text-base font-bold text-slate-800 tracking-tight leading-tight flex items-center gap-2">
                 <span>Student Portal</span>
                 <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100">
-                  ระบบตรวจสอบผลการเรียน
+                  à¸£à¸°à¸šà¸šà¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™
                 </span>
               </h1>
               <p className="text-xs text-slate-500">
-                เช็คคะแนนเก็บ งานค้าง เวลาเรียน .
+                à¹€à¸Šà¹‡à¸„à¸„à¸°à¹à¸™à¸™à¹€à¸à¹‡à¸š à¸‡à¸²à¸™à¸„à¹‰à¸²à¸‡ à¹€à¸§à¸¥à¸²à¹€à¸£à¸µà¸¢à¸™ .
               </p>
             </div>
           </div>
@@ -394,30 +394,30 @@ export default function StudentPortal() {
               <button
                 onClick={() => window.print()}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
-                title="พิมพ์หรือบันทึกเป็น PDF"
+                title="à¸žà¸´à¸¡à¸žà¹Œà¸«à¸£à¸·à¸­à¸šà¸±à¸™à¸—à¸¶à¸à¹€à¸›à¹‡à¸™ PDF"
               >
                 <Printer className="w-3.5 h-3.5 text-slate-500" />
-                <span>พิมพ์รายงาน</span>
+                <span>à¸žà¸´à¸¡à¸žà¹Œà¸£à¸²à¸¢à¸‡à¸²à¸™</span>
               </button>
             )}
           </div>
         </div>
       </header>
 
-      {/* ─── Main Content Container ─── */}
+      {/* â”€â”€â”€ Main Content Container â”€â”€â”€ */}
       <main className="max-w-5xl mx-auto px-4 pt-6 sm:pt-8">
-        {/* ─── Search Box (Hero on Empty State / Compact on Data State) ─── */}
+        {/* â”€â”€â”€ Search Box (Hero on Empty State / Compact on Data State) â”€â”€â”€ */}
         {!data ? (
           <div className="max-w-xl mx-auto mt-6 sm:mt-12 text-center animate-fade-in-up">
             <div className="w-16 h-16 mx-auto rounded-3xl bg-indigo-50 border border-indigo-100/80 flex items-center justify-center text-indigo-600 mb-4 shadow-sm">
               <Sparkles className="w-8 h-8 text-indigo-500 animate-pulse" />
             </div>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight">
-              ค้นหาข้อมูลผลการเรียน
+              à¸„à¹‰à¸™à¸«à¸²à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 mt-2 max-w-md mx-auto">
-              กรอกรหัสประจำตัวนักเรียน พร้อมชื่อหรือนามสกุลเพื่อยืนยันตัวตน
-              และดูสถิติเวลาเรียนกับรายการงานค้างส่ง
+              à¸à¸£à¸­à¸à¸£à¸«à¸±à¸ªà¸›à¸£à¸°à¸ˆà¸³à¸•à¸±à¸§à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™ à¸žà¸£à¹‰à¸­à¸¡à¸Šà¸·à¹ˆà¸­à¸«à¸£à¸·à¸­à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥à¹€à¸žà¸·à¹ˆà¸­à¸¢à¸·à¸™à¸¢à¸±à¸™à¸•à¸±à¸§à¸•à¸™
+              à¹à¸¥à¸°à¸”à¸¹à¸ªà¸–à¸´à¸•à¸´à¹€à¸§à¸¥à¸²à¹€à¸£à¸µà¸¢à¸™à¸à¸±à¸šà¸£à¸²à¸¢à¸à¸²à¸£à¸‡à¸²à¸™à¸„à¹‰à¸²à¸‡à¸ªà¹ˆà¸‡
             </p>
 
             <form onSubmit={handleSearch} className="mt-6 sm:mt-8 space-y-3">
@@ -428,7 +428,7 @@ export default function StudentPortal() {
                     type="text"
                     value={studentCodeInput}
                     onChange={(e) => setStudentCodeInput(e.target.value)}
-                    placeholder="รหัสนักเรียน เช่น 68219090020"
+                    placeholder="à¸£à¸«à¸±à¸ªà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™ à¹€à¸Šà¹ˆà¸™ 68219090020"
                     className="w-full bg-transparent px-2.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none font-mono"
                     autoFocus
                   />
@@ -440,7 +440,7 @@ export default function StudentPortal() {
                     type="text"
                     value={verifyNameInput}
                     onChange={(e) => setVerifyNameInput(e.target.value)}
-                    placeholder="ชื่อ หรือ นามสกุล (ยืนยันตัวตน)"
+                    placeholder="à¸Šà¸·à¹ˆà¸­ à¸«à¸£à¸·à¸­ à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥ (à¸¢à¸·à¸™à¸¢à¸±à¸™à¸•à¸±à¸§à¸•à¸™)"
                     className="w-full bg-transparent px-2.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none"
                   />
                 </div>
@@ -454,7 +454,7 @@ export default function StudentPortal() {
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <>
-                    <span>ตรวจสอบผลการเรียน</span>
+                    <span>à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™</span>
                     <ChevronRight className="w-4 h-4" />
                   </>
                 )}
@@ -474,7 +474,7 @@ export default function StudentPortal() {
               <div className="mt-6 pt-6 border-t border-slate-200/80 text-left">
                 <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium mb-2.5">
                   <Clock className="w-3.5 h-3.5 text-slate-400" />
-                  <span>ค้นหาล่าสุด:</span>
+                  <span>à¸„à¹‰à¸™à¸«à¸²à¸¥à¹ˆà¸²à¸ªà¸¸à¸”:</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {recentCodes.map((code) => (
@@ -504,13 +504,13 @@ export default function StudentPortal() {
             <div className="mt-10 p-4 rounded-2xl bg-slate-100/60 border border-slate-200/60 text-center text-xs text-slate-500">
               <ShieldCheck className="w-4 h-4 text-emerald-500 inline-block mr-1 -mt-0.5" />
               <span>
-                ข้อมูลคะแนนและเวลาเรียนอ้างอิงจากบันทึกของครูผู้สอนแบบ Real-time
-                หากพบข้อมูลไม่ถูกต้องกรุณาติดต่อครูประจำวิชา
+                à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸„à¸°à¹à¸™à¸™à¹à¸¥à¸°à¹€à¸§à¸¥à¸²à¹€à¸£à¸µà¸¢à¸™à¸­à¹‰à¸²à¸‡à¸­à¸´à¸‡à¸ˆà¸²à¸à¸šà¸±à¸™à¸—à¸¶à¸à¸‚à¸­à¸‡à¸„à¸£à¸¹à¸œà¸¹à¹‰à¸ªà¸­à¸™à¹à¸šà¸š Real-time
+                à¸«à¸²à¸à¸žà¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¹„à¸¡à¹ˆà¸–à¸¹à¸à¸•à¹‰à¸­à¸‡à¸à¸£à¸¸à¸“à¸²à¸•à¸´à¸”à¸•à¹ˆà¸­à¸„à¸£à¸¹à¸›à¸£à¸°à¸ˆà¸³à¸§à¸´à¸Šà¸²
               </span>
             </div>
           </div>
         ) : (
-          /* ─── Results Dashboard View ─── */
+          /* â”€â”€â”€ Results Dashboard View â”€â”€â”€ */
           <div className="space-y-6">
             {/* Top Bar with Student Info & Switch Class/Search */}
             <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -530,7 +530,7 @@ export default function StudentPortal() {
                       onClick={() => fileInputRef.current?.click()}
                       disabled={isUploadingAvatar}
                       className="absolute -bottom-1 -right-1 bg-indigo-600 hover:bg-indigo-700 text-white p-1.5 rounded-xl shadow-md border-2 border-white transition-all hover:scale-110 disabled:opacity-50 cursor-pointer"
-                      title="อัพโหลดหรือเปลี่ยนรูปโปรไฟล์"
+                      title="à¸­à¸±à¸žà¹‚à¸«à¸¥à¸”à¸«à¸£à¸·à¸­à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¸£à¸¹à¸›à¹‚à¸›à¸£à¹„à¸Ÿà¸¥à¹Œ"
                     >
                       {isUploadingAvatar ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -547,7 +547,7 @@ export default function StudentPortal() {
                       {data.student.name}
                     </h2>
                     <span className="font-mono text-xs px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-600 font-medium border border-slate-200">
-                      รหัส {data.student.student_code}
+                      à¸£à¸«à¸±à¸ª {data.student.student_code}
                     </span>
                     {data.student.grade_level && (
                       <span className="text-xs px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-600 font-medium">
@@ -561,8 +561,8 @@ export default function StudentPortal() {
                         <School className="w-3.5 h-3.5 text-slate-400" />
                         {data.classroom.name}
                       </span>
-                      <span>•</span>
-                      <span>ครูผู้สอน: {data.classroom.teacher_name}</span>
+                      <span>â€¢</span>
+                      <span>à¸„à¸£à¸¹à¸œà¸¹à¹‰à¸ªà¸­à¸™: {data.classroom.teacher_name}</span>
                     </div>
                   )}
 
@@ -576,7 +576,7 @@ export default function StudentPortal() {
                         className="text-[11px] font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition-colors inline-flex items-center gap-1 border border-indigo-200/60 cursor-pointer"
                       >
                         <Camera className="w-3 h-3" />
-                        <span>{data.student.avatar ? 'เปลี่ยนรูปภาพ' : 'อัพโหลดรูปโปรไฟล์'}</span>
+                        <span>{data.student.avatar ? 'à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¸£à¸¹à¸›à¸ à¸²à¸ž' : 'à¸­à¸±à¸žà¹‚à¸«à¸¥à¸”à¸£à¸¹à¸›à¹‚à¸›à¸£à¹„à¸Ÿà¸¥à¹Œ'}</span>
                       </button>
                       {data.student.avatar && (
                         <button
@@ -584,10 +584,10 @@ export default function StudentPortal() {
                           onClick={handleRemoveAvatar}
                           disabled={isUploadingAvatar}
                           className="text-[11px] font-medium text-rose-500 hover:text-rose-700 hover:bg-rose-50 px-2 py-1 rounded-lg transition-colors inline-flex items-center gap-1 cursor-pointer"
-                          title="ลบรูปโปรไฟล์และใช้อิโมจิเริ่มต้น"
+                          title="à¸¥à¸šà¸£à¸¹à¸›à¹‚à¸›à¸£à¹„à¸Ÿà¸¥à¹Œà¹à¸¥à¸°à¹ƒà¸Šà¹‰à¸­à¸´à¹‚à¸¡à¸ˆà¸´à¹€à¸£à¸´à¹ˆà¸¡à¸•à¹‰à¸™"
                         >
                           <Trash2 className="w-3 h-3" />
-                          <span>ลบรูป</span>
+                          <span>à¸¥à¸šà¸£à¸¹à¸›</span>
                         </button>
                       )}
                     </div>
@@ -614,7 +614,7 @@ export default function StudentPortal() {
                   >
                     {data.all_classrooms!.map((c) => (
                       <option key={c.classroom_id} value={c.classroom_id}>
-                        {c.is_portal_enabled === false ? '🔒 ' : ''}
+                        {c.is_portal_enabled === false ? 'ðŸ”’ ' : ''}
                         {c.classroom_name}
                       </option>
                     ))}
@@ -626,7 +626,7 @@ export default function StudentPortal() {
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-xs font-medium text-slate-600 transition-colors"
                 >
                   <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
-                  <span>ค้นหาใหม่</span>
+                  <span>à¸„à¹‰à¸™à¸«à¸²à¹ƒà¸«à¸¡à¹ˆ</span>
                 </button>
               </div>
             </div>
@@ -635,11 +635,11 @@ export default function StudentPortal() {
             {data.status === 'multiple_classrooms' && data.classrooms && (
               <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
                 <h3 className="text-base font-bold text-slate-800 mb-2">
-                  เลือกรายวิชาที่ต้องการตรวจสอบ
+                  à¹€à¸¥à¸·à¸­à¸à¸£à¸²à¸¢à¸§à¸´à¸Šà¸²à¸—à¸µà¹ˆà¸•à¹‰à¸­à¸‡à¸à¸²à¸£à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸š
                 </h3>
                 <p className="text-xs text-slate-500 mb-4">
-                  พบข้อมูลของนักเรียนใน {data.classrooms.length} รายวิชา
-                  กรุณาคลิกเลือกวิชาที่ต้องการดูผลการเรียน
+                  à¸žà¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸‚à¸­à¸‡à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¹ƒà¸™ {data.classrooms.length} à¸£à¸²à¸¢à¸§à¸´à¸Šà¸²
+                  à¸à¸£à¸¸à¸“à¸²à¸„à¸¥à¸´à¸à¹€à¸¥à¸·à¸­à¸à¸§à¸´à¸Šà¸²à¸—à¸µà¹ˆà¸•à¹‰à¸­à¸‡à¸à¸²à¸£à¸”à¸¹à¸œà¸¥à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {data.classrooms.map((c) => {
@@ -661,7 +661,7 @@ export default function StudentPortal() {
                             {c.classroom_name}
                           </p>
                           <p className="text-xs text-slate-500 mt-1">
-                            ครูผู้สอน: {c.teacher_name}
+                            à¸„à¸£à¸¹à¸œà¸¹à¹‰à¸ªà¸­à¸™: {c.teacher_name}
                           </p>
                           <div className="flex items-center gap-1.5 flex-wrap mt-2">
                             {c.grade_level && (
@@ -672,7 +672,7 @@ export default function StudentPortal() {
                             {isLocked && (
                               <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded bg-slate-200 text-slate-600 font-semibold">
                                 <Lock className="w-3 h-3" />
-                                ครูผู้สอนปิดการเข้าดูชั่วคราว
+                                à¸„à¸£à¸¹à¸œà¸¹à¹‰à¸ªà¸­à¸™à¸›à¸´à¸”à¸à¸²à¸£à¹€à¸‚à¹‰à¸²à¸”à¸¹à¸Šà¸±à¹ˆà¸§à¸„à¸£à¸²à¸§
                               </span>
                             )}
                           </div>
@@ -696,17 +696,17 @@ export default function StudentPortal() {
                   <Lock className="w-8 h-8" />
                 </div>
                 <h3 className="text-lg font-bold text-slate-800">
-                  ครูผู้สอนปิดการเข้าดูชั่วคราว
+                  à¸„à¸£à¸¹à¸œà¸¹à¹‰à¸ªà¸­à¸™à¸›à¸´à¸”à¸à¸²à¸£à¹€à¸‚à¹‰à¸²à¸”à¸¹à¸Šà¸±à¹ˆà¸§à¸„à¸£à¸²à¸§
                 </h3>
                 <p className="text-sm text-slate-500 mt-2 max-w-md mx-auto">
-                  รายวิชา <span className="font-semibold text-slate-700">{data.classroom?.name}</span>{' '}
-                  ยังไม่เปิดให้ตรวจสอบเวลาเรียนและคะแนนในขณะนี้
-                  หากต้องการทราบข้อมูล กรุณาติดต่อครูผู้สอน
+                  à¸£à¸²à¸¢à¸§à¸´à¸Šà¸² <span className="font-semibold text-slate-700">{data.classroom?.name}</span>{' '}
+                  à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¹€à¸›à¸´à¸”à¹ƒà¸«à¹‰à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¹€à¸§à¸¥à¸²à¹€à¸£à¸µà¸¢à¸™à¹à¸¥à¸°à¸„à¸°à¹à¸™à¸™à¹ƒà¸™à¸‚à¸“à¸°à¸™à¸µà¹‰
+                  à¸«à¸²à¸à¸•à¹‰à¸­à¸‡à¸à¸²à¸£à¸—à¸£à¸²à¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥ à¸à¸£à¸¸à¸“à¸²à¸•à¸´à¸”à¸•à¹ˆà¸­à¸„à¸£à¸¹à¸œà¸¹à¹‰à¸ªà¸­à¸™
                   {data.classroom?.teacher_name ? ` (${data.classroom.teacher_name})` : ''}
                 </p>
                 {hasOtherOpenClassroom && (
                   <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-                    <span className="text-xs text-slate-500 w-full">ดูข้อมูลรายวิชาอื่นที่เปิดอยู่:</span>
+                    <span className="text-xs text-slate-500 w-full">à¸”à¸¹à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸£à¸²à¸¢à¸§à¸´à¸Šà¸²à¸­à¸·à¹ˆà¸™à¸—à¸µà¹ˆà¹€à¸›à¸´à¸”à¸­à¸¢à¸¹à¹ˆ:</span>
                     {(data.all_classrooms ?? [])
                       .filter((c) => c.is_portal_enabled !== false)
                       .map((c) => (
@@ -727,7 +727,7 @@ export default function StudentPortal() {
             {/* If Single Classroom Data Ready */}
             {data.attendance_summary && data.grades_summary && (
               <>
-                {/* ─── Quick Alert / Dangerous ม.ส. Banner ─── */}
+                {/* â”€â”€â”€ Quick Alert / Dangerous à¸¡.à¸ª. Banner â”€â”€â”€ */}
                 {data.attendance_summary.status === 'critical' ? (
                   <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 flex items-start gap-3 shadow-xs">
                     <div className="p-2 rounded-xl bg-rose-500 text-white shrink-0 mt-0.5">
@@ -735,16 +735,16 @@ export default function StudentPortal() {
                     </div>
                     <div>
                       <h4 className="text-sm font-bold text-rose-900">
-                        ⚠️ เตือนภัยวิกฤต: เวลาเรียนไม่พอ (ติด ข.ร. / ม.ส.)
+                        âš ï¸ à¹€à¸•à¸·à¸­à¸™à¸ à¸±à¸¢à¸§à¸´à¸à¸¤à¸•: à¹€à¸§à¸¥à¸²à¹€à¸£à¸µà¸¢à¸™à¹„à¸¡à¹ˆà¸žà¸­ (à¸•à¸´à¸” à¸‚.à¸£. / à¸¡.à¸ª.)
                       </h4>
                       <p className="text-xs text-rose-700 mt-1">
-                        เวลาเรียนสะสมต่ำกว่าเกณฑ์ขั้นต่ำ{' '}
-                        {data.attendance_summary.min_attendance_percent}% (ปัจจุบันได้{' '}
+                        à¹€à¸§à¸¥à¸²à¹€à¸£à¸µà¸¢à¸™à¸ªà¸°à¸ªà¸¡à¸•à¹ˆà¸³à¸à¸§à¹ˆà¸²à¹€à¸à¸“à¸‘à¹Œà¸‚à¸±à¹‰à¸™à¸•à¹ˆà¸³{' '}
+                        {data.attendance_summary.min_attendance_percent}% (à¸›à¸±à¸ˆà¸ˆà¸¸à¸šà¸±à¸™à¹„à¸”à¹‰{' '}
                         {data.attendance_summary.attendance_percent}%)
-                        ขาดเรียนสะสมเทียบเท่า{' '}
-                        {data.attendance_summary.total_converted_absent} ครั้ง
-                        เกินโควตาที่อนุญาต ({data.attendance_summary.max_allowed_absences}{' '}
-                        ครั้ง) กรุณาติดต่อครูผู้สอนทันทีเพื่อแก้ไข
+                        à¸‚à¸²à¸”à¹€à¸£à¸µà¸¢à¸™à¸ªà¸°à¸ªà¸¡à¹€à¸—à¸µà¸¢à¸šà¹€à¸—à¹ˆà¸²{' '}
+                        {data.attendance_summary.total_converted_absent} à¸„à¸£à¸±à¹‰à¸‡
+                        à¹€à¸à¸´à¸™à¹‚à¸„à¸§à¸•à¸²à¸—à¸µà¹ˆà¸­à¸™à¸¸à¸à¸²à¸• ({data.attendance_summary.max_allowed_absences}{' '}
+                        à¸„à¸£à¸±à¹‰à¸‡) à¸à¸£à¸¸à¸“à¸²à¸•à¸´à¸”à¸•à¹ˆà¸­à¸„à¸£à¸¹à¸œà¸¹à¹‰à¸ªà¸­à¸™à¸—à¸±à¸™à¸—à¸µà¹€à¸žà¸·à¹ˆà¸­à¹à¸à¹‰à¹„à¸‚
                       </p>
                     </div>
                   </div>
@@ -755,21 +755,21 @@ export default function StudentPortal() {
                     </div>
                     <div>
                       <h4 className="text-sm font-bold text-amber-900">
-                        ⚡ เฝ้าระวังใกล้หมดสิทธิ์สอบ (เสี่ยงติด ม.ส.)
+                        âš¡ à¹€à¸à¹‰à¸²à¸£à¸°à¸§à¸±à¸‡à¹ƒà¸à¸¥à¹‰à¸«à¸¡à¸”à¸ªà¸´à¸—à¸˜à¸´à¹Œà¸ªà¸­à¸š (à¹€à¸ªà¸µà¹ˆà¸¢à¸‡à¸•à¸´à¸” à¸¡.à¸ª.)
                       </h4>
                       <p className="text-xs text-amber-700 mt-1">
-                        สามารถขาดเรียนได้อีกเพียง{' '}
+                        à¸ªà¸²à¸¡à¸²à¸£à¸–à¸‚à¸²à¸”à¹€à¸£à¸µà¸¢à¸™à¹„à¸”à¹‰à¸­à¸µà¸à¹€à¸žà¸µà¸¢à¸‡{' '}
                         <span className="font-bold underline">
-                          {data.attendance_summary.remaining_absences} ครั้ง
+                          {data.attendance_summary.remaining_absences} à¸„à¸£à¸±à¹‰à¸‡
                         </span>{' '}
-                        เท่านั้น
-                        หากขาดเกินกว่านี้จะไม่มีสิทธิ์สอบปลายภาคในรายวิชานี้
+                        à¹€à¸—à¹ˆà¸²à¸™à¸±à¹‰à¸™
+                        à¸«à¸²à¸à¸‚à¸²à¸”à¹€à¸à¸´à¸™à¸à¸§à¹ˆà¸²à¸™à¸µà¹‰à¸ˆà¸°à¹„à¸¡à¹ˆà¸¡à¸µà¸ªà¸´à¸—à¸˜à¸´à¹Œà¸ªà¸­à¸šà¸›à¸¥à¸²à¸¢à¸ à¸²à¸„à¹ƒà¸™à¸£à¸²à¸¢à¸§à¸´à¸Šà¸²à¸™à¸µà¹‰
                       </p>
                     </div>
                   </div>
                 ) : null}
 
-                {/* ─── Key Metrics 2 Cards (Attendance Meter / Missing Assignments) ─── */}
+                {/* â”€â”€â”€ Key Metrics 2 Cards (Attendance Meter / Missing Assignments) â”€â”€â”€ */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
                   {/* 2. Attendance Gauge Card */}
@@ -777,7 +777,7 @@ export default function StudentPortal() {
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
                         <Clock className="w-4 h-4 text-emerald-500" />
-                        เวลาเรียนสะสม
+                        à¹€à¸§à¸¥à¸²à¹€à¸£à¸µà¸¢à¸™à¸ªà¸°à¸ªà¸¡
                       </span>
                       <span
                         className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${data.attendance_summary.status === 'safe'
@@ -788,10 +788,10 @@ export default function StudentPortal() {
                           }`}
                       >
                         {data.attendance_summary.status === 'safe'
-                          ? '🟢 ปกติ'
+                          ? 'ðŸŸ¢ à¸›à¸à¸•à¸´'
                           : data.attendance_summary.status === 'warning'
-                            ? '🟡 เฝ้าระวัง'
-                            : '🔴 หมดสิทธิ์สอบ'}
+                            ? 'ðŸŸ¡ à¹€à¸à¹‰à¸²à¸£à¸°à¸§à¸±à¸‡'
+                            : 'ðŸ”´ à¸«à¸¡à¸”à¸ªà¸´à¸—à¸˜à¸´à¹Œà¸ªà¸­à¸š'}
                       </span>
                     </div>
 
@@ -801,7 +801,7 @@ export default function StudentPortal() {
                           {data.attendance_summary.attendance_percent}%
                         </div>
                         <p className="text-[11px] text-slate-500 mt-0.5">
-                          เกณฑ์ผ่านขั้นต่ำ {data.attendance_summary.min_attendance_percent}%
+                          à¹€à¸à¸“à¸‘à¹Œà¸œà¹ˆà¸²à¸™à¸‚à¸±à¹‰à¸™à¸•à¹ˆà¸³ {data.attendance_summary.min_attendance_percent}%
                         </p>
                       </div>
                       <div className="text-right">
@@ -814,14 +814,14 @@ export default function StudentPortal() {
                             }`}
                         >
                           {data.attendance_summary.remaining_absences >= 0
-                            ? `ขาดได้อีก ${data.attendance_summary.remaining_absences} ครั้ง`
-                            : `เกินโควตา ${Math.abs(
+                            ? `à¸‚à¸²à¸”à¹„à¸”à¹‰à¸­à¸µà¸ ${data.attendance_summary.remaining_absences} à¸„à¸£à¸±à¹‰à¸‡`
+                            : `à¹€à¸à¸´à¸™à¹‚à¸„à¸§à¸•à¸² ${Math.abs(
                               data.attendance_summary.remaining_absences
-                            )} ครั้ง`}
+                            )} à¸„à¸£à¸±à¹‰à¸‡`}
                         </div>
                         <p className="text-[11px] text-slate-400">
-                          ขาดสะสม {data.attendance_summary.total_converted_absent} /{' '}
-                          {data.attendance_summary.max_allowed_absences} ครั้ง
+                          à¸‚à¸²à¸”à¸ªà¸°à¸ªà¸¡ {data.attendance_summary.total_converted_absent} /{' '}
+                          {data.attendance_summary.max_allowed_absences} à¸„à¸£à¸±à¹‰à¸‡
                         </p>
                       </div>
                     </div>
@@ -829,25 +829,25 @@ export default function StudentPortal() {
                     {/* Attendance breakdown pills */}
                     <div className="grid grid-cols-4 gap-1 text-center pt-2 border-t border-slate-100">
                       <div className="p-1 rounded-lg bg-emerald-50 text-emerald-700">
-                        <span className="block text-[10px]">มา</span>
+                        <span className="block text-[10px]">à¸¡à¸²</span>
                         <span className="font-bold text-xs">
                           {data.attendance_summary.present_count}
                         </span>
                       </div>
                       <div className="p-1 rounded-lg bg-amber-50 text-amber-700">
-                        <span className="block text-[10px]">สาย</span>
+                        <span className="block text-[10px]">à¸ªà¸²à¸¢</span>
                         <span className="font-bold text-xs">
                           {data.attendance_summary.late_count}
                         </span>
                       </div>
                       <div className="p-1 rounded-lg bg-blue-50 text-blue-700">
-                        <span className="block text-[10px]">ลา</span>
+                        <span className="block text-[10px]">à¸¥à¸²</span>
                         <span className="font-bold text-xs">
                           {data.attendance_summary.leave_count}
                         </span>
                       </div>
                       <div className="p-1 rounded-lg bg-rose-50 text-rose-700">
-                        <span className="block text-[10px]">ขาด</span>
+                        <span className="block text-[10px]">à¸‚à¸²à¸”</span>
                         <span className="font-bold text-xs">
                           {data.attendance_summary.absent_count}
                         </span>
@@ -860,7 +860,7 @@ export default function StudentPortal() {
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
                         <BookOpen className="w-4 h-4 text-purple-500" />
-                        การส่งงานรายสัปดาห์
+                        à¸à¸²à¸£à¸ªà¹ˆà¸‡à¸‡à¸²à¸™à¸£à¸²à¸¢à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ
                       </span>
                       <span
                         className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${missingAssignmentsCount === 0
@@ -869,8 +869,8 @@ export default function StudentPortal() {
                           }`}
                       >
                         {missingAssignmentsCount === 0
-                          ? 'ส่งงานครบทุกชิ้น'
-                          : `ค้างส่ง ${missingAssignmentsCount} งาน`}
+                          ? 'à¸ªà¹ˆà¸‡à¸‡à¸²à¸™à¸„à¸£à¸šà¸—à¸¸à¸à¸Šà¸´à¹‰à¸™'
+                          : `à¸„à¹‰à¸²à¸‡à¸ªà¹ˆà¸‡ ${missingAssignmentsCount} à¸‡à¸²à¸™`}
                       </span>
                     </div>
 
@@ -879,18 +879,18 @@ export default function StudentPortal() {
                         {missingAssignmentsCount === 0 ? (
                           <span className="text-emerald-600 flex items-center gap-2">
                             <CheckCircle2 className="w-8 h-8" />
-                            <span>เรียบร้อย</span>
+                            <span>à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢</span>
                           </span>
                         ) : (
                           <span className="text-rose-600 flex items-center gap-1.5">
                             <XCircle className="w-7 h-7" />
-                            <span>{missingAssignmentsCount} สัปดาห์</span>
+                            <span>{missingAssignmentsCount} à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ</span>
                           </span>
                         )}
                       </div>
                       <p className="text-xs text-slate-500 mt-1">
-                        คะแนนงานเก็บสะสม {data.grades_summary.scaled_assignment} /{' '}
-                        {data.grades_summary.max_scaled_assignment} แต้ม
+                        à¸„à¸°à¹à¸™à¸™à¸‡à¸²à¸™à¹€à¸à¹‡à¸šà¸ªà¸°à¸ªà¸¡ {data.grades_summary.scaled_assignment} /{' '}
+                        {data.grades_summary.max_scaled_assignment} à¹à¸•à¹‰à¸¡
                       </p>
                     </div>
 
@@ -901,13 +901,13 @@ export default function StudentPortal() {
                       }}
                       className="w-full py-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-slate-700 transition-colors flex items-center justify-center gap-1.5 border border-slate-200"
                     >
-                      <span>ดูรายการงานค้าง</span>
+                      <span>à¸”à¸¹à¸£à¸²à¸¢à¸à¸²à¸£à¸‡à¸²à¸™à¸„à¹‰à¸²à¸‡</span>
                       <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
                     </button>
                   </div>
                 </div>
 
-                {/* ─── Navigation Tabs ─── */}
+                {/* â”€â”€â”€ Navigation Tabs â”€â”€â”€ */}
                 <div className="flex border-b border-slate-200 gap-2 sm:gap-4 overflow-x-auto no-scrollbar pt-2">
                   <button
                     onClick={() => setActiveTab('assignments')}
@@ -917,7 +917,7 @@ export default function StudentPortal() {
                       }`}
                   >
                     <FileText className="w-4 h-4" />
-                    <span>คะแนนงานรายสัปดาห์</span>
+                    <span>à¸„à¸°à¹à¸™à¸™à¸‡à¸²à¸™à¸£à¸²à¸¢à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ</span>
                     {missingAssignmentsCount > 0 && (
                       <span className="px-1.5 py-0.2 rounded-full bg-rose-500 text-white text-[10px] font-bold">
                         {missingAssignmentsCount}
@@ -933,7 +933,7 @@ export default function StudentPortal() {
                       }`}
                   >
                     <Calendar className="w-4 h-4" />
-                    <span>ประวัติบันทึกเวลาเรียน</span>
+                    <span>à¸›à¸£à¸°à¸§à¸±à¸•à¸´à¸šà¸±à¸™à¸—à¸¶à¸à¹€à¸§à¸¥à¸²à¹€à¸£à¸µà¸¢à¸™</span>
                     <span className="text-[11px] text-slate-400">
                       ({data.attendance_records?.length || 0})
                     </span>
@@ -942,18 +942,18 @@ export default function StudentPortal() {
 
 
 
-                {/* ─── TAB 2: Weekly Assignments & Submissions ─── */}
+                {/* â”€â”€â”€ TAB 2: Weekly Assignments & Submissions â”€â”€â”€ */}
                 {activeTab === 'assignments' && (
                   <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="text-base font-bold text-slate-800">
-                            คะแนนการส่งงานและแบบทดสอบรายสัปดาห์
+                            à¸„à¸°à¹à¸™à¸™à¸à¸²à¸£à¸ªà¹ˆà¸‡à¸‡à¸²à¸™à¹à¸¥à¸°à¹à¸šà¸šà¸—à¸”à¸ªà¸­à¸šà¸£à¸²à¸¢à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ
                           </h3>
                           {data.classroom?.current_teaching_week && (
                             <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/70">
-                              สัปดาห์ที่ 1 - {data.classroom.current_teaching_week} (จาก {data.classroom.total_weeks} สัปดาห์)
+                              à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¸—à¸µà¹ˆ 1 - {data.classroom.current_teaching_week} (à¸ˆà¸²à¸ {data.classroom.total_weeks} à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ)
                             </span>
                           )}
                         </div>
@@ -968,7 +968,7 @@ export default function StudentPortal() {
                             : 'text-slate-600 hover:text-slate-900'
                             }`}
                         >
-                          ทั้งหมด ({data.weekly_lessons?.length || 0})
+                          à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸” ({data.weekly_lessons?.length || 0})
                         </button>
                         <button
                           onClick={() => setAssignmentFilter('missing')}
@@ -977,7 +977,7 @@ export default function StudentPortal() {
                             : 'text-rose-600 hover:text-rose-700'
                             }`}
                         >
-                          ค้างส่ง ({missingAssignmentsCount})
+                          à¸„à¹‰à¸²à¸‡à¸ªà¹ˆà¸‡ ({missingAssignmentsCount})
                         </button>
                         <button
                           onClick={() => setAssignmentFilter('submitted')}
@@ -986,7 +986,7 @@ export default function StudentPortal() {
                             : 'text-emerald-700 hover:text-emerald-800'
                             }`}
                         >
-                          ส่งแล้ว
+                          à¸ªà¹ˆà¸‡à¹à¸¥à¹‰à¸§
                         </button>
                       </div>
                     </div>
@@ -1016,12 +1016,12 @@ export default function StudentPortal() {
                                 </h4>
                                 <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
                                   <span>
-                                    งานมอบหมาย: {lesson.assignment_score ?? 0} /{' '}
+                                    à¸‡à¸²à¸™à¸¡à¸­à¸šà¸«à¸¡à¸²à¸¢: {lesson.assignment_score ?? 0} /{' '}
                                     {lesson.max_assignment}
                                   </span>
-                                  <span>•</span>
+                                  <span>â€¢</span>
                                   <span>
-                                    แบบทดสอบ: {lesson.post_test_score ?? 0} /{' '}
+                                    à¹à¸šà¸šà¸—à¸”à¸ªà¸­à¸š: {lesson.post_test_score ?? 0} /{' '}
                                     {lesson.max_post_test}
                                   </span>
                                 </div>
@@ -1032,16 +1032,16 @@ export default function StudentPortal() {
                               {lesson.is_missing ? (
                                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
                                   <XCircle className="w-3.5 h-3.5 text-rose-500" />
-                                  <span>ค้างส่ง</span>
+                                  <span>à¸„à¹‰à¸²à¸‡à¸ªà¹ˆà¸‡</span>
                                 </span>
                               ) : lesson.is_submitted ? (
                                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
                                   <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                  <span>ส่งแล้ว</span>
+                                  <span>à¸ªà¹ˆà¸‡à¹à¸¥à¹‰à¸§</span>
                                 </span>
                               ) : (
                                 <span className="text-xs text-slate-400 font-medium">
-                                  ไม่มีงาน
+                                  à¹„à¸¡à¹ˆà¸¡à¸µà¸‡à¸²à¸™
                                 </span>
                               )}
                             </div>
@@ -1052,11 +1052,11 @@ export default function StudentPortal() {
                           {assignmentFilter === 'missing' ? (
                             <div className="flex flex-col items-center gap-2 text-emerald-600">
                               <CheckCircle2 className="w-8 h-8 text-emerald-500" />
-                              <span className="font-semibold text-sm">ไม่มีงานค้างส่งในสัปดาห์ที่เปิดสอนแล้ว</span>
-                              <span className="text-slate-400 text-xs">คุณส่งงานและทำแบบทดสอบครบถ้วนเรียบร้อย</span>
+                              <span className="font-semibold text-sm">à¹„à¸¡à¹ˆà¸¡à¸µà¸‡à¸²à¸™à¸„à¹‰à¸²à¸‡à¸ªà¹ˆà¸‡à¹ƒà¸™à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¸—à¸µà¹ˆà¹€à¸›à¸´à¸”à¸ªà¸­à¸™à¹à¸¥à¹‰à¸§</span>
+                              <span className="text-slate-400 text-xs">à¸„à¸¸à¸“à¸ªà¹ˆà¸‡à¸‡à¸²à¸™à¹à¸¥à¸°à¸—à¸³à¹à¸šà¸šà¸—à¸”à¸ªà¸­à¸šà¸„à¸£à¸šà¸–à¹‰à¸§à¸™à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢</span>
                             </div>
                           ) : (
-                            'ไม่มีข้อมูลในเงื่อนไขที่เลือก'
+                            'à¹„à¸¡à¹ˆà¸¡à¸µà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¹ƒà¸™à¹€à¸‡à¸·à¹ˆà¸­à¸™à¹„à¸‚à¸—à¸µà¹ˆà¹€à¸¥à¸·à¸­à¸'
                           )}
                         </div>
                       )}
@@ -1064,15 +1064,15 @@ export default function StudentPortal() {
                   </div>
                 )}
 
-                {/* ─── TAB 3: Attendance History ─── */}
+                {/* â”€â”€â”€ TAB 3: Attendance History â”€â”€â”€ */}
                 {activeTab === 'attendance' && (
                   <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
                     <div>
                       <h3 className="text-base font-bold text-slate-800">
-                        ประวัติการเช็คชื่อเข้าชั้นเรียน
+                        à¸›à¸£à¸°à¸§à¸±à¸•à¸´à¸à¸²à¸£à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­à¹€à¸‚à¹‰à¸²à¸Šà¸±à¹‰à¸™à¹€à¸£à¸µà¸¢à¸™
                       </h3>
                       <p className="text-xs text-slate-500 mt-0.5">
-                        บันทึกรายวันทั้งหมดที่ครูผู้สอนได้ทำการเช็คชื่อ
+                        à¸šà¸±à¸™à¸—à¸¶à¸à¸£à¸²à¸¢à¸§à¸±à¸™à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”à¸—à¸µà¹ˆà¸„à¸£à¸¹à¸œà¸¹à¹‰à¸ªà¸­à¸™à¹„à¸”à¹‰à¸—à¸³à¸à¸²à¸£à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­
                       </p>
                     </div>
 
@@ -1081,9 +1081,9 @@ export default function StudentPortal() {
                         <table className="w-full text-left text-xs">
                           <thead>
                             <tr className="border-b border-slate-200 text-slate-500">
-                              <th className="pb-3 font-semibold">ลำดับ</th>
-                              <th className="pb-3 font-semibold">วันที่</th>
-                              <th className="pb-3 font-semibold text-right">สถานะ</th>
+                              <th className="pb-3 font-semibold">à¸¥à¸³à¸”à¸±à¸š</th>
+                              <th className="pb-3 font-semibold">à¸§à¸±à¸™à¸—à¸µà¹ˆ</th>
+                              <th className="pb-3 font-semibold text-right">à¸ªà¸–à¸²à¸™à¸°</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
@@ -1112,12 +1112,12 @@ export default function StudentPortal() {
                                       }`}
                                   >
                                     {rec.status === 'present'
-                                      ? '✓ มาเรียน'
+                                      ? 'âœ“ à¸¡à¸²à¹€à¸£à¸µà¸¢à¸™'
                                       : rec.status === 'late'
-                                        ? '⏱ มาสาย'
+                                        ? 'â± à¸¡à¸²à¸ªà¸²à¸¢'
                                         : rec.status === 'leave'
-                                          ? '📝 ลา'
-                                          : '✗ ขาดเรียน'}
+                                          ? 'ðŸ“ à¸¥à¸²'
+                                          : 'âœ— à¸‚à¸²à¸”à¹€à¸£à¸µà¸¢à¸™'}
                                   </span>
                                 </td>
                               </tr>
@@ -1127,7 +1127,7 @@ export default function StudentPortal() {
                       </div>
                     ) : (
                       <div className="text-center py-10 text-slate-400 text-xs">
-                        ยังไม่มีประวัติการเช็คชื่อ
+                        à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¸¡à¸µà¸›à¸£à¸°à¸§à¸±à¸•à¸´à¸à¸²à¸£à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­
                       </div>
                     )}
                   </div>

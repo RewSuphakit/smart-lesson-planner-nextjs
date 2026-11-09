@@ -5,6 +5,7 @@ import { verifyToken } from '@/lib/auth';
 import { getOrSetCache, userCacheKey } from '@/lib/cache';
 import { fetchDashboardData, getEmptyDashboardData, type DashboardData } from '@/lib/dashboard';
 import { getActiveSemesterId } from '@/lib/semester';
+import { formatClassroomResponse, type FormattedClassroom } from '@/lib/formatters';
 import type { User } from '@/context/AuthContext';
 import type { Semester } from '@/services/semester';
 
@@ -158,4 +159,51 @@ export async function getServerDashboardData(userId: number): Promise<DashboardD
     return getEmptyDashboardData();
   }
 }
+
+/**
+ * Server-side Classrooms prefetcher sharing the same 60s memory cache as `/api/classrooms`.
+ * Pre-populates classroom lists for SSR pages to eliminate client-side LCP delay.
+ */
+export async function getServerClassrooms(
+  userId: number,
+  targetSemesterId?: number | null,
+  allSemesters = false
+): Promise<FormattedClassroom[]> {
+  try {
+    let resolvedSemesterId: number | null = targetSemesterId ?? null;
+    if (!allSemesters && resolvedSemesterId === null) {
+      resolvedSemesterId = await getActiveSemesterId(userId);
+    }
+
+    const cacheKey = userCacheKey(
+      userId,
+      'classrooms',
+      allSemesters ? 'all' : String(resolvedSemesterId ?? 'none')
+    );
+
+    return await getOrSetCache(cacheKey, 60, async () => {
+      const where: Record<string, unknown> = { userId };
+      if (!allSemesters && resolvedSemesterId) {
+        where.semesterId = resolvedSemesterId;
+      }
+
+      const classrooms = await withDbRetry(() =>
+        prisma.classroom.findMany({
+          where,
+          include: {
+            _count: { select: { students: true } },
+            semester: { select: { id: true, name: true, termNumber: true, academicYear: true, startDate: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+        })
+      );
+
+      return classrooms.map((classroom) => formatClassroomResponse(classroom));
+    });
+  } catch (error) {
+    console.error('SSR Classrooms prefetch error:', error);
+    return [];
+  }
+}
+
 

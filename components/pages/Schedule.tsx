@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
@@ -10,7 +10,7 @@ import {
   UploadCloud, FileText, Table, Download,
   FileSpreadsheet, Sparkles, CheckCircle2, Info
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import {
   format as _format,
   startOfMonth as _startOfMonth,
@@ -27,7 +27,7 @@ import {
 import { th as _th } from 'date-fns/locale';
 void [_format, _startOfMonth, _endOfMonth, _startOfWeek, _endOfWeek, _addDays, _addMonths, _subMonths, _isSameDay, _isSameMonth, _parseISO, _th];
 
-const TIMETABLE_DAYS = ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์', 'อาทิตย์'];
+const TIMETABLE_DAYS = ['à¸ˆà¸±à¸™à¸—à¸£à¹Œ', 'à¸­à¸±à¸‡à¸„à¸²à¸£', 'à¸žà¸¸à¸˜', 'à¸žà¸¤à¸«à¸±à¸ªà¸šà¸”à¸µ', 'à¸¨à¸¸à¸à¸£à¹Œ', 'à¹€à¸ªà¸²à¸£à¹Œ', 'à¸­à¸²à¸—à¸´à¸•à¸¢à¹Œ'];
 
 interface ApiError {
   response?: {
@@ -99,9 +99,9 @@ export default function Schedule() {
   const isFormHomeroom =
     timetableForm.entry_type === 'homeroom' ||
     Number(timetableForm.start_period) === 0 ||
-    timetableForm.subject_name?.includes('เสาธง') ||
-    timetableForm.subject_name?.includes('โฮมรูม') ||
-    timetableForm.subject_name?.includes('เข้าแถว');
+    timetableForm.subject_name?.includes('à¹€à¸ªà¸²à¸˜à¸‡') ||
+    timetableForm.subject_name?.includes('à¹‚à¸®à¸¡à¸£à¸¹à¸¡') ||
+    timetableForm.subject_name?.includes('à¹€à¸‚à¹‰à¸²à¹à¸–à¸§');
 
   const [showUpload, setShowUpload] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -140,7 +140,7 @@ export default function Schedule() {
     };
   }, []);
 
-  // ─── Query: ดึงข้อมูลห้องเรียน ───
+  // â”€â”€â”€ Query: à¸”à¸¶à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™ â”€â”€â”€
   const { data: classroomsList = [] } = useQuery<Array<{
     id: string | number;
     name: string;
@@ -156,7 +156,7 @@ export default function Schedule() {
     }
   });
 
-  // ─── Query: ดึงข้อมูลตารางเรียนรายสัปดาห์ (Timetable) ───
+  // â”€â”€â”€ Query: à¸”à¸¶à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸•à¸²à¸£à¸²à¸‡à¹€à¸£à¸µà¸¢à¸™à¸£à¸²à¸¢à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ (Timetable) â”€â”€â”€
   const { data: timetableData = { entries: [], summary: [] }, isLoading: loadingTimetable } = useQuery<{
     entries: TimetableEntry[];
     summary: TimetableSummaryItem[];
@@ -215,7 +215,7 @@ export default function Schedule() {
       start_time: defaultTime.start,
       end_time: defaultTime.end,
       subject_code: '',
-      subject_name: period === 0 ? 'กิจกรรมหน้าเสาธง' : '',
+      subject_name: period === 0 ? 'à¸à¸´à¸ˆà¸à¸£à¸£à¸¡à¸«à¸™à¹‰à¸²à¹€à¸ªà¸²à¸˜à¸‡' : '',
       room: '',
       group_name: '',
       instructor: '',
@@ -268,7 +268,7 @@ export default function Schedule() {
     });
   };
 
-  // ─── Mutation: จัดการคาบเรียนตารางเรียนรายสัปดาห์ (Timetable Entry) ───
+  // â”€â”€â”€ Mutation: à¸ˆà¸±à¸”à¸à¸²à¸£à¸„à¸²à¸šà¹€à¸£à¸µà¸¢à¸™à¸•à¸²à¸£à¸²à¸‡à¹€à¸£à¸µà¸¢à¸™à¸£à¸²à¸¢à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ (Timetable Entry) â”€â”€â”€
   const timetableMutation = useMutation({
     mutationFn: async (payload: Record<string, unknown>) => {
       if (editTimetableTarget) {
@@ -278,13 +278,13 @@ export default function Schedule() {
       }
     },
     onSuccess: () => {
-      toast.success(editTimetableTarget ? 'อัปเดตคาบเรียนเรียบร้อย' : 'เพิ่มคาบเรียนเรียบร้อย');
+      toast.success(editTimetableTarget ? 'à¸­à¸±à¸›à¹€à¸”à¸•à¸„à¸²à¸šà¹€à¸£à¸µà¸¢à¸™à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢' : 'à¹€à¸žà¸´à¹ˆà¸¡à¸„à¸²à¸šà¹€à¸£à¸µà¸¢à¸™à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢');
       setShowTimetableModal(false);
       setEditTimetableTarget(null);
       invalidateAllTimetableQueries();
     },
     onError: (err: ApiError) => {
-      toast.error(err.response?.data?.message || 'บันทึกคาบเรียนไม่สำเร็จ');
+      toast.error(err.response?.data?.message || 'à¸šà¸±à¸™à¸—à¸¶à¸à¸„à¸²à¸šà¹€à¸£à¸µà¸¢à¸™à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
     }
   });
 
@@ -293,24 +293,24 @@ export default function Schedule() {
     const isHomeroomOrFlagpole =
       timetableForm.entry_type === 'homeroom' ||
       Number(timetableForm.start_period) === 0 ||
-      timetableForm.subject_name?.includes('เสาธง') ||
-      timetableForm.subject_name?.includes('โฮมรูม') ||
-      timetableForm.subject_name?.includes('เข้าแถว');
+      timetableForm.subject_name?.includes('à¹€à¸ªà¸²à¸˜à¸‡') ||
+      timetableForm.subject_name?.includes('à¹‚à¸®à¸¡à¸£à¸¹à¸¡') ||
+      timetableForm.subject_name?.includes('à¹€à¸‚à¹‰à¸²à¹à¸–à¸§');
 
     if (!isHomeroomOrFlagpole && !timetableForm.subject_code.trim()) {
-      return toast.error('กรุณากรอกรหัสวิชา');
+      return toast.error('à¸à¸£à¸¸à¸“à¸²à¸à¸£à¸­à¸à¸£à¸«à¸±à¸ªà¸§à¸´à¸Šà¸²');
     }
     if (!timetableForm.subject_code.trim() && !timetableForm.subject_name.trim()) {
       if (editTimetableTarget) {
-        if (window.confirm('คุณลบชื่อวิชา/กิจกรรมออก ต้องการลบคาบนี้ออกจากตารางสอนใช่หรือไม่?')) {
+        if (window.confirm('à¸„à¸¸à¸“à¸¥à¸šà¸Šà¸·à¹ˆà¸­à¸§à¸´à¸Šà¸²/à¸à¸´à¸ˆà¸à¸£à¸£à¸¡à¸­à¸­à¸ à¸•à¹‰à¸­à¸‡à¸à¸²à¸£à¸¥à¸šà¸„à¸²à¸šà¸™à¸µà¹‰à¸­à¸­à¸à¸ˆà¸²à¸à¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™à¹ƒà¸Šà¹ˆà¸«à¸£à¸·à¸­à¹„à¸¡à¹ˆ?')) {
           deleteTimetableMutation.mutate(editTimetableTarget.id);
           return;
         }
       }
-      return toast.error('กรุณากรอกรหัสวิชา หรือชื่อกิจกรรม');
+      return toast.error('à¸à¸£à¸¸à¸“à¸²à¸à¸£à¸­à¸à¸£à¸«à¸±à¸ªà¸§à¸´à¸Šà¸² à¸«à¸£à¸·à¸­à¸Šà¸·à¹ˆà¸­à¸à¸´à¸ˆà¸à¸£à¸£à¸¡');
     }
-    if (Number(timetableForm.start_period) > Number(timetableForm.end_period)) return toast.error('คาบเรียนสิ้นสุดต้องไม่น้อยกว่าคาบเรียนเริ่มต้น');
-    if (timetableForm.start_time >= timetableForm.end_time) return toast.error('เวลาสิ้นสุดต้องมากกว่าเวลาเริ่มต้น');
+    if (Number(timetableForm.start_period) > Number(timetableForm.end_period)) return toast.error('à¸„à¸²à¸šà¹€à¸£à¸µà¸¢à¸™à¸ªà¸´à¹‰à¸™à¸ªà¸¸à¸”à¸•à¹‰à¸­à¸‡à¹„à¸¡à¹ˆà¸™à¹‰à¸­à¸¢à¸à¸§à¹ˆà¸²à¸„à¸²à¸šà¹€à¸£à¸µà¸¢à¸™à¹€à¸£à¸´à¹ˆà¸¡à¸•à¹‰à¸™');
+    if (timetableForm.start_time >= timetableForm.end_time) return toast.error('à¹€à¸§à¸¥à¸²à¸ªà¸´à¹‰à¸™à¸ªà¸¸à¸”à¸•à¹‰à¸­à¸‡à¸¡à¸²à¸à¸à¸§à¹ˆà¸²à¹€à¸§à¸¥à¸²à¹€à¸£à¸´à¹ˆà¸¡à¸•à¹‰à¸™');
 
     const payload = {
       day_of_week: Number(timetableForm.day_of_week),
@@ -331,25 +331,25 @@ export default function Schedule() {
     timetableMutation.mutate(payload);
   };
 
-  // ─── Mutation: ลบคาบเรียนจากตารางเรียน ───
+  // â”€â”€â”€ Mutation: à¸¥à¸šà¸„à¸²à¸šà¹€à¸£à¸µà¸¢à¸™à¸ˆà¸²à¸à¸•à¸²à¸£à¸²à¸‡à¹€à¸£à¸µà¸¢à¸™ â”€â”€â”€
   const deleteTimetableMutation = useMutation({
     mutationFn: async (id: string | number) => {
       return api.delete(`/timetable/${id}`);
     },
     onSuccess: () => {
-      toast.success('ลบคาบเรียนแล้ว');
+      toast.success('à¸¥à¸šà¸„à¸²à¸šà¹€à¸£à¸µà¸¢à¸™à¹à¸¥à¹‰à¸§');
       setShowTimetableModal(false);
       setEditTimetableTarget(null);
       invalidateAllTimetableQueries();
     },
     onError: () => {
-      toast.error('ลบคาบเรียนไม่สำเร็จ');
+      toast.error('à¸¥à¸šà¸„à¸²à¸šà¹€à¸£à¸µà¸¢à¸™à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
     }
   });
 
   const handleDeleteTimetableEntry = () => {
     if (!editTimetableTarget) return;
-    if (!window.confirm('ต้องการลบคาบเรียนนี้ใช่หรือไม่?')) return;
+    if (!window.confirm('à¸•à¹‰à¸­à¸‡à¸à¸²à¸£à¸¥à¸šà¸„à¸²à¸šà¹€à¸£à¸µà¸¢à¸™à¸™à¸µà¹‰à¹ƒà¸Šà¹ˆà¸«à¸£à¸·à¸­à¹„à¸¡à¹ˆ?')) return;
     deleteTimetableMutation.mutate(editTimetableTarget.id);
   };
 
@@ -358,7 +358,7 @@ export default function Schedule() {
     if (file) setUploadFile(file);
   };
 
-  // ─── Mutation: อัพโหลดไฟล์ตารางสอน ───
+  // â”€â”€â”€ Mutation: à¸­à¸±à¸žà¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œà¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™ â”€â”€â”€
   const timetableUploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
       return api.post('/timetable/upload', formData, {
@@ -366,54 +366,54 @@ export default function Schedule() {
       });
     },
     onSuccess: (res) => {
-      toast.success(res.data.message || 'อัพโหลดสำเร็จ');
+      toast.success(res.data.message || 'à¸­à¸±à¸žà¹‚à¸«à¸¥à¸”à¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
       setShowUpload(false);
       setUploadFile(null);
       invalidateAllTimetableQueries();
     },
     onError: (err: ApiError) => {
-      toast.error(err.response?.data?.message || 'อัพโหลดไม่สำเร็จ กรุณาตรวจสอบรูปแบบไฟล์');
+      toast.error(err.response?.data?.message || 'à¸­à¸±à¸žà¹‚à¸«à¸¥à¸”à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ à¸à¸£à¸¸à¸“à¸²à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¸£à¸¹à¸›à¹à¸šà¸šà¹„à¸Ÿà¸¥à¹Œ');
     }
   });
 
   const handleDownloadCsvTemplate = () => {
     const csvContent = '\uFEFF' + [
-      'วัน,คาบเริ่ม,คาบสิ้นสุด,รหัสวิชา,ชื่อวิชา,ห้อง,กลุ่ม,ประเภท,อาจารย์',
-      'จันทร์,1,1,20000-1101,กิจกรรมหน้าเสาธงและโฮมรูม,หน้าเสาธง,ปวช.1/1,โฮมรูม,ครูที่ปรึกษา',
-      'จันทร์,2,4,20001-1005,การใช้คอมพิวเตอร์และสารสนเทศเพื่องานอาชีพ,734,ปวช.1/1,ปฏิบัติ,อ.xxxx',
-      'จันทร์,5,8,21909-2011,การเขียนโปรแกรมเชิงวัตถุ,735,ปวช.2/1,ปฏิบัติ,อ.ณัฐนันท์',
-      'อังคาร,2,4,30001-1003,การประยุกต์ใช้เทคโนโลยีดิจิทัลในอาชีพ,745,ปวส.1/6,ทฤษฎี,อ.xxxx',
-      'พุธ,2,4,30901-1001,การพัฒนาเว็บแอปพลิเคชัน,ห้องคอมฯ ต้นแบบ 2,ปวส.2/2,ปฏิบัติ,อ.xxxx',
-      'พุธ,5,6,20000-2001,กิจกรรมลูกเสือวิสามัญ 1,โดม,ชค.1/1,กิจกรรม,อ.สมชาย',
-      'พฤหัสบดี,1,4,20901-2002,ระบบเครือข่ายคอมพิวเตอร์เบื้องต้น,LAB-1,ชค.2/1,ปฏิบัติ,อ.xxxx',
-      'ศุกร์,2,4,20000-1201,ภาษาอังกฤษเพื่อการสื่อสารในงานอาชีพ,421,ชฟ.2/1,ทฤษฎี,Teacher xxx',
+      'à¸§à¸±à¸™,à¸„à¸²à¸šà¹€à¸£à¸´à¹ˆà¸¡,à¸„à¸²à¸šà¸ªà¸´à¹‰à¸™à¸ªà¸¸à¸”,à¸£à¸«à¸±à¸ªà¸§à¸´à¸Šà¸²,à¸Šà¸·à¹ˆà¸­à¸§à¸´à¸Šà¸²,à¸«à¹‰à¸­à¸‡,à¸à¸¥à¸¸à¹ˆà¸¡,à¸›à¸£à¸°à¹€à¸ à¸—,à¸­à¸²à¸ˆà¸²à¸£à¸¢à¹Œ',
+      'à¸ˆà¸±à¸™à¸—à¸£à¹Œ,1,1,20000-1101,à¸à¸´à¸ˆà¸à¸£à¸£à¸¡à¸«à¸™à¹‰à¸²à¹€à¸ªà¸²à¸˜à¸‡à¹à¸¥à¸°à¹‚à¸®à¸¡à¸£à¸¹à¸¡,à¸«à¸™à¹‰à¸²à¹€à¸ªà¸²à¸˜à¸‡,à¸›à¸§à¸Š.1/1,à¹‚à¸®à¸¡à¸£à¸¹à¸¡,à¸„à¸£à¸¹à¸—à¸µà¹ˆà¸›à¸£à¸¶à¸à¸©à¸²',
+      'à¸ˆà¸±à¸™à¸—à¸£à¹Œ,2,4,20001-1005,à¸à¸²à¸£à¹ƒà¸Šà¹‰à¸„à¸­à¸¡à¸žà¸´à¸§à¹€à¸•à¸­à¸£à¹Œà¹à¸¥à¸°à¸ªà¸²à¸£à¸ªà¸™à¹€à¸—à¸¨à¹€à¸žà¸·à¹ˆà¸­à¸‡à¸²à¸™à¸­à¸²à¸Šà¸µà¸ž,734,à¸›à¸§à¸Š.1/1,à¸›à¸à¸´à¸šà¸±à¸•à¸´,à¸­.xxxx',
+      'à¸ˆà¸±à¸™à¸—à¸£à¹Œ,5,8,21909-2011,à¸à¸²à¸£à¹€à¸‚à¸µà¸¢à¸™à¹‚à¸›à¸£à¹à¸à¸£à¸¡à¹€à¸Šà¸´à¸‡à¸§à¸±à¸•à¸–à¸¸,735,à¸›à¸§à¸Š.2/1,à¸›à¸à¸´à¸šà¸±à¸•à¸´,à¸­.à¸“à¸±à¸à¸™à¸±à¸™à¸—à¹Œ',
+      'à¸­à¸±à¸‡à¸„à¸²à¸£,2,4,30001-1003,à¸à¸²à¸£à¸›à¸£à¸°à¸¢à¸¸à¸à¸•à¹Œà¹ƒà¸Šà¹‰à¹€à¸—à¸„à¹‚à¸™à¹‚à¸¥à¸¢à¸µà¸”à¸´à¸ˆà¸´à¸—à¸±à¸¥à¹ƒà¸™à¸­à¸²à¸Šà¸µà¸ž,745,à¸›à¸§à¸ª.1/6,à¸—à¸¤à¸©à¸Žà¸µ,à¸­.xxxx',
+      'à¸žà¸¸à¸˜,2,4,30901-1001,à¸à¸²à¸£à¸žà¸±à¸’à¸™à¸²à¹€à¸§à¹‡à¸šà¹à¸­à¸›à¸žà¸¥à¸´à¹€à¸„à¸Šà¸±à¸™,à¸«à¹‰à¸­à¸‡à¸„à¸­à¸¡à¸¯ à¸•à¹‰à¸™à¹à¸šà¸š 2,à¸›à¸§à¸ª.2/2,à¸›à¸à¸´à¸šà¸±à¸•à¸´,à¸­.xxxx',
+      'à¸žà¸¸à¸˜,5,6,20000-2001,à¸à¸´à¸ˆà¸à¸£à¸£à¸¡à¸¥à¸¹à¸à¹€à¸ªà¸·à¸­à¸§à¸´à¸ªà¸²à¸¡à¸±à¸ 1,à¹‚à¸”à¸¡,à¸Šà¸„.1/1,à¸à¸´à¸ˆà¸à¸£à¸£à¸¡,à¸­.à¸ªà¸¡à¸Šà¸²à¸¢',
+      'à¸žà¸¤à¸«à¸±à¸ªà¸šà¸”à¸µ,1,4,20901-2002,à¸£à¸°à¸šà¸šà¹€à¸„à¸£à¸·à¸­à¸‚à¹ˆà¸²à¸¢à¸„à¸­à¸¡à¸žà¸´à¸§à¹€à¸•à¸­à¸£à¹Œà¹€à¸šà¸·à¹‰à¸­à¸‡à¸•à¹‰à¸™,LAB-1,à¸Šà¸„.2/1,à¸›à¸à¸´à¸šà¸±à¸•à¸´,à¸­.xxxx',
+      'à¸¨à¸¸à¸à¸£à¹Œ,2,4,20000-1201,à¸ à¸²à¸©à¸²à¸­à¸±à¸‡à¸à¸¤à¸©à¹€à¸žà¸·à¹ˆà¸­à¸à¸²à¸£à¸ªà¸·à¹ˆà¸­à¸ªà¸²à¸£à¹ƒà¸™à¸‡à¸²à¸™à¸­à¸²à¸Šà¸µà¸ž,421,à¸Šà¸Ÿ.2/1,à¸—à¸¤à¸©à¸Žà¸µ,Teacher xxx',
     ].join('\r\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'เทมเพลต_ตารางสอน.csv';
+    a.download = 'à¹€à¸—à¸¡à¹€à¸žà¸¥à¸•_à¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™.csv';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast.success('ดาวน์โหลดไฟล์ตัวอย่าง CSV สำเร็จ');
+    toast.success('à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œà¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡ CSV à¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
   };
 
   const handleDownloadExcelTemplate = async () => {
     try {
       const XLSX = await import('xlsx');
-      const headers = ['วัน', 'คาบเริ่ม', 'คาบสิ้นสุด', 'รหัสวิชา', 'ชื่อวิชา', 'ห้อง', 'กลุ่ม', 'ประเภท', 'อาจารย์'];
+      const headers = ['à¸§à¸±à¸™', 'à¸„à¸²à¸šà¹€à¸£à¸´à¹ˆà¸¡', 'à¸„à¸²à¸šà¸ªà¸´à¹‰à¸™à¸ªà¸¸à¸”', 'à¸£à¸«à¸±à¸ªà¸§à¸´à¸Šà¸²', 'à¸Šà¸·à¹ˆà¸­à¸§à¸´à¸Šà¸²', 'à¸«à¹‰à¸­à¸‡', 'à¸à¸¥à¸¸à¹ˆà¸¡', 'à¸›à¸£à¸°à¹€à¸ à¸—', 'à¸­à¸²à¸ˆà¸²à¸£à¸¢à¹Œ'];
       const rows = [
-        ['จันทร์', 1, 1, '20000-1101', 'กิจกรรมหน้าเสาธงและโฮมรูม', 'หน้าเสาธง', 'ปวช.1/1', 'โฮมรูม', 'ครูที่ปรึกษา'],
-        ['จันทร์', 2, 4, '20001-1005', 'การใช้คอมพิวเตอร์และสารสนเทศเพื่องานอาชีพ', '734', 'ปวช.1/1', 'ปฏิบัติ', 'อ.xxxx'],
-        ['จันทร์', 5, 8, '21909-2011', 'การเขียนโปรแกรมเชิงวัตถุ', '735', 'ปวช.2/1', 'ปฏิบัติ', 'อ.ณัฐนันท์'],
-        ['อังคาร', 2, 4, '30001-1003', 'การประยุกต์ใช้เทคโนโลยีดิจิทัลในอาชีพ', '745', 'ปวส.1/6', 'ทฤษฎี', 'อ.xxxx'],
-        ['พุธ', 2, 4, '30901-1001', 'การพัฒนาเว็บแอปพลิเคชัน', 'ห้องคอมฯ ต้นแบบ 2', 'ปวส.2/2', 'ปฏิบัติ', 'อ.xxxx'],
-        ['พุธ', 5, 6, '20000-2001', 'กิจกรรมลูกเสือวิสามัญ 1', 'โดม', 'ชค.1/1', 'กิจกรรม', 'อ.สมชาย'],
-        ['พฤหัสบดี', 1, 4, '20901-2002', 'ระบบเครือข่ายคอมพิวเตอร์เบื้องต้น', 'LAB-1', 'ชค.2/1', 'ปฏิบัติ', 'อ.xxxx'],
-        ['ศุกร์', 2, 4, '20000-1201', 'ภาษาอังกฤษเพื่อการสื่อสารในงานอาชีพ', '421', 'ชฟ.2/1', 'ทฤษฎี', 'Teacher xxx'],
+        ['à¸ˆà¸±à¸™à¸—à¸£à¹Œ', 1, 1, '20000-1101', 'à¸à¸´à¸ˆà¸à¸£à¸£à¸¡à¸«à¸™à¹‰à¸²à¹€à¸ªà¸²à¸˜à¸‡à¹à¸¥à¸°à¹‚à¸®à¸¡à¸£à¸¹à¸¡', 'à¸«à¸™à¹‰à¸²à¹€à¸ªà¸²à¸˜à¸‡', 'à¸›à¸§à¸Š.1/1', 'à¹‚à¸®à¸¡à¸£à¸¹à¸¡', 'à¸„à¸£à¸¹à¸—à¸µà¹ˆà¸›à¸£à¸¶à¸à¸©à¸²'],
+        ['à¸ˆà¸±à¸™à¸—à¸£à¹Œ', 2, 4, '20001-1005', 'à¸à¸²à¸£à¹ƒà¸Šà¹‰à¸„à¸­à¸¡à¸žà¸´à¸§à¹€à¸•à¸­à¸£à¹Œà¹à¸¥à¸°à¸ªà¸²à¸£à¸ªà¸™à¹€à¸—à¸¨à¹€à¸žà¸·à¹ˆà¸­à¸‡à¸²à¸™à¸­à¸²à¸Šà¸µà¸ž', '734', 'à¸›à¸§à¸Š.1/1', 'à¸›à¸à¸´à¸šà¸±à¸•à¸´', 'à¸­.xxxx'],
+        ['à¸ˆà¸±à¸™à¸—à¸£à¹Œ', 5, 8, '21909-2011', 'à¸à¸²à¸£à¹€à¸‚à¸µà¸¢à¸™à¹‚à¸›à¸£à¹à¸à¸£à¸¡à¹€à¸Šà¸´à¸‡à¸§à¸±à¸•à¸–à¸¸', '735', 'à¸›à¸§à¸Š.2/1', 'à¸›à¸à¸´à¸šà¸±à¸•à¸´', 'à¸­.à¸“à¸±à¸à¸™à¸±à¸™à¸—à¹Œ'],
+        ['à¸­à¸±à¸‡à¸„à¸²à¸£', 2, 4, '30001-1003', 'à¸à¸²à¸£à¸›à¸£à¸°à¸¢à¸¸à¸à¸•à¹Œà¹ƒà¸Šà¹‰à¹€à¸—à¸„à¹‚à¸™à¹‚à¸¥à¸¢à¸µà¸”à¸´à¸ˆà¸´à¸—à¸±à¸¥à¹ƒà¸™à¸­à¸²à¸Šà¸µà¸ž', '745', 'à¸›à¸§à¸ª.1/6', 'à¸—à¸¤à¸©à¸Žà¸µ', 'à¸­.xxxx'],
+        ['à¸žà¸¸à¸˜', 2, 4, '30901-1001', 'à¸à¸²à¸£à¸žà¸±à¸’à¸™à¸²à¹€à¸§à¹‡à¸šà¹à¸­à¸›à¸žà¸¥à¸´à¹€à¸„à¸Šà¸±à¸™', 'à¸«à¹‰à¸­à¸‡à¸„à¸­à¸¡à¸¯ à¸•à¹‰à¸™à¹à¸šà¸š 2', 'à¸›à¸§à¸ª.2/2', 'à¸›à¸à¸´à¸šà¸±à¸•à¸´', 'à¸­.xxxx'],
+        ['à¸žà¸¸à¸˜', 5, 6, '20000-2001', 'à¸à¸´à¸ˆà¸à¸£à¸£à¸¡à¸¥à¸¹à¸à¹€à¸ªà¸·à¸­à¸§à¸´à¸ªà¸²à¸¡à¸±à¸ 1', 'à¹‚à¸”à¸¡', 'à¸Šà¸„.1/1', 'à¸à¸´à¸ˆà¸à¸£à¸£à¸¡', 'à¸­.à¸ªà¸¡à¸Šà¸²à¸¢'],
+        ['à¸žà¸¤à¸«à¸±à¸ªà¸šà¸”à¸µ', 1, 4, '20901-2002', 'à¸£à¸°à¸šà¸šà¹€à¸„à¸£à¸·à¸­à¸‚à¹ˆà¸²à¸¢à¸„à¸­à¸¡à¸žà¸´à¸§à¹€à¸•à¸­à¸£à¹Œà¹€à¸šà¸·à¹‰à¸­à¸‡à¸•à¹‰à¸™', 'LAB-1', 'à¸Šà¸„.2/1', 'à¸›à¸à¸´à¸šà¸±à¸•à¸´', 'à¸­.xxxx'],
+        ['à¸¨à¸¸à¸à¸£à¹Œ', 2, 4, '20000-1201', 'à¸ à¸²à¸©à¸²à¸­à¸±à¸‡à¸à¸¤à¸©à¹€à¸žà¸·à¹ˆà¸­à¸à¸²à¸£à¸ªà¸·à¹ˆà¸­à¸ªà¸²à¸£à¹ƒà¸™à¸‡à¸²à¸™à¸­à¸²à¸Šà¸µà¸ž', '421', 'à¸Šà¸Ÿ.2/1', 'à¸—à¸¤à¸©à¸Žà¸µ', 'Teacher xxx'],
       ];
 
       const wb = XLSX.utils.book_new();
@@ -429,18 +429,18 @@ export default function Schedule() {
         { wch: 14 },
         { wch: 18 }
       ];
-      XLSX.utils.book_append_sheet(wb, ws, 'ตารางสอน');
-      XLSX.writeFile(wb, 'เทมเพลต_ตารางสอน.xlsx');
-      toast.success('ดาวน์โหลดไฟล์ตัวอย่าง Excel สำเร็จ');
+      XLSX.utils.book_append_sheet(wb, ws, 'à¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™');
+      XLSX.writeFile(wb, 'à¹€à¸—à¸¡à¹€à¸žà¸¥à¸•_à¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™.xlsx');
+      toast.success('à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œà¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡ Excel à¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
     } catch (err) {
       console.error(err);
-      toast.error('ดาวน์โหลดไฟล์ตัวอย่าง Excel ไม่สำเร็จ');
+      toast.error('à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œà¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡ Excel à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
     }
   };
 
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!uploadFile) return toast.error('กรุณาเลือกไฟล์');
+    if (!uploadFile) return toast.error('à¸à¸£à¸¸à¸“à¸²à¹€à¸¥à¸·à¸­à¸à¹„à¸Ÿà¸¥à¹Œ');
 
     const formData = new FormData();
 
@@ -467,22 +467,22 @@ export default function Schedule() {
     timetableUploadMutation.mutate(formData);
   };
 
-  // ─── Mutation: ล้างข้อมูลตารางเรียน ───
+  // â”€â”€â”€ Mutation: à¸¥à¹‰à¸²à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸•à¸²à¸£à¸²à¸‡à¹€à¸£à¸µà¸¢à¸™ â”€â”€â”€
   const clearTimetableMutation = useMutation({
     mutationFn: async () => {
       return api.delete('/timetable/clear');
     },
     onSuccess: () => {
-      toast.success('ล้างตารางสอนแล้ว');
+      toast.success('à¸¥à¹‰à¸²à¸‡à¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™à¹à¸¥à¹‰à¸§');
       invalidateAllTimetableQueries();
     },
     onError: () => {
-      toast.error('ทำรายการไม่สำเร็จ');
+      toast.error('à¸—à¸³à¸£à¸²à¸¢à¸à¸²à¸£à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
     }
   });
 
   const clearTimetable = () => {
-    if (!window.confirm('ต้องการลบตารางสอนทั้งหมดใช่หรือไม่?')) return;
+    if (!window.confirm('à¸•à¹‰à¸­à¸‡à¸à¸²à¸£à¸¥à¸šà¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”à¹ƒà¸Šà¹ˆà¸«à¸£à¸·à¸­à¹„à¸¡à¹ˆ?')) return;
     clearTimetableMutation.mutate();
   };
 
@@ -514,17 +514,17 @@ export default function Schedule() {
     updateDragOverCell(null);
   };
 
-  // ─── Mutations: ย้ายและปรับขนาดคาบเรียน ───
+  // â”€â”€â”€ Mutations: à¸¢à¹‰à¸²à¸¢à¹à¸¥à¸°à¸›à¸£à¸±à¸šà¸‚à¸™à¸²à¸”à¸„à¸²à¸šà¹€à¸£à¸µà¸¢à¸™ â”€â”€â”€
   const moveTimetableMutation = useMutation({
     mutationFn: async ({ id, day_of_week, start_period }: { id: string | number; day_of_week: number; start_period: number }) => {
       return api.put(`/timetable/${id}/move`, { day_of_week, start_period });
     },
     onSuccess: () => {
-      toast.success('ย้ายตารางสอนสำเร็จ');
+      toast.success('à¸¢à¹‰à¸²à¸¢à¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™à¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
       invalidateAllTimetableQueries();
     },
     onError: (err: ApiError) => {
-      toast.error(err.response?.data?.message || 'ทำรายการไม่สำเร็จ');
+      toast.error(err.response?.data?.message || 'à¸—à¸³à¸£à¸²à¸¢à¸à¸²à¸£à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
     }
   });
 
@@ -533,11 +533,11 @@ export default function Schedule() {
       return api.put(`/timetable/${id}/resize`, { end_period });
     },
     onSuccess: () => {
-      toast.success('ปรับขนาดคาบเรียนสำเร็จ');
+      toast.success('à¸›à¸£à¸±à¸šà¸‚à¸™à¸²à¸”à¸„à¸²à¸šà¹€à¸£à¸µà¸¢à¸™à¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
       invalidateAllTimetableQueries();
     },
     onError: (err: ApiError) => {
-      toast.error(err.response?.data?.message || 'ทำรายการไม่สำเร็จ');
+      toast.error(err.response?.data?.message || 'à¸—à¸³à¸£à¸²à¸¢à¸à¸²à¸£à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
     }
   });
 
@@ -548,13 +548,13 @@ export default function Schedule() {
 
     if (dragType === 'resize') {
       if (dayIdx !== draggedEntry.day_of_week) {
-        toast.error('ไม่สามารถยืดคาบเรียนข้ามวันได้');
+        toast.error('à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸¢à¸·à¸”à¸„à¸²à¸šà¹€à¸£à¸µà¸¢à¸™à¸‚à¹‰à¸²à¸¡à¸§à¸±à¸™à¹„à¸”à¹‰');
         setDraggedEntry(null);
         setDragType(null);
         return;
       }
       if (Number(slotId) < draggedEntry.start_period) {
-        toast.error('เวลาสิ้นสุดต้องไม่น้อยกว่าคาบเริ่มต้น');
+        toast.error('à¹€à¸§à¸¥à¸²à¸ªà¸´à¹‰à¸™à¸ªà¸¸à¸”à¸•à¹‰à¸­à¸‡à¹„à¸¡à¹ˆà¸™à¹‰à¸­à¸¢à¸à¸§à¹ˆà¸²à¸„à¸²à¸šà¹€à¸£à¸´à¹ˆà¸¡à¸•à¹‰à¸™');
         setDraggedEntry(null);
         setDragType(null);
         return;
@@ -589,12 +589,12 @@ export default function Schedule() {
     };
 
     const TIME_SLOTS = [
-      { id: 0, label: 'กิจกรรม', start: '07:30', end: '08:00', isBreak: false },
+      { id: 0, label: 'à¸à¸´à¸ˆà¸à¸£à¸£à¸¡', start: '07:30', end: '08:00', isBreak: false },
       { id: 1, label: '1', start: '08:00', end: '09:00', isBreak: false },
       { id: 2, label: '2', start: '09:00', end: '10:00', isBreak: false },
       { id: 3, label: '3', start: '10:00', end: '11:00', isBreak: false },
       { id: 4, label: '4', start: '11:00', end: '12:00', isBreak: false },
-      { id: 'lunch', label: 'พักกลางวัน', start: '12:00', end: '13:00', isBreak: true },
+      { id: 'lunch', label: 'à¸žà¸±à¸à¸à¸¥à¸²à¸‡à¸§à¸±à¸™', start: '12:00', end: '13:00', isBreak: true },
       { id: 5, label: '5', start: '13:00', end: '14:00', isBreak: false },
       { id: 6, label: '6', start: '14:00', end: '15:00', isBreak: false },
       { id: 7, label: '7', start: '15:00', end: '16:00', isBreak: false },
@@ -617,9 +617,9 @@ export default function Schedule() {
             <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mb-4">
               <Table className="w-8 h-8 text-indigo-400" />
             </div>
-            <h3 className="text-lg font-bold text-slate-700 mb-2">ยังไม่มีข้อมูลตารางเรียน</h3>
-            <p className="text-slate-500 mb-6 max-w-md">อัพโหลดไฟล์ตารางเรียนในรูปแบบ รูปภาพ (JPG/PNG), CSV หรือ PDF เพื่อดึงข้อมูลอัตโนมัติ (รองรับ AI อ่านรูปภาพตารางสอน)</p>
-            <button onClick={() => setShowUpload(true)} className="btn btn-primary">อัพโหลดไฟล์ตอนนี้</button>
+            <h3 className="text-lg font-bold text-slate-700 mb-2">à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¸¡à¸µà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸•à¸²à¸£à¸²à¸‡à¹€à¸£à¸µà¸¢à¸™</h3>
+            <p className="text-slate-500 mb-6 max-w-md">à¸­à¸±à¸žà¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œà¸•à¸²à¸£à¸²à¸‡à¹€à¸£à¸µà¸¢à¸™à¹ƒà¸™à¸£à¸¹à¸›à¹à¸šà¸š à¸£à¸¹à¸›à¸ à¸²à¸ž (JPG/PNG), CSV à¸«à¸£à¸·à¸­ PDF à¹€à¸žà¸·à¹ˆà¸­à¸”à¸¶à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸­à¸±à¸•à¹‚à¸™à¸¡à¸±à¸•à¸´ (à¸£à¸­à¸‡à¸£à¸±à¸š AI à¸­à¹ˆà¸²à¸™à¸£à¸¹à¸›à¸ à¸²à¸žà¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™)</p>
+            <button onClick={() => setShowUpload(true)} className="btn btn-primary">à¸­à¸±à¸žà¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œà¸•à¸­à¸™à¸™à¸µà¹‰</button>
           </div>
         ) : (
           <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-6">
@@ -627,7 +627,7 @@ export default function Schedule() {
               <div className="w-full min-w-[950px]">
                 {/* Header row */}
                 <div className="grid" style={{ gridTemplateColumns: gridCols }}>
-                  <div className="min-w-0 overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/90 p-2 text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center justify-center text-center">วัน / คาบ</div>
+                  <div className="min-w-0 overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/90 p-2 text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center justify-center text-center">à¸§à¸±à¸™ / à¸„à¸²à¸š</div>
                   {TIME_SLOTS.map(slot => (
                     <div key={slot.id} className="min-w-0 overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/90 p-1 text-center">
                       <div className="text-[0.65rem] font-bold text-slate-700 dark:text-slate-200 truncate">{slot.label}</div>
@@ -638,7 +638,7 @@ export default function Schedule() {
                   ))}
                 </div>
 
-                {/* Day rows — each row is a position:relative container */}
+                {/* Day rows â€” each row is a position:relative container */}
                 {TIMETABLE_DAYS.map((dayName, dayIdx) => {
                   const dayEntries = (entriesByDay[dayIdx] || []).sort((a: TimetableEntry, b: TimetableEntry) => Number(a.start_period) - Number(b.start_period));
                   if (dayEntries.length === 0 && dayIdx > 4) return null;
@@ -649,7 +649,7 @@ export default function Schedule() {
                       className="grid relative"
                       style={{ gridTemplateColumns: gridCols }}
                     >
-                      {/* Day name label — explicit column 1 */}
+                      {/* Day name label â€” explicit column 1 */}
                       <div
                         className="min-w-0 overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/90 p-2 text-sm font-bold text-slate-700 dark:text-slate-200 text-center flex items-center justify-center"
                         style={{ gridRow: 1, gridColumn: 1 }}
@@ -657,7 +657,7 @@ export default function Schedule() {
                         <span className="truncate">{dayName}</span>
                       </div>
 
-                      {/* Background cells — every cell has explicit gridRow AND gridColumn */}
+                      {/* Background cells â€” every cell has explicit gridRow AND gridColumn */}
                       {TIME_SLOTS.map((slot, sIdx) => {
                         const isDragOver = dragOverCell === `${dayIdx}-${slot.id}`;
                         const colPos = sIdx + 2; // +2 because col 1 = day label
@@ -669,7 +669,7 @@ export default function Schedule() {
                               className="min-w-0 overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/60 p-0 text-center flex items-center justify-center min-h-[60px]"
                               style={{ gridRow: 1, gridColumn: colPos }}
                             >
-                              <span className="text-[0.65rem] text-slate-400 dark:text-slate-500 font-medium opacity-50 whitespace-nowrap -rotate-90 origin-center select-none block">พักกลางวัน</span>
+                              <span className="text-[0.65rem] text-slate-400 dark:text-slate-500 font-medium opacity-50 whitespace-nowrap -rotate-90 origin-center select-none block">à¸žà¸±à¸à¸à¸¥à¸²à¸‡à¸§à¸±à¸™</span>
                             </div>
                           );
                         }
@@ -687,7 +687,7 @@ export default function Schedule() {
                         );
                       })}
 
-                      {/* Entry blocks — overlaid on same gridRow:1 with explicit gridColumn spans */}
+                      {/* Entry blocks â€” overlaid on same gridRow:1 with explicit gridColumn spans */}
                       {dayEntries.map((entry: TimetableEntry) => {
                         const startIdx = slotIndex(entry.start_period);
                         const endIdx = slotIndex(entry.end_period);
@@ -751,10 +751,10 @@ export default function Schedule() {
                             >
                               <div
                                 className="text-[0.7rem] font-bold truncate"
-                                title={entry.subject_code || entry.subject_name || (entry.start_period === 0 ? '' : 'กิจกรรม')}
+                                title={entry.subject_code || entry.subject_name || (entry.start_period === 0 ? '' : 'à¸à¸´à¸ˆà¸à¸£à¸£à¸¡')}
                                 style={{ color: entry.color ? entry.color : undefined }}
                               >
-                                {entry.subject_code || entry.subject_name || (entry.start_period === 0 ? '' : 'กิจกรรม')}
+                                {entry.subject_code || entry.subject_name || (entry.start_period === 0 ? '' : 'à¸à¸´à¸ˆà¸à¸£à¸£à¸¡')}
                               </div>
                               {entry.room && (
                                 <div
@@ -775,7 +775,7 @@ export default function Schedule() {
                                 handleDragStart(e, entry, 'resize');
                               }}
                               onDragEnd={handleDragEnd}
-                              title="ลากเพื่อขยาย/ลดคาบ"
+                              title="à¸¥à¸²à¸à¹€à¸žà¸·à¹ˆà¸­à¸‚à¸¢à¸²à¸¢/à¸¥à¸”à¸„à¸²à¸š"
                             >
                               <div className="w-0.5 h-5 bg-slate-500 rounded-full"></div>
                             </div>
@@ -789,15 +789,15 @@ export default function Schedule() {
             </div>
 
             <div className="glass dark:bg-slate-900/85 dark:border-slate-800 p-5 flex flex-col h-full rounded-2xl">
-              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">สรุปชั่วโมงสอน</h3>
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">à¸ªà¸£à¸¸à¸›à¸Šà¸±à¹ˆà¸§à¹‚à¸¡à¸‡à¸ªà¸­à¸™</h3>
               <div className="space-y-4 overflow-y-auto flex-1 pr-1">
                 {(Array.isArray(timetableSummary) ? timetableSummary : []).map((sum, i) => (
                   <div key={i} className="flex gap-3 items-start p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
                     <div className="w-2 h-2 rounded-full mt-1.5 bg-indigo-500 shrink-0"></div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start">
-                        <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">{sum.subject_code || sum.subject_name || 'กิจกรรม'}</p>
-                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{sum.total_hours} ชม.</span>
+                        <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">{sum.subject_code || sum.subject_name || 'à¸à¸´à¸ˆà¸à¸£à¸£à¸¡'}</p>
+                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{sum.total_hours} à¸Šà¸¡.</span>
                       </div>
                       <p className="text-[0.65rem] text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5">{sum.subject_name}</p>
                     </div>
@@ -815,15 +815,15 @@ export default function Schedule() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-1">ตารางสอนประจำสัปดาห์</h1>
+          <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-1">à¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™à¸›à¸£à¸°à¸ˆà¸³à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ</h1>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={() => setShowUpload(true)} className="btn btn-primary flex items-center gap-2">
-            <UploadCloud className="w-4 h-4" /> อัพโหลดไฟล์ตาราง (รูปภาพ/CSV/PDF)
+            <UploadCloud className="w-4 h-4" /> à¸­à¸±à¸žà¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œà¸•à¸²à¸£à¸²à¸‡ (à¸£à¸¹à¸›à¸ à¸²à¸ž/CSV/PDF)
           </button>
           {timetableEntries.length > 0 && (
             <button onClick={clearTimetable} className="btn btn-ghost text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 hover:border-red-200 dark:hover:border-red-900/60">
-              ล้างข้อมูล
+              à¸¥à¹‰à¸²à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥
             </button>
           )}
         </div>
@@ -842,10 +842,10 @@ export default function Schedule() {
         >
           <p className="text-xs font-bold text-slate-800 dark:text-slate-100">{hoverTooltip.entry.subject_name}</p>
           <p className="text-[0.65rem] text-slate-500 dark:text-slate-400 mt-1">{hoverTooltip.entry.subject_code}</p>
-          <p className="text-[0.65rem] text-slate-500 dark:text-slate-400">ห้อง: {hoverTooltip.entry.room || '-'}</p>
-          <p className="text-[0.65rem] text-slate-500 dark:text-slate-400">กลุ่ม: {hoverTooltip.entry.group_name || '-'}</p>
-          <p className="text-[0.65rem] text-slate-500">คาบ: {hoverTooltip.entry.start_period} - {hoverTooltip.entry.end_period} ({hoverTooltip.entry.hours || (hoverTooltip.entry.end_period - hoverTooltip.entry.start_period + 1)} ชม.)</p>
-          <p className="text-[0.6rem] text-indigo-500 mt-1">คลิกเพื่อแก้ไข/ลบคาบเรียน</p>
+          <p className="text-[0.65rem] text-slate-500 dark:text-slate-400">à¸«à¹‰à¸­à¸‡: {hoverTooltip.entry.room || '-'}</p>
+          <p className="text-[0.65rem] text-slate-500 dark:text-slate-400">à¸à¸¥à¸¸à¹ˆà¸¡: {hoverTooltip.entry.group_name || '-'}</p>
+          <p className="text-[0.65rem] text-slate-500">à¸„à¸²à¸š: {hoverTooltip.entry.start_period} - {hoverTooltip.entry.end_period} ({hoverTooltip.entry.hours || (hoverTooltip.entry.end_period - hoverTooltip.entry.start_period + 1)} à¸Šà¸¡.)</p>
+          <p className="text-[0.6rem] text-indigo-500 mt-1">à¸„à¸¥à¸´à¸à¹€à¸žà¸·à¹ˆà¸­à¹à¸à¹‰à¹„à¸‚/à¸¥à¸šà¸„à¸²à¸šà¹€à¸£à¸µà¸¢à¸™</p>
         </div>,
         document.body
       )}
@@ -860,9 +860,9 @@ export default function Schedule() {
                   <UploadCloud className="w-6 h-6" />
                 </div>
                 <div>
-                  <h2 className="text-lg sm:text-xl font-black text-slate-800">อัพโหลดตารางสอน & ตัวอย่างรูปแบบไฟล์</h2>
+                  <h2 className="text-lg sm:text-xl font-black text-slate-800">à¸­à¸±à¸žà¹‚à¸«à¸¥à¸”à¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™ & à¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡à¸£à¸¹à¸›à¹à¸šà¸šà¹„à¸Ÿà¸¥à¹Œ</h2>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    ตรวจสอบตัวอย่างรูปแบบไฟล์ที่ระบบรองรับ ดาวน์โหลดเทมเพลต หรืออัพโหลดไฟล์เพื่อสร้างตารางสอน
+                    à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡à¸£à¸¹à¸›à¹à¸šà¸šà¹„à¸Ÿà¸¥à¹Œà¸—à¸µà¹ˆà¸£à¸°à¸šà¸šà¸£à¸­à¸‡à¸£à¸±à¸š à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹€à¸—à¸¡à¹€à¸žà¸¥à¸• à¸«à¸£à¸·à¸­à¸­à¸±à¸žà¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œà¹€à¸žà¸·à¹ˆà¸­à¸ªà¸£à¹‰à¸²à¸‡à¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™
                   </p>
                 </div>
               </div>
@@ -884,7 +884,7 @@ export default function Schedule() {
                       }`}
                   >
                     <FileSpreadsheet className="w-4 h-4" />
-                    <span>ตัวอย่างไฟล์ CSV / Excel (แนะนำ)</span>
+                    <span>à¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡à¹„à¸Ÿà¸¥à¹Œ CSV / Excel (à¹à¸™à¸°à¸™à¸³)</span>
                   </button>
                   <button
                     type="button"
@@ -895,7 +895,7 @@ export default function Schedule() {
                       }`}
                   >
                     <Sparkles className="w-4 h-4 text-amber-500" />
-                    <span>ตัวอย่างรูปภาพ & PDF (AI)</span>
+                    <span>à¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡à¸£à¸¹à¸›à¸ à¸²à¸ž & PDF (AI)</span>
                   </button>
                 </div>
 
@@ -905,19 +905,19 @@ export default function Schedule() {
                       type="button"
                       onClick={handleDownloadCsvTemplate}
                       className="btn bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all cursor-pointer"
-                      title="ดาวน์โหลดไฟล์ตัวอย่าง .csv สำหรับเปิดใน Excel หรือโปรแกรมสเปรดชีต"
+                      title="à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œà¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡ .csv à¸ªà¸³à¸«à¸£à¸±à¸šà¹€à¸›à¸´à¸”à¹ƒà¸™ Excel à¸«à¸£à¸·à¸­à¹‚à¸›à¸£à¹à¸à¸£à¸¡à¸ªà¹€à¸›à¸£à¸”à¸Šà¸µà¸•"
                     >
                       <Download className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>ดาวน์โหลดตัวอย่าง CSV</span>
+                      <span>à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡ CSV</span>
                     </button>
                     <button
                       type="button"
                       onClick={handleDownloadExcelTemplate}
                       className="btn bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all cursor-pointer"
-                      title="ดาวน์โหลดไฟล์ตัวอย่าง .xlsx พร้อมตารางและสูตร"
+                      title="à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œà¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡ .xlsx à¸žà¸£à¹‰à¸­à¸¡à¸•à¸²à¸£à¸²à¸‡à¹à¸¥à¸°à¸ªà¸¹à¸•à¸£"
                     >
                       <Download className="w-3.5 h-3.5 text-indigo-600" />
-                      <span>ดาวน์โหลดตัวอย่าง Excel</span>
+                      <span>à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡ Excel</span>
                     </button>
                   </div>
                 )}
@@ -929,13 +929,13 @@ export default function Schedule() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-black text-indigo-900">โครงสร้างคอลัมน์ที่ระบบรองรับ (Header)</span>
+                        <span className="text-xs font-black text-indigo-900">à¹‚à¸„à¸£à¸‡à¸ªà¸£à¹‰à¸²à¸‡à¸„à¸­à¸¥à¸±à¸¡à¸™à¹Œà¸—à¸µà¹ˆà¸£à¸°à¸šà¸šà¸£à¸­à¸‡à¸£à¸±à¸š (Header)</span>
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                          แม่นยำ 100%
+                          à¹à¸¡à¹ˆà¸™à¸¢à¸³ 100%
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-600 mt-0.5">
-                        แถวแรกต้องเป็นชื่อคอลัมน์ (รองรับทั้งภาษาไทยและอังกฤษ: วัน, คาบเริ่ม, คาบสิ้นสุด, รหัสวิชา, ชื่อวิชา, ห้อง, กลุ่ม, ประเภท, อาจารย์)
+                        à¹à¸–à¸§à¹à¸£à¸à¸•à¹‰à¸­à¸‡à¹€à¸›à¹‡à¸™à¸Šà¸·à¹ˆà¸­à¸„à¸­à¸¥à¸±à¸¡à¸™à¹Œ (à¸£à¸­à¸‡à¸£à¸±à¸šà¸—à¸±à¹‰à¸‡à¸ à¸²à¸©à¸²à¹„à¸—à¸¢à¹à¸¥à¸°à¸­à¸±à¸‡à¸à¸¤à¸©: à¸§à¸±à¸™, à¸„à¸²à¸šà¹€à¸£à¸´à¹ˆà¸¡, à¸„à¸²à¸šà¸ªà¸´à¹‰à¸™à¸ªà¸¸à¸”, à¸£à¸«à¸±à¸ªà¸§à¸´à¸Šà¸², à¸Šà¸·à¹ˆà¸­à¸§à¸´à¸Šà¸², à¸«à¹‰à¸­à¸‡, à¸à¸¥à¸¸à¹ˆà¸¡, à¸›à¸£à¸°à¹€à¸ à¸—, à¸­à¸²à¸ˆà¸²à¸£à¸¢à¹Œ)
                       </p>
                     </div>
                   </div>
@@ -945,61 +945,61 @@ export default function Schedule() {
                     <table className="w-full text-[11px] text-left border-collapse">
                       <thead>
                         <tr className="bg-indigo-50/80 border-b border-indigo-100 text-slate-700 font-bold">
-                          <th className="p-2 border-r border-indigo-100/60 whitespace-nowrap">วัน</th>
-                          <th className="p-2 border-r border-indigo-100/60 whitespace-nowrap text-center">คาบเริ่ม</th>
-                          <th className="p-2 border-r border-indigo-100/60 whitespace-nowrap text-center">คาบสิ้นสุด</th>
-                          <th className="p-2 border-r border-indigo-100/60 whitespace-nowrap">รหัสวิชา</th>
-                          <th className="p-2 border-r border-indigo-100/60 whitespace-nowrap min-w-[160px]">ชื่อวิชา</th>
-                          <th className="p-2 border-r border-indigo-100/60 whitespace-nowrap">ห้อง</th>
-                          <th className="p-2 border-r border-indigo-100/60 whitespace-nowrap">กลุ่ม</th>
-                          <th className="p-2 border-r border-indigo-100/60 whitespace-nowrap">ประเภท</th>
-                          <th className="p-2 whitespace-nowrap">อาจารย์</th>
+                          <th className="p-2 border-r border-indigo-100/60 whitespace-nowrap">à¸§à¸±à¸™</th>
+                          <th className="p-2 border-r border-indigo-100/60 whitespace-nowrap text-center">à¸„à¸²à¸šà¹€à¸£à¸´à¹ˆà¸¡</th>
+                          <th className="p-2 border-r border-indigo-100/60 whitespace-nowrap text-center">à¸„à¸²à¸šà¸ªà¸´à¹‰à¸™à¸ªà¸¸à¸”</th>
+                          <th className="p-2 border-r border-indigo-100/60 whitespace-nowrap">à¸£à¸«à¸±à¸ªà¸§à¸´à¸Šà¸²</th>
+                          <th className="p-2 border-r border-indigo-100/60 whitespace-nowrap min-w-[160px]">à¸Šà¸·à¹ˆà¸­à¸§à¸´à¸Šà¸²</th>
+                          <th className="p-2 border-r border-indigo-100/60 whitespace-nowrap">à¸«à¹‰à¸­à¸‡</th>
+                          <th className="p-2 border-r border-indigo-100/60 whitespace-nowrap">à¸à¸¥à¸¸à¹ˆà¸¡</th>
+                          <th className="p-2 border-r border-indigo-100/60 whitespace-nowrap">à¸›à¸£à¸°à¹€à¸ à¸—</th>
+                          <th className="p-2 whitespace-nowrap">à¸­à¸²à¸ˆà¸²à¸£à¸¢à¹Œ</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
                         <tr className="hover:bg-slate-50">
-                          <td className="p-2 border-r border-slate-100 font-bold text-indigo-700">จันทร์</td>
+                          <td className="p-2 border-r border-slate-100 font-bold text-indigo-700">à¸ˆà¸±à¸™à¸—à¸£à¹Œ</td>
                           <td className="p-2 border-r border-slate-100 text-center font-mono">1</td>
                           <td className="p-2 border-r border-slate-100 text-center font-mono">1</td>
                           <td className="p-2 border-r border-slate-100 font-mono text-slate-500">20000-1101</td>
-                          <td className="p-2 border-r border-slate-100">กิจกรรมหน้าเสาธงและโฮมรูม</td>
-                          <td className="p-2 border-r border-slate-100">หน้าเสาธง</td>
-                          <td className="p-2 border-r border-slate-100">ปวช.1/1</td>
-                          <td className="p-2 border-r border-slate-100"><span className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 text-[10px] font-bold">โฮมรูม</span></td>
-                          <td className="p-2 text-slate-500">ครูที่ปรึกษา</td>
+                          <td className="p-2 border-r border-slate-100">à¸à¸´à¸ˆà¸à¸£à¸£à¸¡à¸«à¸™à¹‰à¸²à¹€à¸ªà¸²à¸˜à¸‡à¹à¸¥à¸°à¹‚à¸®à¸¡à¸£à¸¹à¸¡</td>
+                          <td className="p-2 border-r border-slate-100">à¸«à¸™à¹‰à¸²à¹€à¸ªà¸²à¸˜à¸‡</td>
+                          <td className="p-2 border-r border-slate-100">à¸›à¸§à¸Š.1/1</td>
+                          <td className="p-2 border-r border-slate-100"><span className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 text-[10px] font-bold">à¹‚à¸®à¸¡à¸£à¸¹à¸¡</span></td>
+                          <td className="p-2 text-slate-500">à¸„à¸£à¸¹à¸—à¸µà¹ˆà¸›à¸£à¸¶à¸à¸©à¸²</td>
                         </tr>
                         <tr className="hover:bg-slate-50">
-                          <td className="p-2 border-r border-slate-100 font-bold text-indigo-700">จันทร์</td>
+                          <td className="p-2 border-r border-slate-100 font-bold text-indigo-700">à¸ˆà¸±à¸™à¸—à¸£à¹Œ</td>
                           <td className="p-2 border-r border-slate-100 text-center font-mono">2</td>
                           <td className="p-2 border-r border-slate-100 text-center font-mono">4</td>
                           <td className="p-2 border-r border-slate-100 font-mono font-bold text-slate-800">20001-1005</td>
-                          <td className="p-2 border-r border-slate-100">การใช้คอมพิวเตอร์และสารสนเทศฯ</td>
+                          <td className="p-2 border-r border-slate-100">à¸à¸²à¸£à¹ƒà¸Šà¹‰à¸„à¸­à¸¡à¸žà¸´à¸§à¹€à¸•à¸­à¸£à¹Œà¹à¸¥à¸°à¸ªà¸²à¸£à¸ªà¸™à¹€à¸—à¸¨à¸¯</td>
                           <td className="p-2 border-r border-slate-100">734</td>
-                          <td className="p-2 border-r border-slate-100">ปวช.1/1</td>
-                          <td className="p-2 border-r border-slate-100"><span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 text-[10px] font-bold">ปฏิบัติ</span></td>
-                          <td className="p-2 text-slate-500">อ.xxxx</td>
+                          <td className="p-2 border-r border-slate-100">à¸›à¸§à¸Š.1/1</td>
+                          <td className="p-2 border-r border-slate-100"><span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 text-[10px] font-bold">à¸›à¸à¸´à¸šà¸±à¸•à¸´</span></td>
+                          <td className="p-2 text-slate-500">à¸­.xxxx</td>
                         </tr>
                         <tr className="hover:bg-slate-50">
-                          <td className="p-2 border-r border-slate-100 font-bold text-indigo-700">อังคาร</td>
+                          <td className="p-2 border-r border-slate-100 font-bold text-indigo-700">à¸­à¸±à¸‡à¸„à¸²à¸£</td>
                           <td className="p-2 border-r border-slate-100 text-center font-mono">2</td>
                           <td className="p-2 border-r border-slate-100 text-center font-mono">4</td>
                           <td className="p-2 border-r border-slate-100 font-mono font-bold text-slate-800">30001-1003</td>
-                          <td className="p-2 border-r border-slate-100">การประยุกต์ใช้เทคโนโลยีดิจิทัลในอาชีพ</td>
+                          <td className="p-2 border-r border-slate-100">à¸à¸²à¸£à¸›à¸£à¸°à¸¢à¸¸à¸à¸•à¹Œà¹ƒà¸Šà¹‰à¹€à¸—à¸„à¹‚à¸™à¹‚à¸¥à¸¢à¸µà¸”à¸´à¸ˆà¸´à¸—à¸±à¸¥à¹ƒà¸™à¸­à¸²à¸Šà¸µà¸ž</td>
                           <td className="p-2 border-r border-slate-100">745</td>
-                          <td className="p-2 border-r border-slate-100">ปวส.1/6</td>
-                          <td className="p-2 border-r border-slate-100"><span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-bold">ทฤษฎี</span></td>
-                          <td className="p-2 text-slate-500">อ.xxxx</td>
+                          <td className="p-2 border-r border-slate-100">à¸›à¸§à¸ª.1/6</td>
+                          <td className="p-2 border-r border-slate-100"><span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-bold">à¸—à¸¤à¸©à¸Žà¸µ</span></td>
+                          <td className="p-2 text-slate-500">à¸­.xxxx</td>
                         </tr>
                         <tr className="hover:bg-slate-50">
-                          <td className="p-2 border-r border-slate-100 font-bold text-indigo-700">พุธ</td>
+                          <td className="p-2 border-r border-slate-100 font-bold text-indigo-700">à¸žà¸¸à¸˜</td>
                           <td className="p-2 border-r border-slate-100 text-center font-mono">5</td>
                           <td className="p-2 border-r border-slate-100 text-center font-mono">6</td>
                           <td className="p-2 border-r border-slate-100 font-mono text-slate-500">20000-2001</td>
-                          <td className="p-2 border-r border-slate-100">กิจกรรมลูกเสือวิสามัญ 1</td>
-                          <td className="p-2 border-r border-slate-100">โดม</td>
-                          <td className="p-2 border-r border-slate-100">ชค.1/1</td>
-                          <td className="p-2 border-r border-slate-100"><span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold">กิจกรรม</span></td>
-                          <td className="p-2 text-slate-500">อ.สมชาย</td>
+                          <td className="p-2 border-r border-slate-100">à¸à¸´à¸ˆà¸à¸£à¸£à¸¡à¸¥à¸¹à¸à¹€à¸ªà¸·à¸­à¸§à¸´à¸ªà¸²à¸¡à¸±à¸ 1</td>
+                          <td className="p-2 border-r border-slate-100">à¹‚à¸”à¸¡</td>
+                          <td className="p-2 border-r border-slate-100">à¸Šà¸„.1/1</td>
+                          <td className="p-2 border-r border-slate-100"><span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold">à¸à¸´à¸ˆà¸à¸£à¸£à¸¡</span></td>
+                          <td className="p-2 text-slate-500">à¸­.à¸ªà¸¡à¸Šà¸²à¸¢</td>
                         </tr>
                       </tbody>
                     </table>
@@ -1009,9 +1009,9 @@ export default function Schedule() {
                 /* Tab 2: AI Image & PDF Guide */
                 <div className="bg-gradient-to-br from-purple-50/70 via-indigo-50/50 to-pink-50/40 p-4 rounded-2xl border border-purple-100/80 space-y-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-purple-900">รูปแบบตารางสอนที่ AI (Gemini) ถอดความได้ดีที่สุด</span>
+                    <span className="text-xs font-black text-purple-900">à¸£à¸¹à¸›à¹à¸šà¸šà¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™à¸—à¸µà¹ˆ AI (Gemini) à¸–à¸­à¸”à¸„à¸§à¸²à¸¡à¹„à¸”à¹‰à¸”à¸µà¸—à¸µà¹ˆà¸ªà¸¸à¸”</span>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
-                      OCR & AI วิเคราะห์
+                      OCR & AI à¸§à¸´à¹€à¸„à¸£à¸²à¸°à¸«à¹Œ
                     </span>
                   </div>
 
@@ -1019,20 +1019,20 @@ export default function Schedule() {
                     <div className="p-3 bg-white/90 rounded-xl border border-purple-100/90 shadow-2xs space-y-1.5">
                       <div className="flex items-center gap-1.5 font-bold text-slate-800">
                         <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span>ตารางสอนรายสัปดาห์ / ตารางครูผู้สอน</span>
+                        <span>à¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™à¸£à¸²à¸¢à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ / à¸•à¸²à¸£à¸²à¸‡à¸„à¸£à¸¹à¸œà¸¹à¹‰à¸ªà¸­à¸™</span>
                       </div>
                       <p className="text-[11px] text-slate-600 leading-relaxed">
-                        ตารางมาตรฐานจากระบบ ศธ.02, RMS หรือแบบฟอร์มวิทยาลัย ที่มีแถววัน (จันทร์-ศุกร์) และคาบเวลา (1-10) ชัดเจน
+                        à¸•à¸²à¸£à¸²à¸‡à¸¡à¸²à¸•à¸£à¸à¸²à¸™à¸ˆà¸²à¸à¸£à¸°à¸šà¸š à¸¨à¸˜.02, RMS à¸«à¸£à¸·à¸­à¹à¸šà¸šà¸Ÿà¸­à¸£à¹Œà¸¡à¸§à¸´à¸—à¸¢à¸²à¸¥à¸±à¸¢ à¸—à¸µà¹ˆà¸¡à¸µà¹à¸–à¸§à¸§à¸±à¸™ (à¸ˆà¸±à¸™à¸—à¸£à¹Œ-à¸¨à¸¸à¸à¸£à¹Œ) à¹à¸¥à¸°à¸„à¸²à¸šà¹€à¸§à¸¥à¸² (1-10) à¸Šà¸±à¸”à¹€à¸ˆà¸™
                       </p>
                     </div>
 
                     <div className="p-3 bg-white/90 rounded-xl border border-purple-100/90 shadow-2xs space-y-1.5">
                       <div className="flex items-center gap-1.5 font-bold text-slate-800">
                         <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span>มีรหัสวิชาและชื่อห้องเรียนระบุ</span>
+                        <span>à¸¡à¸µà¸£à¸«à¸±à¸ªà¸§à¸´à¸Šà¸²à¹à¸¥à¸°à¸Šà¸·à¹ˆà¸­à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™à¸£à¸°à¸šà¸¸</span>
                       </div>
                       <p className="text-[11px] text-slate-600 leading-relaxed">
-                        ควรมีรหัสวิชา 5 หลักหรือ 5 หลักขีด 4 หลัก (เช่น <code className="bg-slate-100 px-1 py-0.5 rounded text-indigo-600 font-mono">30001-1003</code>) และกลุ่มเรียน เพื่อให้ AI จัดกลุ่มวิชาได้อัตโนมัติ
+                        à¸„à¸§à¸£à¸¡à¸µà¸£à¸«à¸±à¸ªà¸§à¸´à¸Šà¸² 5 à¸«à¸¥à¸±à¸à¸«à¸£à¸·à¸­ 5 à¸«à¸¥à¸±à¸à¸‚à¸µà¸” 4 à¸«à¸¥à¸±à¸ (à¹€à¸Šà¹ˆà¸™ <code className="bg-slate-100 px-1 py-0.5 rounded text-indigo-600 font-mono">30001-1003</code>) à¹à¸¥à¸°à¸à¸¥à¸¸à¹ˆà¸¡à¹€à¸£à¸µà¸¢à¸™ à¹€à¸žà¸·à¹ˆà¸­à¹ƒà¸«à¹‰ AI à¸ˆà¸±à¸”à¸à¸¥à¸¸à¹ˆà¸¡à¸§à¸´à¸Šà¸²à¹„à¸”à¹‰à¸­à¸±à¸•à¹‚à¸™à¸¡à¸±à¸•à¸´
                       </p>
                     </div>
                   </div>
@@ -1040,7 +1040,7 @@ export default function Schedule() {
                   <div className="bg-amber-50/90 p-2.5 rounded-xl border border-amber-200/80 text-[11px] text-amber-900 flex items-start gap-2">
                     <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                     <span>
-                      <strong>เคล็ดลับ:</strong> ถ่ายรูปให้ตรง แสงสว่างเพียงพอ ไม่เบลอ ไม่เอียง และครอบตัดให้เห็นเฉพาะตารางสอนเพื่อความแม่นยำสูงสุด
+                      <strong>à¹€à¸„à¸¥à¹‡à¸”à¸¥à¸±à¸š:</strong> à¸–à¹ˆà¸²à¸¢à¸£à¸¹à¸›à¹ƒà¸«à¹‰à¸•à¸£à¸‡ à¹à¸ªà¸‡à¸ªà¸§à¹ˆà¸²à¸‡à¹€à¸žà¸µà¸¢à¸‡à¸žà¸­ à¹„à¸¡à¹ˆà¹€à¸šà¸¥à¸­ à¹„à¸¡à¹ˆà¹€à¸­à¸µà¸¢à¸‡ à¹à¸¥à¸°à¸„à¸£à¸­à¸šà¸•à¸±à¸”à¹ƒà¸«à¹‰à¹€à¸«à¹‡à¸™à¹€à¸‰à¸žà¸²à¸°à¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™à¹€à¸žà¸·à¹ˆà¸­à¸„à¸§à¸²à¸¡à¹à¸¡à¹ˆà¸™à¸¢à¸³à¸ªà¸¹à¸‡à¸ªà¸¸à¸”
                     </span>
                   </div>
                 </div>
@@ -1060,10 +1060,10 @@ export default function Schedule() {
                   <FileText className="w-6 h-6" />
                 </div>
                 <p className="text-sm font-bold text-slate-800">
-                  {uploadFile ? 'เปลี่ยนไฟล์ที่เลือก' : 'คลิกเพื่อเลือกไฟล์ หรือลากไฟล์มาวางที่นี่'}
+                  {uploadFile ? 'à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¹„à¸Ÿà¸¥à¹Œà¸—à¸µà¹ˆà¹€à¸¥à¸·à¸­à¸' : 'à¸„à¸¥à¸´à¸à¹€à¸žà¸·à¹ˆà¸­à¹€à¸¥à¸·à¸­à¸à¹„à¸Ÿà¸¥à¹Œ à¸«à¸£à¸·à¸­à¸¥à¸²à¸à¹„à¸Ÿà¸¥à¹Œà¸¡à¸²à¸§à¸²à¸‡à¸—à¸µà¹ˆà¸™à¸µà¹ˆ'}
                 </p>
                 <p className="text-xs text-slate-500 mt-1">
-                  รองรับไฟล์ภาพ <strong className="text-slate-700">.JPG, .PNG</strong>, เอกสาร <strong className="text-slate-700">.PDF</strong>, และตาราง <strong className="text-slate-700">.CSV, .XLSX</strong> (สูงสุด 5MB)
+                  à¸£à¸­à¸‡à¸£à¸±à¸šà¹„à¸Ÿà¸¥à¹Œà¸ à¸²à¸ž <strong className="text-slate-700">.JPG, .PNG</strong>, à¹€à¸­à¸à¸ªà¸²à¸£ <strong className="text-slate-700">.PDF</strong>, à¹à¸¥à¸°à¸•à¸²à¸£à¸²à¸‡ <strong className="text-slate-700">.CSV, .XLSX</strong> (à¸ªà¸¹à¸‡à¸ªà¸¸à¸” 5MB)
                 </p>
 
                 {uploadFile && (
@@ -1079,7 +1079,7 @@ export default function Schedule() {
                         if (fileInputRef.current) fileInputRef.current.value = '';
                       }}
                       className="text-slate-400 hover:text-red-500 ml-1 p-0.5"
-                      title="ล้างไฟล์ที่เลือก"
+                      title="à¸¥à¹‰à¸²à¸‡à¹„à¸Ÿà¸¥à¹Œà¸—à¸µà¹ˆà¹€à¸¥à¸·à¸­à¸"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -1099,7 +1099,7 @@ export default function Schedule() {
               <div className="bg-amber-50/80 rounded-2xl p-3 border border-amber-200/80 flex items-center gap-2.5">
                 <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
                 <p className="text-xs text-amber-900 font-medium leading-tight">
-                  การอัพโหลดตารางสอนใหม่จะแทนที่ข้อมูลตารางเรียนเดิมทั้งหมดในระบบ
+                  à¸à¸²à¸£à¸­à¸±à¸žà¹‚à¸«à¸¥à¸”à¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™à¹ƒà¸«à¸¡à¹ˆà¸ˆà¸°à¹à¸—à¸™à¸—à¸µà¹ˆà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸•à¸²à¸£à¸²à¸‡à¹€à¸£à¸µà¸¢à¸™à¹€à¸”à¸´à¸¡à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”à¹ƒà¸™à¸£à¸°à¸šà¸š
                 </p>
               </div>
 
@@ -1110,7 +1110,7 @@ export default function Schedule() {
                   onClick={() => setShowUpload(false)}
                   className="btn px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold hover:bg-slate-50 transition-all text-xs"
                 >
-                  ยกเลิก
+                  à¸¢à¸à¹€à¸¥à¸´à¸
                 </button>
                 <button
                   type="submit"
@@ -1120,12 +1120,12 @@ export default function Schedule() {
                   {uploading ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>กำลังให้ AI ประมวลผลตารางเรียน (อาจใช้เวลาสักครู่)...</span>
+                      <span>à¸à¸³à¸¥à¸±à¸‡à¹ƒà¸«à¹‰ AI à¸›à¸£à¸°à¸¡à¸§à¸¥à¸œà¸¥à¸•à¸²à¸£à¸²à¸‡à¹€à¸£à¸µà¸¢à¸™ (à¸­à¸²à¸ˆà¹ƒà¸Šà¹‰à¹€à¸§à¸¥à¸²à¸ªà¸±à¸à¸„à¸£à¸¹à¹ˆ)...</span>
                     </>
                   ) : (
                     <>
                       <UploadCloud className="w-4 h-4" />
-                      <span>อัพโหลดและสร้างตารางสอน</span>
+                      <span>à¸­à¸±à¸žà¹‚à¸«à¸¥à¸”à¹à¸¥à¸°à¸ªà¸£à¹‰à¸²à¸‡à¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™</span>
                     </>
                   )}
                 </button>
@@ -1147,9 +1147,9 @@ export default function Schedule() {
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-slate-800">
-                    {editTimetableTarget ? 'แก้ไขคาบเรียนตารางสอน' : 'เพิ่มคาบเรียนในตาราง'}
+                    {editTimetableTarget ? 'à¹à¸à¹‰à¹„à¸‚à¸„à¸²à¸šà¹€à¸£à¸µà¸¢à¸™à¸•à¸²à¸£à¸²à¸‡à¸ªà¸­à¸™' : 'à¹€à¸žà¸´à¹ˆà¸¡à¸„à¸²à¸šà¹€à¸£à¸µà¸¢à¸™à¹ƒà¸™à¸•à¸²à¸£à¸²à¸‡'}
                   </h2>
-                  <p className="text-xs text-slate-400">กำหนดรายละเอียดคาบเรียนสำหรับตารางเรียนประจำสัปดาห์</p>
+                  <p className="text-xs text-slate-400">à¸à¸³à¸«à¸™à¸”à¸£à¸²à¸¢à¸¥à¸°à¹€à¸­à¸µà¸¢à¸”à¸„à¸²à¸šà¹€à¸£à¸µà¸¢à¸™à¸ªà¸³à¸«à¸£à¸±à¸šà¸•à¸²à¸£à¸²à¸‡à¹€à¸£à¸µà¸¢à¸™à¸›à¸£à¸°à¸ˆà¸³à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ</p>
                 </div>
               </div>
               <button onClick={() => { setShowTimetableModal(false); setEditTimetableTarget(null); }} className="p-2 hover:bg-indigo-50 rounded-xl">
@@ -1161,9 +1161,9 @@ export default function Schedule() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="form-label text-slate-700 dark:text-slate-200 font-bold mb-1.5 block">
-                    รหัสวิชา {!isFormHomeroom && '*'}
+                    à¸£à¸«à¸±à¸ªà¸§à¸´à¸Šà¸² {!isFormHomeroom && '*'}
                     {isFormHomeroom && (
-                      <span className="text-[11px] font-normal text-slate-400 ml-1">(ไม่บังคับสำหรับกิจกรรม)</span>
+                      <span className="text-[11px] font-normal text-slate-400 ml-1">(à¹„à¸¡à¹ˆà¸šà¸±à¸‡à¸„à¸±à¸šà¸ªà¸³à¸«à¸£à¸±à¸šà¸à¸´à¸ˆà¸à¸£à¸£à¸¡)</span>
                     )}
                   </label>
                   <input
@@ -1171,27 +1171,27 @@ export default function Schedule() {
                     value={timetableForm.subject_code}
                     onChange={e => setTimetableForm(f => ({ ...f, subject_code: e.target.value }))}
                     className="form-input"
-                    placeholder={isFormHomeroom ? 'เว้นว่างได้' : 'เช่น ค21101'}
+                    placeholder={isFormHomeroom ? 'à¹€à¸§à¹‰à¸™à¸§à¹ˆà¸²à¸‡à¹„à¸”à¹‰' : 'à¹€à¸Šà¹ˆà¸™ à¸„21101'}
                     required={!isFormHomeroom}
                   />
                 </div>
                 <div>
                   <label className="form-label text-slate-700 dark:text-slate-200 font-bold mb-1.5 block">
-                    ชื่อวิชา / กิจกรรม
+                    à¸Šà¸·à¹ˆà¸­à¸§à¸´à¸Šà¸² / à¸à¸´à¸ˆà¸à¸£à¸£à¸¡
                   </label>
                   <input
                     type="text"
                     value={timetableForm.subject_name}
                     onChange={e => setTimetableForm(f => ({ ...f, subject_name: e.target.value }))}
                     className="form-input"
-                    placeholder={isFormHomeroom ? 'เช่น กิจกรรมหน้าเสาธง, โฮมรูม' : 'เช่น คณิตศาสตร์'}
+                    placeholder={isFormHomeroom ? 'à¹€à¸Šà¹ˆà¸™ à¸à¸´à¸ˆà¸à¸£à¸£à¸¡à¸«à¸™à¹‰à¸²à¹€à¸ªà¸²à¸˜à¸‡, à¹‚à¸®à¸¡à¸£à¸¹à¸¡' : 'à¹€à¸Šà¹ˆà¸™ à¸„à¸“à¸´à¸•à¸¨à¸²à¸ªà¸•à¸£à¹Œ'}
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="form-label text-slate-700 font-bold mb-1.5 block">วันในสัปดาห์ *</label>
+                  <label className="form-label text-slate-700 font-bold mb-1.5 block">à¸§à¸±à¸™à¹ƒà¸™à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ *</label>
                   <select
                     value={timetableForm.day_of_week}
                     onChange={e => setTimetableForm(f => ({ ...f, day_of_week: Number(e.target.value) }))}
@@ -1204,47 +1204,47 @@ export default function Schedule() {
                   </select>
                 </div>
                 <div>
-                  <label className="form-label text-slate-700 font-bold mb-1.5 block">ประเภทวิชา *</label>
+                  <label className="form-label text-slate-700 font-bold mb-1.5 block">à¸›à¸£à¸°à¹€à¸ à¸—à¸§à¸´à¸Šà¸² *</label>
                   <select
                     value={timetableForm.entry_type}
                     onChange={e => setTimetableForm(f => ({ ...f, entry_type: e.target.value }))}
                     className="form-input"
                     required
                   >
-                    <option value="lecture">ทฤษฎี (Theory / Lecture)</option>
-                    <option value="lab">ปฏิบัติ (Lab)</option>
-                    <option value="activity">กิจกรรม (Activity)</option>
-                    <option value="homeroom">โฮมรูม (Homeroom)</option>
+                    <option value="lecture">à¸—à¸¤à¸©à¸Žà¸µ (Theory / Lecture)</option>
+                    <option value="lab">à¸›à¸à¸´à¸šà¸±à¸•à¸´ (Lab)</option>
+                    <option value="activity">à¸à¸´à¸ˆà¸à¸£à¸£à¸¡ (Activity)</option>
+                    <option value="homeroom">à¹‚à¸®à¸¡à¸£à¸¹à¸¡ (Homeroom)</option>
                   </select>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="form-label text-slate-700 font-bold mb-1.5 block">คาบเริ่มต้น *</label>
+                  <label className="form-label text-slate-700 font-bold mb-1.5 block">à¸„à¸²à¸šà¹€à¸£à¸´à¹ˆà¸¡à¸•à¹‰à¸™ *</label>
                   <select
                     value={timetableForm.start_period}
                     onChange={e => handlePeriodChange('start_period', Number(e.target.value))}
                     className="form-input"
                     required
                   >
-                    <option value="0">คาบกิจกรรม (07:30 - 08:00)</option>
+                    <option value="0">à¸„à¸²à¸šà¸à¸´à¸ˆà¸à¸£à¸£à¸¡ (07:30 - 08:00)</option>
                     {Array.from({ length: 12 }, (_, i) => i + 1).map(p => (
-                      <option key={p} value={p}>คาบที่ {p}</option>
+                      <option key={p} value={p}>à¸„à¸²à¸šà¸—à¸µà¹ˆ {p}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="form-label text-slate-700 font-bold mb-1.5 block">คาบสิ้นสุด *</label>
+                  <label className="form-label text-slate-700 font-bold mb-1.5 block">à¸„à¸²à¸šà¸ªà¸´à¹‰à¸™à¸ªà¸¸à¸” *</label>
                   <select
                     value={timetableForm.end_period}
                     onChange={e => handlePeriodChange('end_period', Number(e.target.value))}
                     className="form-input"
                     required
                   >
-                    <option value="0">คาบกิจกรรม (07:30 - 08:00)</option>
+                    <option value="0">à¸„à¸²à¸šà¸à¸´à¸ˆà¸à¸£à¸£à¸¡ (07:30 - 08:00)</option>
                     {Array.from({ length: 12 }, (_, i) => i + 1).map(p => (
-                      <option key={p} value={p}>คาบที่ {p}</option>
+                      <option key={p} value={p}>à¸„à¸²à¸šà¸—à¸µà¹ˆ {p}</option>
                     ))}
                   </select>
                 </div>
@@ -1252,7 +1252,7 @@ export default function Schedule() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="form-label text-slate-700 font-bold mb-1.5 block">เวลาเริ่มต้น *</label>
+                  <label className="form-label text-slate-700 font-bold mb-1.5 block">à¹€à¸§à¸¥à¸²à¹€à¸£à¸´à¹ˆà¸¡à¸•à¹‰à¸™ *</label>
                   <input
                     type="time"
                     value={timetableForm.start_time}
@@ -1262,7 +1262,7 @@ export default function Schedule() {
                   />
                 </div>
                 <div>
-                  <label className="form-label text-slate-700 font-bold mb-1.5 block">เวลาสิ้นสุด *</label>
+                  <label className="form-label text-slate-700 font-bold mb-1.5 block">à¹€à¸§à¸¥à¸²à¸ªà¸´à¹‰à¸™à¸ªà¸¸à¸” *</label>
                   <input
                     type="time"
                     value={timetableForm.end_time}
@@ -1275,44 +1275,44 @@ export default function Schedule() {
 
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <label className="form-label text-slate-700 font-bold mb-1.5 block">ห้องเรียน (สถานที่)</label>
+                  <label className="form-label text-slate-700 font-bold mb-1.5 block">à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™ (à¸ªà¸–à¸²à¸™à¸—à¸µà¹ˆ)</label>
                   <input
                     type="text"
                     value={timetableForm.room}
                     onChange={e => setTimetableForm(f => ({ ...f, room: e.target.value }))}
                     className="form-input"
-                    placeholder="เช่น 311"
+                    placeholder="à¹€à¸Šà¹ˆà¸™ 311"
                   />
                 </div>
                 <div>
-                  <label className="form-label text-slate-700 font-bold mb-1.5 block">กลุ่มเรียน / ชั้นเรียน</label>
+                  <label className="form-label text-slate-700 font-bold mb-1.5 block">à¸à¸¥à¸¸à¹ˆà¸¡à¹€à¸£à¸µà¸¢à¸™ / à¸Šà¸±à¹‰à¸™à¹€à¸£à¸µà¸¢à¸™</label>
                   <input
                     type="text"
                     value={timetableForm.group_name}
                     onChange={e => setTimetableForm(f => ({ ...f, group_name: e.target.value }))}
                     className="form-input"
-                    placeholder="เช่น ม.1/1"
+                    placeholder="à¹€à¸Šà¹ˆà¸™ à¸¡.1/1"
                   />
                 </div>
                 <div>
-                  <label className="form-label text-slate-700 font-bold mb-1.5 block">ผู้สอน</label>
+                  <label className="form-label text-slate-700 font-bold mb-1.5 block">à¸œà¸¹à¹‰à¸ªà¸­à¸™</label>
                   <input
                     type="text"
                     value={timetableForm.instructor}
                     onChange={e => setTimetableForm(f => ({ ...f, instructor: e.target.value }))}
                     className="form-input"
-                    placeholder="เช่น ครูสมชาย"
+                    placeholder="à¹€à¸Šà¹ˆà¸™ à¸„à¸£à¸¹à¸ªà¸¡à¸Šà¸²à¸¢"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="form-label text-slate-700 font-bold mb-1.5 block">เชื่อมห้องเรียนในระบบ</label>
-                  {(timetableForm.entry_type === 'homeroom' || Number(timetableForm.start_period) === 0 || timetableForm.subject_name?.includes('เสาธง') || timetableForm.subject_name?.includes('โฮมรูม') || timetableForm.subject_name?.includes('เข้าแถว')) ? (
+                  <label className="form-label text-slate-700 font-bold mb-1.5 block">à¹€à¸Šà¸·à¹ˆà¸­à¸¡à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™à¹ƒà¸™à¸£à¸°à¸šà¸š</label>
+                  {(timetableForm.entry_type === 'homeroom' || Number(timetableForm.start_period) === 0 || timetableForm.subject_name?.includes('à¹€à¸ªà¸²à¸˜à¸‡') || timetableForm.subject_name?.includes('à¹‚à¸®à¸¡à¸£à¸¹à¸¡') || timetableForm.subject_name?.includes('à¹€à¸‚à¹‰à¸²à¹à¸–à¸§')) ? (
                     <div className="text-xs text-amber-700 bg-amber-50 p-2.5 rounded-xl border border-amber-200/80 flex items-center gap-2">
                       <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
-                      <span>กิจกรรมหน้าเสาธง/โฮมรูม ไม่ต้องเชื่อมห้องเรียน (ไม่นับเป็นคาบสอน)</span>
+                      <span>à¸à¸´à¸ˆà¸à¸£à¸£à¸¡à¸«à¸™à¹‰à¸²à¹€à¸ªà¸²à¸˜à¸‡/à¹‚à¸®à¸¡à¸£à¸¹à¸¡ à¹„à¸¡à¹ˆà¸•à¹‰à¸­à¸‡à¹€à¸Šà¸·à¹ˆà¸­à¸¡à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™ (à¹„à¸¡à¹ˆà¸™à¸±à¸šà¹€à¸›à¹‡à¸™à¸„à¸²à¸šà¸ªà¸­à¸™)</span>
                     </div>
                   ) : (
                     <select
@@ -1320,7 +1320,7 @@ export default function Schedule() {
                       onChange={e => setTimetableForm(f => ({ ...f, classroom_id: e.target.value }))}
                       className="form-input"
                     >
-                      <option value="">-- ไม่เชื่อม --</option>
+                      <option value="">-- à¹„à¸¡à¹ˆà¹€à¸Šà¸·à¹ˆà¸­à¸¡ --</option>
                       {(Array.isArray(classroomsList) ? classroomsList : []).map(c => (
                         <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
@@ -1328,7 +1328,7 @@ export default function Schedule() {
                   )}
                 </div>
                 <div>
-                  <label className="form-label text-slate-700 font-bold mb-1.5 block">สีประจำวิชา</label>
+                  <label className="form-label text-slate-700 font-bold mb-1.5 block">à¸ªà¸µà¸›à¸£à¸°à¸ˆà¸³à¸§à¸´à¸Šà¸²</label>
                   <div className="flex items-center gap-3">
                     <input
                       type="color"
@@ -1345,17 +1345,17 @@ export default function Schedule() {
 
               <div className="flex gap-3 pt-4 border-t border-slate-100 mt-6">
                 <button type="submit" disabled={savingTimetable} className="btn btn-primary flex-1">
-                  {savingTimetable ? <Loader2 className="w-4 h-4 animate-spin" /> : editTimetableTarget ? 'บันทึกการแก้ไข' : 'เพิ่มคาบเรียน'}
+                  {savingTimetable ? <Loader2 className="w-4 h-4 animate-spin" /> : editTimetableTarget ? 'à¸šà¸±à¸™à¸—à¸¶à¸à¸à¸²à¸£à¹à¸à¹‰à¹„à¸‚' : 'à¹€à¸žà¸´à¹ˆà¸¡à¸„à¸²à¸šà¹€à¸£à¸µà¸¢à¸™'}
                 </button>
                 {editTimetableTarget && (
                   <button
                     type="button"
                     onClick={handleDeleteTimetableEntry}
                     className="btn border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 px-3.5 flex items-center gap-1.5 font-medium transition-colors"
-                    title="ลบคาบเรียนนี้ออกจากตาราง"
+                    title="à¸¥à¸šà¸„à¸²à¸šà¹€à¸£à¸µà¸¢à¸™à¸™à¸µà¹‰à¸­à¸­à¸à¸ˆà¸²à¸à¸•à¸²à¸£à¸²à¸‡"
                   >
                     <Trash2 className="w-4 h-4" />
-                    <span>ลบคาบนี้</span>
+                    <span>à¸¥à¸šà¸„à¸²à¸šà¸™à¸µà¹‰</span>
                   </button>
                 )}
                 <button
@@ -1366,7 +1366,7 @@ export default function Schedule() {
                   }}
                   className="btn btn-ghost px-5"
                 >
-                  ยกเลิก
+                  à¸¢à¸à¹€à¸¥à¸´à¸
                 </button>
               </div>
             </form>

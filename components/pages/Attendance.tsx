@@ -11,7 +11,7 @@ import {
   FileSpreadsheet, Upload, BookOpen, GraduationCap, ArrowRight,
   GitBranch, ChevronDown
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import dynamic from 'next/dynamic';
 
 const AttendanceCsvModal = dynamic(() => import('@/components/AttendanceCsvModal'), { ssr: false });
@@ -28,890 +28,41 @@ import {
   cacheAttendanceState,
 } from '@/lib/offlineAttendance';
 
-const THAI_MONTHS_SHORT = [
-  'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
-  'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
-];
-
-const getSchemaDayOfWeek = (dateStr: string): number => {
-  const jsDay = new Date(dateStr).getDay();
-  return (jsDay + 6) % 7; // 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
-};
-
-interface MemoizedAttendanceCellProps {
-  status: string | null;
-  isEditing: boolean;
-  onEditClick: () => void;
-  onStatusSelect: (status: string) => void;
-  onDeleteClick?: () => void;
-  popoverRef?: React.RefObject<HTMLDivElement | null>;
-  holiday?: HolidayInfo | null;
-}
-
-const MemoizedAttendanceCell = memo(({ status, isEditing, onEditClick, onStatusSelect, onDeleteClick, popoverRef, holiday }: MemoizedAttendanceCellProps) => {
-  const isGovHoliday = holiday?.type === 'government';
-  const isWeekend = holiday?.type === 'weekend';
-
-  return (
-    <td className={`p-2 border-r border-indigo-100/40 text-center relative h-14 min-w-[80px] transition-colors ${isGovHoliday ? 'bg-amber-50/40' : isWeekend ? 'bg-slate-50/50' : ''
-      }`}>
-      {!status ? (
-        <button
-          onClick={onEditClick}
-          className={`w-8 h-8 rounded-full border flex items-center justify-center mx-auto transition-all text-xs font-semibold touch-manipulation ${isGovHoliday
-            ? 'border-amber-300 bg-amber-100/80 text-amber-800 hover:bg-amber-200 hover:border-amber-400 shadow-sm'
-            : isWeekend
-              ? 'border-slate-200 bg-slate-100/80 text-slate-400 hover:bg-slate-200'
-              : 'border-dashed border-slate-300 hover:border-indigo-400 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600'
-            }`}
-          title={holiday ? `วันหยุด: ${holiday.name} (คลิกเพื่อลงชื่อย้อนหลัง)` : 'คลิกเพื่อลงชื่อย้อนหลัง'}
-        >
-          {isGovHoliday ? '🏖️' : '+'}
-        </button>
-      ) : (
-        <button
-          onClick={onEditClick}
-          className={`w-14 py-1.5 rounded-xl text-[10px] font-bold mx-auto flex items-center justify-center border transition-all hover:scale-105 touch-manipulation ${status === 'present' ? 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100' :
-            status === 'late' ? 'bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100' :
-              status === 'absent' ? 'bg-red-50 border-red-200 text-red-500 hover:bg-red-100' :
-                'bg-blue-50 border-blue-200 text-blue-500 hover:bg-blue-100'
-            }`}
-        >
-          {status === 'present' ? 'มา' : status === 'late' ? 'สาย' : status === 'absent' ? 'ขาด' : 'ลา'}
-        </button>
-      )}
-
-      {isEditing && (
-        <div
-          ref={popoverRef}
-          className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-1 bg-white p-2 rounded-xl border border-indigo-100 shadow-xl flex items-center gap-1.5 animate-scale-up"
-        >
-          <button
-            onClick={() => onStatusSelect('present')}
-            className="w-7 h-7 rounded-lg bg-emerald-500 text-white font-bold text-xs flex items-center justify-center hover:bg-emerald-600 shadow-sm touch-manipulation"
-            title="มาเรียน"
-          >
-            มา
-          </button>
-          <button
-            onClick={() => onStatusSelect('late')}
-            className="w-7 h-7 rounded-lg bg-amber-500 text-white font-bold text-xs flex items-center justify-center hover:bg-amber-600 shadow-sm touch-manipulation"
-            title="สาย"
-          >
-            สาย
-          </button>
-          <button
-            onClick={() => onStatusSelect('absent')}
-            className="w-7 h-7 rounded-lg bg-red-500 text-white font-bold text-xs flex items-center justify-center hover:bg-red-600 shadow-sm touch-manipulation"
-            title="ขาด"
-          >
-            ขาด
-          </button>
-          <button
-            onClick={() => onStatusSelect('leave')}
-            className="w-7 h-7 rounded-lg bg-blue-500 text-white font-bold text-xs flex items-center justify-center hover:bg-blue-600 shadow-sm touch-manipulation"
-            title="ลา"
-          >
-            ลา
-          </button>
-          {status && onDeleteClick && (
-            <button
-              onClick={onDeleteClick}
-              className="w-7 h-7 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 font-bold text-xs flex items-center justify-center border border-red-200 shadow-sm touch-manipulation"
-              title="ลบ/ยกเลิกการเช็คชื่อช่องนี้"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-      )}
-    </td>
-  );
-}, (prev, next) => (
-  prev.status === next.status &&
-  prev.isEditing === next.isEditing &&
-  prev.holiday?.date === next.holiday?.date &&
-  prev.holiday?.type === next.holiday?.type
-));
-
-MemoizedAttendanceCell.displayName = 'MemoizedAttendanceCell';
-
-interface ThaiDateRangePickerProps {
-  startDate: string;
-  endDate: string;
-  onChange: (start: string, end: string) => void;
-}
-
-const ThaiDateRangePicker = memo(({ startDate, endDate, onChange }: ThaiDateRangePickerProps) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
-  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
-
-  const now = new Date();
-  const [viewYear, setViewYear] = useState(now.getFullYear());
-  const [viewMonth, setViewMonth] = useState(now.getMonth());
-
-  const [draftStart, setDraftStart] = useState(startDate);
-  const [draftEnd, setDraftEnd] = useState(endDate);
-  const [pickingStep, setPickingStep] = useState<'start' | 'end'>('start');
-
-  const updatePosition = useCallback(() => {
-    if (buttonRef.current) {
-      const rect = buttonRef.current.getBoundingClientRect();
-      const popoverWidth = window.innerWidth < 640 ? 320 : 360;
-      let left = rect.left;
-      if (left + popoverWidth > window.innerWidth - 16) {
-        left = Math.max(16, window.innerWidth - popoverWidth - 16);
-      }
-      setPopoverPos({
-        top: rect.bottom + 8,
-        left: Math.max(16, left)
-      });
-    }
-  }, []);
-
-  useEffect(() => {
-    setDraftStart(startDate);
-    setDraftEnd(endDate);
-  }, [startDate, endDate, isOpen]);
-
-  useEffect(() => {
-    if (isOpen) {
-      updatePosition();
-      window.addEventListener('resize', updatePosition);
-      window.addEventListener('scroll', updatePosition, { passive: true, capture: true });
-    }
-    return () => {
-      window.removeEventListener('resize', updatePosition);
-      window.removeEventListener('scroll', updatePosition, { capture: true });
-    };
-  }, [isOpen, updatePosition]);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        popoverRef.current &&
-        !popoverRef.current.contains(e.target as Node) &&
-        buttonRef.current &&
-        !buttonRef.current.contains(e.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    };
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen]);
-
-  const thaiMonths = [
-    'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
-    'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
-  ];
-
-  const formatShortThai = (dateStr: string) => {
-    if (!dateStr) return '';
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return '';
-    const day = d.getDate();
-    const month = THAI_MONTHS_SHORT[d.getMonth()];
-    const yearBE = d.getFullYear() + 543;
-    return `${day} ${month} ${yearBE}`;
-  };
-
-  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-  const firstDayOfWeek = new Date(viewYear, viewMonth, 1).getDay();
-
-  const handlePrevMonth = () => {
-    if (viewMonth === 0) {
-      setViewMonth(11);
-      setViewYear(prev => prev - 1);
-    } else {
-      setViewMonth(prev => prev - 1);
-    }
-  };
-
-  const handleNextMonth = () => {
-    if (viewMonth === 11) {
-      setViewMonth(0);
-      setViewYear(prev => prev + 1);
-    } else {
-      setViewMonth(prev => prev + 1);
-    }
-  };
-
-  const handleDateClick = (dayNum: number) => {
-    const monthStr = String(viewMonth + 1).padStart(2, '0');
-    const dayStr = String(dayNum).padStart(2, '0');
-    const dateStr = `${viewYear}-${monthStr}-${dayStr}`;
-
-    if (pickingStep === 'start' || !draftStart || (draftStart && draftEnd)) {
-      setDraftStart(dateStr);
-      setDraftEnd('');
-      setPickingStep('end');
-    } else {
-      if (dateStr < draftStart) {
-        setDraftStart(dateStr);
-        setDraftEnd(draftStart);
-      } else {
-        setDraftEnd(dateStr);
-      }
-      setPickingStep('start');
-    }
-  };
-
-  const isSelectedStart = (dayNum: number) => {
-    if (!draftStart) return false;
-    const monthStr = String(viewMonth + 1).padStart(2, '0');
-    const dayStr = String(dayNum).padStart(2, '0');
-    return draftStart === `${viewYear}-${monthStr}-${dayStr}`;
-  };
-
-  const isSelectedEnd = (dayNum: number) => {
-    if (!draftEnd) return false;
-    const monthStr = String(viewMonth + 1).padStart(2, '0');
-    const dayStr = String(dayNum).padStart(2, '0');
-    return draftEnd === `${viewYear}-${monthStr}-${dayStr}`;
-  };
-
-  const isInRange = (dayNum: number) => {
-    if (!draftStart || !draftEnd) return false;
-    const monthStr = String(viewMonth + 1).padStart(2, '0');
-    const dayStr = String(dayNum).padStart(2, '0');
-    const dateStr = `${viewYear}-${monthStr}-${dayStr}`;
-    return dateStr >= draftStart && dateStr <= draftEnd;
-  };
-
-  const handlePresetSelect = (days: number) => {
-    const end = new Date().toISOString().split('T')[0];
-    const startObj = new Date();
-    startObj.setDate(startObj.getDate() - days);
-    const start = startObj.toISOString().split('T')[0];
-    setDraftStart(start);
-    setDraftEnd(end);
-  };
-
-  const handleApply = () => {
-    onChange(draftStart, draftEnd);
-    setIsOpen(false);
-  };
-
-  const isPresetActive = (days: number) => {
-    if (!draftStart || !draftEnd) return false;
-    const end = new Date().toISOString().split('T')[0];
-    const startObj = new Date();
-    startObj.setDate(startObj.getDate() - days);
-    const start = startObj.toISOString().split('T')[0];
-    return draftStart === start && draftEnd === end;
-  };
-
-  return (
-    <div className="relative inline-block text-left">
-      {/* Trigger Button */}
-      <button
-        ref={buttonRef}
-        type="button"
-        onClick={() => {
-          if (!isOpen) updatePosition();
-          setIsOpen(!isOpen);
-        }}
-        className="group relative flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-white/90 hover:bg-white border border-indigo-100/90 shadow-md hover:shadow-lg shadow-indigo-500/5 transition-all duration-200 cursor-pointer select-none"
-      >
-        <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-          <CalendarIcon className="w-4 h-4" />
-        </div>
-        <div className="flex flex-col text-left">
-          <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-500">ช่วงวันที่แสดงผล</span>
-          <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-            {startDate ? formatShortThai(startDate) : 'ทั้งหมด'}
-            <span className="text-slate-400">→</span>
-            {endDate ? formatShortThai(endDate) : 'ปัจจุบัน'}
-          </span>
-        </div>
-        <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform duration-200 ml-1 ${isOpen ? 'rotate-90 text-indigo-600' : ''}`} />
-      </button>
-
-      {/* Thai Calendar Popover via Portal */}
-      {isOpen && typeof window !== 'undefined' && createPortal(
-        <div
-          ref={popoverRef}
-          style={{ top: `${popoverPos.top}px`, left: `${popoverPos.left}px` }}
-          className="fixed z-[9999] w-[320px] sm:w-[360px] bg-white p-4 sm:p-5 rounded-3xl border border-indigo-100 shadow-2xl shadow-indigo-500/20 animate-scale-up text-slate-800"
-        >
-          {/* Header Controls */}
-          <div className="flex items-center justify-between pb-3 border-b border-indigo-50 mb-3">
-            <button
-              type="button"
-              onClick={handlePrevMonth}
-              className="p-1.5 rounded-xl hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 transition-colors"
-              title="เดือนก่อนหน้า"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <div className="text-center">
-              <span className="font-extrabold text-slate-800 text-sm sm:text-base">
-                {thaiMonths[viewMonth]} {viewYear + 543}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={handleNextMonth}
-              className="p-1.5 rounded-xl hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 transition-colors"
-              title="เดือนถัดไป"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Quick Presets Pills */}
-          <div className="flex items-center gap-1.5 mb-3 overflow-x-auto pb-1">
-            {[7, 14, 30].map(days => (
-              <button
-                key={days}
-                type="button"
-                onClick={() => handlePresetSelect(days)}
-                className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all ${isPresetActive(days)
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'bg-indigo-50/70 text-indigo-700 hover:bg-indigo-100'
-                  }`}
-              >
-                {days} วัน
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => {
-                const now = new Date();
-                const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-                setDraftStart(firstDay);
-                setDraftEnd(now.toISOString().split('T')[0]);
-              }}
-              className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-indigo-50/70 text-indigo-700 hover:bg-indigo-100 transition-all"
-            >
-              เดือนนี้
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setDraftStart('');
-                setDraftEnd('');
-              }}
-              className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all"
-            >
-              ทั้งหมด
-            </button>
-          </div>
-
-          {/* Weekday Labels */}
-          <div className="grid grid-cols-7 gap-1 text-center font-extrabold text-[11px] text-slate-500 mb-2">
-            <span className="text-rose-500">อา</span>
-            <span>จ</span>
-            <span>อ</span>
-            <span>พ</span>
-            <span>พฤ</span>
-            <span>ศ</span>
-            <span className="text-indigo-500">ส</span>
-          </div>
-
-          {/* Days Grid */}
-          <div className="grid grid-cols-7 gap-1 text-center">
-            {Array.from({ length: firstDayOfWeek }).map((_, i) => (
-              <div key={`blank-${i}`} className="h-8 sm:h-9" />
-            ))}
-
-            {Array.from({ length: daysInMonth }).map((_, i) => {
-              const dayNum = i + 1;
-              const isStart = isSelectedStart(dayNum);
-              const isEnd = isSelectedEnd(dayNum);
-              const inRange = isInRange(dayNum);
-
-              const monthStr = String(viewMonth + 1).padStart(2, '0');
-              const dayStr = String(dayNum).padStart(2, '0');
-              const dateStr = `${viewYear}-${monthStr}-${dayStr}`;
-              const dayHoliday = checkThaiHoliday(dateStr);
-
-              let bgClass = 'hover:bg-indigo-50 text-slate-700';
-              if (isStart || isEnd) {
-                bgClass = 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-black shadow-md shadow-indigo-500/30 rounded-xl';
-              } else if (inRange) {
-                bgClass = 'bg-indigo-100/80 text-indigo-800 font-bold rounded-lg';
-              } else if (dayHoliday?.type === 'government') {
-                bgClass = 'bg-amber-50 text-amber-900 font-bold hover:bg-amber-100 border border-amber-200/60';
-              }
-
-              return (
-                <button
-                  key={dayNum}
-                  type="button"
-                  onClick={() => handleDateClick(dayNum)}
-                  title={dayHoliday ? dayHoliday.name : undefined}
-                  className={`h-8 sm:h-9 text-xs font-semibold rounded-xl flex flex-col items-center justify-center transition-all duration-150 relative ${bgClass}`}
-                >
-                  <span>{dayNum}</span>
-                  {dayHoliday?.type === 'government' && !isStart && !isEnd && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 absolute bottom-1"></span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Popover Footer Actions */}
-          <div className="mt-4 pt-3 border-t border-indigo-50 flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500 truncate max-w-[170px]">
-              {draftStart ? formatShortThai(draftStart) : 'ทั้งหมด'} {draftEnd ? `→ ${formatShortThai(draftEnd)}` : ''}
-            </span>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setIsOpen(false)}
-                className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50"
-              >
-                ยกเลิก
-              </button>
-              <button
-                type="button"
-                onClick={handleApply}
-                className="px-4 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-bold shadow-md shadow-indigo-500/20 hover:bg-indigo-700"
-              >
-                ตกลง
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-    </div>
-  );
-});
-
-ThaiDateRangePicker.displayName = 'ThaiDateRangePicker';
-
-interface TimetableEntry {
-  id: number;
-  day_of_week: number;
-  start_period: number;
-  end_period: number;
-  subject_name?: string;
-  subject_code?: string;
-  room?: string;
-  group_name?: string;
-  classroom_id?: number;
-  hours: number;
-  entry_type: string;
-}
-
-interface Classroom {
-  id: string;
-  name: string;
-  total_classes?: number;
-  min_attendance_percent?: number;
-  late_to_absent_ratio?: number;
-  leave_to_absent_ratio?: number;
-  curriculum_type?: 'pvch' | 'pvs' | 'custom';
-  total_weeks?: number;
-  semester_start_date?: string | null;
-  semester_end_date?: string | null;
-  current_week?: number | null;
-  student_count?: number;
-}
-
-export interface ParsedClassroomName {
-  code: string | null;
-  subjectTitle: string;
-  groupName: string | null;
-  curriculumType: 'pvs' | 'pvch' | 'other';
-}
-
-export function parseClassroomName(fullName: string): ParsedClassroomName {
-  if (!fullName) {
-    return { code: null, subjectTitle: '', groupName: null, curriculumType: 'other' };
-  }
-
-  const trimmed = fullName.trim();
-  const codeMatch = trimmed.match(/^([0-9]{4,5}-[0-9]{4}|[A-Za-z0-9-]{5,12})\s+/);
-  const code = codeMatch ? codeMatch[1] : null;
-  const afterCode = codeMatch ? trimmed.slice(codeMatch[0].length).trim() : trimmed;
-
-  const groupMatch = afterCode.match(/\s+((?:\([^\)]+\)\s*)?(?:ชก|ชย|ชค|ชอ|ชส|บช|กต|คธ|ทธ|อส)?\s*(?:ปวช\.|ปวส\.|ม\.)\s*[0-9]+(?:\/[0-9]+)?|[0-9]+\/[0-9]+)$/);
-
-  let groupName: string | null = null;
-  let subjectTitle = afterCode;
-
-  if (groupMatch && groupMatch.index !== undefined) {
-    groupName = groupMatch[1].trim();
-    subjectTitle = afterCode.slice(0, groupMatch.index).trim();
-  }
-
-  const isPvs = fullName.includes('ปวส') || (groupName?.includes('ปวส') ?? false);
-  const isPvch = fullName.includes('ปวช') || (groupName?.includes('ปวช') ?? false);
-
-  return {
-    code,
-    subjectTitle: subjectTitle || fullName,
-    groupName,
-    curriculumType: isPvs ? 'pvs' : isPvch ? 'pvch' : 'other',
-  };
-}
-
-interface SemesterWeek {
-  week: number;
-  start: string;
-  end: string;
-  isCurrent: boolean;
-}
-
-interface SemesterInfo {
-  classroomId: number;
-  curriculumType: 'pvch' | 'pvs' | 'custom';
-  totalWeeks: number;
-  semesterStartDate: string | null;
-  semesterEndDate: string | null;
-  currentWeek: number | null;
-  isSemesterActive: boolean;
-  weeks: SemesterWeek[];
-}
-
-interface Student {
-  id: string;
-  student_code?: string;
-  name: string;
-  classroom_id: string;
-  email?: string;
-  grade_level?: string | null;
-  branch?: string | null;
-  avatar?: string | null;
-}
-
-interface AttendanceRecord {
-  id: string;
-  student_id: string;
-  date: string;
-  status: string;
-}
-
-interface StudentStats {
-  student_id: string;
-  present_count: number;
-  late_count: number;
-  absent_count: number;
-  leave_count: number;
-  converted_absent_count: number;
-  remaining_late_count: number;
-  remaining_leave_count: number;
-  is_f?: boolean;
-}
-
-interface MobileStudentAttendanceCardProps {
-  student: Student;
-  status: string | undefined;
-  stats: StudentStats;
-  maxAllowedAbsences: number;
-  sectionBadge?: string | null;
-  onStatusSelect: (studentId: string, status: string) => void;
-  onViewHistory: (student: Student) => void;
-}
-
-const MobileStudentAttendanceCard = memo(({
-  student,
-  status,
-  stats,
-  maxAllowedAbsences,
-  sectionBadge,
-  onStatusSelect,
-  onViewHistory,
-}: MobileStudentAttendanceCardProps) => {
-  const isCloseToFRisk = stats.converted_absent_count >= maxAllowedAbsences * 0.75;
-
-  return (
-    <div className="p-3.5 bg-white dark:bg-slate-850 rounded-2xl border border-indigo-100/90 dark:border-slate-800 shadow-sm space-y-2.5 transition-all">
-      {/* Header: Avatar, Name, Code, History, and Absence Badge */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <UserAvatar avatar={student.avatar} name={student.name} userId={student.id} size="sm" />
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span className="font-bold text-slate-800 dark:text-slate-100 text-sm truncate">{student.name}</span>
-              <button
-                type="button"
-                onClick={() => onViewHistory(student)}
-                className="p-1 rounded-lg text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
-                title="ดูประวัติการมาเรียน"
-              >
-                <History className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <p className="text-[11px] text-slate-400 dark:text-slate-500 font-mono">รหัส: {student.student_code || '-'}</p>
-              {sectionBadge && (
-                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/70 dark:border-indigo-800">
-                  {sectionBadge}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Absence Warning Pill */}
-        <div className="shrink-0 text-right">
-          {stats.is_f ? (
-            <span className="text-[10px] font-extrabold text-white bg-red-600 px-2 py-0.5 rounded-full animate-pulse border border-red-700">
-              หมดสิทธิ์เรียน
-            </span>
-          ) : (
-            <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg border ${isCloseToFRisk
-              ? 'bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800 animate-pulse'
-              : stats.converted_absent_count > 0
-                ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800'
-                : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-              }`}>
-              ขาด {stats.converted_absent_count}/{maxAllowedAbsences}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Status Buttons Grid - 4 large thumb-friendly buttons (min-h-[44px]) */}
-      <div className="grid grid-cols-4 gap-1.5 pt-0.5">
-        <button
-          type="button"
-          onClick={() => onStatusSelect(student.id, 'present')}
-          className={`min-h-[44px] py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 touch-manipulation active:scale-95 cursor-pointer ${status === 'present'
-            ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20 ring-2 ring-emerald-400 font-black'
-            : 'bg-slate-50 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-300 border border-slate-200/80 dark:border-slate-700'
-            }`}
-        >
-          <CheckCircle className={`w-4 h-4 ${status === 'present' ? 'text-white' : 'text-emerald-600 dark:text-emerald-400'}`} />
-          <span>มา</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onStatusSelect(student.id, 'late')}
-          className={`min-h-[44px] py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 touch-manipulation active:scale-95 cursor-pointer ${status === 'late'
-            ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20 ring-2 ring-amber-400 font-black'
-            : 'bg-slate-50 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-300 border border-slate-200/80 dark:border-slate-700'
-            }`}
-        >
-          <Clock className={`w-4 h-4 ${status === 'late' ? 'text-white' : 'text-amber-600 dark:text-amber-400'}`} />
-          <span>สาย</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onStatusSelect(student.id, 'absent')}
-          className={`min-h-[44px] py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 touch-manipulation active:scale-95 cursor-pointer ${status === 'absent'
-            ? 'bg-rose-500 text-white shadow-md shadow-rose-500/20 ring-2 ring-rose-400 font-black'
-            : 'bg-slate-50 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 hover:text-rose-700 dark:hover:text-rose-300 border border-slate-200/80 dark:border-slate-700'
-            }`}
-        >
-          <XCircle className={`w-4 h-4 ${status === 'absent' ? 'text-white' : 'text-rose-500 dark:text-rose-400'}`} />
-          <span>ขาด</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onStatusSelect(student.id, 'leave')}
-          className={`min-h-[44px] py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 touch-manipulation active:scale-95 cursor-pointer ${status === 'leave'
-            ? 'bg-blue-500 text-white shadow-md shadow-blue-500/20 ring-2 ring-blue-400 font-black'
-            : 'bg-slate-50 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 hover:text-blue-700 dark:hover:text-blue-300 border border-slate-200/80 dark:border-slate-700'
-            }`}
-        >
-          <FileText className={`w-4 h-4 ${status === 'leave' ? 'text-white' : 'text-blue-500 dark:text-blue-400'}`} />
-          <span>ลา</span>
-        </button>
-      </div>
-
-      {(stats.remaining_late_count > 0 || stats.remaining_leave_count > 0) && (
-        <div className="flex gap-2 text-[10px] text-slate-500 dark:text-slate-400 pt-0.5">
-          {stats.remaining_late_count > 0 && <span>สายสะสม {stats.remaining_late_count}</span>}
-          {stats.remaining_leave_count > 0 && <span>ลาสะสม {stats.remaining_leave_count}</span>}
-        </div>
-      )}
-    </div>
-  );
-});
-
-MobileStudentAttendanceCard.displayName = 'MobileStudentAttendanceCard';
-
-interface DesktopStudentRowProps {
-  student: Student;
-  idx: number;
-  showRoomPill?: boolean;
-  status: string | undefined;
-  stats: StudentStats;
-  maxAllowedAbsences: number;
-  onStatusSelect: (studentId: string, status: string) => void;
-  onViewHistory: (student: Student) => void;
-}
-
-const MemoizedDesktopStudentRow = memo(({
-  student,
-  idx,
-  showRoomPill = false,
-  status,
-  stats,
-  maxAllowedAbsences,
-  onStatusSelect,
-  onViewHistory,
-}: DesktopStudentRowProps) => {
-  const isCloseToFRisk = stats.converted_absent_count >= maxAllowedAbsences * 0.75;
-  const sId = String(student.id);
-
-  const renderStatusBtn = (statusVal: string, icon: React.ReactNode, label: string, activeClass: string) => {
-    const isActive = status === statusVal;
-    return (
-      <button
-        type="button"
-        onClick={() => onStatusSelect(sId, statusVal)}
-        className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-[13px] font-bold transition-all duration-150 cursor-pointer select-none ${isActive
-          ? `${activeClass} [&>svg]:text-white shadow-xs scale-[1.02]`
-          : 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white border border-slate-200/90 dark:border-slate-700 shadow-2xs hover:border-slate-300 dark:hover:border-slate-600'
-        }`}
-        title={`ทำเครื่องหมาย: ${label}`}
-      >
-        {icon} <span>{label}</span>
-      </button>
-    );
-  };
-
-  return (
-    <div
-      key={student.id}
-      className={`px-4 py-3 sm:py-3.5 rounded-2xl border transition-all duration-150 flex items-center justify-between gap-4 shadow-2xs hover:shadow-xs ${
-        status === 'present'
-          ? 'bg-emerald-50/20 dark:bg-slate-850/95 border-emerald-300 dark:border-emerald-800/80 ring-1 ring-emerald-400/20'
-          : status === 'absent'
-          ? 'bg-rose-50/20 dark:bg-slate-850/95 border-rose-300 dark:border-rose-800/80 ring-1 ring-rose-400/20'
-          : status === 'late'
-          ? 'bg-amber-50/20 dark:bg-slate-850/95 border-amber-300 dark:border-amber-800/80 ring-1 ring-amber-400/20'
-          : status === 'leave'
-          ? 'bg-sky-50/20 dark:bg-slate-850/95 border-sky-300 dark:border-sky-800/80 ring-1 ring-sky-400/20'
-          : 'bg-white dark:bg-slate-850/90 border-slate-200/90 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-slate-750'
-      }`}
-    >
-      {/* Left Side: Number, Avatar, Name, Code, Room Badge, and Risk Tag */}
-      <div className="flex items-center gap-3 min-w-0 w-80 lg:w-96 shrink-0">
-        <span className="text-xs font-mono font-bold text-slate-400 dark:text-slate-500 w-6 text-right shrink-0">
-          {idx + 1}
-        </span>
-        <UserAvatar
-          avatar={student.avatar}
-          name={student.name}
-          userId={student.id}
-          size="md"
-          className="rounded-2xl border border-indigo-100 dark:border-slate-700 shadow-xs shrink-0"
-        />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm truncate" title={student.name}>
-              {student.name}
-            </span>
-            {stats.is_f ? (
-              <span className="text-[10px] font-extrabold text-white bg-rose-600 px-2 py-0.5 rounded-md animate-pulse border border-rose-700 shadow-2xs whitespace-nowrap">
-                มส. (หมดสิทธิ์สอบ)
-              </span>
-            ) : isCloseToFRisk ? (
-              <span className="text-[10px] font-bold text-amber-800 bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300 px-1.5 py-0.5 rounded-md border border-amber-300 dark:border-amber-700 whitespace-nowrap">
-                ⚠️ เสี่ยง มส.
-              </span>
-            ) : null}
-          </div>
-
-          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex-wrap">
-            <span className="font-mono text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-              {student.student_code ? `รหัส ${student.student_code}` : '-'}
-            </span>
-            {showRoomPill && student.grade_level && (
-              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/70 dark:border-indigo-800">
-                {student.grade_level}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => onViewHistory(student)}
-              className="p-0.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline text-[11px] flex items-center gap-1 cursor-pointer ml-1"
-              title="ดูประวัติการมาเรียนอย่างละเอียด"
-            >
-              <History className="w-3 h-3" />
-              <span>ประวัติ</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Center: Large, Tactile Check-in Buttons */}
-      <div className="inline-flex items-center gap-2 shrink-0">
-        {renderStatusBtn('present', <CheckCircle className="w-[18px] h-[18px] text-emerald-600 dark:text-emerald-400 shrink-0" />, 'มาเรียน', 'bg-emerald-600 text-white border-emerald-600 ring-2 ring-emerald-500/20')}
-        {renderStatusBtn('late', <Clock className="w-[18px] h-[18px] text-amber-500 dark:text-amber-400 shrink-0" />, 'สาย', 'bg-amber-500 text-white border-amber-500 ring-2 ring-amber-400/20')}
-        {renderStatusBtn('absent', <XCircle className="w-[18px] h-[18px] text-rose-500 dark:text-rose-400 shrink-0" />, 'ขาด', 'bg-rose-600 text-white border-rose-600 ring-2 ring-rose-500/20')}
-        {renderStatusBtn('leave', <FileText className="w-[18px] h-[18px] text-sky-500 dark:text-sky-400 shrink-0" />, 'ลา', 'bg-sky-600 text-white border-sky-600 ring-2 ring-sky-500/20')}
-      </div>
-
-      {/* Right Side: Attendance Quota Progress Bar & Secondary Stats */}
-      <div className="flex items-center gap-3 w-56 lg:w-64 justify-end shrink-0">
-        <div className="w-full">
-          <div className="flex justify-between items-center text-[11px] font-bold mb-1">
-            <span className={stats.converted_absent_count > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-600 dark:text-slate-400'}>
-              ขาด {stats.converted_absent_count} / {maxAllowedAbsences} คาบ
-            </span>
-            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-normal">
-              {stats.is_f ? 'หมดสิทธิ์สอบ' : `ขาดได้อีก ${Math.max(0, maxAllowedAbsences - stats.converted_absent_count)} คาบ`}
-            </span>
-          </div>
-          <div className="w-full bg-slate-200/80 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-300 ${
-                isCloseToFRisk
-                  ? 'bg-rose-500 animate-pulse'
-                  : stats.converted_absent_count >= maxAllowedAbsences * 0.5
-                  ? 'bg-amber-500'
-                  : 'bg-indigo-500'
-              }`}
-              style={{ width: `${Math.min((stats.converted_absent_count / (maxAllowedAbsences || 1)) * 100, 100)}%` }}
-            />
-          </div>
-          {(stats.remaining_late_count > 0 || stats.remaining_leave_count > 0) && (
-            <div className="flex gap-1.5 text-[9px] mt-1 font-bold justify-end">
-              {stats.remaining_late_count > 0 && (
-                <span className="text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.2 rounded border border-amber-200/60 dark:border-amber-800">
-                  สาย {stats.remaining_late_count}
-                </span>
-              )}
-              {stats.remaining_leave_count > 0 && (
-                <span className="text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/60 px-1.5 py-0.2 rounded border border-sky-200/60 dark:border-sky-800">
-                  ลา {stats.remaining_leave_count}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}, (prev, next) => {
-  return (
-    prev.student.id === next.student.id &&
-    prev.student.name === next.student.name &&
-    prev.student.avatar === next.student.avatar &&
-    prev.student.student_code === next.student.student_code &&
-    prev.idx === next.idx &&
-    prev.showRoomPill === next.showRoomPill &&
-    prev.status === next.status &&
-    prev.maxAllowedAbsences === next.maxAllowedAbsences &&
-    prev.stats.converted_absent_count === next.stats.converted_absent_count &&
-    prev.stats.remaining_late_count === next.stats.remaining_late_count &&
-    prev.stats.remaining_leave_count === next.stats.remaining_leave_count &&
-    prev.stats.is_f === next.stats.is_f &&
-    prev.onStatusSelect === next.onStatusSelect &&
-    prev.onViewHistory === next.onViewHistory
-  );
-});
-
-MemoizedDesktopStudentRow.displayName = 'MemoizedDesktopStudentRow';
-
-export default function Attendance() {
+import {
+  TimetableEntry,
+  Classroom,
+  ParsedClassroomName,
+  parseClassroomName,
+  SemesterWeek,
+  SemesterInfo,
+  Student,
+  AttendanceRecord,
+  StudentStats,
+  ActiveTab,
+  AutoSaveStatus,
+  THAI_MONTHS_SHORT,
+  getSchemaDayOfWeek,
+  MemoizedAttendanceCell,
+  ThaiDateRangePicker,
+  MobileStudentAttendanceCard,
+  MemoizedDesktopStudentRow,
+  AttendanceRetroactiveModal,
+  AttendanceHistoryModal,
+  AttendanceStatsBar,
+  AttendanceClassroomSelector,
+  AttendanceHeader,
+  AttendanceDailyToolbar,
+  useAttendanceFilters,
+} from './attendance/index';
+
+export { parseClassroomName };
+export type { ParsedClassroomName };
+
+export default function Attendance({
+  initialClassrooms,
+}: {
+  initialClassrooms?: Classroom[];
+} = {}) {
   const queryClient = useQueryClient();
 
   const [selectedClass, setSelectedClass] = useState<string>(() => {
@@ -925,9 +76,27 @@ export default function Attendance() {
   const [students, setStudents] = useState<Student[]>([]);
   const [attendance, setAttendance] = useState<Record<string, string>>({});
   const [stats, setStats] = useState<StudentStats[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedSectionKey, setSelectedSectionKey] = useState<string>('all');
-  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+
+  // Filters hook
+  const {
+    searchQuery,
+    setSearchQuery,
+    classSearch,
+    setClassSearch,
+    classFilter,
+    setClassFilter,
+    selectedSectionKey,
+    setSelectedSectionKey,
+    collapsedSections,
+    setCollapsedSections,
+    toggleSectionCollapse,
+    teachingDays,
+    setTeachingDays,
+    matrixStartDate,
+    setMatrixStartDate,
+    matrixEndDate,
+    setMatrixEndDate,
+  } = useAttendanceFilters();
 
   // Auto-Save state
   const [autoSave, setAutoSave] = useState<boolean>(() => {
@@ -983,13 +152,7 @@ export default function Attendance() {
   // Tabs state
   const [activeTab, setActiveTab] = useState<'daily' | 'matrix'>('daily');
 
-  // Matrix history grid state
-  const [matrixStartDate, setMatrixStartDate] = useState<string>(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 14); // Default to last 14 days
-    return d.toISOString().split('T')[0];
-  });
-  const [matrixEndDate, setMatrixEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  // Matrix editing cell
   const [matrixEditingCell, setMatrixEditingCell] = useState<{ studentId: string; date: string } | null>(null);
 
   // History Modal state
@@ -1003,22 +166,17 @@ export default function Attendance() {
 
   // ─── Retroactive Attendance Modal State ───
   const [showRetroactiveModal, setShowRetroactiveModal] = useState(false);
-  const [retroactiveTab, setRetroactiveTab] = useState<'weeks' | 'calendar'>('weeks');
-  const [customRetroDate, setCustomRetroDate] = useState<string>(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 1);
-    return d.toISOString().split('T')[0];
-  });
 
   const cellPopoverRef = useRef<HTMLDivElement>(null);
 
   // ─── Query: ดึงข้อมูลห้องเรียน (shared cache) ───
-  const { data: classrooms = [], isLoading: loadingClassrooms } = useQuery<Classroom[]>({
+  const { data: classrooms = initialClassrooms || [], isLoading: loadingClassrooms } = useQuery<Classroom[]>({
     queryKey: ['classrooms'],
     queryFn: async () => {
       const res = await api.get('/classrooms');
       return res.data.data || [];
     },
+    initialData: initialClassrooms && initialClassrooms.length > 0 ? initialClassrooms : undefined,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -1056,9 +214,6 @@ export default function Attendance() {
       return true;
     });
   }, [allTimetableEntries]);
-
-  // ─── State: วันที่มีการสอนของห้องเรียนนี้ (0=Mon .. 6=Sun) ───
-  const [teachingDays, setTeachingDays] = useState<number[]>([0, 1, 2, 3, 4]);
 
   useEffect(() => {
     if (!selectedClass) return;
@@ -1241,10 +396,6 @@ export default function Attendance() {
     });
     return scStats;
   }, [sectionScopedStudents, attendance]);
-
-  const toggleSectionCollapse = useCallback((sectionKey: string) => {
-    setCollapsedSections(prev => ({ ...prev, [sectionKey]: !prev[sectionKey] }));
-  }, []);
 
 
 
@@ -1818,9 +969,6 @@ export default function Attendance() {
     return selectedClassData ? parseClassroomName(selectedClassData.name) : null;
   }, [selectedClassData]);
 
-  const [classFilter, setClassFilter] = useState<'all' | 'today' | 'pvch' | 'pvs'>('all');
-  const [classSearch, setClassSearch] = useState('');
-
   const todayClassroomIds = useMemo(() => {
     return new Set(
       todayEntries
@@ -1919,7 +1067,7 @@ export default function Attendance() {
             status={status}
             isEditing={isEditing}
             onEditClick={() => setMatrixEditingCell({ studentId: student.id, date: dateStr })}
-            onStatusSelect={statusVal => handleMatrixCellUpdate(student.id, dateStr, statusVal)}
+            onStatusSelect={(statusVal: string) => handleMatrixCellUpdate(student.id, dateStr, statusVal)}
             onDeleteClick={status ? () => handleMatrixCellDelete(student.id, dateStr) : undefined}
             popoverRef={isEditing ? cellPopoverRef : undefined}
             holiday={holiday}
@@ -1948,456 +1096,50 @@ export default function Attendance() {
 
       {/* Active Classroom Bar (เมื่อเลือกห้องแล้ว) */}
       {selectedClass && selectedClassData && activeParsed && (
-        <div className="glass dark:bg-slate-900/85 p-5 sm:p-6 rounded-3xl border border-white/60 dark:border-slate-800 shadow-xl shadow-indigo-100/30 dark:shadow-black/40 space-y-4 backdrop-blur-xl">
-          {/* Top Row: Course Info & Quick Switcher + Tools */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="flex items-start sm:items-center gap-3.5 min-w-0">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/25 shrink-0">
-                <GraduationCap className="w-6 h-6" />
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {activeParsed.code && (
-                    <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-lg bg-slate-100/90 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 shadow-2xs">
-                      {activeParsed.code}
-                    </span>
-                  )}
-                  <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border shadow-2xs ${activeParsed.curriculumType === 'pvs'
-                    ? 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
-                    : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
-                    }`}>
-                    {activeParsed.curriculumType === 'pvs' ? 'ปวส.' : 'ปวช.'}
-                  </span>
-                  {activeParsed.groupName && (
-                    <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800 shadow-2xs">
-                      {activeParsed.groupName}
-                    </span>
-                  )}
-                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1">
-                    (👥 {selectedClassData.student_count || students.length || 0} คน)
-                  </span>
-                </div>
-                <h2 className="text-base sm:text-xl font-black text-slate-800 dark:text-slate-100 leading-tight mt-1 truncate" title={activeParsed.subjectTitle}>
-                  {activeParsed.subjectTitle}
-                </h2>
-              </div>
-            </div>
-
-            {/* Quick Switch / เปลี่ยนห้อง & Action Tools */}
-            <div className="flex items-center gap-2 shrink-0 self-start lg:self-center flex-wrap">
-              <button
-                type="button"
-                onClick={() => { setExportStartDate(''); setExportEndDate(''); setShowExportModal(true); }}
-                className="px-3 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/70 dark:border-emerald-800 font-bold text-xs transition-all flex items-center gap-1.5 shadow-2xs hover:shadow-xs cursor-pointer"
-                title="พรีวิวและส่งออกข้อมูลการเช็คชื่อเป็น CSV / Excel"
-              >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span>ส่งออก CSV</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowImportModal(true)}
-                className="px-3 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/70 dark:border-indigo-800 font-bold text-xs transition-all flex items-center gap-1.5 shadow-2xs hover:shadow-xs cursor-pointer"
-                title="นำเข้าข้อมูลการเช็คชื่อจากไฟล์ Excel พร้อมดูตัวอย่างรูปแบบและดาวน์โหลดเทมเพลต"
-              >
-                <Upload className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                <span>นำเข้า Excel</span>
-              </button>
-
-              <div className="relative">
-                <select
-                  value={selectedClass}
-                  onChange={e => setSelectedClass(e.target.value)}
-                  className="form-input text-xs font-bold py-2 pl-3 pr-8 bg-white/90 hover:bg-white dark:bg-slate-800 dark:hover:bg-slate-750 border-slate-200 dark:border-slate-700 rounded-xl focus:border-indigo-400 focus:ring focus:ring-indigo-200/50 transition-all text-slate-700 dark:text-slate-200 cursor-pointer shadow-xs max-w-[200px] sm:max-w-[240px] truncate"
-                  title="สลับห้องเรียนเร็ว"
-                >
-                  {classrooms.map(c => (
-                    <option key={c.id} value={c.id} className="dark:bg-slate-800 dark:text-slate-200">
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setSelectedClass('')}
-                className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-slate-100/90 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700 transition-all shadow-xs cursor-pointer shrink-0"
-                title="ย้อนกลับไปดูการ์ดห้องเรียนทั้งหมด"
-              >
-                <Grid className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
-                <span>การ์ดทั้งหมด</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Divider */}
-          <div className="border-t border-slate-100/80 dark:border-slate-800" />
-
-          {/* Bottom Row: Tab Switcher & Attendance Threshold Badge */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-0.5">
-            {/* View Mode Tabs */}
-            <div className="flex bg-slate-100/90 dark:bg-slate-800/90 p-1.5 rounded-2xl border border-slate-200/60 dark:border-slate-700 shrink-0">
-              <button
-                onClick={() => setActiveTab('daily')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${activeTab === 'daily'
-                  ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300'
-                  }`}
-              >
-                <List className="w-4 h-4" />
-                <span>เช็คชื่อประจำวัน</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('matrix')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${activeTab === 'matrix'
-                  ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300'
-                  }`}
-              >
-                <Grid className="w-4 h-4" />
-                <span>ตารางประวัติย้อนหลัง</span>
-              </button>
-            </div>
-
-            {/* Attendance Threshold Info Pill */}
-            <div className="flex items-center gap-3 px-4 py-2 rounded-2xl bg-slate-50/80 dark:bg-slate-800/80 border border-indigo-100/90 dark:border-slate-700 text-indigo-950 dark:text-indigo-200 text-xs font-medium shrink-0 shadow-2xs">
-              <div className="w-7 h-7 rounded-xl bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
-                <AlertCircle className="w-4 h-4" />
-              </div>
-              <div className="flex items-center gap-3 flex-wrap">
-                <div className="leading-tight">
-                  <span className="text-slate-500 dark:text-slate-400 text-[11px]">เวลาเรียนขั้นต่ำ: </span>
-                  <strong className="font-black text-indigo-900 dark:text-indigo-300">{selectedClassData.min_attendance_percent || 80}%</strong>
-                </div>
-                <span className="text-slate-300 dark:text-slate-600 hidden sm:inline">|</span>
-                <div className="leading-tight">
-                  <span className="text-slate-500 dark:text-slate-400 text-[11px]">ขาดได้ไม่เกิน: </span>
-                  <strong className="font-black text-rose-600 dark:text-rose-400">{maxAllowedAbsences} คาบ</strong>
-                  <span className="text-slate-500 dark:text-slate-400 text-[11px] font-normal"> / {selectedClassData.total_classes || 40} คาบ</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Sub-room / Section Switcher Bar (แสดงอัตโนมัติเมื่อห้องเรียนมีหลายห้องย่อย เช่น ปวช.1/1 เรียนรวมกับ ปวช.1/2) */}
-          {hasMultipleSections && (
-            <>
-              <div className="border-t border-slate-100/80 dark:border-slate-800" />
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-0.5">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <div className="flex items-center gap-1.5 text-xs font-extrabold text-indigo-800 dark:text-indigo-300 mr-1">
-                    <GitBranch className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                    <span>แยกห้องเช็คชื่อ:</span>
-                    {sharedBranch && (
-                      <span className="px-2 py-0.5 rounded-md bg-violet-50 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300 border border-violet-200/80 dark:border-violet-800 font-bold text-[11px]">
-                        สาขา{sharedBranch}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Pill: รวมทุกห้อง */}
-                  <button
-                    type="button"
-                    onClick={() => setSelectedSectionKey('all')}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${selectedSectionKey === 'all'
-                      ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/20'
-                      : 'bg-white/90 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200/90 dark:border-slate-700'
-                      }`}
-                    title="แสดงรายชื่อรวมทุกห้องย่อย (จัดกลุ่มแยกหัวข้อให้ตามห้อง)"
-                  >
-                    <span>รวมทุกห้อง</span>
-                    <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${selectedSectionKey === 'all'
-                      ? 'bg-white/20 text-white'
-                      : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                      }`}>
-                      {students.length}
-                    </span>
-                  </button>
-
-                  {/* Pills per Sub-room / Section */}
-                  {sectionGroups.map(grp => {
-                    const isSelected = selectedSectionKey === grp.key;
-                    const secStats = sectionDailyStatsMap[grp.key];
-                    const isAllMarked = secStats && secStats.total > 0 && secStats.marked === secStats.total;
-                    const isPartialMarked = secStats && secStats.marked > 0 && secStats.marked < secStats.total;
-
-                    return (
-                      <button
-                        key={grp.key}
-                        type="button"
-                        onClick={() => setSelectedSectionKey(grp.key)}
-                        className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${isSelected
-                          ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/20'
-                          : 'bg-white/90 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200/90 dark:border-slate-700'
-                          }`}
-                        title={`สลับไปเช็คชื่อเฉพาะห้อง ${grp.label} (${grp.students.length} คน)`}
-                      >
-                        <span>{grp.label}</span>
-                        {activeTab === 'daily' && secStats ? (
-                          <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold flex items-center gap-0.5 ${isSelected
-                            ? isAllMarked
-                              ? 'bg-emerald-400/30 text-white border border-emerald-200/40'
-                              : 'bg-white/20 text-white'
-                            : isAllMarked
-                              ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-                              : isPartialMarked
-                                ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-                                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                            }`}>
-                            {isAllMarked && <Check className="w-2.5 h-2.5" />}
-                            <span>{secStats.marked}/{secStats.total}</span>
-                          </span>
-                        ) : (
-                          <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${isSelected
-                            ? 'bg-white/20 text-white'
-                            : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                            }`}>
-                            {grp.students.length}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {activeTab === 'daily' && selectedSectionKey !== 'all' && (
-                  <div className="text-[11px] font-semibold text-slate-500 flex items-center gap-1.5 shrink-0">
-                    <span>เช็ครวมทั้งวิชาวันนี้:</span>
-                    <strong className={overallDailyMarked === students.length ? 'text-emerald-600 font-extrabold' : 'text-indigo-700 font-extrabold'}>
-                      {overallDailyMarked}/{students.length} คน
-                    </strong>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </div>
+        <AttendanceHeader
+          selectedClass={selectedClass}
+          setSelectedClass={setSelectedClass}
+          classrooms={classrooms}
+          selectedClassData={selectedClassData}
+          activeParsed={activeParsed}
+          studentsCount={students.length}
+          maxAllowedAbsences={maxAllowedAbsences}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          onOpenExportModal={() => {
+            setExportStartDate('');
+            setExportEndDate('');
+            setShowExportModal(true);
+          }}
+          onOpenImportModal={() => setShowImportModal(true)}
+          hasMultipleSections={hasMultipleSections}
+          sharedBranch={sharedBranch}
+          sectionGroups={sectionGroups}
+          selectedSectionKey={selectedSectionKey}
+          setSelectedSectionKey={setSelectedSectionKey}
+          sectionDailyStatsMap={sectionDailyStatsMap}
+          overallDailyMarked={overallDailyMarked}
+        />
       )}
 
       {/* Classroom Card Grid Selector (เมื่อยังไม่ได้เลือกห้องเรียน) */}
       {!selectedClass ? (
-        <div className="space-y-5 animate-fade-in">
-          {/* Header & Filters */}
-          <div className="glass dark:bg-slate-900/85 p-5 sm:p-6 rounded-3xl border border-white/60 dark:border-slate-800 bg-white/95 dark:bg-slate-900 shadow-xl shadow-indigo-100/20 dark:shadow-black/40 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500 via-indigo-600 to-purple-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/25 shrink-0">
-                <BookOpen className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="text-lg font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                  <span>เลือกห้องเรียนเพื่อบันทึกเวลาเรียน</span>
-                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800 shadow-2xs">
-                    {classrooms.length} ห้อง
-                  </span>
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">เลือกห้องเรียนเพื่อเริ่มเช็คชื่อรายวันหรือดูตารางเวลาเรียนสะสม</p>
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-              {/* Category Filter Pills */}
-              <div className="flex items-center bg-slate-100/80 dark:bg-slate-800/80 p-1 rounded-2xl border border-slate-200/60 dark:border-slate-700 flex-wrap gap-1">
-                <button
-                  type="button"
-                  onClick={() => setClassFilter('all')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${classFilter === 'all'
-                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-2xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                    }`}
-                >
-                  ทั้งหมด ({classrooms.length})
-                </button>
-                {todayCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setClassFilter('today')}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${classFilter === 'today'
-                      ? 'bg-emerald-600 text-white shadow-2xs ring-1 ring-emerald-400'
-                      : 'text-emerald-700 dark:text-emerald-300 bg-emerald-50/80 dark:bg-emerald-950/50 hover:bg-emerald-100/90 dark:hover:bg-emerald-900/50'
-                      }`}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                    มีสอนวันนี้ ({todayCount})
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setClassFilter('pvch')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${classFilter === 'pvch'
-                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-2xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                    }`}
-                >
-                  ปวช. ({pvchCount})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setClassFilter('pvs')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${classFilter === 'pvs'
-                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-2xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                    }`}
-                >
-                  ปวส. ({pvsCount})
-                </button>
-              </div>
-
-              {/* Search Box */}
-              <div className="relative min-w-[220px]">
-                <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={classSearch}
-                  onChange={e => setClassSearch(e.target.value)}
-                  placeholder="ค้นหารหัสวิชา, ชื่อวิชา..."
-                  className="w-full pl-9 pr-8 py-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-400/50 focus:border-indigo-500 shadow-2xs"
-                />
-                {classSearch && (
-                  <button
-                    type="button"
-                    onClick={() => setClassSearch('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Classroom Cards Grid */}
-          {filteredClassrooms.length === 0 ? (
-            <div className="glass dark:bg-slate-900/80 p-12 text-center rounded-2xl border border-white/40 dark:border-slate-800 shadow-sm">
-              <Users className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
-              <h4 className="text-base font-bold text-slate-700 dark:text-slate-200">ไม่พบห้องเรียนที่ตรงกับเงื่อนไข</h4>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
-                {classSearch ? `ไม่มีห้องเรียนที่ตรงกับคำค้นหา "${classSearch}"` : 'ยังไม่มีห้องเรียนในกลุ่มนี้'}
-              </p>
-              {(classSearch || classFilter !== 'all') && (
-                <button
-                  type="button"
-                  onClick={() => { setClassSearch(''); setClassFilter('all'); }}
-                  className="mt-3.5 px-4 py-2 rounded-xl bg-indigo-50 dark:bg-slate-800 hover:bg-indigo-100 dark:hover:bg-slate-700 text-indigo-700 dark:text-indigo-300 text-xs font-bold border border-indigo-200 dark:border-slate-700 transition-colors"
-                >
-                  ล้างตัวกรองทั้งหมด
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4.5">
-              {filteredClassrooms.map(c => {
-                const parsed = parseClassroomName(c.name);
-                const hasToday = todayEntries.some(e => String(e.classroom_id) === String(c.id));
-                const todayEntry = todayEntries.find(e => String(e.classroom_id) === String(c.id));
-                const classMaxAbs = Math.floor((Number(c.total_classes) || 40) * (100 - (Number(c.min_attendance_percent) || 80)) / 100);
-
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedClass(String(c.id));
-                      setActiveTab('daily');
-                    }}
-                    className={`group relative bg-white/90 dark:bg-slate-900/80 hover:bg-white dark:hover:bg-slate-900 backdrop-blur-xl rounded-3xl p-5 sm:p-6 border text-left flex flex-col justify-between transition-all duration-200 hover:-translate-y-1 hover:shadow-xl hover:shadow-indigo-500/15 dark:hover:shadow-black/50 cursor-pointer overflow-hidden ${hasToday
-                      ? 'border-emerald-300 dark:border-emerald-600/60 shadow-md shadow-emerald-500/5 ring-1 ring-emerald-400/40'
-                      : 'border-indigo-100/90 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-500/50 shadow-xs'
-                      }`}
-                  >
-                    {/* Top Accent Gradient Bar */}
-                    <div className={`absolute top-0 left-0 right-0 h-1.5 transition-all ${hasToday
-                      ? 'bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500'
-                      : parsed.curriculumType === 'pvs'
-                        ? 'bg-gradient-to-r from-purple-500 via-fuchsia-500 to-indigo-500'
-                        : 'bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-500'
-                      }`} />
-
-                    <div>
-                      {/* Badge Header Row */}
-                      <div className="flex items-center justify-between gap-2 mb-3">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {parsed.code && (
-                            <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-lg bg-slate-100/90 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-2xs">
-                              {parsed.code}
-                            </span>
-                          )}
-                          <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border shadow-2xs ${parsed.curriculumType === 'pvs'
-                            ? 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
-                            : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
-                            }`}>
-                            {parsed.curriculumType === 'pvs' ? 'ปวส.' : 'ปวช.'}
-                          </span>
-                          {parsed.groupName && (
-                            <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200/90 dark:border-amber-800 shadow-2xs">
-                              {parsed.groupName}
-                            </span>
-                          )}
-                        </div>
-
-                        {hasToday && (
-                          <span className="flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 shadow-xs animate-pulse shrink-0">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                            มีสอนวันนี้
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Course Title */}
-                      <h4 className="font-black text-base text-slate-800 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors line-clamp-2 leading-snug mb-3.5">
-                        {parsed.subjectTitle}
-                      </h4>
-
-                      {/* Info & Criteria Box */}
-                      <div className="space-y-2 bg-slate-50/80 dark:bg-slate-800/60 group-hover:bg-indigo-50/40 dark:group-hover:bg-slate-800/90 p-3 rounded-xl border border-slate-100 dark:border-slate-800 group-hover:border-indigo-100/60 dark:group-hover:border-slate-700 transition-colors mb-4">
-                        <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
-                          <span className="flex items-center gap-1.5">
-                            <Users className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
-                            <span>นักเรียน</span>
-                          </span>
-                          <strong className="text-slate-800 dark:text-slate-100 font-bold">{c.student_count || 0} คน</strong>
-                        </div>
-
-                        <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
-                          <span className="flex items-center gap-1.5">
-                            <Clock className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
-                            <span>แผนการสอน</span>
-                          </span>
-                          <span className="text-slate-700 dark:text-slate-300 font-medium">
-                            {c.total_weeks || (parsed.curriculumType === 'pvs' ? 15 : 18)} สัปดาห์ · {c.total_classes || 40} คาบ
-                          </span>
-                        </div>
-
-                        {todayEntry && (
-                          <div className="pt-1.5 border-t border-emerald-200/60 flex items-center justify-between text-[11px] text-emerald-800 font-semibold">
-                            <span>คาบสอนวันนี้</span>
-                            <span>คาบ {todayEntry.start_period}{todayEntry.start_period !== todayEntry.end_period ? `-${todayEntry.end_period}` : ''} ({todayEntry.room || 'ห้องปกติ'})</span>
-                          </div>
-                        )}
-
-                        <div className="pt-1.5 border-t border-slate-200/50 flex items-center justify-between text-[11px] text-slate-500">
-                          <span>เกณฑ์เข้าเรียน</span>
-                          <span>
-                            ขั้นต่ำ <strong className="text-indigo-900 font-bold">{c.min_attendance_percent || 80}%</strong> (ขาดได้ {classMaxAbs} คาบ)
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Footer Prompt */}
-                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-indigo-600 group-hover:text-indigo-700">
-                      <span>เริ่มเช็คชื่อห้องนี้</span>
-                      <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white flex items-center justify-center transition-all group-hover:translate-x-1 shadow-xs">
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        <AttendanceClassroomSelector
+          classrooms={classrooms}
+          classFilter={classFilter}
+          setClassFilter={setClassFilter}
+          classSearch={classSearch}
+          setClassSearch={setClassSearch}
+          todayCount={todayCount}
+          pvchCount={pvchCount}
+          pvsCount={pvsCount}
+          filteredClassrooms={filteredClassrooms}
+          todayEntries={todayEntries}
+          onSelectClassroom={(classId: string) => {
+            setSelectedClass(classId);
+            setActiveTab('daily');
+          }}
+        />
       ) : loadingAttendance && students.length === 0 ? (
         /* Skeleton Loading State — eliminates blank flash & optimizes LCP */
         <div className="space-y-6 animate-pulse" aria-busy="true" aria-label="กำลังโหลดข้อมูลการเช็คชื่อ">
@@ -2475,215 +1217,26 @@ export default function Attendance() {
             /* ================= DAILY ROLL CALL TAB ================= */
             <div className="space-y-6">
 
-              {/* Date Control Panel */}
-              <div className="glass dark:bg-slate-900/85 p-4 sm:p-5 rounded-3xl border border-indigo-100/80 dark:border-slate-800 bg-white/95 dark:bg-slate-900 shadow-xl shadow-indigo-100/20 dark:shadow-black/40">
-                <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3.5">
-                  {/* Left: Date Stepper & Picker */}
-                  <div className="flex items-center gap-2 bg-slate-100/80 dark:bg-slate-800/80 p-1.5 rounded-2xl border border-slate-200/70 dark:border-slate-700 shadow-2xs">
-                    <button
-                      type="button"
-                      onClick={() => adjustDate(-1)}
-                      className="p-2 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-700 rounded-xl transition-all shadow-2xs cursor-pointer"
-                      title="วันก่อนหน้า"
-                    >
-                      <ChevronLeft className="w-5 h-5" />
-                    </button>
-
-                    <div className="relative flex items-center gap-2 px-3 py-1 font-extrabold text-slate-800 dark:text-slate-100 cursor-pointer group bg-white dark:bg-slate-800 rounded-xl border border-slate-200/60 dark:border-slate-700 shadow-xs hover:border-indigo-300 dark:hover:border-indigo-500 transition-all">
-                      <CalendarIcon className="w-4 h-4 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform" />
-                      <span className="text-xs sm:text-sm font-black text-slate-800 dark:text-slate-100">{formattedSelectedDate}</span>
-                      <input
-                        type="date"
-                        value={date}
-                        onChange={e => setDate(e.target.value)}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      />
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => adjustDate(1)}
-                      className="p-2 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-700 rounded-xl transition-all shadow-2xs cursor-pointer"
-                      title="วันถัดไป"
-                    >
-                      <ChevronRight className="w-5 h-5" />
-                    </button>
-                  </div>
-
-                  {/* Right: Quick Date Filters & Actions */}
-                  <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-between lg:justify-end">
-                    <div className="flex items-center gap-1.5 bg-slate-100/80 dark:bg-slate-800/80 p-1 rounded-2xl border border-slate-200/60 dark:border-slate-700">
-                      <button
-                        type="button"
-                        onClick={setToday}
-                        className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${isToday
-                          ? 'bg-indigo-600 text-white shadow-xs'
-                          : 'bg-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/70 dark:hover:bg-slate-700'
-                          }`}
-                      >
-                        {isToday && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
-                        <span>วันนี้</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={setYesterday}
-                        className="px-3.5 py-1.5 text-xs font-bold rounded-xl bg-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/70 dark:hover:bg-slate-700 transition-all cursor-pointer"
-                      >
-                        เมื่อวาน
-                      </button>
-                    </div>
-
-                    {/* ปุ่มเช็คชื่อย้อนหลัง */}
-                    <button
-                      type="button"
-                      onClick={() => setShowRetroactiveModal(true)}
-                      className="px-3.5 py-2 text-xs font-bold rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/30 transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
-                      title="เปิดหน้าต่างเลือกสัปดาห์หรือวันย้อนหลังเพื่อเช็คชื่อ"
-                    >
-                      <History className="w-4 h-4" />
-                      <span>เช็คชื่อย้อนหลัง</span>
-                    </button>
-
-                    {/* ปุ่มลบข้อมูลวันที่เลือก */}
-                    <button
-                      type="button"
-                      onClick={handleClearData}
-                      disabled={saving}
-                      className="px-3 py-2 text-xs font-bold rounded-xl bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-400 border border-rose-200/70 dark:border-rose-900/60 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
-                      title={activeSectionGroup
-                        ? `ลบข้อมูลการเช็คชื่อเฉพาะห้อง ${activeSectionGroup.label} สำหรับวันที่เลือกอยู่`
-                        : 'ลบข้อมูลการเช็คชื่อทั้งห้องสำหรับวันที่เลือกอยู่'}
-                    >
-                      <Trash2 className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
-                      <span className="hidden sm:inline">
-                        ลบข้อมูล{activeSectionGroup ? ` (${activeSectionGroup.label})` : ''} ({new Date(date).getDate()} {THAI_MONTHS_SHORT[new Date(date).getMonth()]})
-                      </span>
-                      <span className="sm:hidden">
-                        ลบข้อมูล
-                      </span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Retroactive Alert Banner (เมื่อเลือกวันในอดีต) */}
-              {isPastDate && (
-                <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-amber-100/70 dark:from-amber-950/40 dark:via-slate-900 dark:to-slate-900 p-4 rounded-3xl border border-amber-200/90 dark:border-amber-900/60 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fade-in-up">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-500/20 shrink-0">
-                      <History className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-extrabold text-amber-950 dark:text-amber-200 text-sm">
-                          🕒 กำลังเช็คชื่อย้อนหลัง:
-                        </span>
-                        <span className="text-xs bg-white dark:bg-slate-800 text-amber-900 dark:text-amber-300 font-bold px-2.5 py-0.5 rounded-full border border-amber-300 dark:border-amber-700 shadow-xs">
-                          {formattedSelectedDate}
-                        </span>
-                        {selectedDateWeekNumber && (
-                          <span className="text-xs bg-indigo-100 dark:bg-indigo-950/60 text-indigo-800 dark:text-indigo-300 font-bold px-2.5 py-0.5 rounded-full border border-indigo-200 dark:border-indigo-800">
-                            สัปดาห์ที่ {selectedDateWeekNumber}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-amber-800 dark:text-amber-400 mt-0.5">
-                        {dailyStats.marked === dailyStats.total && dailyStats.total > 0
-                          ? `บันทึกครบแล้ว (${dailyStats.marked}/${dailyStats.total} คน)`
-                          : dailyStats.marked > 0
-                            ? `เช็คแล้ว ${dailyStats.marked} คน (ยังค้างอีก ${dailyStats.total - dailyStats.marked} คน)`
-                            : 'ยังไม่มีประวัติการเช็คชื่อของวันนี้ — สามารถเช็คสถานะและบันทึกได้ทันที'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setShowRetroactiveModal(true)}
-                      className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-slate-700 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-700 text-xs font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer"
-                    >
-                      <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                      <span>เปลี่ยนวันย้อนหลัง</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={setToday}
-                      className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs font-bold transition-all shadow-md shadow-indigo-500/20 hover:scale-105 flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>กลับไปวันนี้</span>
-                    </button>
-                  </div>
-                </div>
-              )}
+              {/* Date Control Panel & Retroactive Banner */}
+              <AttendanceDailyToolbar
+                date={date}
+                setDate={setDate}
+                formattedSelectedDate={formattedSelectedDate}
+                isToday={isToday}
+                isPastDate={isPastDate}
+                selectedDateWeekNumber={selectedDateWeekNumber}
+                dailyStats={dailyStats}
+                activeSectionGroup={activeSectionGroup}
+                saving={saving}
+                adjustDate={adjustDate}
+                setToday={setToday}
+                setYesterday={setYesterday}
+                onOpenRetroactiveModal={() => setShowRetroactiveModal(true)}
+                onClearData={handleClearData}
+              />
 
               {/* Dynamic Counters Card */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-                <div className="glass dark:bg-slate-900/90 p-4 rounded-3xl border border-emerald-100/80 dark:border-emerald-950/60 bg-gradient-to-br from-emerald-50/70 via-white to-teal-50/30 dark:from-emerald-950/20 dark:via-slate-900 dark:to-slate-900 flex items-center justify-between shadow-xs hover:shadow-md transition-all">
-                  <div>
-                    <p className="text-xs font-bold text-emerald-800 dark:text-emerald-300 mb-0.5">มาเรียน</p>
-                    <p className="text-2xl sm:text-3xl font-black text-emerald-700 dark:text-emerald-400 tracking-tight tabular-nums">{dailyStats.present}</p>
-                    <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">คน</span>
-                  </div>
-                  <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-2xs">
-                    <CheckCircle className="w-6 h-6" />
-                  </div>
-                </div>
-
-                <div className="glass dark:bg-slate-900/90 p-4 rounded-3xl border border-amber-100/80 dark:border-amber-950/60 bg-gradient-to-br from-amber-50/70 via-white to-orange-50/30 dark:from-amber-950/20 dark:via-slate-900 dark:to-slate-900 flex items-center justify-between shadow-xs hover:shadow-md transition-all">
-                  <div>
-                    <p className="text-xs font-bold text-amber-800 dark:text-amber-300 mb-0.5">สาย</p>
-                    <p className="text-2xl sm:text-3xl font-black text-amber-700 dark:text-amber-400 tracking-tight tabular-nums">{dailyStats.late}</p>
-                    <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">คน</span>
-                  </div>
-                  <div className="w-11 h-11 rounded-2xl bg-amber-500/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shadow-2xs">
-                    <Clock className="w-6 h-6" />
-                  </div>
-                </div>
-
-                <div className="glass dark:bg-slate-900/90 p-4 rounded-3xl border border-rose-100/80 dark:border-rose-950/60 bg-gradient-to-br from-rose-50/70 via-white to-red-50/30 dark:from-rose-950/20 dark:via-slate-900 dark:to-slate-900 flex items-center justify-between shadow-xs hover:shadow-md transition-all">
-                  <div>
-                    <p className="text-xs font-bold text-rose-800 dark:text-rose-300 mb-0.5">ขาด</p>
-                    <p className="text-2xl sm:text-3xl font-black text-rose-700 dark:text-rose-400 tracking-tight tabular-nums">{dailyStats.absent}</p>
-                    <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">คน</span>
-                  </div>
-                  <div className="w-11 h-11 rounded-2xl bg-rose-500/10 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-center shadow-2xs">
-                    <XCircle className="w-6 h-6" />
-                  </div>
-                </div>
-
-                <div className="glass dark:bg-slate-900/90 p-4 rounded-3xl border border-sky-100/80 dark:border-sky-950/60 bg-gradient-to-br from-sky-50/70 via-white to-blue-50/30 dark:from-sky-950/20 dark:via-slate-900 dark:to-slate-900 flex items-center justify-between shadow-xs hover:shadow-md transition-all">
-                  <div>
-                    <p className="text-xs font-bold text-sky-800 dark:text-sky-300 mb-0.5">ลา</p>
-                    <p className="text-2xl sm:text-3xl font-black text-sky-700 dark:text-sky-400 tracking-tight tabular-nums">{dailyStats.leave}</p>
-                    <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">คน</span>
-                  </div>
-                  <div className="w-11 h-11 rounded-2xl bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 flex items-center justify-center shadow-2xs">
-                    <FileText className="w-6 h-6" />
-                  </div>
-                </div>
-
-                <div className="glass dark:bg-slate-900/90 p-4 rounded-3xl border border-indigo-100/80 dark:border-indigo-950/60 bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/30 dark:from-indigo-950/20 dark:via-slate-900 dark:to-slate-900 col-span-2 sm:col-span-1 flex flex-col justify-between shadow-xs hover:shadow-md transition-all">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-bold text-indigo-900 dark:text-indigo-300 mb-0.5">บันทึกผลแล้ว</p>
-                      <p className="text-2xl sm:text-3xl font-black text-indigo-800 dark:text-indigo-200 tracking-tight tabular-nums">
-                        {dailyStats.marked}
-                        <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 ml-1">/ {dailyStats.total}</span>
-                      </p>
-                    </div>
-                    <div className="w-11 h-11 rounded-2xl bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 flex items-center justify-center font-black text-xs shadow-2xs">
-                      {Math.round((dailyStats.marked / (dailyStats.total || 1)) * 100)}%
-                    </div>
-                  </div>
-                  <div className="w-full bg-indigo-100/70 dark:bg-slate-800 h-2 rounded-full overflow-hidden mt-2.5">
-                    <div
-                      className="h-full bg-gradient-to-r from-indigo-500 to-violet-600 rounded-full transition-all duration-300"
-                      style={{ width: `${Math.min(100, Math.round((dailyStats.marked / (dailyStats.total || 1)) * 100))}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
+              <AttendanceStatsBar dailyStats={dailyStats} />
 
               {/* Student List View */}
               <div className="glass dark:bg-slate-900/85 overflow-hidden rounded-3xl border border-indigo-100/80 dark:border-slate-800 shadow-xl shadow-indigo-100/20 dark:shadow-black/40 pb-16 md:pb-0 bg-white/95 dark:bg-slate-900">
@@ -3086,7 +1639,7 @@ export default function Attendance() {
                     <ThaiDateRangePicker
                       startDate={matrixStartDate}
                       endDate={matrixEndDate}
-                      onChange={(start, end) => {
+                      onChange={(start: string, end: string) => {
                         setMatrixStartDate(start);
                         setMatrixEndDate(end);
                       }}
@@ -3135,10 +1688,10 @@ export default function Attendance() {
                           onClick={() => {
                             if (isSelected) {
                               if (teachingDays.length > 1) {
-                                setTeachingDays(prev => prev.filter(d => d !== day.id));
+                                setTeachingDays((prev: number[]) => prev.filter((d: number) => d !== day.id));
                               }
                             } else {
-                              setTeachingDays(prev => [...prev, day.id].sort((a, b) => a - b));
+                              setTeachingDays((prev: number[]) => [...prev, day.id].sort((a: number, b: number) => a - b));
                             }
                           }}
                           className={`px-3 py-1 text-xs font-bold rounded-xl transition-all cursor-pointer ${isSelected
@@ -3304,76 +1857,14 @@ export default function Attendance() {
       )}
 
       {/* ================= HISTORY LIST MODAL FOR SINGLE STUDENT ================= */}
-      {historyStudent && createPortal(
-        <div className="modal-overlay" onClick={() => setHistoryStudent(null)}>
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl dark:shadow-black/60 w-full max-w-md p-6 animate-scale-up" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg text-white">
-                  <History className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 leading-tight">ประวัติการเช็คชื่อ</h2>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">{historyStudent.name}</p>
-                </div>
-              </div>
-              <button onClick={() => setHistoryStudent(null)} className="p-2 hover:bg-indigo-50 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer">
-                <X className="w-5 h-5 text-slate-500 dark:text-slate-400" />
-              </button>
-            </div>
-
-            {historyLoading ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
-              </div>
-            ) : historyData.length === 0 ? (
-              <div className="text-center py-8 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700">
-                <p className="text-slate-500 dark:text-slate-400 text-sm font-semibold">ไม่พบสถิติการเช็คชื่อใดๆ</p>
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
-                {historyData.map(record => {
-                  const dateObj = new Date(record.date);
-                  const formattedDate = dateObj.toLocaleDateString('th-TH', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                    weekday: 'short'
-                  });
-                  return (
-                    <div key={record.id} className="flex items-center justify-between bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-indigo-50/60 dark:hover:bg-slate-750 transition-colors group">
-                      <div className="flex items-center gap-3">
-                        <CalendarIcon className="w-4 h-4 text-indigo-400" />
-                        <span className="text-sm text-slate-700 dark:text-slate-200 font-semibold">{formattedDate}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        {getStatusDisplay(record.status)}
-                        <button
-                          onClick={() => handleDeleteHistory(record.id)}
-                          className="p-1.5 rounded-lg text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 opacity-0 group-hover:opacity-100 transition-all duration-150 cursor-pointer"
-                          title="ลบสถิตินี้ออก"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            <div className="mt-5 pt-4 border-t border-indigo-50/50 dark:border-slate-800 flex justify-end">
-              <button
-                onClick={() => setHistoryStudent(null)}
-                className="px-5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-sm transition-colors cursor-pointer"
-              >
-                ปิดหน้าต่าง
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+      <AttendanceHistoryModal
+        student={historyStudent}
+        onClose={() => setHistoryStudent(null)}
+        isLoading={historyLoading}
+        records={historyData}
+        onDeleteRecord={handleDeleteHistory}
+        getStatusDisplay={getStatusDisplay}
+      />
 
       {/* ================= ATTENDANCE CSV PREVIEW & EXPORT MODAL ================= */}
       <AttendanceCsvModal
@@ -3409,252 +1900,17 @@ export default function Attendance() {
       )}
 
       {/* ================= RETROACTIVE ATTENDANCE MODAL ================= */}
-      {showRetroactiveModal && createPortal(
-        <div className="modal-overlay" onClick={() => setShowRetroactiveModal(false)}>
-          <div
-            className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl dark:shadow-black/60 w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto animate-scale-up"
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                  <History className="w-5 h-5" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 leading-tight">เลือกวัน/สัปดาห์ที่ต้องการเช็คชื่อย้อนหลัง</h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    ห้องเรียน: <span className="font-semibold text-indigo-700 dark:text-indigo-400">{selectedClassData?.name || 'ห้องเรียน'}</span>
-                    {selectedClassData?.curriculum_type && (
-                      <span className="ml-1.5 px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold text-[10px] border border-indigo-200 dark:border-indigo-800">
-                        {selectedClassData.curriculum_type === 'pvs' ? 'ปวส. 15 สัปดาห์' : selectedClassData.curriculum_type === 'custom' ? `กำหนดเอง ${selectedClassData.total_weeks || 18} สัปดาห์` : 'ปวช. 18 สัปดาห์'}
-                      </span>
-                    )}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowRetroactiveModal(false)}
-                className="p-2 hover:bg-indigo-50 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
-                aria-label="ปิดหน้าต่าง"
-              >
-                <X className="w-5 h-5 text-slate-500 dark:text-slate-400" />
-              </button>
-            </div>
-
-            {/* Modal Tabs */}
-            <div className="flex bg-slate-100/80 dark:bg-slate-800/80 p-1.5 rounded-2xl mb-5 border border-slate-200/60 dark:border-slate-700">
-              <button
-                type="button"
-                onClick={() => setRetroactiveTab('weeks')}
-                className={`flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${retroactiveTab === 'weeks'
-                  ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300'
-                  }`}
-              >
-                <CalendarIcon className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                <span>เลือกตามสัปดาห์ภาคเรียน ({semesterInfo?.totalWeeks || selectedClassData?.total_weeks || 18} สัปดาห์)</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setRetroactiveTab('calendar')}
-                className={`flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${retroactiveTab === 'calendar'
-                  ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300'
-                  }`}
-              >
-                <Clock className="w-4 h-4 text-violet-600 dark:text-violet-400" />
-                <span>ปฏิทินเลือกวันที่ด่วน</span>
-              </button>
-            </div>
-
-            {/* Tab 1: Week Navigator */}
-            {retroactiveTab === 'weeks' && (
-              <div className="space-y-4">
-                {semesterInfo?.weeks && semesterInfo.weeks.length > 0 ? (
-                  <div className="space-y-3">
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      คลิกเลือกวันที่มีการสอนในสัปดาห์ที่ต้องการ เพื่อเปิดหน้าเช็คชื่อย้อนหลังของวันนั้น:
-                    </p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto pr-1">
-                      {semesterInfo.weeks.map(w => {
-                        const weekStart = new Date(w.start);
-                        const daysInThisWeek = [];
-                        for (let i = 0; i < 7; i++) {
-                          const curD = new Date(weekStart);
-                          curD.setDate(weekStart.getDate() + i);
-                          const curDateStr = curD.toISOString().split('T')[0];
-                          const dayOfWeek = (curD.getDay() + 6) % 7; // 0=Mon..6=Sun
-                          daysInThisWeek.push({
-                            dateStr: curDateStr,
-                            dateObj: curD,
-                            dayOfWeek,
-                            isTeachingDay: teachingDays.includes(dayOfWeek),
-                            isFuture: curDateStr > todayStr,
-                            isSelected: curDateStr === date
-                          });
-                        }
-
-                        const thaiDayNames = ['จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.', 'อา.'];
-
-                        return (
-                          <div
-                            key={w.week}
-                            className={`p-3.5 rounded-2xl border transition-all ${w.isCurrent
-                              ? 'bg-indigo-50/90 dark:bg-slate-800 border-indigo-300 dark:border-indigo-500 ring-2 ring-indigo-200 dark:ring-indigo-500/30 shadow-sm'
-                              : 'bg-white dark:bg-slate-850 border-slate-200/80 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-slate-700 shadow-xs'
-                              }`}
-                          >
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="font-extrabold text-sm text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
-                                <span>สัปดาห์ที่ {w.week}</span>
-                                {w.isCurrent && (
-                                  <span className="text-[10px] bg-indigo-600 text-white font-bold px-2 py-0.5 rounded-full">
-                                    สัปดาห์ปัจจุบัน
-                                  </span>
-                                )}
-                              </span>
-                              <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                                {new Date(w.start).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} - {new Date(w.end).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
-                              </span>
-                            </div>
-
-                            {/* Days buttons in this week */}
-                            <div className="flex flex-wrap gap-1.5">
-                              {daysInThisWeek.map(d => {
-                                if (!d.isTeachingDay && d.dayOfWeek >= 5) return null;
-
-                                return (
-                                  <button
-                                    key={d.dateStr}
-                                    type="button"
-                                    disabled={d.isFuture}
-                                    onClick={() => {
-                                      setDate(d.dateStr);
-                                      setShowRetroactiveModal(false);
-                                      setActiveTab('daily');
-                                      toast.success(`เลือกเช็คชื่อวันที่ ${d.dateObj.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })} (สัปดาห์ที่ ${w.week})`);
-                                    }}
-                                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex flex-col items-center min-w-[50px] cursor-pointer ${d.isSelected
-                                      ? 'bg-indigo-600 text-white shadow-sm'
-                                      : d.isFuture
-                                        ? 'bg-slate-100 dark:bg-slate-800 text-slate-300 dark:text-slate-600 cursor-not-allowed'
-                                        : d.isTeachingDay
-                                          ? 'bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-800 dark:text-indigo-300 border border-indigo-200/70 dark:border-indigo-800 hover:scale-105'
-                                          : 'bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
-                                      }`}
-                                    title={d.isFuture ? 'ยังไม่ถึงวันที่นี้' : `เช็คชื่อวันที่ ${d.dateStr}`}
-                                  >
-                                    <span className="text-[10px] opacity-75">{thaiDayNames[d.dayOfWeek]}</span>
-                                    <span>{d.dateObj.getDate()}</span>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-8 text-center bg-indigo-50/50 dark:bg-slate-800/60 rounded-2xl border border-indigo-100 dark:border-slate-700">
-                    <CalendarIcon className="w-10 h-10 text-indigo-400 mx-auto mb-2" />
-                    <p className="font-bold text-slate-700 dark:text-slate-200 text-sm">ยังไม่ได้กำหนดวันเปิดภาคเรียนของห้องนี้</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-md mx-auto">
-                      สามารถไปตั้งค่า &quot;วันเปิดภาคเรียน&quot; ได้ที่เมนู <strong>ห้องเรียน</strong> หรือใช้แท็บ <strong>&quot;ปฏิทินเลือกวันที่ด่วน&quot;</strong> เพื่อเลือกวันที่ย้อนหลังได้ทันทีครับ
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setRetroactiveTab('calendar')}
-                      className="btn btn-primary text-xs px-4 py-2 mt-4 cursor-pointer"
-                    >
-                      ใช้ปฏิทินเลือกวันที่ด่วน
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Tab 2: Quick Presets & Calendar */}
-            {retroactiveTab === 'calendar' && (
-              <div className="space-y-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 block">
-                    ปุ่มลัดเลือกวันย้อนหลัง:
-                  </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {[
-                      { label: 'เมื่อวาน', days: 1 },
-                      { label: '2 วันก่อน', days: 2 },
-                      { label: '3 วันก่อน', days: 3 },
-                      { label: '1 สัปดาห์ก่อน', days: 7 },
-                    ].map(p => {
-                      const d = new Date();
-                      d.setDate(d.getDate() - p.days);
-                      const dStr = d.toISOString().split('T')[0];
-                      const isSel = date === dStr;
-
-                      return (
-                        <button
-                          key={p.days}
-                          type="button"
-                          onClick={() => {
-                            setDate(dStr);
-                            setShowRetroactiveModal(false);
-                            setActiveTab('daily');
-                            toast.success(`เลือกเช็คชื่อวันที่ ${d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}`);
-                          }}
-                          className={`p-3 rounded-2xl border text-center transition-all cursor-pointer ${isSel
-                            ? 'bg-indigo-600 text-white font-bold border-indigo-600 shadow-sm'
-                            : 'bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold'
-                            }`}
-                        >
-                          <div className="text-xs">{p.label}</div>
-                          <div className={`text-[10px] mt-0.5 ${isSel ? 'text-indigo-100' : 'text-slate-400 dark:text-slate-500'}`}>
-                            {d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
-                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 block" htmlFor="retro-custom-date">
-                    หรือระบุวันที่ในอดีตที่ต้องการ:
-                  </label>
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <input
-                      id="retro-custom-date"
-                      type="date"
-                      max={todayStr}
-                      value={customRetroDate}
-                      onChange={e => setCustomRetroDate(e.target.value)}
-                      className="form-input text-sm flex-1 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!customRetroDate) return;
-                        setDate(customRetroDate);
-                        setShowRetroactiveModal(false);
-                        setActiveTab('daily');
-                        const parsed = new Date(customRetroDate);
-                        toast.success(`เลือกเช็คชื่อวันที่ ${parsed.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}`);
-                      }}
-                      className="btn btn-primary px-6 py-2.5 text-sm cursor-pointer"
-                    >
-                      ยืนยันเลือกวันนี้
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>,
-        document.body
-      )}
-
+      <AttendanceRetroactiveModal
+        isOpen={showRetroactiveModal}
+        onClose={() => setShowRetroactiveModal(false)}
+        selectedClassData={selectedClassData}
+        semesterInfo={semesterInfo}
+        date={date}
+        setDate={setDate}
+        setActiveTab={setActiveTab}
+        teachingDays={teachingDays}
+        todayStr={todayStr}
+      />
     </div>
   );
 }

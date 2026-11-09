@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useMemo, useCallback, memo, Fragment } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -8,7 +8,7 @@ import {
   Calculator, FileSpreadsheet, Grid, Table, CheckCircle2, TrendingUp,
   Award, Eye, EyeOff
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import dynamic from 'next/dynamic';
 import { checkThaiHoliday } from '@/lib/thaiHolidays';
 
@@ -208,14 +208,14 @@ const MatrixStudentRow = memo(function MatrixStudentRow({
         );
       })}
       {hasMidterm && (
-        <td className="p-1 border-l border-indigo-100 bg-cyan-50/30 text-center font-bold text-cyan-800 text-xs h-9" title="คะแนนสอบกลางภาค (W9)">
+        <td className="p-1 border-l border-indigo-100 bg-cyan-50/30 text-center font-bold text-cyan-800 text-xs h-9" title="à¸„à¸°à¹à¸™à¸™à¸ªà¸­à¸šà¸à¸¥à¸²à¸‡à¸ à¸²à¸„ (W9)">
           {student.midterm_score ?? '-'}
         </td>
       )}
-      <td className="p-1 border-l border-indigo-50 bg-blue-50/30 text-center font-bold text-blue-800 text-xs h-9" title="คะแนนสอบปลายภาค">
+      <td className="p-1 border-l border-indigo-50 bg-blue-50/30 text-center font-bold text-blue-800 text-xs h-9" title="à¸„à¸°à¹à¸™à¸™à¸ªà¸­à¸šà¸›à¸¥à¸²à¸¢à¸ à¸²à¸„">
         {student.final_score ?? '-'}
       </td>
-      <td className="p-1 border-l border-indigo-50 bg-pink-50/30 text-center font-bold text-pink-800 text-xs h-9" title="คะแนนจิตพิสัย">
+      <td className="p-1 border-l border-indigo-50 bg-pink-50/30 text-center font-bold text-pink-800 text-xs h-9" title="à¸„à¸°à¹à¸™à¸™à¸ˆà¸´à¸•à¸žà¸´à¸ªà¸±à¸¢">
         {student.affective_score ?? '-'}
       </td>
       <td className="p-2 border-l border-indigo-100 bg-indigo-50 text-center font-black text-indigo-700 text-sm h-9">
@@ -253,7 +253,7 @@ export default function Scores() {
       return 'weekly';
     }
     return 'matrix';
-  }); // 'matrix' (ตารางรวมทั้งเทอม) vs 'weekly' (รายสัปดาห์)
+  }); // 'matrix' (à¸•à¸²à¸£à¸²à¸‡à¸£à¸§à¸¡à¸—à¸±à¹‰à¸‡à¹€à¸—à¸­à¸¡) vs 'weekly' (à¸£à¸²à¸¢à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ)
 
   // Settings State
   const [structures, setStructures] = useState<ScoreStructure[]>([]);
@@ -289,7 +289,7 @@ export default function Scores() {
   });
   const [hideAbsentInWeekly, setHideAbsentInWeekly] = useState(true);
 
-  // ─── Query: ดึงข้อมูลการเข้าเรียนตามวันที่ ───
+  // â”€â”€â”€ Query: à¸”à¸¶à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸à¸²à¸£à¹€à¸‚à¹‰à¸²à¹€à¸£à¸µà¸¢à¸™à¸•à¸²à¸¡à¸§à¸±à¸™à¸—à¸µà¹ˆ â”€â”€â”€
   const { data: attendanceRecords = {} as Record<string, string> } = useQuery<Record<string, string>>({
     queryKey: ['attendance-for-scores', selectedClass, attendanceDate],
     queryFn: async () => {
@@ -304,7 +304,7 @@ export default function Scores() {
     enabled: !!selectedClass && !!attendanceDate,
   });
 
-  // ─── Query: ดึงข้อมูลการเข้าเรียนทั้งหมดของห้องเรียน เพื่อแมปกับสัปดาห์ W1, W2... ───
+  // â”€â”€â”€ Query: à¸”à¸¶à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸à¸²à¸£à¹€à¸‚à¹‰à¸²à¹€à¸£à¸µà¸¢à¸™à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”à¸‚à¸­à¸‡à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™ à¹€à¸žà¸·à¹ˆà¸­à¹à¸¡à¸›à¸à¸±à¸šà¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ W1, W2... â”€â”€â”€
   const { data: allClassAttendance = [] } = useQuery<{ id: number; student_id: number; date: string; status: string }[]>({
     queryKey: ['attendance-all-class-for-scores', selectedClass],
     queryFn: async () => {
@@ -359,10 +359,10 @@ export default function Scores() {
     return { weekDateMap: wDateMap, weekAttendanceMap: wAttMap };
   }, [allClassAttendance]);
 
-  // State for Semester Start Date (วันเริ่มเรียน/วันเริ่มต้นภาคเรียน)
+  // State for Semester Start Date (à¸§à¸±à¸™à¹€à¸£à¸´à¹ˆà¸¡à¹€à¸£à¸µà¸¢à¸™/à¸§à¸±à¸™à¹€à¸£à¸´à¹ˆà¸¡à¸•à¹‰à¸™à¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™)
   const [semesterStartDate, setSemesterStartDate] = useState<string>('');
 
-  // ─── Query: ดึงข้อมูลตารางเรียนทั้งหมด (All Timetable Entries) ───
+  // â”€â”€â”€ Query: à¸”à¸¶à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸•à¸²à¸£à¸²à¸‡à¹€à¸£à¸µà¸¢à¸™à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸” (All Timetable Entries) â”€â”€â”€
   const { data: allTimetableEntries = [] } = useQuery<{ classroom_id: number | string; day_of_week: number; hours?: number; entry_type?: string; entryType?: string }[]>({
     queryKey: ['timetable-all'],
     queryFn: async () => {
@@ -371,7 +371,7 @@ export default function Scores() {
     }
   });
 
-  // ─── Query: ดึงข้อมูลห้องเรียน (shared cache) ───
+  // â”€â”€â”€ Query: à¸”à¸¶à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™ (shared cache) â”€â”€â”€
   const { data: classrooms = [], isLoading: loadingClassrooms } = useQuery<Classroom[]>({
     queryKey: ['classrooms'],
     queryFn: async () => {
@@ -388,7 +388,7 @@ export default function Scores() {
   useEffect(() => {
     if (!selectedClass) return;
 
-    // 1. ถ้ามีข้อมูลใน DB (classroom.semester_start_date) ให้ใช้ค่าจาก DB เสมอ
+    // 1. à¸–à¹‰à¸²à¸¡à¸µà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¹ƒà¸™ DB (classroom.semester_start_date) à¹ƒà¸«à¹‰à¹ƒà¸Šà¹‰à¸„à¹ˆà¸²à¸ˆà¸²à¸ DB à¹€à¸ªà¸¡à¸­
     if (classroomObj?.semester_start_date) {
       setSemesterStartDate(classroomObj.semester_start_date);
       try {
@@ -397,7 +397,7 @@ export default function Scores() {
       return;
     }
 
-    // 2. ตรวจสอบ legacy localStorage (ถ้ามีค่าเก่า ให้ซิงก์ขึ้น DB ให้ด้วย)
+    // 2. à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸š legacy localStorage (à¸–à¹‰à¸²à¸¡à¸µà¸„à¹ˆà¸²à¹€à¸à¹ˆà¸² à¹ƒà¸«à¹‰à¸‹à¸´à¸‡à¸à¹Œà¸‚à¸¶à¹‰à¸™ DB à¹ƒà¸«à¹‰à¸”à¹‰à¸§à¸¢)
     const stored = typeof window !== 'undefined' ? localStorage.getItem(`scores_start_date_${selectedClass}`) : null;
     if (stored) {
       setSemesterStartDate(stored);
@@ -412,7 +412,7 @@ export default function Scores() {
       return;
     }
 
-    // 3. Fallback: ดูจากวันแรกที่มีการเช็คชื่อ
+    // 3. Fallback: à¸”à¸¹à¸ˆà¸²à¸à¸§à¸±à¸™à¹à¸£à¸à¸—à¸µà¹ˆà¸¡à¸µà¸à¸²à¸£à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­
     if (allClassAttendance && allClassAttendance.length > 0) {
       const validDates = allClassAttendance
         .map(r => parseSafeDateStr(r.date))
@@ -424,7 +424,7 @@ export default function Scores() {
       }
     }
 
-    // 4. Default: วันที่ 18 พฤษภาคม ของปีปัจจุบัน
+    // 4. Default: à¸§à¸±à¸™à¸—à¸µà¹ˆ 18 à¸žà¸¤à¸©à¸ à¸²à¸„à¸¡ à¸‚à¸­à¸‡à¸›à¸µà¸›à¸±à¸ˆà¸ˆà¸¸à¸šà¸±à¸™
     const d = new Date();
     setSemesterStartDate(`${d.getFullYear()}-05-18`);
   }, [selectedClass, classroomObj?.semester_start_date, allClassAttendance, queryClient]);
@@ -439,10 +439,10 @@ export default function Scores() {
       try {
         localStorage.removeItem(`scores_start_date_${selectedClass}`);
       } catch {}
-      toast.success('บันทึกวันเริ่มต้นภาคเรียนเรียบร้อย');
+      toast.success('à¸šà¸±à¸™à¸—à¸¶à¸à¸§à¸±à¸™à¹€à¸£à¸´à¹ˆà¸¡à¸•à¹‰à¸™à¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢');
     } catch (err) {
       console.error('Failed to update semester_start_date in DB:', err);
-      toast.error('ไม่สามารถบันทึกวันเริ่มต้นภาคเรียนลงฐานข้อมูลได้');
+      toast.error('à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸šà¸±à¸™à¸—à¸¶à¸à¸§à¸±à¸™à¹€à¸£à¸´à¹ˆà¸¡à¸•à¹‰à¸™à¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™à¸¥à¸‡à¸à¸²à¸™à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¹„à¸”à¹‰');
     }
   };
 
@@ -496,8 +496,8 @@ export default function Scores() {
     if (!dateStr) return null;
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return null;
-    const THAI_DAYS = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
-    const THAI_SHORT_MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+    const THAI_DAYS = ['à¸­à¸².', 'à¸ˆ.', 'à¸­.', 'à¸ž.', 'à¸žà¸¤.', 'à¸¨.', 'à¸ª.'];
+    const THAI_SHORT_MONTHS = ['à¸¡.à¸„.', 'à¸.à¸ž.', 'à¸¡à¸µ.à¸„.', 'à¹€à¸¡.à¸¢.', 'à¸ž.à¸„.', 'à¸¡à¸´.à¸¢.', 'à¸.à¸„.', 'à¸ª.à¸„.', 'à¸.à¸¢.', 'à¸•.à¸„.', 'à¸ž.à¸¢.', 'à¸˜.à¸„.'];
     const dayName = THAI_DAYS[d.getDay()];
     const dayNum = d.getDate();
     const monthName = THAI_SHORT_MONTHS[d.getMonth()];
@@ -510,7 +510,7 @@ export default function Scores() {
 
 
 
-  // ─── Composite Matrix Query: ดึงข้อมูลนักเรียน + โครงสร้างคะแนน + คะแนนทั้งหมด ───
+  // â”€â”€â”€ Composite Matrix Query: à¸”à¸¶à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™ + à¹‚à¸„à¸£à¸‡à¸ªà¸£à¹‰à¸²à¸‡à¸„à¸°à¹à¸™à¸™ + à¸„à¸°à¹à¸™à¸™à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸” â”€â”€â”€
   const { data: matrixData, isLoading: matrixLoading, refetch: refetchMatrix } = useQuery({
     queryKey: ['scores-matrix-data', selectedClass],
     queryFn: async () => {
@@ -522,7 +522,7 @@ export default function Scores() {
 
   const students: Student[] = useMemo(() => matrixData?.students || [], [matrixData?.students]);
 
-  // ─── Sub-room / Section Grouping (แยกห้องย่อยเมื่อเรียนรวม เช่น ปวช.1/1 + ปวช.1/2) ───
+  // â”€â”€â”€ Sub-room / Section Grouping (à¹à¸¢à¸à¸«à¹‰à¸­à¸‡à¸¢à¹ˆà¸­à¸¢à¹€à¸¡à¸·à¹ˆà¸­à¹€à¸£à¸µà¸¢à¸™à¸£à¸§à¸¡ à¹€à¸Šà¹ˆà¸™ à¸›à¸§à¸Š.1/1 + à¸›à¸§à¸Š.1/2) â”€â”€â”€
   const [selectedSectionKey, setSelectedSectionKey] = useState<string>('all');
 
   // Reset section filter when switching classrooms
@@ -554,17 +554,17 @@ export default function Scores() {
 
   const isPws = useMemo(() => {
     const nameOrDesc = `${classroomObj?.name || ''} ${classroomObj?.description || ''}`;
-    return classroomObj?.curriculum_type === 'pvs' || Boolean(nameOrDesc.includes('ปวส') || nameOrDesc.includes('ปวส.'));
+    return classroomObj?.curriculum_type === 'pvs' || Boolean(nameOrDesc.includes('à¸›à¸§à¸ª') || nameOrDesc.includes('à¸›à¸§à¸ª.'));
   }, [classroomObj]);
 
   const hasMidterm = useMemo(() => {
-    // ปวส. ไม่มีสอบกลางภาคเสมอ
+    // à¸›à¸§à¸ª. à¹„à¸¡à¹ˆà¸¡à¸µà¸ªà¸­à¸šà¸à¸¥à¸²à¸‡à¸ à¸²à¸„à¹€à¸ªà¸¡à¸­
     if (isPws) return false;
-    // ปวช. สามารถมีหรือไม่มีกลางภาคได้ โดยอิงตามค่าน้ำหนักกลางภาค (> 0)
+    // à¸›à¸§à¸Š. à¸ªà¸²à¸¡à¸²à¸£à¸–à¸¡à¸µà¸«à¸£à¸·à¸­à¹„à¸¡à¹ˆà¸¡à¸µà¸à¸¥à¸²à¸‡à¸ à¸²à¸„à¹„à¸”à¹‰ à¹‚à¸”à¸¢à¸­à¸´à¸‡à¸•à¸²à¸¡à¸„à¹ˆà¸²à¸™à¹‰à¸³à¸«à¸™à¸±à¸à¸à¸¥à¸²à¸‡à¸ à¸²à¸„ (> 0)
     return Number(classroomObj?.midterm_weight ?? 0) > 0;
   }, [isPws, classroomObj]);
 
-  // สัปดาห์เก็บงานย่อย: ปวส = 14 สัปดาห์ (W1–W14), ปวช = 17 สัปดาห์ (W1–W17) เพราะสัปดาห์สุดท้ายเป็นปลายภาค
+  // à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¹€à¸à¹‡à¸šà¸‡à¸²à¸™à¸¢à¹ˆà¸­à¸¢: à¸›à¸§à¸ª = 14 à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ (W1â€“W14), à¸›à¸§à¸Š = 17 à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ (W1â€“W17) à¹€à¸žà¸£à¸²à¸°à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¸ªà¸¸à¸”à¸—à¹‰à¸²à¸¢à¹€à¸›à¹‡à¸™à¸›à¸¥à¸²à¸¢à¸ à¸²à¸„
   const targetTeachingWeeks = useMemo(() => {
     return isPws ? 14 : 17;
   }, [isPws]);
@@ -580,7 +580,7 @@ export default function Scores() {
       if (fetchedStructs.length === 0) {
         finalStructs = Array.from({ length: targetWeeks }, (_, i) => ({
           lesson_number: i + 1,
-          lesson_name: `บทที่/สัปดาห์ที่ ${i + 1}`,
+          lesson_name: `à¸šà¸—à¸—à¸µà¹ˆ/à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¸—à¸µà¹ˆ ${i + 1}`,
           max_assignment_score: 10,
           max_post_test_score: 10,
           hours: 0
@@ -594,7 +594,7 @@ export default function Scores() {
           const startNum = adjustedStructs.length + 1;
           const padding = Array.from({ length: diff }, (_, i) => ({
             lesson_number: startNum + i,
-            lesson_name: `บทที่/สัปดาห์ที่ ${startNum + i}`,
+            lesson_name: `à¸šà¸—à¸—à¸µà¹ˆ/à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¸—à¸µà¹ˆ ${startNum + i}`,
             max_assignment_score: 10,
             max_post_test_score: 10,
             hours: 0
@@ -654,7 +654,7 @@ export default function Scores() {
     setScores(scoresMap);
   }, [selectedLesson, matrixScores, students, selectedClass]);
 
-  // ─── Auto-sync attendanceDate with the currently selected weekly lesson ───
+  // â”€â”€â”€ Auto-sync attendanceDate with the currently selected weekly lesson â”€â”€â”€
   useEffect(() => {
     const weekNum = parseInt(selectedLesson);
     if (!isNaN(weekNum) && weekNum > 0) {
@@ -665,7 +665,7 @@ export default function Scores() {
     }
   }, [selectedLesson, calculatedWeekDates, weekDateMap, attendanceDate]);
 
-  // ─── Analytics Summary Computations (ตามขอบเขตห้องย่อยที่เลือก) ───
+  // â”€â”€â”€ Analytics Summary Computations (à¸•à¸²à¸¡à¸‚à¸­à¸šà¹€à¸‚à¸•à¸«à¹‰à¸­à¸‡à¸¢à¹ˆà¸­à¸¢à¸—à¸µà¹ˆà¹€à¸¥à¸·à¸­à¸) â”€â”€â”€
   const analyticsSummary = useMemo(() => {
     if (!sectionScopedStudents.length || !structures.length) {
       return { avgScore: 0, completionRate: 0, highestScore: 0, lowestScore: 0, totalMaxScore: 100 };
@@ -760,7 +760,7 @@ export default function Scores() {
     return '';
   }, [attendanceRecords, attendanceStatusIndex, weekAttendanceMap, calculatedWeekDates, weekDateMap, attendanceDate, selectedLesson]);
 
-  // Weekly displayed students: hide absent students when in weekly focus (ตามขอบเขตห้องย่อยที่เลือก)
+  // Weekly displayed students: hide absent students when in weekly focus (à¸•à¸²à¸¡à¸‚à¸­à¸šà¹€à¸‚à¸•à¸«à¹‰à¸­à¸‡à¸¢à¹ˆà¸­à¸¢à¸—à¸µà¹ˆà¹€à¸¥à¸·à¸­à¸)
   const weeklyDisplayedStudents = useMemo(() => {
     const weekNum = parseInt(selectedLesson);
     if (isNaN(weekNum) || weekNum <= 0) return sectionScopedStudents;
@@ -774,7 +774,7 @@ export default function Scores() {
     });
   }, [sectionScopedStudents, selectedLesson, hideAbsentInWeekly, getStudentAttendanceStatus]);
 
-  // Attendance stats for the active weekly lesson (ตามขอบเขตห้องย่อยที่เลือก)
+  // Attendance stats for the active weekly lesson (à¸•à¸²à¸¡à¸‚à¸­à¸šà¹€à¸‚à¸•à¸«à¹‰à¸­à¸‡à¸¢à¹ˆà¸­à¸¢à¸—à¸µà¹ˆà¹€à¸¥à¸·à¸­à¸)
   const weeklyAttendanceCounts = useMemo(() => {
     if (!selectedLesson) {
       return { absent: 0, leave: 0, present: 0, late: 0, noData: 0, total: sectionScopedStudents.length };
@@ -848,19 +848,19 @@ export default function Scores() {
   const getAttendanceBadge = (status: string) => {
     switch (status) {
       case 'present':
-        return <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-[10px] font-bold border border-emerald-500/20">มาเรียน</span>;
+        return <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-[10px] font-bold border border-emerald-500/20">à¸¡à¸²à¹€à¸£à¸µà¸¢à¸™</span>;
       case 'late':
-        return <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 text-[10px] font-bold border border-amber-500/20">สาย</span>;
+        return <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 text-[10px] font-bold border border-amber-500/20">à¸ªà¸²à¸¢</span>;
       case 'absent':
-        return <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-500 text-[10px] font-bold border border-rose-500/20">ขาด (0)</span>;
+        return <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-500 text-[10px] font-bold border border-rose-500/20">à¸‚à¸²à¸” (0)</span>;
       case 'leave':
-        return <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 text-[10px] font-bold border border-blue-500/20">ลา (0)</span>;
+        return <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 text-[10px] font-bold border border-blue-500/20">à¸¥à¸² (0)</span>;
       default:
-        return <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-400 text-[10px] font-bold border border-slate-200">ไม่มีข้อมูล</span>;
+        return <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-400 text-[10px] font-bold border border-slate-200">à¹„à¸¡à¹ˆà¸¡à¸µà¸‚à¹‰à¸­à¸¡à¸¹à¸¥</span>;
     }
   };
 
-  // ─── Quick Fill 0 for Absent & Leave Students (ตามขอบเขตห้องย่อยที่เลือก) ───
+  // â”€â”€â”€ Quick Fill 0 for Absent & Leave Students (à¸•à¸²à¸¡à¸‚à¸­à¸šà¹€à¸‚à¸•à¸«à¹‰à¸­à¸‡à¸¢à¹ˆà¸­à¸¢à¸—à¸µà¹ˆà¹€à¸¥à¸·à¸­à¸) â”€â”€â”€
   const handleFillZeroForAbsentees = (targetWeekNum?: number) => {
     const targetWeek = targetWeekNum || (Number(selectedLesson) ? Number(selectedLesson) : null);
     let fillCount = 0;
@@ -901,8 +901,8 @@ export default function Scores() {
     }
 
     setHasPendingChanges(true);
-    const scopeLabel = activeSectionGroup ? `ห้อง "${activeSectionGroup.label}"` : '';
-    toast.success(`เติมคะแนน 0 ให้ผู้เรียนที่ขาด/ลา ${scopeLabel} (${fillCount} ช่อง) เรียบร้อยแล้ว`);
+    const scopeLabel = activeSectionGroup ? `à¸«à¹‰à¸­à¸‡ "${activeSectionGroup.label}"` : '';
+    toast.success(`à¹€à¸•à¸´à¸¡à¸„à¸°à¹à¸™à¸™ 0 à¹ƒà¸«à¹‰à¸œà¸¹à¹‰à¹€à¸£à¸µà¸¢à¸™à¸—à¸µà¹ˆà¸‚à¸²à¸”/à¸¥à¸² ${scopeLabel} (${fillCount} à¸Šà¹ˆà¸­à¸‡) à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢à¹à¸¥à¹‰à¸§`);
   };
 
   const handleFillSingleStudentZero = (studentId: string | number, lessonNum?: number) => {
@@ -918,7 +918,7 @@ export default function Scores() {
       [String(studentId)]: { assignment_score: 0, post_test_score: 0 }
     }));
     setHasPendingChanges(true);
-    toast.success('กำหนดคะแนน 0 สำหรับนักเรียนที่ขาด/ลาแล้ว');
+    toast.success('à¸à¸³à¸«à¸™à¸”à¸„à¸°à¹à¸™à¸™ 0 à¸ªà¸³à¸«à¸£à¸±à¸šà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸—à¸µà¹ˆà¸‚à¸²à¸”/à¸¥à¸²à¹à¸¥à¹‰à¸§');
   };
 
   const handleStructureChange = (index: number, field: keyof ScoreStructure, value: string | number) => {
@@ -927,7 +927,7 @@ export default function Scores() {
     setStructures(newStructs);
   };
 
-  // ─── Mutation: บันทึกโครงสร้างคะแนน ───
+  // â”€â”€â”€ Mutation: à¸šà¸±à¸™à¸—à¸¶à¸à¹‚à¸„à¸£à¸‡à¸ªà¸£à¹‰à¸²à¸‡à¸„à¸°à¹à¸™à¸™ â”€â”€â”€
   const saveStructureMutation = useMutation({
     mutationFn: async () => {
       await api.post(`/scores?classroom_id=${selectedClass}&type=structure`, {
@@ -941,12 +941,12 @@ export default function Scores() {
       });
     },
     onSuccess: () => {
-      toast.success('บันทึกโครงสร้างคะแนนเรียบร้อย');
+      toast.success('à¸šà¸±à¸™à¸—à¸¶à¸à¹‚à¸„à¸£à¸‡à¸ªà¸£à¹‰à¸²à¸‡à¸„à¸°à¹à¸™à¸™à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢');
       setStructureSavedInDB(true);
       refetchMatrix();
     },
     onError: () => {
-      toast.error('บันทึกโครงสร้างคะแนนไม่สำเร็จ');
+      toast.error('à¸šà¸±à¸™à¸—à¸¶à¸à¹‚à¸„à¸£à¸‡à¸ªà¸£à¹‰à¸²à¸‡à¸„à¸°à¹à¸™à¸™à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
     },
   });
 
@@ -988,7 +988,7 @@ export default function Scores() {
     setHasPendingChanges(true);
   };
 
-  // ─── Mutation: บันทึกคะแนนแบบ Bulk Matrix Transaction ───
+  // â”€â”€â”€ Mutation: à¸šà¸±à¸™à¸—à¸¶à¸à¸„à¸°à¹à¸™à¸™à¹à¸šà¸š Bulk Matrix Transaction â”€â”€â”€
   const saveMatrixScoresMutation = useMutation({
     mutationFn: async () => {
       const currentMatrix = matrixScores;
@@ -1023,16 +1023,16 @@ export default function Scores() {
       setHasPendingChanges(false);
       const now = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       setLastSavedTime(now);
-      toast.success('บันทึกคะแนนรวมเรียบร้อยแล้ว');
+      toast.success('à¸šà¸±à¸™à¸—à¸¶à¸à¸„à¸°à¹à¸™à¸™à¸£à¸§à¸¡à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢à¹à¸¥à¹‰à¸§');
       queryClient.invalidateQueries({ queryKey: ['grades'] });
       refetchMatrix();
     },
     onError: () => {
-      toast.error('บันทึกคะแนนไม่สำเร็จ');
+      toast.error('à¸šà¸±à¸™à¸—à¸¶à¸à¸„à¸°à¹à¸™à¸™à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
     },
   });
 
-  // ─── Mutation: บันทึกคะแนนสัปดาห์เดียว ───
+  // â”€â”€â”€ Mutation: à¸šà¸±à¸™à¸—à¸¶à¸à¸„à¸°à¹à¸™à¸™à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¹€à¸”à¸µà¸¢à¸§ â”€â”€â”€
   const saveWeeklyScoresMutation = useMutation({
     mutationFn: async () => {
       const currentScores = scores;
@@ -1052,12 +1052,12 @@ export default function Scores() {
       setHasPendingChanges(false);
       const now = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       setLastSavedTime(now);
-      toast.success('บันทึกคะแนนเรียบร้อย');
+      toast.success('à¸šà¸±à¸™à¸—à¸¶à¸à¸„à¸°à¹à¸™à¸™à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢');
       queryClient.invalidateQueries({ queryKey: ['grades'] });
       refetchMatrix();
     },
     onError: () => {
-      toast.error('บันทึกคะแนนไม่สำเร็จ');
+      toast.error('à¸šà¸±à¸™à¸—à¸¶à¸à¸„à¸°à¹à¸™à¸™à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
     },
   });
 
@@ -1103,9 +1103,9 @@ export default function Scores() {
 
   // --- Open Test Blueprint Calculator with Smart Auto-Prefill ---
   const handleOpenCalculator = () => {
-    // 1. Auto-detect curriculum (ปวช. 18 สัปดาห์ vs ปวส. 15 สัปดาห์)
+    // 1. Auto-detect curriculum (à¸›à¸§à¸Š. 18 à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ vs à¸›à¸§à¸ª. 15 à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ)
     const nameOrDesc = `${classroomObj?.name || ''} ${classroomObj?.description || ''}`;
-    const isPwsClass = Boolean(nameOrDesc.includes('ปวส') || nameOrDesc.includes('ปวส.') || classroomObj?.curriculum_type === 'pvs');
+    const isPwsClass = Boolean(nameOrDesc.includes('à¸›à¸§à¸ª') || nameOrDesc.includes('à¸›à¸§à¸ª.') || classroomObj?.curriculum_type === 'pvs');
     const detectedWeeks = isPwsClass ? 15 : 18;
     setCurriculumWeeks(detectedWeeks);
     setHasMidtermCalculator(!isPwsClass && Number(classroomObj?.midterm_weight ?? 0) > 0);
@@ -1121,7 +1121,7 @@ export default function Scores() {
     }
 
     // 3. Auto-detect Theory and Practice hours from Subject name/description e.g. (1-2-2) or timetable
-    const match = nameOrDesc.match(/\(?\b(\d+)\s*[-–/]\s*(\d+)\s*[-–/]\s*(\d+)\b\)?/);
+    const match = nameOrDesc.match(/\(?\b(\d+)\s*[-â€“/]\s*(\d+)\s*[-â€“/]\s*(\d+)\b\)?/);
     if (match) {
       const t = parseInt(match[1]);
       const p = parseInt(match[2]);
@@ -1154,17 +1154,17 @@ export default function Scores() {
     setShowCalculator(true);
   };
 
-  // --- Test Blueprint Calculator with Smart Fallback & Curriculum (ปวช./ปวส.) ---
+  // --- Test Blueprint Calculator with Smart Fallback & Curriculum (à¸›à¸§à¸Š./à¸›à¸§à¸ª.) ---
   const calculateBlueprint = (customTeachingWeeks?: number) => {
     const totalContactHours = (Number(theoryHoursPerWeek) || 0) + (Number(practiceHoursPerWeek) || 0);
     if (totalContactHours === 0) {
-      toast.error('กรุณาระบุชั่วโมงทฤษฎีและปฏิบัติ (ต้องรวมกันมากกว่า 0)');
+      toast.error('à¸à¸£à¸¸à¸“à¸²à¸£à¸°à¸šà¸¸à¸Šà¸±à¹ˆà¸§à¹‚à¸¡à¸‡à¸—à¸¤à¸©à¸Žà¸µà¹à¸¥à¸°à¸›à¸à¸´à¸šà¸±à¸•à¸´ (à¸•à¹‰à¸­à¸‡à¸£à¸§à¸¡à¸à¸±à¸™à¸¡à¸²à¸à¸à¸§à¹ˆà¸² 0)');
       return;
     }
 
     const weeksCount = customTeachingWeeks || targetTeachingWeeks;
 
-    // 1. Adjust structures length to match teaching weeks (14 for ปวส., 17 for ปวช.)
+    // 1. Adjust structures length to match teaching weeks (14 for à¸›à¸§à¸ª., 17 for à¸›à¸§à¸Š.)
     let effectiveStructures = structures;
     if (effectiveStructures.length !== weeksCount) {
       if (effectiveStructures.length > weeksCount) {
@@ -1174,7 +1174,7 @@ export default function Scores() {
         const startNum = effectiveStructures.length + 1;
         const padding = Array.from({ length: diff }, (_, i) => ({
           lesson_number: startNum + i,
-          lesson_name: `บทที่/สัปดาห์ที่ ${startNum + i}`,
+          lesson_name: `à¸šà¸—à¸—à¸µà¹ˆ/à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¸—à¸µà¹ˆ ${startNum + i}`,
           max_assignment_score: 10,
           max_post_test_score: 10,
           hours: totalContactHours
@@ -1201,7 +1201,7 @@ export default function Scores() {
     let newStructs: ScoreStructure[] = [];
 
     if (scoreScaleMode === 'standard_10') {
-      // โหมดคะแนนเต็มมาตรฐาน (เช่น เต็ม 10/ช่อง หรือตามสัดส่วน 5 กับ 10) ตรวจง่าย ไม่เป็น 1 คะแนน
+      // à¹‚à¸«à¸¡à¸”à¸„à¸°à¹à¸™à¸™à¹€à¸•à¹‡à¸¡à¸¡à¸²à¸•à¸£à¸à¸²à¸™ (à¹€à¸Šà¹ˆà¸™ à¹€à¸•à¹‡à¸¡ 10/à¸Šà¹ˆà¸­à¸‡ à¸«à¸£à¸·à¸­à¸•à¸²à¸¡à¸ªà¸±à¸”à¸ªà¹ˆà¸§à¸™ 5 à¸à¸±à¸š 10) à¸•à¸£à¸§à¸ˆà¸‡à¹ˆà¸²à¸¢ à¹„à¸¡à¹ˆà¹€à¸›à¹‡à¸™ 1 à¸„à¸°à¹à¸™à¸™
       let assignPerWeek = standardWeeklyBaseScore;
       let postTestPerWeek = standardWeeklyBaseScore;
 
@@ -1221,9 +1221,9 @@ export default function Scores() {
       }));
 
       const totalRaw = newStructs.reduce((sum, s) => sum + Number(s.max_assignment_score || 0) + Number(s.max_post_test_score || 0), 0);
-      toast.success(`ตั้งค่าสัดส่วนสำเร็จ (${curriculumWeeks === 15 ? 'ปวส. 15 สัปดาห์' : 'ปวช. 18 สัปดาห์'})! สอบย่อยเต็ม ${postTestPerWeek} | งานเก็บเต็ม ${assignPerWeek} (รวมดิบ ${totalRaw} คะแนน — ทอนน้ำหนัก ${totalAcademicScore} ในหน้าตัดเกรดอัตโนมัติ)`);
+      toast.success(`à¸•à¸±à¹‰à¸‡à¸„à¹ˆà¸²à¸ªà¸±à¸”à¸ªà¹ˆà¸§à¸™à¸ªà¸³à¹€à¸£à¹‡à¸ˆ (${curriculumWeeks === 15 ? 'à¸›à¸§à¸ª. 15 à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ' : 'à¸›à¸§à¸Š. 18 à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ'})! à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢à¹€à¸•à¹‡à¸¡ ${postTestPerWeek} | à¸‡à¸²à¸™à¹€à¸à¹‡à¸šà¹€à¸•à¹‡à¸¡ ${assignPerWeek} (à¸£à¸§à¸¡à¸”à¸´à¸š ${totalRaw} à¸„à¸°à¹à¸™à¸™ â€” à¸—à¸­à¸™à¸™à¹‰à¸³à¸«à¸™à¸±à¸ ${totalAcademicScore} à¹ƒà¸™à¸«à¸™à¹‰à¸²à¸•à¸±à¸”à¹€à¸à¸£à¸”à¸­à¸±à¸•à¹‚à¸™à¸¡à¸±à¸•à¸´)`);
     } else {
-      // โหมดเกลี่ยตรงตามค่าน้ำหนักวิชา (Direct weight distribution)
+      // à¹‚à¸«à¸¡à¸”à¹€à¸à¸¥à¸µà¹ˆà¸¢à¸•à¸£à¸‡à¸•à¸²à¸¡à¸„à¹ˆà¸²à¸™à¹‰à¸³à¸«à¸™à¸±à¸à¸§à¸´à¸Šà¸² (Direct weight distribution)
       let runningSkillTotal = 0;
       let runningTestTotal = 0;
       const targetSkillTotal = Math.round(totalAcademicScore * practiceRatio);
@@ -1252,7 +1252,7 @@ export default function Scores() {
         };
       });
 
-      toast.success(`คำนวณสัดส่วนสำเร็จ (${curriculumWeeks === 15 ? 'ปวส. 15 สัปดาห์' : 'ปวช. 18 สัปดาห์'})! สอบย่อย = ${targetTestTotal} | งานเก็บ = ${targetSkillTotal} | รวม = ${totalAcademicScore}`);
+      toast.success(`à¸„à¸³à¸™à¸§à¸“à¸ªà¸±à¸”à¸ªà¹ˆà¸§à¸™à¸ªà¸³à¹€à¸£à¹‡à¸ˆ (${curriculumWeeks === 15 ? 'à¸›à¸§à¸ª. 15 à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ' : 'à¸›à¸§à¸Š. 18 à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ'})! à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢ = ${targetTestTotal} | à¸‡à¸²à¸™à¹€à¸à¹‡à¸š = ${targetSkillTotal} | à¸£à¸§à¸¡ = ${totalAcademicScore}`);
     }
 
     setStructures(newStructs);
@@ -1278,7 +1278,7 @@ export default function Scores() {
       {/* Top Header Title */}
 
 
-      {/* Active Classroom Bar (เมื่อเลือกห้องแล้ว) */}
+      {/* Active Classroom Bar (à¹€à¸¡à¸·à¹ˆà¸­à¹€à¸¥à¸·à¸­à¸à¸«à¹‰à¸­à¸‡à¹à¸¥à¹‰à¸§) */}
       {selectedClass && selectedClassData && activeParsed && (
         <div className="glass p-5 sm:p-6 rounded-3xl border border-indigo-100/80 bg-white/95 shadow-xl shadow-indigo-100/20 space-y-4">
           {/* Top Row: Course Info & Quick Switcher */}
@@ -1298,7 +1298,7 @@ export default function Scores() {
                     ? 'bg-purple-50 text-purple-700 border-purple-200'
                     : 'bg-indigo-50 text-indigo-700 border-indigo-200'
                     }`}>
-                    {activeParsed.curriculumType === 'pvs' ? 'ปวส.' : 'ปวช.'}
+                    {activeParsed.curriculumType === 'pvs' ? 'à¸›à¸§à¸ª.' : 'à¸›à¸§à¸Š.'}
                   </span>
                   {activeParsed.groupName && (
                     <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-800 border border-amber-200/80 shadow-2xs">
@@ -1306,7 +1306,7 @@ export default function Scores() {
                     </span>
                   )}
                   <span className="text-xs font-semibold text-slate-500 ml-1">
-                    (👥 {selectedClassData.student_count || students.length || 0} คน)
+                    (ðŸ‘¥ {selectedClassData.student_count || students.length || 0} à¸„à¸™)
                   </span>
                 </div>
                 <h2 className="text-base sm:text-xl font-black text-slate-800 leading-tight mt-1 truncate" title={activeParsed.subjectTitle}>
@@ -1315,14 +1315,14 @@ export default function Scores() {
               </div>
             </div>
 
-            {/* Quick Switch / เปลี่ยนห้อง */}
+            {/* Quick Switch / à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¸«à¹‰à¸­à¸‡ */}
             <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
               <div className="relative">
                 <select
                   value={selectedClass}
                   onChange={e => handleClassroomSelectChange(e.target.value)}
                   className="form-input text-xs font-bold py-2 pl-3 pr-8 bg-white/90 hover:bg-white border-slate-200 rounded-xl focus:border-indigo-400 focus:ring focus:ring-indigo-200/50 transition-all text-slate-700 cursor-pointer shadow-xs max-w-[200px] sm:max-w-[260px] truncate"
-                  title="สลับห้องเรียนเร็ว"
+                  title="à¸ªà¸¥à¸±à¸šà¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™à¹€à¸£à¹‡à¸§"
                 >
                   {classrooms.map(c => (
                     <option key={c.id} value={c.id}>
@@ -1335,10 +1335,10 @@ export default function Scores() {
                 type="button"
                 onClick={() => setSelectedClass('')}
                 className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/70 transition-all shadow-xs cursor-pointer shrink-0"
-                title="ย้อนกลับไปดูการ์ดห้องเรียนทั้งหมด"
+                title="à¸¢à¹‰à¸­à¸™à¸à¸¥à¸±à¸šà¹„à¸›à¸”à¸¹à¸à¸²à¸£à¹Œà¸”à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”"
               >
                 <Grid className="w-3.5 h-3.5 text-indigo-600" />
-                <span>การ์ดทั้งหมด</span>
+                <span>à¸à¸²à¸£à¹Œà¸”à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”</span>
               </button>
             </div>
           </div>
@@ -1355,16 +1355,16 @@ export default function Scores() {
                   totalStudentsCount={students.length}
                   sharedBranch={sharedBranch}
                   themeColor="indigo"
-                  label="แยกห้องบันทึกคะแนน:"
+                  label="à¹à¸¢à¸à¸«à¹‰à¸­à¸‡à¸šà¸±à¸™à¸—à¸¶à¸à¸„à¸°à¹à¸™à¸™:"
                   rightContent={
                     activeSectionGroup ? (
                       <span className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
-                        กำลังบันทึกคะแนนห้อง: <span className="text-indigo-700 font-extrabold bg-indigo-50 px-2.5 py-0.5 rounded-lg border border-indigo-200/70">{activeSectionGroup.label}</span>
-                        <span className="text-slate-400">({activeSectionGroup.students.length} คน)</span>
+                        à¸à¸³à¸¥à¸±à¸‡à¸šà¸±à¸™à¸—à¸¶à¸à¸„à¸°à¹à¸™à¸™à¸«à¹‰à¸­à¸‡: <span className="text-indigo-700 font-extrabold bg-indigo-50 px-2.5 py-0.5 rounded-lg border border-indigo-200/70">{activeSectionGroup.label}</span>
+                        <span className="text-slate-400">({activeSectionGroup.students.length} à¸„à¸™)</span>
                       </span>
                     ) : (
                       <span className="text-xs text-slate-400 font-medium">
-                        (แสดงนักเรียนทุกห้องย่อยรวมกัน)
+                        (à¹à¸ªà¸”à¸‡à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸—à¸¸à¸à¸«à¹‰à¸­à¸‡à¸¢à¹ˆà¸­à¸¢à¸£à¸§à¸¡à¸à¸±à¸™)
                       </span>
                     )
                   }
@@ -1375,16 +1375,16 @@ export default function Scores() {
         </div>
       )}
 
-      {/* Classroom Card Picker (เมื่อยังไม่ได้เลือกห้องเรียน) */}
+      {/* Classroom Card Picker (à¹€à¸¡à¸·à¹ˆà¸­à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¹„à¸”à¹‰à¹€à¸¥à¸·à¸­à¸à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™) */}
       {!selectedClass && (
         <ClassroomCardPicker
           classrooms={classrooms}
           onSelect={(id) => handleClassroomSelectChange(id)}
-          title="เลือกห้องเรียนเพื่อจัดการคะแนน"
+          title="à¹€à¸¥à¸·à¸­à¸à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™à¹€à¸žà¸·à¹ˆà¸­à¸ˆà¸±à¸”à¸à¸²à¸£à¸„à¸°à¹à¸™à¸™"
           subtitle=""
           icon={<BookOpen className="w-6 h-6" />}
           themeColor="indigo"
-          actionText="เปิดสมุดคะแนนห้องนี้"
+          actionText="à¹€à¸›à¸´à¸”à¸ªà¸¡à¸¸à¸”à¸„à¸°à¹à¸™à¸™à¸«à¹‰à¸­à¸‡à¸™à¸µà¹‰"
         />
       )}
 
@@ -1397,7 +1397,7 @@ export default function Scores() {
                 <TrendingUp className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-xs font-semibold text-slate-500">คะแนนเฉลี่ยห้อง (Mean)</p>
+                <p className="text-xs font-semibold text-slate-500">à¸„à¸°à¹à¸™à¸™à¹€à¸‰à¸¥à¸µà¹ˆà¸¢à¸«à¹‰à¸­à¸‡ (Mean)</p>
                 <p className="text-xl font-extrabold text-indigo-700">
                   {analyticsSummary.avgScore} <span className="text-xs font-normal text-slate-500">/ {analyticsSummary.totalMaxScore}</span>
                 </p>
@@ -1409,7 +1409,7 @@ export default function Scores() {
                 <CheckCircle2 className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-xs font-semibold text-slate-500">อัตราการกรอกคะแนน</p>
+                <p className="text-xs font-semibold text-slate-500">à¸­à¸±à¸•à¸£à¸²à¸à¸²à¸£à¸à¸£à¸­à¸à¸„à¸°à¹à¸™à¸™</p>
                 <p className="text-xl font-extrabold text-emerald-700">{analyticsSummary.completionRate}%</p>
               </div>
             </div>
@@ -1419,7 +1419,7 @@ export default function Scores() {
                 <Award className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-xs font-semibold text-slate-500">คะแนนสูงสุด / ต่ำสุด</p>
+                <p className="text-xs font-semibold text-slate-500">à¸„à¸°à¹à¸™à¸™à¸ªà¸¹à¸‡à¸ªà¸¸à¸” / à¸•à¹ˆà¸³à¸ªà¸¸à¸”</p>
                 <p className="text-lg font-bold text-slate-800">
                   <span className="text-emerald-600">{analyticsSummary.highestScore}</span> / <span className="text-rose-500">{analyticsSummary.lowestScore}</span>
                 </p>
@@ -1431,8 +1431,8 @@ export default function Scores() {
                 <Users className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-xs font-semibold text-slate-500">จำนวนนักเรียน{activeSectionGroup ? ` (${activeSectionGroup.label})` : 'ทั้งหมด'}</p>
-                <p className="text-xl font-extrabold text-slate-800">{sectionScopedStudents.length} คน</p>
+                <p className="text-xs font-semibold text-slate-500">à¸ˆà¸³à¸™à¸§à¸™à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™{activeSectionGroup ? ` (${activeSectionGroup.label})` : 'à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”'}</p>
+                <p className="text-xl font-extrabold text-slate-800">{sectionScopedStudents.length} à¸„à¸™</p>
               </div>
             </div>
           </div>
@@ -1447,7 +1447,7 @@ export default function Scores() {
                   : 'text-slate-600 hover:bg-indigo-50'
                   }`}
               >
-                <FileText className="w-4 h-4" /> ตารางกรอกคะแนน
+                <FileText className="w-4 h-4" /> à¸•à¸²à¸£à¸²à¸‡à¸à¸£à¸­à¸à¸„à¸°à¹à¸™à¸™
               </button>
               <button
                 onClick={() => handleTabChange('settings')}
@@ -1456,7 +1456,7 @@ export default function Scores() {
                   : 'text-slate-600 hover:bg-indigo-50'
                   }`}
               >
-                <Settings className="w-4 h-4" /> ตั้งค่าคะแนนเต็ม (Blueprint)
+                <Settings className="w-4 h-4" /> à¸•à¸±à¹‰à¸‡à¸„à¹ˆà¸²à¸„à¸°à¹à¸™à¸™à¹€à¸•à¹‡à¸¡ (Blueprint)
               </button>
             </div>
 
@@ -1467,27 +1467,27 @@ export default function Scores() {
                   className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${viewMode === 'matrix' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'
                     }`}
                 >
-                  <Grid className="w-3.5 h-3.5" /> ตารางรวมทั้งเทอม (Excel View)
+                  <Grid className="w-3.5 h-3.5" /> à¸•à¸²à¸£à¸²à¸‡à¸£à¸§à¸¡à¸—à¸±à¹‰à¸‡à¹€à¸—à¸­à¸¡ (Excel View)
                 </button>
                 <button
                   onClick={() => handleViewModeChange('weekly')}
                   className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${viewMode === 'weekly' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'
                     }`}
                 >
-                  <Table className="w-3.5 h-3.5" /> โฟกัสรายสัปดาห์ (Weekly Focus)
+                  <Table className="w-3.5 h-3.5" /> à¹‚à¸Ÿà¸à¸±à¸ªà¸£à¸²à¸¢à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ (Weekly Focus)
                 </button>
               </div>
             )}
           </div>
 
-          {/* ─── TAB: โครงสร้างคะแนนเต็ม (Settings) ─── */}
+          {/* â”€â”€â”€ TAB: à¹‚à¸„à¸£à¸‡à¸ªà¸£à¹‰à¸²à¸‡à¸„à¸°à¹à¸™à¸™à¹€à¸•à¹‡à¸¡ (Settings) â”€â”€â”€ */}
           {activeTab === 'settings' && (
             <div className="glass rounded-2xl overflow-hidden border border-indigo-100 shadow-sm">
               <div className="p-5 border-b border-indigo-100 flex flex-col lg:flex-row items-center justify-between gap-4 bg-indigo-50/60">
                 <div>
-                  <h2 className="text-lg font-bold text-slate-800">ตารางน้ำหนักคะแนนเต็ม (Test Blueprint)</h2>
+                  <h2 className="text-lg font-bold text-slate-800">à¸•à¸²à¸£à¸²à¸‡à¸™à¹‰à¸³à¸«à¸™à¸±à¸à¸„à¸°à¹à¸™à¸™à¹€à¸•à¹‡à¸¡ (Test Blueprint)</h2>
                   <p className="text-sm text-slate-600">
-                    กำหนดคะแนนเต็มของงานเก็บและสอบย่อยในแต่ละบทเรียน ({structures.length} สัปดาห์เรียน — {isPws ? 'หลักสูตร ปวส. (W1-W14 + ปลายภาค)' : 'หลักสูตร ปวช. (W1-W17 + ปลายภาค)'})
+                    à¸à¸³à¸«à¸™à¸”à¸„à¸°à¹à¸™à¸™à¹€à¸•à¹‡à¸¡à¸‚à¸­à¸‡à¸‡à¸²à¸™à¹€à¸à¹‡à¸šà¹à¸¥à¸°à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢à¹ƒà¸™à¹à¸•à¹ˆà¸¥à¸°à¸šà¸—à¹€à¸£à¸µà¸¢à¸™ ({structures.length} à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¹€à¸£à¸µà¸¢à¸™ â€” {isPws ? 'à¸«à¸¥à¸±à¸à¸ªà¸¹à¸•à¸£ à¸›à¸§à¸ª. (W1-W14 + à¸›à¸¥à¸²à¸¢à¸ à¸²à¸„)' : 'à¸«à¸¥à¸±à¸à¸ªà¸¹à¸•à¸£ à¸›à¸§à¸Š. (W1-W17 + à¸›à¸¥à¸²à¸¢à¸ à¸²à¸„)'})
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -1500,7 +1500,7 @@ export default function Scores() {
                           if (diff > 0) {
                             const padding = Array.from({ length: diff }, (_, i) => ({
                               lesson_number: structures.length + 1 + i,
-                              lesson_name: `บทที่/สัปดาห์ที่ ${structures.length + 1 + i}`,
+                              lesson_name: `à¸šà¸—à¸—à¸µà¹ˆ/à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¸—à¸µà¹ˆ ${structures.length + 1 + i}`,
                               max_assignment_score: 10,
                               max_post_test_score: 10,
                               hours: 4
@@ -1515,7 +1515,7 @@ export default function Scores() {
                       className={`px-2.5 py-1 rounded-md font-medium transition-all ${structures.length === 17 ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-indigo-600'
                         }`}
                     >
-                      ปวช. (17 สัปดาห์เรียน)
+                      à¸›à¸§à¸Š. (17 à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¹€à¸£à¸µà¸¢à¸™)
                     </button>
                     <button
                       type="button"
@@ -1528,25 +1528,25 @@ export default function Scores() {
                       className={`px-2.5 py-1 rounded-md font-medium transition-all ${structures.length === 14 ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-indigo-600'
                         }`}
                     >
-                      ปวส. (14 สัปดาห์เรียน)
+                      à¸›à¸§à¸ª. (14 à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¹€à¸£à¸µà¸¢à¸™)
                     </button>
                   </div>
                   <button onClick={handleOpenCalculator} className="btn bg-indigo-500/10 text-indigo-600 hover:bg-indigo-500/20 border border-indigo-200 flex items-center gap-2 text-xs">
                     <Calculator className="w-4 h-4" />
-                    คำนวณสัดส่วนอัตโนมัติ
+                    à¸„à¸³à¸™à¸§à¸“à¸ªà¸±à¸”à¸ªà¹ˆà¸§à¸™à¸­à¸±à¸•à¹‚à¸™à¸¡à¸±à¸•à¸´
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowExcelImportModal(true)}
                     className="btn bg-indigo-100 hover:bg-indigo-200 text-indigo-700 cursor-pointer flex items-center gap-2 text-xs font-semibold shadow-xs"
-                    title="เปิดหน้าต่างนำเข้า Blueprint พร้อมดูตัวอย่างรูปแบบและดาวน์โหลดเทมเพลต"
+                    title="à¹€à¸›à¸´à¸”à¸«à¸™à¹‰à¸²à¸•à¹ˆà¸²à¸‡à¸™à¸³à¹€à¸‚à¹‰à¸² Blueprint à¸žà¸£à¹‰à¸­à¸¡à¸”à¸¹à¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡à¸£à¸¹à¸›à¹à¸šà¸šà¹à¸¥à¸°à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹€à¸—à¸¡à¹€à¸žà¸¥à¸•"
                   >
                     <Upload className="w-4 h-4 text-indigo-600" />
-                    <span>นำเข้า Blueprint & ตัวอย่างไฟล์</span>
+                    <span>à¸™à¸³à¹€à¸‚à¹‰à¸² Blueprint & à¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡à¹„à¸Ÿà¸¥à¹Œ</span>
                   </button>
                   <button onClick={saveStructure} disabled={saving} className="btn btn-primary flex items-center gap-2 text-xs">
                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                    บันทึกโครงสร้าง
+                    à¸šà¸±à¸™à¸—à¸¶à¸à¹‚à¸„à¸£à¸‡à¸ªà¸£à¹‰à¸²à¸‡
                   </button>
                 </div>
               </div>
@@ -1555,11 +1555,11 @@ export default function Scores() {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-indigo-100/50 border-b border-indigo-200 text-slate-700 text-xs uppercase tracking-wider">
-                      <th className="p-3 w-16 text-center">สัปดาห์</th>
-                      <th className="p-3">ชื่อบทเรียน/รายละเอียด</th>
-                      <th className="p-3 w-28 text-center text-blue-600">ชั่วโมงเรียน</th>
-                      <th className="p-3 w-40 text-center text-emerald-600">งานเก็บเต็ม (ทักษะ)</th>
-                      <th className="p-3 w-40 text-center text-amber-600">สอบย่อยเต็ม (พุทธิ)</th>
+                      <th className="p-3 w-16 text-center">à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ</th>
+                      <th className="p-3">à¸Šà¸·à¹ˆà¸­à¸šà¸—à¹€à¸£à¸µà¸¢à¸™/à¸£à¸²à¸¢à¸¥à¸°à¹€à¸­à¸µà¸¢à¸”</th>
+                      <th className="p-3 w-28 text-center text-blue-600">à¸Šà¸±à¹ˆà¸§à¹‚à¸¡à¸‡à¹€à¸£à¸µà¸¢à¸™</th>
+                      <th className="p-3 w-40 text-center text-emerald-600">à¸‡à¸²à¸™à¹€à¸à¹‡à¸šà¹€à¸•à¹‡à¸¡ (à¸—à¸±à¸à¸©à¸°)</th>
+                      <th className="p-3 w-40 text-center text-amber-600">à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢à¹€à¸•à¹‡à¸¡ (à¸žà¸¸à¸—à¸˜à¸´)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1571,7 +1571,7 @@ export default function Scores() {
                             value={struct.lesson_name || ''}
                             onChange={e => handleStructureChange(index, 'lesson_name', e.target.value)}
                             className="bg-white border border-indigo-200 rounded-lg px-3 py-1.5 w-full text-slate-800 outline-none focus:border-indigo-500 text-sm"
-                            placeholder="เช่น บทที่ 1 การประมวลผลคำ..."
+                            placeholder="à¹€à¸Šà¹ˆà¸™ à¸šà¸—à¸—à¸µà¹ˆ 1 à¸à¸²à¸£à¸›à¸£à¸°à¸¡à¸§à¸¥à¸œà¸¥à¸„à¸³..."
                           />
                         </td>
                         <td className="p-3">
@@ -1606,15 +1606,15 @@ export default function Scores() {
             </div>
           )}
 
-          {/* ─── TAB: ตารางกรอกคะแนน (Entry) ─── */}
+          {/* â”€â”€â”€ TAB: à¸•à¸²à¸£à¸²à¸‡à¸à¸£à¸­à¸à¸„à¸°à¹à¸™à¸™ (Entry) â”€â”€â”€ */}
           {activeTab === 'entry' && (
             <div className="space-y-4">
               {!structureSavedInDB && (
                 <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 animate-fade-in-up">
                   <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-amber-800 font-bold text-sm">⚠️ ยังไม่ได้บันทึกโครงสร้างคะแนน!</p>
-                    <p className="text-amber-700/80 text-xs mt-1">กรุณาไปที่แท็บ <strong>&quot;ตั้งค่าคะแนนเต็ม (Blueprint)&quot;</strong> แล้วกดปุ่ม <strong>&quot;บันทึกโครงสร้าง&quot;</strong> เพื่อให้ระบบมีเกณฑ์คะแนนเต็มในการคำนวณเกรด</p>
+                    <p className="text-amber-800 font-bold text-sm">âš ï¸ à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¹„à¸”à¹‰à¸šà¸±à¸™à¸—à¸¶à¸à¹‚à¸„à¸£à¸‡à¸ªà¸£à¹‰à¸²à¸‡à¸„à¸°à¹à¸™à¸™!</p>
+                    <p className="text-amber-700/80 text-xs mt-1">à¸à¸£à¸¸à¸“à¸²à¹„à¸›à¸—à¸µà¹ˆà¹à¸—à¹‡à¸š <strong>&quot;à¸•à¸±à¹‰à¸‡à¸„à¹ˆà¸²à¸„à¸°à¹à¸™à¸™à¹€à¸•à¹‡à¸¡ (Blueprint)&quot;</strong> à¹à¸¥à¹‰à¸§à¸à¸”à¸›à¸¸à¹ˆà¸¡ <strong>&quot;à¸šà¸±à¸™à¸—à¸¶à¸à¹‚à¸„à¸£à¸‡à¸ªà¸£à¹‰à¸²à¸‡&quot;</strong> à¹€à¸žà¸·à¹ˆà¸­à¹ƒà¸«à¹‰à¸£à¸°à¸šà¸šà¸¡à¸µà¹€à¸à¸“à¸‘à¹Œà¸„à¸°à¹à¸™à¸™à¹€à¸•à¹‡à¸¡à¹ƒà¸™à¸à¸²à¸£à¸„à¸³à¸™à¸§à¸“à¹€à¸à¸£à¸”</p>
                   </div>
                 </div>
               )}
@@ -1625,47 +1625,47 @@ export default function Scores() {
                   {/* Realtime Save Status Badges */}
                   {saving && (
                     <span className="inline-flex items-center gap-1.5 text-xs text-indigo-700 font-bold bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-200 animate-pulse shadow-2xs">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" /> กำลังบันทึกข้อมูล...
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" /> à¸à¸³à¸¥à¸±à¸‡à¸šà¸±à¸™à¸—à¸¶à¸à¸‚à¹‰à¸­à¸¡à¸¹à¸¥...
                     </span>
                   )}
 
 
                   {!saving && !hasPendingChanges && lastSavedTime && (
                     <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 font-semibold bg-emerald-50/90 px-3 py-1.5 rounded-xl border border-emerald-200 shadow-2xs">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> บันทึกล่าสุดเมื่อ {lastSavedTime}
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> à¸šà¸±à¸™à¸—à¸¶à¸à¸¥à¹ˆà¸²à¸ªà¸¸à¸”à¹€à¸¡à¸·à¹ˆà¸­ {lastSavedTime}
                     </span>
                   )}
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="flex items-center gap-1.5 bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-200 text-xs font-bold text-indigo-900 shadow-2xs">
-                    <span>📅 วันเริ่มสอน:</span>
+                    <span>ðŸ“… à¸§à¸±à¸™à¹€à¸£à¸´à¹ˆà¸¡à¸ªà¸­à¸™:</span>
                     <input
                       type="date"
                       value={semesterStartDate}
                       onChange={e => handleStartDateChange(e.target.value)}
                       className="form-input py-0.5 px-2 bg-white border-indigo-300 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500 shadow-2xs cursor-pointer"
-                      title="เลือกวันเริ่มต้นสอนของภาคเรียน เพื่อให้ระบบคำนวณวันที่ของทั้ง 18 สัปดาห์อัตโนมัติ"
+                      title="à¹€à¸¥à¸·à¸­à¸à¸§à¸±à¸™à¹€à¸£à¸´à¹ˆà¸¡à¸•à¹‰à¸™à¸ªà¸­à¸™à¸‚à¸­à¸‡à¸ à¸²à¸„à¹€à¸£à¸µà¸¢à¸™ à¹€à¸žà¸·à¹ˆà¸­à¹ƒà¸«à¹‰à¸£à¸°à¸šà¸šà¸„à¸³à¸™à¸§à¸“à¸§à¸±à¸™à¸—à¸µà¹ˆà¸‚à¸­à¸‡à¸—à¸±à¹‰à¸‡ 18 à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¸­à¸±à¸•à¹‚à¸™à¸¡à¸±à¸•à¸´"
                     />
                   </div>
                   <button
                     onClick={() => handleFillZeroForAbsentees()}
                     className="btn bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
-                    title="กรอกคะแนน 0 ให้อัตโนมัติสำหรับนักเรียนที่มีประวัติขาดเรียนหรือลา"
+                    title="à¸à¸£à¸­à¸à¸„à¸°à¹à¸™à¸™ 0 à¹ƒà¸«à¹‰à¸­à¸±à¸•à¹‚à¸™à¸¡à¸±à¸•à¸´à¸ªà¸³à¸«à¸£à¸±à¸šà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸—à¸µà¹ˆà¸¡à¸µà¸›à¸£à¸°à¸§à¸±à¸•à¸´à¸‚à¸²à¸”à¹€à¸£à¸µà¸¢à¸™à¸«à¸£à¸·à¸­à¸¥à¸²"
                   >
-                    <AlertCircle className="w-3.5 h-3.5 text-rose-500" /> ⚡ กรอก 0 คนขาดเรียน
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-500" /> âš¡ à¸à¸£à¸­à¸ 0 à¸„à¸™à¸‚à¸²à¸”à¹€à¸£à¸µà¸¢à¸™
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowExcelImportModal(true)}
                     className="btn bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 text-xs flex items-center gap-1.5 font-bold shadow-xs cursor-pointer"
-                    title="เปิดหน้าต่างนำเข้าคะแนนจาก Excel พร้อมดูตัวอย่างรูปแบบและดาวน์โหลดเทมเพลต"
+                    title="à¹€à¸›à¸´à¸”à¸«à¸™à¹‰à¸²à¸•à¹ˆà¸²à¸‡à¸™à¸³à¹€à¸‚à¹‰à¸²à¸„à¸°à¹à¸™à¸™à¸ˆà¸²à¸ Excel à¸žà¸£à¹‰à¸­à¸¡à¸”à¸¹à¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡à¸£à¸¹à¸›à¹à¸šà¸šà¹à¸¥à¸°à¸”à¸²à¸§à¸™à¹Œà¹‚à¸«à¸¥à¸”à¹€à¸—à¸¡à¹€à¸žà¸¥à¸•"
                   >
                     <Upload className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>นำเข้าคะแนน (Excel) & ตัวอย่างไฟล์</span>
+                    <span>à¸™à¸³à¹€à¸‚à¹‰à¸²à¸„à¸°à¹à¸™à¸™ (Excel) & à¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡à¹„à¸Ÿà¸¥à¹Œ</span>
                   </button>
                   <button onClick={() => setShowExportModal(true)} className="btn bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 text-xs flex items-center gap-1.5 font-semibold shadow-2xs">
-                    <FileSpreadsheet className="w-3.5 h-3.5" /> พรีวิว & ส่งออก Excel
+                    <FileSpreadsheet className="w-3.5 h-3.5" /> à¸žà¸£à¸µà¸§à¸´à¸§ & à¸ªà¹ˆà¸‡à¸­à¸­à¸ Excel
                   </button>
                   <button
                     onClick={saveScores}
@@ -1676,7 +1676,7 @@ export default function Scores() {
                       }`}
                   >
                     {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                    บันทึกคะแนน
+                    à¸šà¸±à¸™à¸—à¸¶à¸à¸„à¸°à¹à¸™à¸™
                   </button>
                 </div>
               </div>
@@ -1688,18 +1688,18 @@ export default function Scores() {
                     <div>
                       <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
                         <Grid className="w-4 h-4 text-indigo-600" />
-                        ตารางคะแนนรวมทั้งเทอม (Full Term Spreadsheet Matrix)
+                        à¸•à¸²à¸£à¸²à¸‡à¸„à¸°à¹à¸™à¸™à¸£à¸§à¸¡à¸—à¸±à¹‰à¸‡à¹€à¸—à¸­à¸¡ (Full Term Spreadsheet Matrix)
                       </h3>
-                      <p className="text-xs text-slate-500">สามารถพิมพ์กรอกคะแนนได้ทุกช่อง ระบบจะคำนวณคะแนนรวมให้อัตโนมัติ</p>
+                      <p className="text-xs text-slate-500">à¸ªà¸²à¸¡à¸²à¸£à¸–à¸žà¸´à¸¡à¸žà¹Œà¸à¸£à¸­à¸à¸„à¸°à¹à¸™à¸™à¹„à¸”à¹‰à¸—à¸¸à¸à¸Šà¹ˆà¸­à¸‡ à¸£à¸°à¸šà¸šà¸ˆà¸°à¸„à¸³à¸™à¸§à¸“à¸„à¸°à¹à¸™à¸™à¸£à¸§à¸¡à¹ƒà¸«à¹‰à¸­à¸±à¸•à¹‚à¸™à¸¡à¸±à¸•à¸´</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
                         onClick={() => handleFillZeroForAbsentees()}
                         className="btn bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 text-xs py-1.5 px-3 rounded-xl font-bold flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
-                        title="ตรวจจับและเติม 0 ให้อัตโนมัติทุกสัปดาห์ที่มีการเช็คชื่อว่า ขาด หรือ ลา"
+                        title="à¸•à¸£à¸§à¸ˆà¸ˆà¸±à¸šà¹à¸¥à¸°à¹€à¸•à¸´à¸¡ 0 à¹ƒà¸«à¹‰à¸­à¸±à¸•à¹‚à¸™à¸¡à¸±à¸•à¸´à¸—à¸¸à¸à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¸—à¸µà¹ˆà¸¡à¸µà¸à¸²à¸£à¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­à¸§à¹ˆà¸² à¸‚à¸²à¸” à¸«à¸£à¸·à¸­ à¸¥à¸²"
                       >
-                        ⚡ ใส่ 0 คนขาด/ลา ทุกสัปดาห์
+                        âš¡ à¹ƒà¸ªà¹ˆ 0 à¸„à¸™à¸‚à¸²à¸”/à¸¥à¸² à¸—à¸¸à¸à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ
                       </button>
                     </div>
                   </div>
@@ -1707,21 +1707,21 @@ export default function Scores() {
                   {/* Mobile Recommendation Banner for Matrix Mode */}
                   <div className="md:hidden p-3 bg-amber-50 border-b border-amber-200/80 flex items-center justify-between gap-2 text-xs text-amber-900">
                     <span className="font-medium">
-                      💡 บนโทรศัพท์ แนะนำใช้ <strong>&quot;โฟกัสรายสัปดาห์&quot;</strong> เพื่อกรอกคะแนนได้สะดวกที่สุด
+                      ðŸ’¡ à¸šà¸™à¹‚à¸—à¸£à¸¨à¸±à¸žà¸—à¹Œ à¹à¸™à¸°à¸™à¸³à¹ƒà¸Šà¹‰ <strong>&quot;à¹‚à¸Ÿà¸à¸±à¸ªà¸£à¸²à¸¢à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ&quot;</strong> à¹€à¸žà¸·à¹ˆà¸­à¸à¸£à¸­à¸à¸„à¸°à¹à¸™à¸™à¹„à¸”à¹‰à¸ªà¸°à¸”à¸§à¸à¸—à¸µà¹ˆà¸ªà¸¸à¸”
                     </span>
                     <button
                       type="button"
                       onClick={() => handleViewModeChange('weekly')}
                       className="px-2.5 py-1 bg-white border border-amber-300 rounded-lg font-bold text-amber-900 shadow-2xs shrink-0 active:scale-95"
                     >
-                      สลับโหมด
+                      à¸ªà¸¥à¸±à¸šà¹‚à¸«à¸¡à¸”
                     </button>
                   </div>
 
                   {matrixLoading ? (
                     <div className="p-16 text-center text-indigo-500 flex flex-col items-center gap-3">
                       <Loader2 className="w-9 h-9 animate-spin text-indigo-600" />
-                      <span className="text-sm font-semibold text-slate-700">กำลังโหลดข้อมูลคะแนนและโครงสร้างทั้งเทอม...</span>
+                      <span className="text-sm font-semibold text-slate-700">à¸à¸³à¸¥à¸±à¸‡à¹‚à¸«à¸¥à¸”à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸„à¸°à¹à¸™à¸™à¹à¸¥à¸°à¹‚à¸„à¸£à¸‡à¸ªà¸£à¹‰à¸²à¸‡à¸—à¸±à¹‰à¸‡à¹€à¸—à¸­à¸¡...</span>
                     </div>
                   ) : (
                     <div
@@ -1761,14 +1761,14 @@ export default function Scores() {
                               className="p-3 sticky top-0 left-0 z-40 bg-indigo-100 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)] text-center font-bold border-r border-indigo-200 text-slate-700"
                               style={{ left: 0, top: 0, width: 120, minWidth: 120, maxWidth: 120, backgroundColor: '#e0e7ff', backfaceVisibility: 'hidden' }}
                             >
-                              รหัส
+                              à¸£à¸«à¸±à¸ª
                             </th>
                             <th
                               rowSpan={2}
                               className="p-3 sticky top-0 z-40 bg-indigo-100 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)] font-bold border-r border-indigo-200 text-slate-700 text-left pl-3"
                               style={{ left: 120, top: 0, width: 200, minWidth: 200, maxWidth: 200, backgroundColor: '#e0e7ff', backfaceVisibility: 'hidden' }}
                             >
-                              ชื่อ-นามสกุล
+                              à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥
                             </th>
                             {structures.map(struct => {
                               const dateStr = calculatedWeekDates[struct.lesson_number] || weekDateMap[struct.lesson_number];
@@ -1789,9 +1789,9 @@ export default function Scores() {
                                           ? 'bg-amber-100 text-amber-800 border-amber-300'
                                           : 'bg-white text-indigo-800 border-indigo-200'
                                           }`}
-                                        title={holiday ? `วันหยุด: ${holiday.name}` : `วันที่สอน: ${dateStr}`}
+                                        title={holiday ? `à¸§à¸±à¸™à¸«à¸¢à¸¸à¸”: ${holiday.name}` : `à¸§à¸±à¸™à¸—à¸µà¹ˆà¸ªà¸­à¸™: ${dateStr}`}
                                       >
-                                        {holiday ? '🏖️' : ''} {dateInfo.label}
+                                        {holiday ? 'ðŸ–ï¸' : ''} {dateInfo.label}
                                       </span>
                                     ) : (
                                       <span className="text-[10px] font-normal text-slate-400">
@@ -1807,10 +1807,10 @@ export default function Scores() {
                                 rowSpan={2}
                                 className="p-3 text-center border-l border-indigo-200 bg-cyan-100 font-bold sticky top-0 z-20 text-cyan-950"
                                 style={{ top: 0, width: 75, minWidth: 75, maxWidth: 75, backgroundColor: '#cffafe', backfaceVisibility: 'hidden' }}
-                                title="คะแนนสอบกลางภาค (สัปดาห์ที่ 9 สำหรับ ปวช.)"
+                                title="à¸„à¸°à¹à¸™à¸™à¸ªà¸­à¸šà¸à¸¥à¸²à¸‡à¸ à¸²à¸„ (à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¸—à¸µà¹ˆ 9 à¸ªà¸³à¸«à¸£à¸±à¸š à¸›à¸§à¸Š.)"
                               >
                                 <div className="flex flex-col items-center">
-                                  <span>กลางภาค</span>
+                                  <span>à¸à¸¥à¸²à¸‡à¸ à¸²à¸„</span>
                                   <span className="text-[10px] font-normal text-cyan-800">(W9)</span>
                                 </div>
                               </th>
@@ -1819,10 +1819,10 @@ export default function Scores() {
                               rowSpan={2}
                               className="p-3 text-center bg-blue-100 font-bold sticky top-0 z-20 text-blue-950"
                               style={{ top: 0, width: 75, minWidth: 75, maxWidth: 75, backgroundColor: '#dbeafe', backfaceVisibility: 'hidden' }}
-                              title={`คะแนนสอบปลายภาค (${isPws ? 'สัปดาห์ที่ 15' : 'สัปดาห์ที่ 18'})`}
+                              title={`à¸„à¸°à¹à¸™à¸™à¸ªà¸­à¸šà¸›à¸¥à¸²à¸¢à¸ à¸²à¸„ (${isPws ? 'à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¸—à¸µà¹ˆ 15' : 'à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¸—à¸µà¹ˆ 18'})`}
                             >
                               <div className="flex flex-col items-center">
-                                <span>ปลายภาค</span>
+                                <span>à¸›à¸¥à¸²à¸¢à¸ à¸²à¸„</span>
                                 <span className="text-[10px] font-normal text-blue-800">({isPws ? 'W15' : 'W18'})</span>
                               </div>
                             </th>
@@ -1830,16 +1830,16 @@ export default function Scores() {
                               rowSpan={2}
                               className="p-3 text-center bg-pink-100 font-bold sticky top-0 z-20 text-pink-950"
                               style={{ top: 0, width: 65, minWidth: 65, maxWidth: 65, backgroundColor: '#fce7f3', backfaceVisibility: 'hidden' }}
-                              title="กรอกหรือคำนวณคะแนนจิตพิสัยอัตโนมัติได้ที่เมนู ตัดเกรด"
+                              title="à¸à¸£à¸­à¸à¸«à¸£à¸·à¸­à¸„à¸³à¸™à¸§à¸“à¸„à¸°à¹à¸™à¸™à¸ˆà¸´à¸•à¸žà¸´à¸ªà¸±à¸¢à¸­à¸±à¸•à¹‚à¸™à¸¡à¸±à¸•à¸´à¹„à¸”à¹‰à¸—à¸µà¹ˆà¹€à¸¡à¸™à¸¹ à¸•à¸±à¸”à¹€à¸à¸£à¸”"
                             >
-                              จิตพิสัย
+                              à¸ˆà¸´à¸•à¸žà¸´à¸ªà¸±à¸¢
                             </th>
                             <th
                               rowSpan={2}
                               className="p-3 text-center bg-indigo-200 font-extrabold text-indigo-950 sticky top-0 z-20"
                               style={{ top: 0, width: 65, minWidth: 65, maxWidth: 65, backgroundColor: '#c7d2fe', backfaceVisibility: 'hidden' }}
                             >
-                              รวมคะแนน
+                              à¸£à¸§à¸¡à¸„à¸°à¹à¸™à¸™
                             </th>
                           </tr>
                           <tr className="h-[26px] bg-indigo-50">
@@ -1849,13 +1849,13 @@ export default function Scores() {
                                   className="p-1 text-center border-l border-indigo-200 text-emerald-700 font-semibold sticky z-20 bg-indigo-50 border-b"
                                   style={{ top: 44, width: 52, minWidth: 52, maxWidth: 52, backgroundColor: '#eef2ff', backfaceVisibility: 'hidden' }}
                                 >
-                                  งาน
+                                  à¸‡à¸²à¸™
                                 </th>
                                 <th
                                   className="p-1 text-center text-amber-700 font-semibold sticky z-20 bg-indigo-50 border-b border-l border-indigo-200/50"
                                   style={{ top: 44, width: 52, minWidth: 52, maxWidth: 52, backgroundColor: '#eef2ff', backfaceVisibility: 'hidden' }}
                                 >
-                                  สอบ
+                                  à¸ªà¸­à¸š
                                 </th>
                               </Fragment>
                             ))}
@@ -1885,7 +1885,7 @@ export default function Scores() {
                 <div className="glass rounded-2xl overflow-hidden border border-indigo-100 shadow-sm bg-white">
                   <div className="p-4 border-b border-indigo-100 flex flex-col md:flex-row gap-4 items-end justify-between bg-indigo-50/60">
                     <div className="w-full md:w-1/3">
-                      <label className="form-label text-indigo-800 font-bold">เลือกบทเรียน / สัปดาห์</label>
+                      <label className="form-label text-indigo-800 font-bold">à¹€à¸¥à¸·à¸­à¸à¸šà¸—à¹€à¸£à¸µà¸¢à¸™ / à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ</label>
                       <select
                         value={selectedLesson}
                         onChange={e => handleLessonChange(e.target.value)}
@@ -1897,7 +1897,7 @@ export default function Scores() {
                           const dateText = dateInfo ? ` (${dateInfo.label})` : '';
                           return (
                             <option key={s.lesson_number} value={s.lesson_number}>
-                              สัปดาห์ที่ {s.lesson_number}{dateText}: {s.lesson_name || 'ไม่มีชื่อ'}
+                              à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¸—à¸µà¹ˆ {s.lesson_number}{dateText}: {s.lesson_name || 'à¹„à¸¡à¹ˆà¸¡à¸µà¸Šà¸·à¹ˆà¸­'}
                             </option>
                           );
                         })}
@@ -1906,10 +1906,10 @@ export default function Scores() {
 
                     <div className="flex flex-wrap items-center gap-3 text-sm font-medium">
                       <div className="bg-emerald-500/10 text-emerald-600 px-3 py-1.5 rounded-xl border border-emerald-500/20 text-xs font-bold">
-                        คะแนนงานเก็บเต็ม: {currentStruct.max_assignment_score}
+                        à¸„à¸°à¹à¸™à¸™à¸‡à¸²à¸™à¹€à¸à¹‡à¸šà¹€à¸•à¹‡à¸¡: {currentStruct.max_assignment_score}
                       </div>
                       <div className="bg-amber-500/10 text-amber-600 px-3 py-1.5 rounded-xl border border-amber-500/20 text-xs font-bold">
-                        คะแนนสอบเต็ม: {currentStruct.max_post_test_score}
+                        à¸„à¸°à¹à¸™à¸™à¸ªà¸­à¸šà¹€à¸•à¹‡à¸¡: {currentStruct.max_post_test_score}
                       </div>
                     </div>
                   </div>
@@ -1926,14 +1926,14 @@ export default function Scores() {
                           className="w-4 h-4 rounded border-indigo-300 text-indigo-600 focus:ring-indigo-400 cursor-pointer"
                         />
                         <label htmlFor="show-attendance" className="text-sm font-semibold text-slate-700 cursor-pointer select-none">
-                          🔗 แสดงสถานะการเข้าเรียนประกอบการกรอกคะแนน
+                          ðŸ”— à¹à¸ªà¸”à¸‡à¸ªà¸–à¸²à¸™à¸°à¸à¸²à¸£à¹€à¸‚à¹‰à¸²à¹€à¸£à¸µà¸¢à¸™à¸›à¸£à¸°à¸à¸­à¸šà¸à¸²à¸£à¸à¸£à¸­à¸à¸„à¸°à¹à¸™à¸™
                         </label>
                       </div>
 
                       {showAttendance && (
                         <div className="flex items-center gap-2.5 flex-wrap">
                           <span className="text-xs font-semibold text-slate-600 flex items-center gap-1">
-                            <span>📅 วันที่เช็คชื่อ:</span>
+                            <span>ðŸ“… à¸§à¸±à¸™à¸—à¸µà¹ˆà¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­:</span>
                           </span>
                           <div className="flex items-center gap-2 flex-wrap">
                             <input
@@ -1941,7 +1941,7 @@ export default function Scores() {
                               value={attendanceDate}
                               onChange={e => setAttendanceDate(e.target.value)}
                               className="form-input py-1 px-2.5 text-xs bg-white border-indigo-300 rounded-xl font-medium text-slate-800 focus:border-indigo-500 shadow-2xs cursor-pointer"
-                              title="เลือกวันที่เช็คชื่อที่ต้องการดึงข้อมูลมาแสดง"
+                              title="à¹€à¸¥à¸·à¸­à¸à¸§à¸±à¸™à¸—à¸µà¹ˆà¹€à¸Šà¹‡à¸„à¸Šà¸·à¹ˆà¸­à¸—à¸µà¹ˆà¸•à¹‰à¸­à¸‡à¸à¸²à¸£à¸”à¸¶à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸¡à¸²à¹à¸ªà¸”à¸‡"
                             />
                             {(() => {
                               const weekNum = parseInt(selectedLesson);
@@ -1961,9 +1961,9 @@ export default function Scores() {
                                       type="button"
                                       onClick={() => setAttendanceDate(targetWeekDate)}
                                       className="btn bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-[11px] py-0.5 px-2 rounded-lg flex items-center gap-1 transition-all shadow-2xs font-semibold"
-                                      title={`คลิกเพื่อรีเซ็ตวันที่ให้ตรงกับสัปดาห์ที่ ${weekNum} (${targetWeekDate})`}
+                                      title={`à¸„à¸¥à¸´à¸à¹€à¸žà¸·à¹ˆà¸­à¸£à¸µà¹€à¸‹à¹‡à¸•à¸§à¸±à¸™à¸—à¸µà¹ˆà¹ƒà¸«à¹‰à¸•à¸£à¸‡à¸à¸±à¸šà¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¸—à¸µà¹ˆ ${weekNum} (${targetWeekDate})`}
                                     >
-                                      🔄 ซิงค์ตามสัปดาห์ที่ {weekNum}
+                                      ðŸ”„ à¸‹à¸´à¸‡à¸„à¹Œà¸•à¸²à¸¡à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¸—à¸µà¹ˆ {weekNum}
                                     </button>
                                   )}
                                 </div>
@@ -1980,26 +1980,26 @@ export default function Scores() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                         <span className="inline-block w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
-                        <span>สถานะสัปดาห์นี้:</span>
+                        <span>à¸ªà¸–à¸²à¸™à¸°à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¸™à¸µà¹‰:</span>
                       </div>
                       <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
                         <span className="px-2 py-0.5 rounded-full bg-emerald-100/90 text-emerald-800 font-bold border border-emerald-200">
-                          มา: {weeklyAttendanceCounts.present}
+                          à¸¡à¸²: {weeklyAttendanceCounts.present}
                         </span>
                         {weeklyAttendanceCounts.late > 0 && (
                           <span className="px-2 py-0.5 rounded-full bg-amber-100/90 text-amber-800 font-bold border border-amber-200">
-                            สาย: {weeklyAttendanceCounts.late}
+                            à¸ªà¸²à¸¢: {weeklyAttendanceCounts.late}
                           </span>
                         )}
                         <span className="px-2 py-0.5 rounded-full bg-blue-100/90 text-blue-800 font-bold border border-blue-200">
-                          ลา: {weeklyAttendanceCounts.leave} (คะแนน 0)
+                          à¸¥à¸²: {weeklyAttendanceCounts.leave} (à¸„à¸°à¹à¸™à¸™ 0)
                         </span>
                         <span className="px-2 py-0.5 rounded-full bg-rose-100/90 text-rose-800 font-black border border-rose-300">
-                          ขาด: {weeklyAttendanceCounts.absent} (คะแนน 0)
+                          à¸‚à¸²à¸”: {weeklyAttendanceCounts.absent} (à¸„à¸°à¹à¸™à¸™ 0)
                         </span>
                         {weeklyAttendanceCounts.noData > 0 && (
                           <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium border border-slate-200">
-                            ยังไม่เช็ค: {weeklyAttendanceCounts.noData}
+                            à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¹€à¸Šà¹‡à¸„: {weeklyAttendanceCounts.noData}
                           </span>
                         )}
                       </div>
@@ -2014,17 +2014,17 @@ export default function Scores() {
                           ? 'bg-rose-100/90 hover:bg-rose-200 text-rose-800 border border-rose-300 ring-2 ring-rose-300/30'
                           : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-300'
                           }`}
-                        title={hideAbsentInWeekly ? 'กำลังซ่อนคนขาดเรียน (คลิกเพื่อแสดงทุกคน)' : 'กำลังแสดงทุกคน (คลิกเพื่อซ่อนคนขาดเรียน)'}
+                        title={hideAbsentInWeekly ? 'à¸à¸³à¸¥à¸±à¸‡à¸‹à¹ˆà¸­à¸™à¸„à¸™à¸‚à¸²à¸”à¹€à¸£à¸µà¸¢à¸™ (à¸„à¸¥à¸´à¸à¹€à¸žà¸·à¹ˆà¸­à¹à¸ªà¸”à¸‡à¸—à¸¸à¸à¸„à¸™)' : 'à¸à¸³à¸¥à¸±à¸‡à¹à¸ªà¸”à¸‡à¸—à¸¸à¸à¸„à¸™ (à¸„à¸¥à¸´à¸à¹€à¸žà¸·à¹ˆà¸­à¸‹à¹ˆà¸­à¸™à¸„à¸™à¸‚à¸²à¸”à¹€à¸£à¸µà¸¢à¸™)'}
                       >
                         {hideAbsentInWeekly ? (
                           <>
                             <EyeOff className="w-3.5 h-3.5 text-rose-600" />
-                            <span>ซ่อนคนขาด ({weeklyAttendanceCounts.absent})</span>
+                            <span>à¸‹à¹ˆà¸­à¸™à¸„à¸™à¸‚à¸²à¸” ({weeklyAttendanceCounts.absent})</span>
                           </>
                         ) : (
                           <>
                             <Eye className="w-3.5 h-3.5 text-slate-500" />
-                            <span>แสดงทุกคน ({students.length})</span>
+                            <span>à¹à¸ªà¸”à¸‡à¸—à¸¸à¸à¸„à¸™ ({students.length})</span>
                           </>
                         )}
                       </button>
@@ -2034,9 +2034,9 @@ export default function Scores() {
                         type="button"
                         onClick={() => handleFillZeroForAbsentees(Number(selectedLesson))}
                         className="btn bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 text-xs py-1 px-2.5 rounded-xl font-bold flex items-center gap-1 transition-all shadow-2xs active:scale-95"
-                        title="เติมคะแนน 0 ให้คนที่ขาดหรือลาในสัปดาห์นี้ทันที"
+                        title="à¹€à¸•à¸´à¸¡à¸„à¸°à¹à¸™à¸™ 0 à¹ƒà¸«à¹‰à¸„à¸™à¸—à¸µà¹ˆà¸‚à¸²à¸”à¸«à¸£à¸·à¸­à¸¥à¸²à¹ƒà¸™à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¸™à¸µà¹‰à¸—à¸±à¸™à¸—à¸µ"
                       >
-                        ⚡ ใส่ 0 คนขาด/ลา
+                        âš¡ à¹ƒà¸ªà¹ˆ 0 à¸„à¸™à¸‚à¸²à¸”/à¸¥à¸²
                       </button>
                     </div>
                   </div>
@@ -2045,11 +2045,11 @@ export default function Scores() {
                   <div className="block md:hidden p-3 space-y-3">
                     {weeklyDisplayedStudents.length === 0 ? (
                       <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-2">
-                        <p className="text-sm font-semibold text-slate-600">ไม่มีรายชื่อนักเรียนที่ต้องกรอกคะแนนในสัปดาห์นี้</p>
+                        <p className="text-sm font-semibold text-slate-600">à¹„à¸¡à¹ˆà¸¡à¸µà¸£à¸²à¸¢à¸Šà¸·à¹ˆà¸­à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸—à¸µà¹ˆà¸•à¹‰à¸­à¸‡à¸à¸£à¸­à¸à¸„à¸°à¹à¸™à¸™à¹ƒà¸™à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¸™à¸µà¹‰</p>
                         <p className="text-xs text-slate-400">
                           {weeklyAttendanceCounts.absent > 0 && hideAbsentInWeekly
-                            ? `(มีนักเรียนขาด ${weeklyAttendanceCounts.absent} คน ซึ่งถูกซ่อนและใส่คะแนน 0 ไว้แล้ว)`
-                            : 'ไม่มีข้อมูลนักเรียน'}
+                            ? `(à¸¡à¸µà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸‚à¸²à¸” ${weeklyAttendanceCounts.absent} à¸„à¸™ à¸‹à¸¶à¹ˆà¸‡à¸–à¸¹à¸à¸‹à¹ˆà¸­à¸™à¹à¸¥à¸°à¹ƒà¸ªà¹ˆà¸„à¸°à¹à¸™à¸™ 0 à¹„à¸§à¹‰à¹à¸¥à¹‰à¸§)`
+                            : 'à¹„à¸¡à¹ˆà¸¡à¸µà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™'}
                         </p>
                         {hideAbsentInWeekly && weeklyAttendanceCounts.absent > 0 && (
                           <button
@@ -2057,7 +2057,7 @@ export default function Scores() {
                             onClick={() => setHideAbsentInWeekly(false)}
                             className="mt-2 text-xs font-bold text-indigo-600 underline"
                           >
-                            คลิกเพื่อแสดงรายชื่อคนที่ขาด
+                            à¸„à¸¥à¸´à¸à¹€à¸žà¸·à¹ˆà¸­à¹à¸ªà¸”à¸‡à¸£à¸²à¸¢à¸Šà¸·à¹ˆà¸­à¸„à¸™à¸—à¸µà¹ˆà¸‚à¸²à¸”
                           </button>
                         )}
                       </div>
@@ -2081,16 +2081,16 @@ export default function Scores() {
                                     )}
                                     {getAttendanceBadge(attStatus)}
                                   </div>
-                                  <p className="text-[11px] text-slate-400 font-mono">รหัส: {student.student_code || '-'}</p>
+                                  <p className="text-[11px] text-slate-400 font-mono">à¸£à¸«à¸±à¸ª: {student.student_code || '-'}</p>
                                 </div>
 
                                 <button
                                   type="button"
                                   onClick={() => handleFillSingleStudentZero(student.id)}
                                   className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-xs font-bold rounded-xl transition-colors shadow-2xs shrink-0 active:scale-95"
-                                  title="กำหนดคะแนนเป็น 0 สำหรับนักเรียนที่ขาดเรียนหรือลา"
+                                  title="à¸à¸³à¸«à¸™à¸”à¸„à¸°à¹à¸™à¸™à¹€à¸›à¹‡à¸™ 0 à¸ªà¸³à¸«à¸£à¸±à¸šà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸—à¸µà¹ˆà¸‚à¸²à¸”à¹€à¸£à¸µà¸¢à¸™à¸«à¸£à¸·à¸­à¸¥à¸²"
                                 >
-                                  ขาด/ลา = 0
+                                  à¸‚à¸²à¸”/à¸¥à¸² = 0
                                 </button>
                               </div>
 
@@ -2098,8 +2098,8 @@ export default function Scores() {
                               <div className="grid grid-cols-2 gap-2.5">
                                 <div className="p-2.5 bg-emerald-50/50 rounded-xl border border-emerald-100 space-y-1">
                                   <div className="flex items-center justify-between text-[11px] font-bold text-emerald-800">
-                                    <span>งานเก็บ</span>
-                                    <span className="text-[10px] text-emerald-600 font-normal">เต็ม {currentStruct.max_assignment_score}</span>
+                                    <span>à¸‡à¸²à¸™à¹€à¸à¹‡à¸š</span>
+                                    <span className="text-[10px] text-emerald-600 font-normal">à¹€à¸•à¹‡à¸¡ {currentStruct.max_assignment_score}</span>
                                   </div>
                                   <input
                                     type="number"
@@ -2116,8 +2116,8 @@ export default function Scores() {
 
                                 <div className="p-2.5 bg-amber-50/50 rounded-xl border border-amber-100 space-y-1">
                                   <div className="flex items-center justify-between text-[11px] font-bold text-amber-800">
-                                    <span>สอบย่อย</span>
-                                    <span className="text-[10px] text-amber-600 font-normal">เต็ม {currentStruct.max_post_test_score}</span>
+                                    <span>à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢</span>
+                                    <span className="text-[10px] text-amber-600 font-normal">à¹€à¸•à¹‡à¸¡ {currentStruct.max_post_test_score}</span>
                                   </div>
                                   <input
                                     type="number"
@@ -2144,10 +2144,10 @@ export default function Scores() {
                     <table className="w-full text-left border-collapse text-xs">
                       <thead>
                         <tr className="bg-indigo-100/50 border-b border-indigo-200 font-bold text-slate-700">
-                          <th className="p-3 w-20">รหัส</th>
-                          <th className="p-3">ชื่อ-นามสกุล</th>
-                          <th className="p-3 text-center text-emerald-600 w-44">งานเก็บ (ภาคผลงาน)</th>
-                          <th className="p-3 text-center text-amber-600 w-44">สอบย่อย (ภาคผลงาน)</th>
+                          <th className="p-3 w-20">à¸£à¸«à¸±à¸ª</th>
+                          <th className="p-3">à¸Šà¸·à¹ˆà¸­-à¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥</th>
+                          <th className="p-3 text-center text-emerald-600 w-44">à¸‡à¸²à¸™à¹€à¸à¹‡à¸š (à¸ à¸²à¸„à¸œà¸¥à¸‡à¸²à¸™)</th>
+                          <th className="p-3 text-center text-amber-600 w-44">à¸ªà¸­à¸šà¸¢à¹ˆà¸­à¸¢ (à¸ à¸²à¸„à¸œà¸¥à¸‡à¸²à¸™)</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2155,11 +2155,11 @@ export default function Scores() {
                           <tr>
                             <td colSpan={4} className="p-8 text-center text-slate-500 bg-slate-50/50">
                               <div className="space-y-1">
-                                <p className="font-semibold text-sm">ไม่มีรายชื่อนักเรียนที่ต้องกรอกคะแนนในสัปดาห์นี้</p>
+                                <p className="font-semibold text-sm">à¹„à¸¡à¹ˆà¸¡à¸µà¸£à¸²à¸¢à¸Šà¸·à¹ˆà¸­à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸—à¸µà¹ˆà¸•à¹‰à¸­à¸‡à¸à¸£à¸­à¸à¸„à¸°à¹à¸™à¸™à¹ƒà¸™à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œà¸™à¸µà¹‰</p>
                                 <p className="text-xs text-slate-400">
                                   {weeklyAttendanceCounts.absent > 0 && hideAbsentInWeekly
-                                    ? `(มีนักเรียนขาด ${weeklyAttendanceCounts.absent} คน ซึ่งถูกซ่อนและใส่คะแนน 0 ไว้แล้ว)`
-                                    : 'ไม่มีข้อมูลนักเรียน'}
+                                    ? `(à¸¡à¸µà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸‚à¸²à¸” ${weeklyAttendanceCounts.absent} à¸„à¸™ à¸‹à¸¶à¹ˆà¸‡à¸–à¸¹à¸à¸‹à¹ˆà¸­à¸™à¹à¸¥à¸°à¹ƒà¸ªà¹ˆà¸„à¸°à¹à¸™à¸™ 0 à¹„à¸§à¹‰à¹à¸¥à¹‰à¸§)`
+                                    : 'à¹„à¸¡à¹ˆà¸¡à¸µà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™'}
                                 </p>
                                 {hideAbsentInWeekly && weeklyAttendanceCounts.absent > 0 && (
                                   <button
@@ -2167,7 +2167,7 @@ export default function Scores() {
                                     onClick={() => setHideAbsentInWeekly(false)}
                                     className="mt-2 text-xs font-bold text-indigo-600 underline"
                                   >
-                                    คลิกเพื่อแสดงรายชื่อคนที่ขาด
+                                    à¸„à¸¥à¸´à¸à¹€à¸žà¸·à¹ˆà¸­à¹à¸ªà¸”à¸‡à¸£à¸²à¸¢à¸Šà¸·à¹ˆà¸­à¸„à¸™à¸—à¸µà¹ˆà¸‚à¸²à¸”
                                   </button>
                                 )}
                               </div>
@@ -2195,9 +2195,9 @@ export default function Scores() {
                                       type="button"
                                       onClick={() => handleFillSingleStudentZero(student.id)}
                                       className="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-[10px] font-bold rounded-lg transition-colors shadow-2xs"
-                                      title="กำหนดคะแนนเป็น 0 สำหรับนักเรียนที่ขาดเรียนหรือลา"
+                                      title="à¸à¸³à¸«à¸™à¸”à¸„à¸°à¹à¸™à¸™à¹€à¸›à¹‡à¸™ 0 à¸ªà¸³à¸«à¸£à¸±à¸šà¸™à¸±à¸à¹€à¸£à¸µà¸¢à¸™à¸—à¸µà¹ˆà¸‚à¸²à¸”à¹€à¸£à¸µà¸¢à¸™à¸«à¸£à¸·à¸­à¸¥à¸²"
                                     >
-                                      ขาด/ลา = 0
+                                      à¸‚à¸²à¸”/à¸¥à¸² = 0
                                     </button>
                                   </div>
                                 </td>
@@ -2290,7 +2290,7 @@ export default function Scores() {
             <ScoreImportModal
               isOpen={showExcelImportModal}
               onClose={() => setShowExcelImportModal(false)}
-              classroomName={classroomObj?.name || 'ห้องเรียน'}
+              classroomName={classroomObj?.name || 'à¸«à¹‰à¸­à¸‡à¹€à¸£à¸µà¸¢à¸™'}
               students={students}
               structures={structures}
               onImportScores={async (scores, type) => {
@@ -2302,7 +2302,7 @@ export default function Scores() {
                     ...(type === 'assignment' ? { assignment_score: d.assignment_score } : { post_test_score: d.post_test_score })
                   }))
                 });
-                toast.success(`นำเข้าคะแนนสำเร็จ ${scores.length} รายการ`);
+                toast.success(`à¸™à¸³à¹€à¸‚à¹‰à¸²à¸„à¸°à¹à¸™à¸™à¸ªà¸³à¹€à¸£à¹‡à¸ˆ ${scores.length} à¸£à¸²à¸¢à¸à¸²à¸£`);
                 refetchMatrix();
               }}
               onImportBlueprint={(newStructs) => {

@@ -36,7 +36,15 @@ export async function GET(request: NextRequest) {
 
     // Verify classroom ownership and get settings
     const classroom = await prisma.classroom.findFirst({
-      where: { id: Number(classroomId), userId: user.id }
+      where: { id: Number(classroomId), userId: user.id },
+      select: {
+        id: true,
+        name: true,
+        lateToAbsentRatio: true,
+        leaveToAbsentRatio: true,
+        totalClasses: true,
+        minAttendancePercent: true,
+      },
     });
     if (!classroom) return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
 
@@ -58,8 +66,11 @@ export async function GET(request: NextRequest) {
         select: { id: true, name: true, studentCode: true, gradeLevel: true, branch: true },
         orderBy: [{ gradeLevel: 'asc' }, { studentCode: 'asc' }, { name: 'asc' }]
       }),
+      // Only studentId/date/status are read below. No extra bound is added: without start_date/end_date
+      // the export is intentionally "all records" (and the Thai summary needs every date column).
       prisma.attendance.findMany({
         where,
+        select: { studentId: true, date: true, status: true },
         orderBy: { date: 'asc' }
       }),
       prisma.attendance.groupBy({
