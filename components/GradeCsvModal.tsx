@@ -6,7 +6,7 @@ import {
   FileSpreadsheet, X, Download, Copy, Check, Filter, Search, 
   CheckSquare, Square, Eye, FileText, ArrowUpDown
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 
 import type { Classroom, ReportStudent, Weights } from '@/components/pages/Grades';
 

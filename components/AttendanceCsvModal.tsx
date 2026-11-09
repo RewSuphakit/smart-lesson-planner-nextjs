@@ -7,7 +7,7 @@ import {
   Calendar as CalendarIcon, Eye, CheckSquare, Square,
   Sparkles, Loader2, TableProperties, RefreshCw, GraduationCap, GitBranch
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import * as XLSX from 'xlsx';
 import api from '@/services/api';
 import { toSafeExcelSheetName } from '@/lib/studentSections';

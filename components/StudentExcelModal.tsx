@@ -7,7 +7,7 @@ import {
   CheckSquare, Square, Eye, Users, FileText, 
   Settings2, TableProperties, Sparkles
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import * as XLSX from 'xlsx';
 
 export interface Classroom {

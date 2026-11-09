@@ -253,7 +253,7 @@ export default function DashboardClient({
       a.click();
       URL.revokeObjectURL(url);
 
-      const { toast } = await import('react-hot-toast');
+      const { toast } = await import('@/lib/toast');
       const totalItems = Object.values((exportData.total_counts || {}) as Record<string, unknown>).reduce<number>(
         (sum, val) => sum + Number(val),
         0
@@ -261,7 +261,7 @@ export default function DashboardClient({
       toast.success(`สำรองข้อมูลสำเร็จ! รวม ${totalItems} รายการ`);
     } catch (err) {
       console.error('Export failed:', err);
-      const { toast } = await import('react-hot-toast');
+      const { toast } = await import('@/lib/toast');
       toast.error('สำรองข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
     } finally {
       setExporting(false);

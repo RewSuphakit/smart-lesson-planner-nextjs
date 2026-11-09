@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/services/api';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { Loader2 } from 'lucide-react';
 
 declare global {

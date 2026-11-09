@@ -8,7 +8,7 @@ import {
   Calculator, FileSpreadsheet, Grid, Table, CheckCircle2, TrendingUp,
   Award, Eye, EyeOff
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import dynamic from 'next/dynamic';
 import { checkThaiHoliday } from '@/lib/thaiHolidays';
 

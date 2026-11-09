@@ -7,7 +7,7 @@ import {
 } from '@/lib/offlineAttendance';
 import api from '@/services/api';
 import { WifiOff, RefreshCw, CheckCircle2, CloudUpload } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 
 export default function OfflineBanner({ onSyncComplete }: { onSyncComplete?: () => void }) {
   const [isOnline, setIsOnline] = useState<boolean>(true);

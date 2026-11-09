@@ -11,7 +11,7 @@ import {
 import Image from 'next/image';
 import Link from 'next/link';
 import logoImg from '@/public/logo.png';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import GoogleSignInButton from '@/components/GoogleSignInButton';
 import Turnstile, { TurnstileRef } from '@/components/Turnstile';
 

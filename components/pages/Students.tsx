@@ -10,7 +10,7 @@ import {
   Camera, Sparkles, Image as ImageIcon, GitBranch,
   Download, FileText, Info
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import dynamic from 'next/dynamic';
 import Pagination from '@/components/Pagination';
 const StudentExcelModal = dynamic(() => import('@/components/StudentExcelModal'), { ssr: false });

@@ -10,7 +10,7 @@ import {
   UploadCloud, FileText, Table, Download,
   FileSpreadsheet, Sparkles, CheckCircle2, Info
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import {
   format as _format,
   startOfMonth as _startOfMonth,

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/services/api';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import {
   User, Mail, Lock, Shield, Sparkles, Check,
   Eye, EyeOff, Save, KeyRound, Calendar,

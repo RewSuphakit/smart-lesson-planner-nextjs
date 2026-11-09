@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/services/api';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import {
   KeyRound, Loader2, Mail, Lock, Eye, EyeOff,
   ArrowRight, ArrowLeft, CheckCircle2, RefreshCw,

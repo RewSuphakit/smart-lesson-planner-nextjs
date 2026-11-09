@@ -9,7 +9,7 @@ import {
   ThumbsUp, ThumbsDown, AlertCircle, HeartHandshake, CheckCircle2, AlertTriangle, Award, X, Grid,
   Sliders, Pencil
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import UserAvatar from '@/components/UserAvatar';
 import ClassroomCardPicker from '@/components/ClassroomCardPicker';
 import SectionSwitcher from '@/components/SectionSwitcher';

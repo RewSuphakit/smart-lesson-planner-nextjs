@@ -13,7 +13,7 @@ import {
   Sparkles,
   RefreshCw,
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 
 export interface Criterion {
   grade: string;

@@ -7,7 +7,7 @@ import {
   ZoomIn, ZoomOut, RotateCcw, Award, CheckCircle2, UserCheck,
   Building2, Calendar, BookOpen, Layers
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 
 import type { Classroom, Criterion, ReportStudent, Weights } from '@/components/pages/Grades';
 

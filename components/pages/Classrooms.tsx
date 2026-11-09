@@ -5,11 +5,11 @@ import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
 import { Plus, Edit, Trash2, X, Loader2, Search, Calendar, ChevronDown, Users, Layers, Eye, EyeOff, Lock, Link2, ExternalLink } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { useSemester } from '@/context/SemesterContext';
 import { ANIMAL_AVATARS as animalAvatars } from '@/components/UserAvatar';
 
-interface Classroom {
+export interface Classroom {
   id: string;
   name: string;
   description?: string;
@@ -265,7 +265,11 @@ function ClassroomCard({ c, onEdit, onDelete, onTogglePortal, isTogglingPortal }
   );
 }
 
-export default function Classrooms() {
+export default function Classrooms({
+  initialClassrooms,
+}: {
+  initialClassrooms?: Classroom[];
+} = {}) {
   const queryClient = useQueryClient();
   const { activeSemester } = useSemester();
 

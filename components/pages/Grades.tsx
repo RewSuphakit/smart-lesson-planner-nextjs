@@ -8,7 +8,7 @@ import {
   FileSpreadsheet, Printer, Zap, AlertTriangle, Search, Award, CheckCircle2, XCircle, Download,
   SlidersHorizontal, LayoutGrid, Table as TableIcon, Grid, Users
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import Pagination from '@/components/Pagination';
 import dynamic from 'next/dynamic';
 import { calculateAffectiveScore } from '@/lib/affective';

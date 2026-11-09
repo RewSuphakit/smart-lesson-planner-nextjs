@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/services/api';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { Mail, ArrowRight, Check, Loader2, RefreshCw } from 'lucide-react';
 
 interface ApiError {

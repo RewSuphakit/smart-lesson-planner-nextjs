@@ -7,7 +7,7 @@ import {
   HelpCircle, Sparkles, BookOpen, Layers, Info, Check, ArrowRight, Loader2,
   Table as TableIcon
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import * as XLSX from 'xlsx';
 
 export interface Student {

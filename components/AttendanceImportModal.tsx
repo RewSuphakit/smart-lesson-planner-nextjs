@@ -6,7 +6,7 @@ import {
   Upload, X, Download, FileSpreadsheet, CheckCircle2, AlertCircle, 
   HelpCircle, Calendar, Check, Info, Loader2, ArrowRight, Table as TableIcon
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import * as XLSX from 'xlsx';
 import api from '@/services/api';
 

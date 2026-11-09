@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { syncOfflineAttendance, getOfflinePendingQueue } from '@/lib/offlineAttendance';
 import api from '@/services/api';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { Wifi, WifiOff, Download, X } from 'lucide-react';
 
 interface BeforeInstallPromptEvent extends Event {

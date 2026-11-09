@@ -24,7 +24,7 @@ import {
   Trash2,
   Lock,
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import UserAvatar from '@/components/UserAvatar';
 import { compressImageFile } from '@/lib/avatarCompression';
 
