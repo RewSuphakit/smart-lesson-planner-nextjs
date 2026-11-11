@@ -6,7 +6,7 @@ import api from '@/services/api';
 import {
   Loader2, Save, Settings, AlertCircle, Plus, Trash2,
   FileSpreadsheet, Printer, Zap, AlertTriangle, Search, Award, CheckCircle2, XCircle, Download,
-  SlidersHorizontal, LayoutGrid, Table as TableIcon, Grid, Users
+  LayoutGrid, Table as TableIcon, Grid, Users
 } from 'lucide-react';
 import toast from '@/lib/toast';
 import Pagination from '@/components/Pagination';
@@ -146,10 +146,6 @@ export default function Grades() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
 
-  // Auto & Dynamic Column Width State for "ชื่อ-นามสกุล"
-  const [nameColMode, setNameColMode] = useState<'auto' | 'compact' | 'normal' | 'wide'>('auto');
-  const [customWidthOffset, setCustomWidthOffset] = useState<number>(0);
-
   // Track unsaved changes for floating save button
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
@@ -160,37 +156,8 @@ export default function Grades() {
     }
   }, []);
 
-  // Dynamic calculation for optimal Name column width based on student data
-  const calculatedAutoWidth = useMemo(() => {
-    if (!report || report.length === 0) return 260;
-    const maxNameLen = Math.max(14, ...report.map(s => (s.name || '').length));
-    const hasBadges = report.some(s =>
-      s.is_f || s.grade === 'ข.ร.' || s.grade === 'ขร' || s.is_absent_final || s.is_incomplete ||
-      (s.remaining_absences !== undefined && s.remaining_absences <= 2 && s.remaining_absences >= 0)
-    );
-    const base = maxNameLen * 9.5 + (hasBadges ? 130 : 45);
-    return Math.max(220, Math.min(480, Math.round(base)));
-  }, [report]);
-
-  const activeNameStyle = useMemo<React.CSSProperties>(() => {
-    if (nameColMode === 'auto') {
-      return { minWidth: '180px' };
-    }
-    let w = 220;
-    if (nameColMode === 'compact') w = 180;
-    else if (nameColMode === 'normal') w = 240;
-    else if (nameColMode === 'wide') w = 320;
-    const finalW = Math.max(160, Math.min(550, w + customWidthOffset));
-    return { minWidth: `${finalW}px`, width: `${finalW}px` };
-  }, [nameColMode, customWidthOffset]);
-
-  const activeNameWidth = useMemo(() => {
-    let w = 220;
-    if (nameColMode === 'compact') w = 180;
-    else if (nameColMode === 'normal') w = 240;
-    else if (nameColMode === 'wide') w = 320;
-    return Math.max(160, Math.min(550, w + customWidthOffset));
-  }, [nameColMode, customWidthOffset]);
+  // ความกว้างคอลัมน์ "ชื่อ-นามสกุล" แบบพอดีจอ (Auto) ขยายตามขนาดตาราง
+  const activeNameStyle = useMemo<React.CSSProperties>(() => ({ minWidth: '180px' }), []);
 
   // ─── Query: ดึงข้อมูลห้องเรียน ───
   const { data: classrooms = EMPTY_CLASSROOMS, isLoading: loadingClassrooms } = useQuery<Classroom[]>({
@@ -948,39 +915,7 @@ export default function Grades() {
                   </div>
                 </div>
 
-                {/* Column Width Selector (Desktop view) */}
-                {viewMode === 'table' && (
-                  <div className="hidden xl:flex items-center gap-1.5">
-                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                      <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-500" />
-                      กว้างชื่อ:
-                    </span>
-                    <div className="inline-flex rounded-xl bg-white dark:bg-slate-800 p-0.5 border border-slate-200 dark:border-slate-700 shadow-2xs text-xs font-semibold">
-                      <button
-                        type="button"
-                        onClick={() => { setNameColMode('auto'); setCustomWidthOffset(0); }}
-                        className={`px-2.5 py-1 rounded-lg transition-all ${nameColMode === 'auto' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
-                        title="ปรับความกว้างพอดีกับหน้าจอ (ไม่ต้องเลื่อนแกน X)"
-                      >
-                        Auto (พอดีจอ)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setNameColMode('compact'); setCustomWidthOffset(0); }}
-                        className={`px-2 py-1 rounded-lg transition-all ${nameColMode === 'compact' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
-                      >
-                        กระชับ
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setNameColMode('normal'); setCustomWidthOffset(0); }}
-                        className={`px-2 py-1 rounded-lg transition-all ${nameColMode === 'normal' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
-                      >
-                        ปกติ
-                      </button>
-                    </div>
-                  </div>
-                )}
+
               </div>
 
               {/* Action Buttons Row */}
