@@ -629,7 +629,7 @@ export default function Scores() {
         setSelectedLesson(finalStructs[0].lesson_number.toString());
       }
     }
-  }, [matrixData, classroomObj, selectedLesson]);
+  }, [matrixData, classroomObj, selectedLesson, targetTeachingWeeks]);
 
   // Reset state when class deselected
   useEffect(() => {
