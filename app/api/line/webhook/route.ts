@@ -19,14 +19,20 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { calculateAffectiveScore } from '@/lib/affective';
 import { resolveTargetWeeks, resolveCurrentTeachingWeek } from '@/lib/semester';
 import { decryptIfPresent, encryptIfPresent } from '@/lib/encryption';
+import { getOrSetCache, invalidateCache } from '@/lib/cache';
+import { getAttendanceConfig, computeAbsentConversion } from '@/lib/formatters';
 import {
-  checkRateLimit,
-  recordSuccessfulQuery,
+  extractClassroomWeights,
+  normalizeGradeCriteria,
+  calculateStudentGradeSummary,
+} from '@/lib/gradeCalculator';
+import {
+  checkRateLimitAsync,
+  recordSuccessfulQueryAsync,
   recordUserActivity,
-  getDailyQuotaStatus,
+  getDailyQuotaStatusAsync,
 } from '@/lib/lineRateLimit';
 import {
   verifyLineSignature,
@@ -42,6 +48,69 @@ import {
   LineEvent,
 } from '@/lib/line';
 
+interface DecryptedChannelConfig {
+  channelId: string;
+  channelSecret: string;
+  channelAccessToken: string;
+  userId: number;
+}
+
+async function resolveMatchedChannelConfig(
+  rawBody: string,
+  signature: string,
+  targetChannelId?: string | null
+): Promise<DecryptedChannelConfig | null> {
+  // 1. O(1) Direct lookup when channelId is specified in URL path or query parameter
+  if (targetChannelId && targetChannelId.trim() && targetChannelId !== 'env-default' && targetChannelId !== 'env-configured') {
+    const cleanId = targetChannelId.trim();
+    const singleConfig = await getOrSetCache<DecryptedChannelConfig | null>(
+      `line:config:${cleanId}`,
+      120,
+      async () => {
+        const cfg = await prisma.lineChannelConfig.findFirst({
+          where: { channelId: cleanId, isActive: true },
+        });
+        if (!cfg) return null;
+        return {
+          channelId: cfg.channelId,
+          channelSecret: decryptIfPresent(cfg.channelSecret),
+          channelAccessToken: decryptIfPresent(cfg.channelAccessToken),
+          userId: cfg.userId,
+        };
+      }
+    );
+
+    if (singleConfig && verifyLineSignature(rawBody, signature, singleConfig.channelSecret)) {
+      return singleConfig;
+    }
+  }
+
+  // 2. Cached lookup across active channels (avoids repeated DB queries & AES-GCM decryption on every webhook)
+  const activeConfigs = await getOrSetCache<DecryptedChannelConfig[]>(
+    'line:active_configs',
+    60,
+    async () => {
+      const rows = await prisma.lineChannelConfig.findMany({
+        where: { isActive: true },
+      });
+      return rows.map((cfg) => ({
+        channelId: cfg.channelId,
+        channelSecret: decryptIfPresent(cfg.channelSecret),
+        channelAccessToken: decryptIfPresent(cfg.channelAccessToken),
+        userId: cfg.userId,
+      }));
+    }
+  );
+
+  for (const config of activeConfigs) {
+    if (verifyLineSignature(rawBody, signature, config.channelSecret)) {
+      return config;
+    }
+  }
+
+  return null;
+}
+
 // GET /api/line/webhook — Minimal health check (does not expose internal counts or secret metadata)
 export async function GET() {
   return NextResponse.json({
@@ -50,8 +119,17 @@ export async function GET() {
   });
 }
 
-// POST /api/line/webhook
+// POST /api/line/webhook (and /api/line/webhook/[channelId])
 export async function POST(request: NextRequest) {
+  const pathSegments = request.nextUrl.pathname.split('/').filter(Boolean);
+  const pathChannelId =
+    pathSegments.length >= 4 && pathSegments[2] === 'webhook'
+      ? decodeURIComponent(pathSegments[3])
+      : undefined;
+  return handleLineWebhook(request, pathChannelId);
+}
+
+async function handleLineWebhook(request: NextRequest, explicitChannelId?: string) {
   try {
     // 1. Read raw body for signature verification
     const rawBody = await request.text();
@@ -74,23 +152,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: 'ok' });
     }
 
-    // 3. Find matching LINE channel config by verifying signature against known channels
-    const activeConfigs = await prisma.lineChannelConfig.findMany({
-      where: { isActive: true },
-    });
-
-    let matchedConfig: { channelSecret: string; channelAccessToken: string; userId: number } | null = null;
-    for (const config of activeConfigs) {
-      const secret = decryptIfPresent(config.channelSecret);
-      if (verifyLineSignature(rawBody, signature, secret)) {
-        matchedConfig = {
-          channelSecret: secret,
-          channelAccessToken: decryptIfPresent(config.channelAccessToken),
-          userId: config.userId,
-        };
-        break;
-      }
-    }
+    // 3. Find matching LINE channel config (O(1) by channelId or cached active configs)
+    const targetChannelId = explicitChannelId || request.nextUrl.searchParams.get('channel_id');
+    let matchedConfig = await resolveMatchedChannelConfig(rawBody, signature, targetChannelId);
 
     // Fallback: check environment variables from .env
     const envSecret = process.env.LINE_CHANNEL_SECRET || process.env.channel_secret;
@@ -109,6 +173,7 @@ export async function POST(request: NextRequest) {
         }
 
         matchedConfig = {
+          channelId: envChannelId,
           channelSecret: envSecret,
           channelAccessToken: envToken,
           userId: teacherUserId,
@@ -132,6 +197,7 @@ export async function POST(request: NextRequest) {
               isActive: true,
             },
           });
+          invalidateCache('line:');
         } catch (dbErr) {
           console.warn('Auto-save env LINE config warning:', dbErr);
         }
@@ -218,7 +284,7 @@ async function handleTextMessage(
       );
       return;
     }
-    const statusMsg = getDailyQuotaStatus(lineUserId, binding.studentCode, binding.classroomId);
+    const statusMsg = await getDailyQuotaStatusAsync(lineUserId, binding.studentCode, binding.classroomId);
     await replyMessage(replyToken, [textMessage(statusMsg)], accessToken);
     return;
   }
@@ -572,8 +638,8 @@ async function handleScoreQuery(
     return;
   }
 
-  // Rate limit check: 1 check per day per category
-  const rateLimit = checkRateLimit({
+  // Rate limit check: 1 check per day per category (Serverless/DB-synced)
+  const rateLimit = await checkRateLimitAsync({
     lineUserId,
     studentCode: student.studentCode || binding.studentCode,
     classroomId: classroom.id,
@@ -590,22 +656,17 @@ async function handleScoreQuery(
   }
 
   const targetWeeks = resolveTargetWeeks(classroom);
+  const weightsConfig = extractClassroomWeights(classroom);
+  const {
+    assignmentWeight: weightAssign,
+    postTestWeight: weightPostTest,
+    affectiveWeight: weightAffective,
+    midtermWeight: weightMidterm,
+    finalWeight: weightFinal,
+    totalWeightSum,
+  } = weightsConfig;
 
-  // Weights
-  const weightAssign = Number(classroom.assignmentWeight ?? 10);
-  const weightPostTest = Number(classroom.postTestWeight ?? 70);
-  const weightAffective = Number(classroom.affectiveWeight ?? 20);
-  const weightMidterm = Number(classroom.midtermWeight ?? 0);
-  const weightFinal = Number(classroom.finalWeight ?? 0);
-  const maxMidtermScore = Number(classroom.midtermMaxScore ?? 100);
-  const maxFinalScore = Number(classroom.finalMaxScore ?? 100);
-
-  // Attendance config for F check
-  const ratioLate = classroom.lateToAbsentRatio || 3;
-  const ratioLeave = classroom.leaveToAbsentRatio || 2;
-  const totalClasses = classroom.totalClasses || 40;
-  const minAttPercent = classroom.minAttendancePercent || 80;
-  const maxAllowedAbsences = Math.floor(totalClasses * ((100 - minAttPercent) / 100));
+  const attConfig = getAttendanceConfig(classroom);
 
   const [structures, studentScores, attendanceRecords, dbCriteria] = await Promise.all([
     prisma.scoreStructure.findMany({
@@ -640,10 +701,11 @@ async function handleScoreQuery(
     else if (a.status === 'leave') leaveCount++;
   }
 
-  const convertedFromLate = Math.floor(lateCount / ratioLate);
-  const convertedFromLeave = Math.floor(leaveCount / ratioLeave);
-  const totalConverted = absentCount + convertedFromLate + convertedFromLeave;
-  const isF = totalConverted > maxAllowedAbsences;
+  const attConv = computeAbsentConversion(
+    { absent: absentCount, late: lateCount, leave: leaveCount },
+    attConfig
+  );
+  const isF = attConv.isF;
 
   // Sum scores
   let sumAssignRaw = 0, sumPostTestRaw = 0;
@@ -652,76 +714,41 @@ async function handleScoreQuery(
     if (sc.postTestScore !== null) sumPostTestRaw += Number(sc.postTestScore);
   }
 
-  const midtermScore = Number(student.midtermScore ?? 0);
-  const rawFinalScore = student.finalScore !== null ? Number(student.finalScore) : null;
-  const isAbsentFinal = rawFinalScore === -1;
-  const isIncomplete = rawFinalScore === -2;
-  const finalScore = (rawFinalScore === null || rawFinalScore < 0) ? 0 : rawFinalScore;
-
-  const preciseScaledAssign = maxAssignRaw > 0 ? (sumAssignRaw / maxAssignRaw) * weightAssign : 0;
-  const preciseScaledPostTest = maxPostTestRaw > 0 ? (sumPostTestRaw / maxPostTestRaw) * weightPostTest : 0;
-  const preciseScaledMidterm = maxMidtermScore > 0 ? (midtermScore / maxMidtermScore) * weightMidterm : 0;
-  const preciseScaledFinal = maxFinalScore > 0 ? (finalScore / maxFinalScore) * weightFinal : 0;
-
-  const affectiveScore = calculateAffectiveScore({
-    baseScore: student.affectiveScore ? Number(student.affectiveScore) : null,
-    maxWeight: weightAffective,
+  const criteria = normalizeGradeCriteria(dbCriteria);
+  const calc = calculateStudentGradeSummary({
+    sumAssignRaw,
+    maxAssignRaw,
+    sumPostTestRaw,
+    maxPostTestRaw,
+    midtermScore: student.midtermScore,
+    finalScore: student.finalScore,
+    examStatus: student.examStatus,
+    baseAffectiveScore: student.affectiveScore,
     absentCount,
     lateCount,
+    isF,
+    weights: weightsConfig,
+    criteria,
   });
-
-  const totalScorePrecise = preciseScaledAssign + preciseScaledPostTest + affectiveScore + preciseScaledMidterm + preciseScaledFinal;
-  const totalWeightSum = weightAssign + weightPostTest + weightAffective + weightMidterm + weightFinal;
-  const percentage = totalWeightSum > 0 ? (totalScorePrecise / totalWeightSum) * 100 : 0;
-
-  // Grade
-  const criteria = dbCriteria.length > 0
-    ? dbCriteria.map((c) => ({ grade: c.grade, minScore: Number(c.minScore) }))
-    : [
-      { grade: '4', minScore: 80 },
-      { grade: '3.5', minScore: 75 },
-      { grade: '3', minScore: 70 },
-      { grade: '2.5', minScore: 65 },
-      { grade: '2', minScore: 60 },
-      { grade: '1.5', minScore: 55 },
-      { grade: '1', minScore: 50 },
-      { grade: '0', minScore: 0 },
-    ];
-
-  let finalGrade = '0';
-  if (isF) {
-    finalGrade = 'ข.ร.';
-  } else if (isAbsentFinal) {
-    finalGrade = 'ข.ส.';
-  } else if (isIncomplete) {
-    finalGrade = 'ม.ส.';
-  } else {
-    for (const c of criteria) {
-      if (percentage >= c.minScore) {
-        finalGrade = c.grade;
-        break;
-      }
-    }
-  }
 
   try {
     await replyMessage(replyToken, [
       buildScoreFlexMessage({
         studentName: student.name,
         classroomName: classroom.name,
-        grade: finalGrade,
-        percentage: percentage.toFixed(2),
-        totalScore: Math.round(totalScorePrecise),
+        grade: calc.grade,
+        percentage: calc.percentage,
+        totalScore: calc.totalScore,
         maxScore: totalWeightSum,
-        scaledAssignment: Math.round(preciseScaledAssign),
+        scaledAssignment: calc.scaledAssign,
         maxAssignment: weightAssign,
-        scaledPostTest: Math.round(preciseScaledPostTest),
+        scaledPostTest: calc.scaledPostTest,
         maxPostTest: weightPostTest,
-        scaledMidterm: Math.round(preciseScaledMidterm),
+        scaledMidterm: calc.scaledMidterm,
         maxMidterm: weightMidterm,
-        scaledFinal: Math.round(preciseScaledFinal),
+        scaledFinal: calc.scaledFinal,
         maxFinal: weightFinal,
-        affectiveScore,
+        affectiveScore: calc.affectiveScore,
         maxAffective: weightAffective,
       }),
     ], accessToken);
@@ -732,14 +759,14 @@ async function handleScoreQuery(
         `📊 สรุปคะแนน\n` +
         `👤 ${student.name}\n` +
         `📚 ${classroom.name}\n\n` +
-        `🏆 เกรด: ${finalGrade}\n` +
-        `📈 ร้อยละ: ${percentage.toFixed(2)}%\n` +
-        `🎯 คะแนนรวม: ${Math.round(totalScorePrecise)}/${totalWeightSum}`
+        `🏆 เกรด: ${calc.grade}\n` +
+        `📈 ร้อยละ: ${calc.percentage}%\n` +
+        `🎯 คะแนนรวม: ${calc.totalScore}/${totalWeightSum}`
       ),
     ], accessToken);
   }
 
-  recordSuccessfulQuery({
+  await recordSuccessfulQueryAsync({
     lineUserId,
     studentCode: student.studentCode || binding.studentCode,
     classroomId: classroom.id,
@@ -766,8 +793,8 @@ async function handleAttendanceQuery(
     return;
   }
 
-  // Rate limit check: 1 check per day per category
-  const rateLimit = checkRateLimit({
+  // Rate limit check: 1 check per day per category (Serverless/DB-synced)
+  const rateLimit = await checkRateLimitAsync({
     lineUserId,
     studentCode: student.studentCode || binding.studentCode,
     classroomId: classroom.id,
@@ -783,11 +810,7 @@ async function handleAttendanceQuery(
     return;
   }
 
-  const ratioLate = classroom.lateToAbsentRatio || 3;
-  const ratioLeave = classroom.leaveToAbsentRatio || 2;
-  const totalClasses = classroom.totalClasses || 40;
-  const minAttPercent = classroom.minAttendancePercent || 80;
-  const maxAllowedAbsences = Math.floor(totalClasses * ((100 - minAttPercent) / 100));
+  const attConfig = getAttendanceConfig(classroom);
 
   const attendanceRecords = await prisma.attendance.findMany({
     where: { studentId: student.id, classroomId: classroom.id },
@@ -801,14 +824,15 @@ async function handleAttendanceQuery(
     else if (a.status === 'leave') leaveCount++;
   }
 
-  const convertedFromLate = Math.floor(lateCount / ratioLate);
-  const convertedFromLeave = Math.floor(leaveCount / ratioLeave);
-  const totalConverted = absentCount + convertedFromLate + convertedFromLeave;
-  const remaining = maxAllowedAbsences - totalConverted;
-  const isF = totalConverted > maxAllowedAbsences;
-  const attendancePercent = totalClasses > 0
-    ? Math.max(0, Math.min(100, Math.round(((totalClasses - totalConverted) / totalClasses) * 100)))
-    : 100;
+  const attConv = computeAbsentConversion(
+    { absent: absentCount, late: lateCount, leave: leaveCount },
+    attConfig
+  );
+  const totalConverted = attConv.totalConverted;
+  const maxAllowedAbsences = attConv.maxAllowedAbsences;
+  const remaining = attConv.remaining;
+  const isF = attConv.isF;
+  const attendancePercent = attConv.attendancePercent;
 
   let status: 'safe' | 'warning' | 'critical' = 'safe';
   if (isF || remaining < 0) {
@@ -852,7 +876,7 @@ async function handleAttendanceQuery(
     ], accessToken);
   }
 
-  recordSuccessfulQuery({
+  await recordSuccessfulQueryAsync({
     lineUserId,
     studentCode: student.studentCode || binding.studentCode,
     classroomId: classroom.id,
@@ -879,8 +903,8 @@ async function handleMissingTasksQuery(
     return;
   }
 
-  // Rate limit check: 1 check per day per category
-  const rateLimit = checkRateLimit({
+  // Rate limit check: 1 check per day per category (Serverless/DB-synced)
+  const rateLimit = await checkRateLimitAsync({
     lineUserId,
     studentCode: student.studentCode || binding.studentCode,
     classroomId: classroom.id,
@@ -1051,7 +1075,7 @@ async function handleMissingTasksQuery(
     }
   }
 
-  recordSuccessfulQuery({
+  await recordSuccessfulQueryAsync({
     lineUserId,
     studentCode: student.studentCode || binding.studentCode,
     classroomId: classroom.id,

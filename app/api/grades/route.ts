@@ -1,10 +1,15 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { withAuth } from '@/lib/apiHandler';
-import { calculateAffectiveScore } from '@/lib/affective';
 import { resolveTargetWeeks } from '@/lib/semester';
 import { getOrSetCache, userCacheKey, invalidateCache, memoryCache } from '@/lib/cache';
 import { getAttendanceConfig, computeAbsentConversion } from '@/lib/formatters';
+import {
+  extractClassroomWeights,
+  normalizeGradeCriteria,
+  calculateStudentGradeSummary,
+} from '@/lib/gradeCalculator';
+import { resolveStudentAvatarUrl } from '@/lib/avatarStorage';
 
 export const GET = withAuth(async (request, user) => {
   const { searchParams } = new URL(request.url);
@@ -50,16 +55,20 @@ export const GET = withAuth(async (request, user) => {
   const cachedReport = memoryCache.get<Record<string, unknown>>(reportCacheKey);
   if (cachedReport) return NextResponse.json(cachedReport);
 
-  // Get report weights & settings
-  const weightAssign = Number(classroom.assignmentWeight ?? 10);
-  const weightPostTest = Number(classroom.postTestWeight ?? 70);
-  const weightAffective = Number(classroom.affectiveWeight ?? 20);
-  const lateDeduction = classroom.lateDeductionScore !== null && classroom.lateDeductionScore !== undefined ? Number(classroom.lateDeductionScore) : 1;
-  const absentDeduction = classroom.absentDeductionScore !== null && classroom.absentDeductionScore !== undefined ? Number(classroom.absentDeductionScore) : 2;
-  const weightMidterm = Number(classroom.midtermWeight ?? 0);
-  const weightFinal = Number(classroom.finalWeight ?? 0);
-  const maxMidtermScore = Number(classroom.midtermMaxScore ?? 100);
-  const maxFinalScore = Number(classroom.finalMaxScore ?? 100);
+  // Get report weights & settings via centralized gradeCalculator
+  const weightsConfig = extractClassroomWeights(classroom);
+  const {
+    assignmentWeight: weightAssign,
+    postTestWeight: weightPostTest,
+    affectiveWeight: weightAffective,
+    lateDeductionScore: lateDeduction,
+    absentDeductionScore: absentDeduction,
+    midtermWeight: weightMidterm,
+    finalWeight: weightFinal,
+    midtermMaxScore: maxMidtermScore,
+    finalMaxScore: maxFinalScore,
+    totalWeightSum,
+  } = weightsConfig;
 
   // Resolve target weeks from classroom settings (replaces old name-guessing logic)
   const weeksParam = searchParams.get('weeks');
@@ -93,6 +102,7 @@ export const GET = withAuth(async (request, user) => {
         updatedAt: true,
         midtermScore: true,
         finalScore: true,
+        examStatus: true,
         affectiveScore: true,
       },
       orderBy: [{ gradeLevel: 'asc' }, { studentCode: 'asc' }, { name: 'asc' }],
@@ -135,21 +145,10 @@ export const GET = withAuth(async (request, user) => {
     maxPostTestRaw = targetWeeks * 10;
   }
 
-  const criteria = dbCriteria.length > 0 ? dbCriteria.map(c => ({ grade: c.grade, minScore: Number(c.minScore) })) : [
-    { grade: '4', minScore: 80 },
-    { grade: '3.5', minScore: 75 },
-    { grade: '3', minScore: 70 },
-    { grade: '2.5', minScore: 65 },
-    { grade: '2', minScore: 60 },
-    { grade: '1.5', minScore: 55 },
-    { grade: '1', minScore: 50 },
-    { grade: '0', minScore: 0 },
-  ];
+  const criteria = normalizeGradeCriteria(dbCriteria);
 
   // Get attendance config
   const attConfig = getAttendanceConfig(classroom);
-
-  const totalWeightSum = weightAssign + weightPostTest + weightAffective + weightMidterm + weightFinal;
 
   const report = students.map((s) => {
     // Attendance stats
@@ -161,51 +160,26 @@ export const GET = withAuth(async (request, user) => {
     const isF = attConv.isF;
     const attendancePercent = attConv.attendancePercent;
 
-    // Single-pass score calculation up to targetWeeks (optimized from dual filter+reduce)
+    // Single-pass score calculation up to targetWeeks via shared gradeCalculator
     const sums = scoreByStudent.get(s.id);
     const sumAssignRaw = Number(sums?.assignmentScore ?? 0);
     const sumPostTestRaw = Number(sums?.postTestScore ?? 0);
-    const midtermScore = Number(s.midtermScore ?? 0);
-    
-    const rawFinalScore = s.finalScore !== null ? Number(s.finalScore) : null;
-    const isAbsentFinal = rawFinalScore === -1;
-    const isIncomplete = rawFinalScore === -2;
-    const finalScore = (rawFinalScore === null || rawFinalScore < 0) ? 0 : rawFinalScore;
 
-    const preciseScaledAssign = maxAssignRaw > 0 ? (sumAssignRaw / maxAssignRaw) * weightAssign : 0;
-    const preciseScaledPostTest = maxPostTestRaw > 0 ? (sumPostTestRaw / maxPostTestRaw) * weightPostTest : 0;
-    const preciseScaledMidterm = maxMidtermScore > 0 ? (midtermScore / maxMidtermScore) * weightMidterm : 0;
-    const preciseScaledFinal = maxFinalScore > 0 ? (finalScore / maxFinalScore) * weightFinal : 0;
-
-    // Affective score calculation via shared helper
-    const affectiveScore = calculateAffectiveScore({
-      baseScore: s.affectiveScore ? Number(s.affectiveScore) : null,
-      maxWeight: weightAffective,
+    const calc = calculateStudentGradeSummary({
+      sumAssignRaw,
+      maxAssignRaw,
+      sumPostTestRaw,
+      maxPostTestRaw,
+      midtermScore: s.midtermScore,
+      finalScore: s.finalScore,
+      examStatus: s.examStatus,
+      baseAffectiveScore: s.affectiveScore,
       absentCount,
       lateCount,
-      absentDeduction,
-      lateDeduction,
+      isF,
+      weights: weightsConfig,
+      criteria,
     });
-
-    const totalScorePrecise = preciseScaledAssign + preciseScaledPostTest + affectiveScore + preciseScaledMidterm + preciseScaledFinal;
-    const percentage = totalWeightSum > 0 ? (totalScorePrecise / totalWeightSum) * 100 : 0;
-
-    // Determine final grade according to official vocational education (สอศ.) rules
-    let finalGrade: string | null = null;
-    if (isF) {
-      finalGrade = 'ข.ร.';
-    } else if (isAbsentFinal) {
-      finalGrade = 'ข.ส.';
-    } else if (isIncomplete) {
-      finalGrade = 'ม.ส.';
-    } else {
-      for (const c of criteria) {
-        if (percentage >= Number(c.minScore)) {
-          finalGrade = c.grade;
-          break;
-        }
-      }
-    }
 
     return {
       id: s.id,
@@ -214,32 +188,30 @@ export const GET = withAuth(async (request, user) => {
       student_code: s.studentCode,
       grade_level: s.gradeLevel,
       branch: s.branch,
-      avatar:
-        typeof s.avatar === 'string' && s.avatar.startsWith('data:image/')
-          ? `/api/students/${s.id}/avatar?v=${s.updatedAt ? s.updatedAt.getTime() : 0}`
-          : s.avatar ?? null,
-      midterm_score: midtermScore,
-      final_score: rawFinalScore,
-      is_absent_final: isAbsentFinal,
-      is_incomplete: isIncomplete,
+      avatar: resolveStudentAvatarUrl(s.id, s.avatar, s.updatedAt),
+      midterm_score: calc.midtermScore,
+      final_score: calc.rawFinalScore,
+      exam_status: calc.examStatus,
+      is_absent_final: calc.isAbsentFinal,
+      is_incomplete: calc.isIncomplete,
       raw_assign: sumAssignRaw,
       max_assign: maxAssignRaw,
-      precise_scaled_assign: preciseScaledAssign,
-      scaled_assign: Math.round(preciseScaledAssign),
+      precise_scaled_assign: calc.preciseScaledAssign,
+      scaled_assign: calc.scaledAssign,
       raw_post_test: sumPostTestRaw,
       max_post_test: maxPostTestRaw,
-      precise_scaled_post_test: preciseScaledPostTest,
-      scaled_post_test: Math.round(preciseScaledPostTest),
-      precise_scaled_midterm: preciseScaledMidterm,
-      scaled_midterm: Math.round(preciseScaledMidterm),
-      precise_scaled_final: preciseScaledFinal,
-      scaled_final: Math.round(preciseScaledFinal),
-      total_score_precise: totalScorePrecise,
-      total_score: Math.round(totalScorePrecise),
-      affective_score: affectiveScore,
-      percentage: percentage.toFixed(2),
+      precise_scaled_post_test: calc.preciseScaledPostTest,
+      scaled_post_test: calc.scaledPostTest,
+      precise_scaled_midterm: calc.preciseScaledMidterm,
+      scaled_midterm: calc.scaledMidterm,
+      precise_scaled_final: calc.preciseScaledFinal,
+      scaled_final: calc.scaledFinal,
+      total_score_precise: calc.totalScorePrecise,
+      total_score: calc.totalScore,
+      affective_score: calc.affectiveScore,
+      percentage: calc.percentage,
       attendance_percent: attendancePercent,
-      grade: finalGrade || 'ไม่มีเกรด',
+      grade: calc.grade || 'ไม่มีเกรด',
       is_f: isF,
       absent_count: absentCount,
       late_count: lateCount,

@@ -44,6 +44,12 @@ enum CurriculumType {
   custom  // กำหนดเอง
 }
 
+enum ExamStatus {
+  normal        // ปกติ
+  absent_final  // ข.ส. (ขาดสอบปลายภาค)
+  incomplete    // ม.ส. (ไม่สมบูรณ์)
+}
+
 // ==================== Users ====================
 model User {
   id        Int      @id @default(autoincrement())
@@ -147,10 +153,11 @@ model Student {
   gradeLevel     String?  @map("grade_level") @db.VarChar(100)
   branch         String?  @db.VarChar(255)
   email          String?  @db.VarChar(255)
-  classroomId    Int?     @map("classroom_id")
-  midtermScore   Decimal? @default(0) @map("midterm_score") @db.Decimal(5, 2)
-  finalScore     Decimal? @default(0) @map("final_score") @db.Decimal(5, 2)
-  affectiveScore Decimal? @map("affective_score") @db.Decimal(5, 2)
+  classroomId    Int?       @map("classroom_id")
+  midtermScore   Decimal?   @default(0) @map("midterm_score") @db.Decimal(5, 2)
+  finalScore     Decimal?   @default(0) @map("final_score") @db.Decimal(5, 2)
+  examStatus     ExamStatus @default(normal) @map("exam_status")
+  affectiveScore Decimal?   @map("affective_score") @db.Decimal(5, 2)
   avatar         String?  @db.MediumText
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
@@ -340,4 +347,20 @@ model LineChannelConfig {
   @@unique([channelId], map: "unique_line_channel_id")
   @@index([userId], map: "idx_line_channel_user")
   @@map("line_channel_configs")
+}
+
+// ==================== LINE Daily Quota Checks (Serverless-Safe Persistence) ====================
+model LineQuotaCheck {
+  id          Int      @id @default(autoincrement())
+  lineUserId  String   @map("line_user_id") @db.VarChar(64)
+  studentCode String   @map("student_code") @db.VarChar(50)
+  classroomId Int      @default(0) @map("classroom_id")
+  category    String   @db.VarChar(32)
+  checkDate   String   @map("check_date") @db.VarChar(10)
+  checkedAt   DateTime @default(now()) @map("checked_at")
+
+  @@unique([lineUserId, studentCode, classroomId, category], map: "unique_line_quota_check")
+  @@index([lineUserId], map: "idx_line_quota_user")
+  @@index([checkDate], map: "idx_line_quota_date")
+  @@map("line_quota_checks")
 }

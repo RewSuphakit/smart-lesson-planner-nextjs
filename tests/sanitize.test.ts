@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizeScore, sanitizeExamScore } from '@/lib/sanitize';
+import { sanitizeScore, sanitizeExamScore, sanitizeFinalExamPayload } from '@/lib/sanitize';
 
 describe('sanitizeScore', () => {
   it.each([undefined, null, ''])('returns null for empty value %p', (v) => {
@@ -52,5 +52,32 @@ describe('sanitizeExamScore', () => {
 
   it('passes through valid scores', () => {
     expect(sanitizeExamScore('45.5')).toBe(45.5);
+  });
+});
+
+describe('sanitizeFinalExamPayload', () => {
+  it('converts legacy -1 sentinel to absent_final with finalScore 0', () => {
+    expect(sanitizeFinalExamPayload(-1)).toEqual({
+      finalScore: 0,
+      examStatus: 'absent_final',
+    });
+  });
+
+  it('converts legacy -2 sentinel to incomplete with finalScore 0', () => {
+    expect(sanitizeFinalExamPayload('-2')).toEqual({
+      finalScore: 0,
+      examStatus: 'incomplete',
+    });
+  });
+
+  it('respects explicit examStatus and clamps finalScore to maxScore', () => {
+    expect(sanitizeFinalExamPayload(25, 'normal', 20)).toEqual({
+      finalScore: 20,
+      examStatus: 'normal',
+    });
+    expect(sanitizeFinalExamPayload(15, 'absent_final', 20)).toEqual({
+      finalScore: 0,
+      examStatus: 'absent_final',
+    });
   });
 });

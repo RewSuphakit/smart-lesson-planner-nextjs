@@ -266,6 +266,7 @@ describe('other response formatters', () => {
       avatar: null,
       midterm_score: null,
       final_score: null,
+      exam_status: 'normal',
       affective_score: null,
     });
     const r = formatStudentListItem({
@@ -278,6 +279,16 @@ describe('other response formatters', () => {
     });
     expect(r.classroom_name).toBe('ปวช.1');
     expect(r.midterm_score).toBe(12.5);
+    expect(r.exam_status).toBe('normal');
+
+    const absentStudent = formatStudentListItem({
+      id: 3,
+      name: 'C',
+      finalScore: 0,
+      examStatus: 'absent_final',
+    });
+    expect(absentStudent.exam_status).toBe('absent_final');
+    expect(absentStudent.final_score).toBe(-1);
     expect(r.final_score).toBe(0); // 0 must be preserved
     expect(r.affective_score).toBeNull();
   });

@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import { withAuth } from '@/lib/apiHandler';
 import { UpdateStudentExamScoresSchema, validateRequestBody } from '@/lib/validation';
 import { invalidateCache, userCacheKey } from '@/lib/cache';
-import { sanitizeExamScore } from '@/lib/sanitize';
+import { sanitizeExamScore, sanitizeFinalExamPayload } from '@/lib/sanitize';
 
 export const PUT = withAuth(async (request, user) => {
   const validation = await validateRequestBody(request, UpdateStudentExamScoresSchema);
@@ -37,8 +37,10 @@ export const PUT = withAuth(async (request, user) => {
     if (score.midterm_score !== undefined) {
       dataToUpdate.midtermScore = sanitizeExamScore(score.midterm_score, false);
     }
-    if (score.final_score !== undefined) {
-      dataToUpdate.finalScore = sanitizeExamScore(score.final_score, true);
+    if (score.final_score !== undefined || score.exam_status !== undefined) {
+      const { finalScore, examStatus } = sanitizeFinalExamPayload(score.final_score, score.exam_status);
+      dataToUpdate.finalScore = finalScore;
+      dataToUpdate.examStatus = examStatus;
     }
     if (score.affective_score !== undefined) {
       dataToUpdate.affectiveScore = sanitizeExamScore(score.affective_score, false);

@@ -242,8 +242,24 @@ export function formatStudentListItem(s: {
   avatar?: string | null;
   midtermScore?: unknown;
   finalScore?: unknown;
+  examStatus?: string | null;
   affectiveScore?: unknown;
 }) {
+  const rawFinal = s.finalScore != null ? Number(s.finalScore) : null;
+  const examStatus =
+    s.examStatus === 'absent_final' || rawFinal === -1
+      ? 'absent_final'
+      : s.examStatus === 'incomplete' || rawFinal === -2
+        ? 'incomplete'
+        : 'normal';
+
+  const legacyCompatibleFinal =
+    examStatus === 'absent_final'
+      ? -1
+      : examStatus === 'incomplete'
+        ? -2
+        : rawFinal;
+
   return {
     id: s.id,
     name: s.name,
@@ -255,7 +271,8 @@ export function formatStudentListItem(s: {
     classroom_name: s.classroom?.name ?? null,
     avatar: s.avatar ?? null,
     midterm_score: s.midtermScore != null ? Number(s.midtermScore) : null,
-    final_score: s.finalScore != null ? Number(s.finalScore) : null,
+    final_score: legacyCompatibleFinal,
+    exam_status: examStatus,
     affective_score: s.affectiveScore != null ? Number(s.affectiveScore) : null,
   };
 }

@@ -84,9 +84,15 @@ COPY --chown=nextjs:nodejs <<'EOF' /app/entrypoint.sh
 #!/bin/sh
 set -e
 if [ "${SKIP_DB_PUSH:-false}" != "true" ]; then
-  echo "🔄 Running Prisma schema sync (db push)..."
-  npx prisma db push --skip-generate
-  echo "✅ Database schema synced"
+  if [ -d "./prisma/migrations" ] && [ "$(ls -A ./prisma/migrations 2>/dev/null)" ]; then
+    echo "🔄 Running production Prisma migrations (migrate deploy)..."
+    npx prisma migrate deploy
+    echo "✅ Database migrations applied"
+  else
+    echo "🔄 Running Prisma schema sync (db push)..."
+    npx prisma db push --skip-generate
+    echo "✅ Database schema synced"
+  fi
 fi
 echo "🚀 Starting Next.js server..."
 exec node server.js

@@ -23,6 +23,7 @@ const PUBLIC_PATHS = [
   '/api/auth/change-email-unverified',
   '/api/auth/forgot-password',
   '/api/auth/reset-password',
+  '/api/line/webhook',
   '/api/health',
 ];
 

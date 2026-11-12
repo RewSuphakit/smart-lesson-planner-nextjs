@@ -4,8 +4,9 @@ import { withAuth } from '@/lib/apiHandler';
 import { CreateStudentSchema, BulkCreateStudentSchema, BulkUpdateStudentMetaSchema, UpdateStudentExamScoresSchema, validateData } from '@/lib/validation';
 import { invalidateCache, userCacheKey, getOrSetCache } from '@/lib/cache';
 import { formatStudentListItem } from '@/lib/formatters';
-import { sanitizeExamScore } from '@/lib/sanitize';
+import { sanitizeExamScore, sanitizeFinalExamPayload } from '@/lib/sanitize';
 import { normalizeGradeLevel, normalizeBranchDisplay } from '@/lib/studentSections';
+import { persistAvatarDataUri, resolveStudentAvatarUrl } from '@/lib/avatarStorage';
 
 export const GET = withAuth(async (request, user) => {
   const { searchParams } = new URL(request.url);
@@ -39,10 +40,7 @@ export const GET = withAuth(async (request, user) => {
     const { updatedAt, ...rest } = s;
     return {
       ...rest,
-      avatar:
-        typeof s.avatar === 'string' && s.avatar.startsWith('data:image/')
-          ? `/api/students/${s.id}/avatar?v=${updatedAt ? updatedAt.getTime() : 0}`
-          : s.avatar ?? null,
+      avatar: resolveStudentAvatarUrl(s.id, s.avatar, updatedAt),
     };
   };
 
@@ -60,6 +58,7 @@ export const GET = withAuth(async (request, user) => {
         updatedAt: true,
         midtermScore: true,
         finalScore: true,
+        examStatus: true,
         affectiveScore: true,
       }
     : {
@@ -73,6 +72,7 @@ export const GET = withAuth(async (request, user) => {
         classroom: { select: { name: true } },
         midtermScore: true,
         finalScore: true,
+        examStatus: true,
         affectiveScore: true,
       };
 
@@ -153,7 +153,7 @@ export const POST = withAuth(async (request, user) => {
       }
     }
 
-    const data = validation.data.students.map(s => ({
+    const data = validation.data.students.map((s, idx) => ({
       userId: user.id,
       name: s.name,
       studentCode: s.student_code || null,
@@ -161,7 +161,7 @@ export const POST = withAuth(async (request, user) => {
       branch: s.branch ? normalizeBranchDisplay(s.branch) || null : null,
       email: s.email || null,
       classroomId: s.classroom_id ? Number(s.classroom_id) : null,
-      avatar: s.avatar || null,
+      avatar: s.avatar ? persistAvatarDataUri(s.avatar, `student-${user.id}-${idx}`) : null,
     }));
 
     const result = await prisma.student.createMany({ data });
@@ -198,7 +198,9 @@ export const POST = withAuth(async (request, user) => {
       branch: validation.data.branch ? normalizeBranchDisplay(validation.data.branch) || null : null,
       email: validation.data.email || null,
       classroomId: validation.data.classroom_id ? Number(validation.data.classroom_id) : null,
-      avatar: validation.data.avatar || null,
+      avatar: validation.data.avatar
+        ? persistAvatarDataUri(validation.data.avatar, `student-${user.id}`)
+        : null,
     },
     include: {
       classroom: { select: { name: true } },
@@ -296,8 +298,10 @@ export const PATCH = withAuth(async (request, user) => {
       if (score.midterm_score !== undefined) {
         dataToUpdate.midtermScore = sanitizeExamScore(score.midterm_score, false);
       }
-      if (score.final_score !== undefined) {
-        dataToUpdate.finalScore = sanitizeExamScore(score.final_score, true);
+      if (score.final_score !== undefined || score.exam_status !== undefined) {
+        const { finalScore, examStatus } = sanitizeFinalExamPayload(score.final_score, score.exam_status);
+        dataToUpdate.finalScore = finalScore;
+        dataToUpdate.examStatus = examStatus;
       }
       if (score.affective_score !== undefined) {
         dataToUpdate.affectiveScore = sanitizeExamScore(score.affective_score, false);

@@ -31,3 +31,44 @@ export function sanitizeExamScore(val: unknown, allowSpecialCodes = false): numb
   }
   return Math.min(999.99, Math.max(0, num));
 }
+
+export type SanitizedExamStatus = 'normal' | 'absent_final' | 'incomplete';
+
+/**
+ * Separates final exam score from special vocational exam statuses (`absent_final` / ข.ส., `incomplete` / ม.ส.)
+ * so negative sentinel numbers are never stored in the numeric `final_score` column while preserving
+ * full backward compatibility with callers sending `-1` or `-2`.
+ */
+export function sanitizeFinalExamPayload(
+  finalScoreVal: unknown,
+  examStatusVal?: unknown,
+  maxScore = 999.99
+): { finalScore: number | null; examStatus: SanitizedExamStatus } {
+  if (examStatusVal === 'absent_final') {
+    return { finalScore: 0, examStatus: 'absent_final' };
+  }
+  if (examStatusVal === 'incomplete') {
+    return { finalScore: 0, examStatus: 'incomplete' };
+  }
+
+  if (finalScoreVal === undefined || finalScoreVal === null || finalScoreVal === '') {
+    return { finalScore: null, examStatus: 'normal' };
+  }
+
+  const num = Number(finalScoreVal);
+  if (isNaN(num)) {
+    return { finalScore: null, examStatus: 'normal' };
+  }
+
+  if (num === -1) {
+    return { finalScore: 0, examStatus: 'absent_final' };
+  }
+  if (num === -2) {
+    return { finalScore: 0, examStatus: 'incomplete' };
+  }
+
+  return {
+    finalScore: Math.min(maxScore, Math.max(0, num)),
+    examStatus: 'normal',
+  };
+}

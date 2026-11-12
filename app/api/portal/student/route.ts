@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { calculateAffectiveScore } from '@/lib/affective';
 import { resolveTargetWeeks, resolveCurrentTeachingWeek } from '@/lib/semester';
 import { protectRequest, portalLimiter } from '@/lib/arcjet';
 import { invalidateCache, userCacheKey } from '@/lib/cache';
 import { generatePortalSession, verifyPortalSession, getAuthUser } from '@/lib/auth';
+import { getAttendanceConfig, computeAbsentConversion } from '@/lib/formatters';
+import {
+  extractClassroomWeights,
+  normalizeGradeCriteria,
+  calculateStudentGradeSummary,
+} from '@/lib/gradeCalculator';
+import { persistAvatarDataUri, resolveStudentAvatarUrl } from '@/lib/avatarStorage';
 
 function stripThaiNamePrefix(raw: string): string {
   return raw
@@ -28,11 +34,7 @@ function matchesStudentNameVerification(fullName: string, verifyInput: string): 
 }
 
 function toLightweightAvatarUrl(student: { id: number; avatar?: string | null; updatedAt: Date }): string | null {
-  if (!student.avatar) return null;
-  if (student.avatar.startsWith('data:image/')) {
-    return `/api/students/${student.id}/avatar?v=${student.updatedAt.getTime()}`;
-  }
-  return student.avatar;
+  return resolveStudentAvatarUrl(student.id, student.avatar, student.updatedAt);
 }
 
 /**
@@ -103,6 +105,7 @@ export async function GET(request: NextRequest) {
         gradeLevel: true,
         midtermScore: true,
         finalScore: true,
+        examStatus: true,
         affectiveScore: true,
         updatedAt: true,
         classroom: {
@@ -118,6 +121,8 @@ export async function GET(request: NextRequest) {
             assignmentWeight: true,
             postTestWeight: true,
             affectiveWeight: true,
+            lateDeductionScore: true,
+            absentDeductionScore: true,
             midtermWeight: true,
             finalWeight: true,
             midtermMaxScore: true,
@@ -273,21 +278,22 @@ export async function GET(request: NextRequest) {
     // Resolve target weeks
     const targetWeeks = resolveTargetWeeks(classroom);
 
-    // Weights & config
-    const weightAssign = Number(classroom.assignmentWeight ?? 10);
-    const weightPostTest = Number(classroom.postTestWeight ?? 70);
-    const weightAffective = Number(classroom.affectiveWeight ?? 20);
-    const weightMidterm = Number(classroom.midtermWeight ?? 0);
-    const weightFinal = Number(classroom.finalWeight ?? 0);
-    const maxMidtermScore = Number(classroom.midtermMaxScore ?? 100);
-    const maxFinalScore = Number(classroom.finalMaxScore ?? 100);
+    // Weights & attendance config via shared helpers
+    const weightsConfig = extractClassroomWeights(classroom);
+    const {
+      assignmentWeight: weightAssign,
+      postTestWeight: weightPostTest,
+      affectiveWeight: weightAffective,
+      midtermWeight: weightMidterm,
+      finalWeight: weightFinal,
+      midtermMaxScore: maxMidtermScore,
+      finalMaxScore: maxFinalScore,
+      totalWeightSum,
+    } = weightsConfig;
 
-    // Attendance config
-    const ratioLate = classroom.lateToAbsentRatio || 3;
-    const ratioLeave = classroom.leaveToAbsentRatio || 2;
-    const totalClasses = classroom.totalClasses || 40;
-    const minAttPercent = classroom.minAttendancePercent || 80;
-    const maxAllowedAbsences = Math.floor(totalClasses * ((100 - minAttPercent) / 100));
+    const attConfig = getAttendanceConfig(classroom);
+    const totalClasses = attConfig.totalClasses;
+    const minAttPercent = attConfig.minAttendancePercent;
 
     // Fetch details in parallel
     const [
@@ -396,14 +402,15 @@ export async function GET(request: NextRequest) {
       else if (a.status === 'leave') leaveCount++;
     }
 
-    const convertedFromLate = Math.floor(lateCount / ratioLate);
-    const convertedFromLeave = Math.floor(leaveCount / ratioLeave);
-    const totalConverted = absentCount + convertedFromLate + convertedFromLeave;
-    const remainingAbsences = maxAllowedAbsences - totalConverted;
-    const isF = totalConverted > maxAllowedAbsences;
-    const attendancePercent = totalClasses > 0
-      ? Math.max(0, Math.min(100, Math.round(((totalClasses - totalConverted) / totalClasses) * 100)))
-      : 100;
+    const attConv = computeAbsentConversion(
+      { absent: absentCount, late: lateCount, leave: leaveCount },
+      attConfig
+    );
+    const totalConverted = attConv.totalConverted;
+    const maxAllowedAbsences = attConv.maxAllowedAbsences;
+    const remainingAbsences = attConv.remaining;
+    const isF = attConv.isF;
+    const attendancePercent = attConv.attendancePercent;
 
     let attendanceRiskStatus: 'safe' | 'warning' | 'critical' = 'safe';
     if (isF || remainingAbsences < 0) {
@@ -467,59 +474,23 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Exam scores
-    const midtermScore = Number(targetStudent.midtermScore ?? 0);
-    const rawFinalScore = targetStudent.finalScore !== null ? Number(targetStudent.finalScore) : null;
-    const isAbsentFinal = rawFinalScore === -1;
-    const isIncomplete = rawFinalScore === -2;
-    const finalScore = (rawFinalScore === null || rawFinalScore < 0) ? 0 : rawFinalScore;
-
-    // Scaled scores
-    const preciseScaledAssign = maxAssignRaw > 0 ? (sumAssignRaw / maxAssignRaw) * weightAssign : 0;
-    const preciseScaledPostTest = maxPostTestRaw > 0 ? (sumPostTestRaw / maxPostTestRaw) * weightPostTest : 0;
-    const preciseScaledMidterm = maxMidtermScore > 0 ? (midtermScore / maxMidtermScore) * weightMidterm : 0;
-    const preciseScaledFinal = maxFinalScore > 0 ? (finalScore / maxFinalScore) * weightFinal : 0;
-
-    const affectiveScore = calculateAffectiveScore({
-      baseScore: targetStudent.affectiveScore ? Number(targetStudent.affectiveScore) : null,
-      maxWeight: weightAffective,
+    // Calculate exam & grade summary via centralized gradeCalculator
+    const criteria = normalizeGradeCriteria(dbCriteria);
+    const calc = calculateStudentGradeSummary({
+      sumAssignRaw,
+      maxAssignRaw,
+      sumPostTestRaw,
+      maxPostTestRaw,
+      midtermScore: targetStudent.midtermScore,
+      finalScore: targetStudent.finalScore,
+      examStatus: targetStudent.examStatus,
+      baseAffectiveScore: targetStudent.affectiveScore,
       absentCount,
       lateCount,
+      isF,
+      weights: weightsConfig,
+      criteria,
     });
-
-    const totalScorePrecise = preciseScaledAssign + preciseScaledPostTest + affectiveScore + preciseScaledMidterm + preciseScaledFinal;
-    const totalWeightSum = weightAssign + weightPostTest + weightAffective + weightMidterm + weightFinal;
-    const percentage = totalWeightSum > 0 ? (totalScorePrecise / totalWeightSum) * 100 : 0;
-
-    // Criteria for final grade
-    const criteria = dbCriteria.length > 0
-      ? dbCriteria.map((c) => ({ grade: c.grade, minScore: Number(c.minScore) }))
-      : [
-          { grade: '4', minScore: 80 },
-          { grade: '3.5', minScore: 75 },
-          { grade: '3', minScore: 70 },
-          { grade: '2.5', minScore: 65 },
-          { grade: '2', minScore: 60 },
-          { grade: '1.5', minScore: 55 },
-          { grade: '1', minScore: 50 },
-          { grade: '0', minScore: 0 },
-        ];
-
-    let finalGrade = '0';
-    if (isF) {
-      finalGrade = 'ข.ร.';
-    } else if (isAbsentFinal) {
-      finalGrade = 'ข.ส.';
-    } else if (isIncomplete) {
-      finalGrade = 'ม.ส.';
-    } else {
-      for (const c of criteria) {
-        if (percentage >= c.minScore) {
-          finalGrade = c.grade;
-          break;
-        }
-      }
-    }
 
     const response = NextResponse.json({
       status: 'success',
@@ -555,28 +526,29 @@ export async function GET(request: NextRequest) {
         is_f: isF,
       },
       grades_summary: {
-        grade: finalGrade,
-        percentage: percentage.toFixed(2),
-        total_score: Math.round(totalScorePrecise),
-        total_score_precise: totalScorePrecise,
+        grade: calc.grade,
+        percentage: calc.percentage,
+        total_score: calc.totalScore,
+        total_score_precise: calc.totalScorePrecise,
         max_score: totalWeightSum,
         raw_assignment: sumAssignRaw,
         max_raw_assignment: maxAssignRaw,
-        scaled_assignment: Math.round(preciseScaledAssign),
+        scaled_assignment: calc.scaledAssign,
         max_scaled_assignment: weightAssign,
         raw_post_test: sumPostTestRaw,
         max_raw_post_test: maxPostTestRaw,
-        scaled_post_test: Math.round(preciseScaledPostTest),
+        scaled_post_test: calc.scaledPostTest,
         max_scaled_post_test: weightPostTest,
-        midterm_score: midtermScore,
+        midterm_score: calc.midtermScore,
         max_midterm_score: maxMidtermScore,
-        scaled_midterm: Math.round(preciseScaledMidterm),
+        scaled_midterm: calc.scaledMidterm,
         max_scaled_midterm: weightMidterm,
-        final_score: rawFinalScore,
+        final_score: calc.rawFinalScore,
+        exam_status: calc.examStatus,
         max_final_score: maxFinalScore,
-        scaled_final: Math.round(preciseScaledFinal),
+        scaled_final: calc.scaledFinal,
         max_scaled_final: weightFinal,
-        affective_score: affectiveScore,
+        affective_score: calc.affectiveScore,
         max_affective_score: weightAffective,
         weights: {
           assignment: weightAssign,
@@ -720,7 +692,7 @@ async function handleAvatarUpdate(request: NextRequest) {
           { status: 400 }
         );
       }
-      avatar = rawAvatar;
+      avatar = persistAvatarDataUri(rawAvatar, `portal-${studentCode}`);
     }
 
     const authorizedIds = authorizedStudents.map((s) => s.id);

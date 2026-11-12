@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma, { withDbRetry } from '@/lib/prisma';
 import { requireAuth, getAuthUser, clearAuthCookie, AuthError, handleAuthError } from '@/lib/auth';
+import { persistAvatarDataUri, removeAvatarFileIfLocal } from '@/lib/avatarStorage';
 
 import bcrypt from 'bcryptjs';
 
@@ -77,11 +78,16 @@ export async function PUT(request: NextRequest) {
       updateData.name = name;
     }
     if (body.avatar !== undefined) {
+      const existingUser = await prisma.user.findUnique({
+        where: { id: authUser.id },
+        select: { avatar: true },
+      });
       if (body.avatar) {
         const rawAvatar = String(body.avatar).trim();
         const isGoogleAvatar = rawAvatar.startsWith('https://lh3.googleusercontent.com/');
+        const isLocalUpload = rawAvatar.startsWith('/uploads/avatars/');
         const isBase64Image = /^data:image\/(webp|jpeg|png);base64,[A-Za-z0-9+/=]+$/.test(rawAvatar);
-        if (!isGoogleAvatar && !isBase64Image) {
+        if (!isGoogleAvatar && !isLocalUpload && !isBase64Image) {
           return NextResponse.json(
             { message: 'รูปแบบรูปภาพไม่ถูกต้อง (รองรับเฉพาะ base64 WebP, JPG, PNG หรือ Google Avatar)' },
             { status: 400 }
@@ -90,8 +96,11 @@ export async function PUT(request: NextRequest) {
         if (rawAvatar.length > 512 * 1024) {
           return NextResponse.json({ message: 'ขนาดรูปภาพใหญ่เกินไป (สูงสุด 500KB)' }, { status: 400 });
         }
-        updateData.avatar = rawAvatar;
+        updateData.avatar = isBase64Image
+          ? persistAvatarDataUri(rawAvatar, `user-${authUser.id}`, existingUser?.avatar)
+          : rawAvatar;
       } else {
+        removeAvatarFileIfLocal(existingUser?.avatar);
         updateData.avatar = null;
       }
     }

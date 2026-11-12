@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, memo, Fragment } from 'react';
+import { useState, useEffect, useMemo, useCallback, Fragment } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
 import {
   Loader2, Save, FileText, Settings, Users, BookOpen, AlertCircle, Upload,
-  Calculator, FileSpreadsheet, Grid, Table, CheckCircle2, TrendingUp,
-  Award, Eye, EyeOff
+  FileSpreadsheet, Grid, Table, CheckCircle2, TrendingUp, Award,
 } from 'lucide-react';
 import toast from '@/lib/toast';
 import dynamic from 'next/dynamic';
@@ -19,229 +18,18 @@ import SectionSwitcher from '@/components/SectionSwitcher';
 import BlueprintCalculatorModal from '@/components/BlueprintCalculatorModal';
 import { parseClassroomName } from '@/lib/classroom';
 import { buildStudentSectionGroups } from '@/lib/studentSections';
-
-interface MemoizedScoreInputProps {
-  value: number | string;
-  maxScore: number;
-  focusColor: 'indigo' | 'amber';
-  onChange: (value: string) => void;
-}
-
-const MemoizedScoreInput = memo(function MemoizedScoreInput({
-  value,
-  maxScore,
-  focusColor,
-  onChange,
-}: MemoizedScoreInputProps) {
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let val = e.target.value;
-    const num = parseFloat(val);
-    if (!isNaN(num) && maxScore > 0 && num > maxScore) {
-      val = String(maxScore);
-    }
-    onChange(val);
-  };
-
-  const focusClass = focusColor === 'indigo'
-    ? 'focus:border-indigo-500 focus:bg-indigo-50/50'
-    : 'focus:border-amber-500 focus:bg-amber-50/50';
-
-  return (
-    <input
-      type="number"
-      inputMode="decimal"
-      step="0.5"
-      min="0"
-      max={maxScore > 0 ? maxScore : undefined}
-      value={value !== null && value !== undefined ? value : ''}
-      onChange={handleChange}
-      className={`w-full text-center py-1 px-1 rounded-lg border border-indigo-100 bg-white font-medium text-slate-800 text-xs touch-manipulation focus:outline-none transition-colors ${focusClass}`}
-    />
-  );
-}, (prev, next) => {
-  return (
-    prev.value === next.value &&
-    prev.maxScore === next.maxScore &&
-    prev.focusColor === next.focusColor
-  );
-});
-
-MemoizedScoreInput.displayName = 'MemoizedScoreInput';
-
-interface Classroom {
-  id: string | number;
-  name: string;
-  student_count?: number;
-  description?: string;
-  total_classes?: number;
-  assignment_weight?: number;
-  post_test_weight?: number;
-  affective_weight?: number;
-  midterm_weight?: number;
-  final_weight?: number;
-  midterm_max_score?: number;
-  final_max_score?: number;
-  total_weeks?: number;
-  curriculum_type?: 'pvch' | 'pvs' | 'custom' | string;
-  semester_start_date?: string | null;
-}
-
-interface Student {
-  id: string | number;
-  student_code?: string;
-  name: string;
-  classroom_id?: string | number;
-  grade_level?: string | null;
-  branch?: string | null;
-  midterm_score?: number | null;
-  final_score?: number | null;
-  affective_score?: number | null;
-}
-
-interface ScoreStructure {
-  lesson_number: number;
-  lesson_name: string;
-  max_assignment_score: number;
-  max_post_test_score: number;
-  hours: number;
-}
-
-
-interface ScoreValue {
-  assignment_score: number | string;
-  post_test_score: number | string;
-}
-
-interface ScoresMap {
-  [studentId: string]: ScoreValue;
-}
-
-interface FullMatrixScoresMap {
-  [key: string]: {
-    assignment_score: number | string;
-    post_test_score: number | string;
-  };
-}
-
-interface MatrixStudentRowProps {
-  student: Student;
-  idx: number;
-  structures: ScoreStructure[];
-  matrixScores: FullMatrixScoresMap;
-  onScoreChange: (studentId: string | number, lessonNum: number, field: 'assignment_score' | 'post_test_score', value: string) => void;
-  hasMidterm?: boolean;
-}
-
-const MatrixStudentRow = memo(function MatrixStudentRow({
-  student,
-  idx,
-  structures,
-  matrixScores,
-  onScoreChange,
-  hasMidterm = true,
-}: MatrixStudentRowProps) {
-  let totalStudentScore = 0;
-  for (let i = 0; i < structures.length; i++) {
-    const struct = structures[i];
-    const key = `${student.id}_${struct.lesson_number}`;
-    const val = matrixScores[key];
-    if (val) {
-      if (val.assignment_score !== '' && val.assignment_score !== null && val.assignment_score !== undefined) {
-        totalStudentScore += Number(val.assignment_score);
-      }
-      if (val.post_test_score !== '' && val.post_test_score !== null && val.post_test_score !== undefined) {
-        totalStudentScore += Number(val.post_test_score);
-      }
-    }
-  }
-  totalStudentScore += (hasMidterm ? Number(student.midterm_score || 0) : 0) + Number(student.final_score || 0) + Number(student.affective_score || 0);
-
-  const roundedTotal = Math.round(totalStudentScore * 10) / 10;
-  const isEven = idx % 2 === 0;
-  const rowBg = isEven ? 'bg-white' : 'bg-slate-50/50';
-  const cellBg = isEven ? '#ffffff' : '#f8fafc';
-
-  return (
-    <tr className={`border-b border-indigo-50 hover:bg-indigo-50/60 ${rowBg} h-9`}>
-      <td
-        className="p-2 sticky left-0 z-10 font-medium text-slate-500 text-center shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)] border-r border-indigo-100 whitespace-nowrap overflow-hidden text-ellipsis text-xs h-9"
-        style={{ left: 0, width: 120, minWidth: 120, maxWidth: 120, backgroundColor: cellBg, backfaceVisibility: 'hidden' }}
-      >
-        {student.student_code || '-'}
-      </td>
-      <td
-        className="p-2 pl-3 sticky z-10 font-semibold text-slate-800 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)] border-r border-indigo-100 whitespace-nowrap overflow-hidden text-ellipsis text-xs h-9"
-        style={{ left: 120, width: 200, minWidth: 200, maxWidth: 200, backgroundColor: cellBg, backfaceVisibility: 'hidden' }}
-        title={student.name}
-      >
-        <div className="flex items-center justify-between gap-1.5">
-          <span className="truncate">{student.name}</span>
-          {student.grade_level && (
-            <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100/80">
-              {student.grade_level}
-            </span>
-          )}
-        </div>
-      </td>
-      {structures.map(struct => {
-        const key = `${student.id}_${struct.lesson_number}`;
-        const val = matrixScores[key];
-        return (
-          <Fragment key={struct.lesson_number}>
-            <td className="p-1 border-l border-indigo-100 text-center h-9">
-              <MemoizedScoreInput
-                value={val?.assignment_score ?? ''}
-                maxScore={Number(struct.max_assignment_score || 0)}
-                focusColor="indigo"
-                onChange={valStr => onScoreChange(student.id, struct.lesson_number, 'assignment_score', valStr)}
-              />
-            </td>
-            <td className="p-1 border-l border-indigo-50 text-center h-9">
-              <MemoizedScoreInput
-                value={val?.post_test_score ?? ''}
-                maxScore={Number(struct.max_post_test_score || 0)}
-                focusColor="amber"
-                onChange={valStr => onScoreChange(student.id, struct.lesson_number, 'post_test_score', valStr)}
-              />
-            </td>
-          </Fragment>
-        );
-      })}
-      {hasMidterm && (
-        <td className="p-1 border-l border-indigo-100 bg-cyan-50/30 text-center font-bold text-cyan-800 text-xs h-9" title="คะแนนสอบกลางภาค (W9)">
-          {student.midterm_score ?? '-'}
-        </td>
-      )}
-      <td className="p-1 border-l border-indigo-50 bg-blue-50/30 text-center font-bold text-blue-800 text-xs h-9" title="คะแนนสอบปลายภาค">
-        {student.final_score ?? '-'}
-      </td>
-      <td className="p-1 border-l border-indigo-50 bg-pink-50/30 text-center font-bold text-pink-800 text-xs h-9" title="คะแนนจิตพิสัย">
-        {student.affective_score ?? '-'}
-      </td>
-      <td className="p-2 border-l border-indigo-100 bg-indigo-50 text-center font-black text-indigo-700 text-sm h-9">
-        {roundedTotal}
-      </td>
-    </tr>
-  );
-}, (prev, next) => {
-  if (prev.student !== next.student) return false;
-  if (prev.idx !== next.idx) return false;
-  if (prev.structures !== next.structures) return false;
-  if (prev.hasMidterm !== next.hasMidterm) return false;
-  if (prev.onScoreChange !== next.onScoreChange) return false;
-
-  for (let i = 0; i < next.structures.length; i++) {
-    const lessonNum = next.structures[i].lesson_number;
-    const key = `${next.student.id}_${lessonNum}`;
-    const pVal = prev.matrixScores[key];
-    const nVal = next.matrixScores[key];
-    if ((pVal?.assignment_score ?? '') !== (nVal?.assignment_score ?? '')) return false;
-    if ((pVal?.post_test_score ?? '') !== (nVal?.post_test_score ?? '')) return false;
-  }
-  return true;
-});
-
-MatrixStudentRow.displayName = 'MatrixStudentRow';
+import {
+  MatrixStudentRow,
+  ScoreBlueprintSettingsTab,
+  WeeklyFocusView,
+  parseSafeDateStr,
+  formatThaiFullDateHeader,
+  type Classroom,
+  type Student,
+  type ScoreStructure,
+  type ScoresMap,
+  type FullMatrixScoresMap,
+} from './scores/index';
 
 export default function Scores() {
   const queryClient = useQueryClient();
@@ -253,7 +41,7 @@ export default function Scores() {
       return 'weekly';
     }
     return 'matrix';
-  }); // 'matrix' (ตารางรวมทั้งเทอม) vs 'weekly' (รายสัปดาห์)
+  });
 
   // Settings State
   const [structures, setStructures] = useState<ScoreStructure[]>([]);
@@ -314,21 +102,6 @@ export default function Scores() {
     enabled: !!selectedClass,
   });
 
-  const parseSafeDateStr = (rawDate: unknown): string => {
-    if (!rawDate) return '';
-    if (typeof rawDate === 'string') {
-      const clean = rawDate.split('T')[0];
-      if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
-    }
-    try {
-      const d = new Date(rawDate as string | number | Date);
-      if (isNaN(d.getTime())) return '';
-      return d.toISOString().split('T')[0];
-    } catch {
-      return '';
-    }
-  };
-
   const { weekDateMap, weekAttendanceMap } = useMemo(() => {
     if (!allClassAttendance || allClassAttendance.length === 0) {
       return { weekDateMap: {} as Record<number, string>, weekAttendanceMap: {} as Record<string, string> };
@@ -368,7 +141,7 @@ export default function Scores() {
     queryFn: async () => {
       const res = await api.get('/timetable');
       return res.data.data?.entries || [];
-    }
+    },
   });
 
   // ─── Query: ดึงข้อมูลห้องเรียน (shared cache) ───
@@ -388,7 +161,6 @@ export default function Scores() {
   useEffect(() => {
     if (!selectedClass) return;
 
-    // 1. ถ้ามีข้อมูลใน DB (classroom.semester_start_date) ให้ใช้ค่าจาก DB เสมอ
     if (classroomObj?.semester_start_date) {
       setSemesterStartDate(classroomObj.semester_start_date);
       try {
@@ -397,7 +169,6 @@ export default function Scores() {
       return;
     }
 
-    // 2. ตรวจสอบ legacy localStorage (ถ้ามีค่าเก่า ให้ซิงก์ขึ้น DB ให้ด้วย)
     const stored = typeof window !== 'undefined' ? localStorage.getItem(`scores_start_date_${selectedClass}`) : null;
     if (stored) {
       setSemesterStartDate(stored);
@@ -412,7 +183,6 @@ export default function Scores() {
       return;
     }
 
-    // 3. Fallback: ดูจากวันแรกที่มีการเช็คชื่อ
     if (allClassAttendance && allClassAttendance.length > 0) {
       const validDates = allClassAttendance
         .map(r => parseSafeDateStr(r.date))
@@ -424,7 +194,6 @@ export default function Scores() {
       }
     }
 
-    // 4. Default: วันที่ 18 พฤษภาคม ของปีปัจจุบัน
     const d = new Date();
     setSemesterStartDate(`${d.getFullYear()}-05-18`);
   }, [selectedClass, classroomObj?.semester_start_date, allClassAttendance, queryClient]);
@@ -448,7 +217,7 @@ export default function Scores() {
 
   // Calculate Teaching Days of this Classroom (0=Mon .. 6=Sun)
   const classTeachingDays = useMemo(() => {
-    if (!selectedClass) return [2]; // Default Wednesday (2)
+    if (!selectedClass) return [2];
     const classEntries = allTimetableEntries.filter(
       e => String(e.classroom_id) === String(selectedClass)
     );
@@ -464,7 +233,6 @@ export default function Scores() {
     if (isNaN(start.getTime())) return {};
 
     const targetWeeks = classroomObj?.total_weeks || (classroomObj?.curriculum_type === 'pvs' ? 15 : 18);
-
     const getSchemaDay = (d: Date) => (d.getDay() + 6) % 7;
 
     const current = new Date(start);
@@ -492,24 +260,6 @@ export default function Scores() {
     return weekMap;
   }, [semesterStartDate, classTeachingDays, classroomObj, allClassAttendance]);
 
-  const formatThaiFullDateHeader = (dateStr?: string) => {
-    if (!dateStr) return null;
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return null;
-    const THAI_DAYS = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
-    const THAI_SHORT_MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
-    const dayName = THAI_DAYS[d.getDay()];
-    const dayNum = d.getDate();
-    const monthName = THAI_SHORT_MONTHS[d.getMonth()];
-    return {
-      dayName,
-      label: `${dayName} ${dayNum} ${monthName}`,
-      shortLabel: `${dayNum} ${monthName}`
-    };
-  };
-
-
-
   // ─── Composite Matrix Query: ดึงข้อมูลนักเรียน + โครงสร้างคะแนน + คะแนนทั้งหมด ───
   const { data: matrixData, isLoading: matrixLoading, refetch: refetchMatrix } = useQuery({
     queryKey: ['scores-matrix-data', selectedClass],
@@ -525,7 +275,6 @@ export default function Scores() {
   // ─── Sub-room / Section Grouping (แยกห้องย่อยเมื่อเรียนรวม เช่น ปวช.1/1 + ปวช.1/2) ───
   const [selectedSectionKey, setSelectedSectionKey] = useState<string>('all');
 
-  // Reset section filter when switching classrooms
   useEffect(() => {
     setSelectedSectionKey('all');
   }, [selectedClass]);
@@ -558,13 +307,10 @@ export default function Scores() {
   }, [classroomObj]);
 
   const hasMidterm = useMemo(() => {
-    // ปวส. ไม่มีสอบกลางภาคเสมอ
     if (isPws) return false;
-    // ปวช. สามารถมีหรือไม่มีกลางภาคได้ โดยอิงตามค่าน้ำหนักกลางภาค (> 0)
     return Number(classroomObj?.midterm_weight ?? 0) > 0;
   }, [isPws, classroomObj]);
 
-  // สัปดาห์เก็บงานย่อย: ปวส = 14 สัปดาห์ (W1–W14), ปวช = 17 สัปดาห์ (W1–W17) เพราะสัปดาห์สุดท้ายเป็นปลายภาค
   const targetTeachingWeeks = useMemo(() => {
     return isPws ? 14 : 17;
   }, [isPws]);
@@ -583,7 +329,7 @@ export default function Scores() {
           lesson_name: `บทที่/สัปดาห์ที่ ${i + 1}`,
           max_assignment_score: 10,
           max_post_test_score: 10,
-          hours: 0
+          hours: 0,
         }));
       } else {
         let adjustedStructs = [...fetchedStructs];
@@ -597,7 +343,7 @@ export default function Scores() {
             lesson_name: `บทที่/สัปดาห์ที่ ${startNum + i}`,
             max_assignment_score: 10,
             max_post_test_score: 10,
-            hours: 0
+            hours: 0,
           }));
           adjustedStructs = [...adjustedStructs, ...padding];
         }
@@ -608,7 +354,6 @@ export default function Scores() {
       setStructures(finalStructs);
       setStructureSavedInDB(savedInDB);
 
-      // Build Matrix Scores Map
       const mScores: FullMatrixScoresMap = {};
       (matrixData.scores || []).forEach((s: {
         student_id: string | number;
@@ -619,12 +364,11 @@ export default function Scores() {
         const key = `${s.student_id}_${s.lesson_number}`;
         mScores[key] = {
           assignment_score: s.assignment_score !== null ? s.assignment_score : '',
-          post_test_score: s.post_test_score !== null ? s.post_test_score : ''
+          post_test_score: s.post_test_score !== null ? s.post_test_score : '',
         };
       });
       setMatrixScores(mScores);
 
-      // Set default selected lesson (or reset if out of range)
       if (finalStructs.length > 0 && (!selectedLesson || !finalStructs.some(s => String(s.lesson_number) === String(selectedLesson)))) {
         setSelectedLesson(finalStructs[0].lesson_number.toString());
       }
@@ -665,7 +409,7 @@ export default function Scores() {
     }
   }, [selectedLesson, calculatedWeekDates, weekDateMap, attendanceDate]);
 
-  // ─── Analytics Summary Computations (ตามขอบเขตห้องย่อยที่เลือก) ───
+  // ─── Analytics Summary Computations ───
   const analyticsSummary = useMemo(() => {
     if (!sectionScopedStudents.length || !structures.length) {
       return { avgScore: 0, completionRate: 0, highestScore: 0, lowestScore: 0, totalMaxScore: 100 };
@@ -700,7 +444,7 @@ export default function Scores() {
           }
         }
       });
-      currentStudentTotal += Number(student.midterm_score || 0) + Number(student.final_score || 0) + Number(student.affective_score || 0);
+      currentStudentTotal += Number(student.midterm_score || 0) + Number(Math.max(0, Number(student.final_score || 0))) + Number(student.affective_score || 0);
 
       totalStudentScoresSum += currentStudentTotal;
       if (currentStudentTotal > maxStudentScore) maxStudentScore = currentStudentTotal;
@@ -715,11 +459,11 @@ export default function Scores() {
       completionRate: Math.min(100, completionRate),
       highestScore: Math.round(maxStudentScore * 10) / 10,
       lowestScore: minStudentScore === Infinity ? 0 : Math.round(minStudentScore * 10) / 10,
-      totalMaxScore: totalPossibleAcademicScore
+      totalMaxScore: totalPossibleAcademicScore,
     };
   }, [sectionScopedStudents, structures, matrixScores, classroomObj]);
 
-  // Index of `${studentId}_${YYYY-MM-DD}` -> status (first match wins, same as the previous Array.find)
+  // Index of `${studentId}_${YYYY-MM-DD}` -> status
   const attendanceStatusIndex = useMemo(() => {
     const index = new Map<string, string>();
     for (const r of allClassAttendance) {
@@ -730,29 +474,24 @@ export default function Scores() {
     return index;
   }, [allClassAttendance]);
 
-  // Helper to determine attendance status for any student in a given week
   const getStudentAttendanceStatus = useCallback((studentId: string | number, weekLesson: string | number, targetDate?: string): string => {
     const idStr = String(studentId);
     const weekNum = parseInt(String(weekLesson));
     const dateStr = targetDate || (calculatedWeekDates[weekNum] || weekDateMap[weekNum] || (String(weekLesson) === String(selectedLesson) ? attendanceDate : ''));
 
-    // 1. Direct check in attendanceRecords if looking at current attendanceDate
     if (dateStr && dateStr === attendanceDate && attendanceRecords[idStr]) {
       return attendanceRecords[idStr];
     }
 
-    // 2. Check in allClassAttendance by student_id and dateStr (O(1) via precomputed index)
     if (dateStr) {
       const matchStatus = attendanceStatusIndex.get(`${idStr}_${dateStr}`);
       if (matchStatus) return matchStatus;
     }
 
-    // 3. Fallback to weekAttendanceMap by studentId_weekNum
     if (!isNaN(weekNum) && weekAttendanceMap[`${idStr}_${weekNum}`]) {
       return weekAttendanceMap[`${idStr}_${weekNum}`];
     }
 
-    // 4. If current week and attendanceRecords has it
     if (String(weekLesson) === String(selectedLesson) && attendanceRecords[idStr]) {
       return attendanceRecords[idStr];
     }
@@ -760,7 +499,6 @@ export default function Scores() {
     return '';
   }, [attendanceRecords, attendanceStatusIndex, weekAttendanceMap, calculatedWeekDates, weekDateMap, attendanceDate, selectedLesson]);
 
-  // Weekly displayed students: hide absent students when in weekly focus (ตามขอบเขตห้องย่อยที่เลือก)
   const weeklyDisplayedStudents = useMemo(() => {
     const weekNum = parseInt(selectedLesson);
     if (isNaN(weekNum) || weekNum <= 0) return sectionScopedStudents;
@@ -774,7 +512,6 @@ export default function Scores() {
     });
   }, [sectionScopedStudents, selectedLesson, hideAbsentInWeekly, getStudentAttendanceStatus]);
 
-  // Attendance stats for the active weekly lesson (ตามขอบเขตห้องย่อยที่เลือก)
   const weeklyAttendanceCounts = useMemo(() => {
     if (!selectedLesson) {
       return { absent: 0, leave: 0, present: 0, late: 0, noData: 0, total: sectionScopedStudents.length };
@@ -814,7 +551,7 @@ export default function Scores() {
           if (!currWeekly || currWeekly.assignment_score === '' || currWeekly.post_test_score === '') {
             nextScores[idStr] = {
               assignment_score: currWeekly?.assignment_score !== '' && currWeekly?.assignment_score !== undefined ? currWeekly.assignment_score : 0,
-              post_test_score: currWeekly?.post_test_score !== '' && currWeekly?.post_test_score !== undefined ? currWeekly.post_test_score : 0
+              post_test_score: currWeekly?.post_test_score !== '' && currWeekly?.post_test_score !== undefined ? currWeekly.post_test_score : 0,
             };
             changedWeekly = true;
           }
@@ -833,7 +570,7 @@ export default function Scores() {
           if (!currMatrix || currMatrix.assignment_score === '' || currMatrix.post_test_score === '') {
             nextMatrixScores[matrixKey] = {
               assignment_score: currMatrix?.assignment_score !== '' && currMatrix?.assignment_score !== undefined ? currMatrix.assignment_score : 0,
-              post_test_score: currMatrix?.post_test_score !== '' && currMatrix?.post_test_score !== undefined ? currMatrix.post_test_score : 0
+              post_test_score: currMatrix?.post_test_score !== '' && currMatrix?.post_test_score !== undefined ? currMatrix.post_test_score : 0,
             };
             changedMatrix = true;
           }
@@ -843,24 +580,7 @@ export default function Scores() {
     });
   }, [selectedLesson, selectedClass, students, getStudentAttendanceStatus]);
 
-
-
-  const getAttendanceBadge = (status: string) => {
-    switch (status) {
-      case 'present':
-        return <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-[10px] font-bold border border-emerald-500/20">มาเรียน</span>;
-      case 'late':
-        return <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 text-[10px] font-bold border border-amber-500/20">สาย</span>;
-      case 'absent':
-        return <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-500 text-[10px] font-bold border border-rose-500/20">ขาด (0)</span>;
-      case 'leave':
-        return <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 text-[10px] font-bold border border-blue-500/20">ลา (0)</span>;
-      default:
-        return <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-400 text-[10px] font-bold border border-slate-200">ไม่มีข้อมูล</span>;
-    }
-  };
-
-  // ─── Quick Fill 0 for Absent & Leave Students (ตามขอบเขตห้องย่อยที่เลือก) ───
+  // ─── Quick Fill 0 for Absent & Leave Students ───
   const handleFillZeroForAbsentees = (targetWeekNum?: number) => {
     const targetWeek = targetWeekNum || (Number(selectedLesson) ? Number(selectedLesson) : null);
     let fillCount = 0;
@@ -910,12 +630,12 @@ export default function Scores() {
     if (!isNaN(targetLesson) && targetLesson > 0) {
       setMatrixScores(prev => ({
         ...prev,
-        [`${studentId}_${targetLesson}`]: { assignment_score: 0, post_test_score: 0 }
+        [`${studentId}_${targetLesson}`]: { assignment_score: 0, post_test_score: 0 },
       }));
     }
     setScores(prev => ({
       ...prev,
-      [String(studentId)]: { assignment_score: 0, post_test_score: 0 }
+      [String(studentId)]: { assignment_score: 0, post_test_score: 0 },
     }));
     setHasPendingChanges(true);
     toast.success('กำหนดคะแนน 0 สำหรับนักเรียนที่ขาด/ลาแล้ว');
@@ -936,8 +656,8 @@ export default function Scores() {
           ...s,
           max_assignment_score: parseFloat(String(s.max_assignment_score)) || 0,
           max_post_test_score: parseFloat(String(s.max_post_test_score)) || 0,
-          hours: parseFloat(String(s.hours)) || 0
-        }))
+          hours: parseFloat(String(s.hours)) || 0,
+        })),
       });
     },
     onSuccess: () => {
@@ -962,8 +682,8 @@ export default function Scores() {
       ...prev,
       [key]: {
         ...(prev[key] || { assignment_score: '', post_test_score: '' }),
-        [field]: value
-      }
+        [field]: value,
+      },
     }));
     setHasPendingChanges(true);
   }, []);
@@ -973,8 +693,8 @@ export default function Scores() {
       ...prev,
       [studentId]: {
         ...(prev[studentId] || { assignment_score: '', post_test_score: '' }),
-        [field]: value
-      }
+        [field]: value,
+      },
     }));
 
     const key = `${studentId}_${selectedLesson}`;
@@ -982,8 +702,8 @@ export default function Scores() {
       ...prev,
       [key]: {
         ...(prev[key] || { assignment_score: '', post_test_score: '' }),
-        [field]: value
-      }
+        [field]: value,
+      },
     }));
     setHasPendingChanges(true);
   };
@@ -1009,14 +729,14 @@ export default function Scores() {
             student_id: studentId,
             lesson_number: lessonNumber,
             assignment_score: val.assignment_score,
-            post_test_score: val.post_test_score
+            post_test_score: val.post_test_score,
           });
         }
       });
 
       await api.post(`/scores?classroom_id=${selectedClass}`, {
         classroom_id: selectedClass,
-        scores: bulkScores
+        scores: bulkScores,
       });
     },
     onSuccess: () => {
@@ -1039,13 +759,13 @@ export default function Scores() {
       const scoresArray = Object.keys(currentScores).map(studentId => ({
         student_id: studentId,
         assignment_score: currentScores[studentId]?.assignment_score,
-        post_test_score: currentScores[studentId]?.post_test_score
+        post_test_score: currentScores[studentId]?.post_test_score,
       }));
 
       await api.post(`/scores?classroom_id=${selectedClass}`, {
         classroom_id: selectedClass,
         lesson_number: selectedLesson,
-        scores: scoresArray
+        scores: scoresArray,
       });
     },
     onSuccess: () => {
@@ -1103,14 +823,12 @@ export default function Scores() {
 
   // --- Open Test Blueprint Calculator with Smart Auto-Prefill ---
   const handleOpenCalculator = () => {
-    // 1. Auto-detect curriculum (ปวช. 18 สัปดาห์ vs ปวส. 15 สัปดาห์)
     const nameOrDesc = `${classroomObj?.name || ''} ${classroomObj?.description || ''}`;
     const isPwsClass = Boolean(nameOrDesc.includes('ปวส') || nameOrDesc.includes('ปวส.') || classroomObj?.curriculum_type === 'pvs');
     const detectedWeeks = isPwsClass ? 15 : 18;
     setCurriculumWeeks(detectedWeeks);
     setHasMidtermCalculator(!isPwsClass && Number(classroomObj?.midterm_weight ?? 0) > 0);
 
-    // 2. Auto-prefill total academic score from classroom settings
     const assignWeight = Number(classroomObj?.assignment_weight) || 0;
     const postTestWeight = Number(classroomObj?.post_test_weight) || 0;
     const academicSum = assignWeight + postTestWeight;
@@ -1120,7 +838,6 @@ export default function Scores() {
       setTotalAcademicScore(40);
     }
 
-    // 3. Auto-detect Theory and Practice hours from Subject name/description e.g. (1-2-2) or timetable
     const match = nameOrDesc.match(/\(?\b(\d+)\s*[-–/]\s*(\d+)\s*[-–/]\s*(\d+)\b\)?/);
     if (match) {
       const t = parseInt(match[1]);
@@ -1164,7 +881,6 @@ export default function Scores() {
 
     const weeksCount = customTeachingWeeks || targetTeachingWeeks;
 
-    // 1. Adjust structures length to match teaching weeks (14 for ปวส., 17 for ปวช.)
     let effectiveStructures = structures;
     if (effectiveStructures.length !== weeksCount) {
       if (effectiveStructures.length > weeksCount) {
@@ -1177,7 +893,7 @@ export default function Scores() {
           lesson_name: `บทที่/สัปดาห์ที่ ${startNum + i}`,
           max_assignment_score: 10,
           max_post_test_score: 10,
-          hours: totalContactHours
+          hours: totalContactHours,
         }));
         effectiveStructures = [...effectiveStructures, ...padding];
       }
@@ -1186,11 +902,10 @@ export default function Scores() {
     let totalHours = 0;
     effectiveStructures.forEach(s => { totalHours += parseFloat(String(s.hours)) || 0; });
 
-    // Zero-friction fallback: If no hours are defined yet in the structure, auto-assign weekly contact hours
     if (totalHours === 0) {
       effectiveStructures = effectiveStructures.map(s => ({
         ...s,
-        hours: totalContactHours
+        hours: totalContactHours,
       }));
       totalHours = effectiveStructures.reduce((sum, s) => sum + (Number(s.hours) || 0), 0);
     }
@@ -1201,7 +916,6 @@ export default function Scores() {
     let newStructs: ScoreStructure[] = [];
 
     if (scoreScaleMode === 'standard_10') {
-      // โหมดคะแนนเต็มมาตรฐาน (เช่น เต็ม 10/ช่อง หรือตามสัดส่วน 5 กับ 10) ตรวจง่าย ไม่เป็น 1 คะแนน
       let assignPerWeek = standardWeeklyBaseScore;
       let postTestPerWeek = standardWeeklyBaseScore;
 
@@ -1217,13 +931,12 @@ export default function Scores() {
         ...s,
         hours: s.hours || totalContactHours,
         max_assignment_score: assignPerWeek,
-        max_post_test_score: postTestPerWeek
+        max_post_test_score: postTestPerWeek,
       }));
 
       const totalRaw = newStructs.reduce((sum, s) => sum + Number(s.max_assignment_score || 0) + Number(s.max_post_test_score || 0), 0);
       toast.success(`ตั้งค่าสัดส่วนสำเร็จ (${curriculumWeeks === 15 ? 'ปวส. 15 สัปดาห์' : 'ปวช. 18 สัปดาห์'})! สอบย่อยเต็ม ${postTestPerWeek} | งานเก็บเต็ม ${assignPerWeek} (รวมดิบ ${totalRaw} คะแนน — ทอนน้ำหนัก ${totalAcademicScore} ในหน้าตัดเกรดอัตโนมัติ)`);
     } else {
-      // โหมดเกลี่ยตรงตามค่าน้ำหนักวิชา (Direct weight distribution)
       let runningSkillTotal = 0;
       let runningTestTotal = 0;
       const targetSkillTotal = Math.round(totalAcademicScore * practiceRatio);
@@ -1248,7 +961,7 @@ export default function Scores() {
           ...s,
           hours: s.hours || totalContactHours,
           max_assignment_score: Math.max(0, finalSkill),
-          max_post_test_score: Math.max(0, finalPostTest)
+          max_post_test_score: Math.max(0, finalPostTest),
         };
       });
 
@@ -1275,13 +988,9 @@ export default function Scores() {
 
   return (
     <div className="space-y-6 animate-fade-in-up">
-      {/* Top Header Title */}
-
-
-      {/* Active Classroom Bar (เมื่อเลือกห้องแล้ว) */}
+      {/* Active Classroom Bar */}
       {selectedClass && selectedClassData && activeParsed && (
         <div className="glass p-5 sm:p-6 rounded-3xl border border-indigo-100/80 bg-white/95 shadow-xl shadow-indigo-100/20 space-y-4">
-          {/* Top Row: Course Info & Quick Switcher */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-start sm:items-center gap-3.5 min-w-0">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/25 shrink-0">
@@ -1315,7 +1024,6 @@ export default function Scores() {
               </div>
             </div>
 
-            {/* Quick Switch / เปลี่ยนห้อง */}
             <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
               <div className="relative">
                 <select
@@ -1343,7 +1051,6 @@ export default function Scores() {
             </div>
           </div>
 
-          {/* Sub-room / Section Switcher Bar */}
           {hasMultipleSections && (
             <>
               <div className="border-t border-slate-100/90" />
@@ -1375,7 +1082,7 @@ export default function Scores() {
         </div>
       )}
 
-      {/* Classroom Card Picker (เมื่อยังไม่ได้เลือกห้องเรียน) */}
+      {/* Classroom Card Picker */}
       {!selectedClass && (
         <ClassroomCardPicker
           classrooms={classrooms}
@@ -1482,128 +1189,17 @@ export default function Scores() {
 
           {/* ─── TAB: โครงสร้างคะแนนเต็ม (Settings) ─── */}
           {activeTab === 'settings' && (
-            <div className="glass rounded-2xl overflow-hidden border border-indigo-100 shadow-sm">
-              <div className="p-5 border-b border-indigo-100 flex flex-col lg:flex-row items-center justify-between gap-4 bg-indigo-50/60">
-                <div>
-                  <h2 className="text-lg font-bold text-slate-800">ตารางน้ำหนักคะแนนเต็ม (Test Blueprint)</h2>
-                  <p className="text-sm text-slate-600">
-                    กำหนดคะแนนเต็มของงานเก็บและสอบย่อยในแต่ละบทเรียน ({structures.length} สัปดาห์เรียน — {isPws ? 'หลักสูตร ปวส. (W1-W14 + ปลายภาค)' : 'หลักสูตร ปวช. (W1-W17 + ปลายภาค)'})
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="flex items-center bg-white border border-indigo-200 rounded-lg p-0.5 text-xs shadow-sm">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (structures.length !== 17) {
-                          const diff = 17 - structures.length;
-                          if (diff > 0) {
-                            const padding = Array.from({ length: diff }, (_, i) => ({
-                              lesson_number: structures.length + 1 + i,
-                              lesson_name: `บทที่/สัปดาห์ที่ ${structures.length + 1 + i}`,
-                              max_assignment_score: 10,
-                              max_post_test_score: 10,
-                              hours: 4
-                            }));
-                            setStructures([...structures, ...padding]);
-                          } else {
-                            setStructures(structures.slice(0, 17));
-                          }
-                          setCurriculumWeeks(18);
-                        }
-                      }}
-                      className={`px-2.5 py-1 rounded-md font-medium transition-all ${structures.length === 17 ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-indigo-600'
-                        }`}
-                    >
-                      ปวช. (17 สัปดาห์เรียน)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (structures.length !== 14) {
-                          setStructures(structures.slice(0, 14));
-                          setCurriculumWeeks(15);
-                        }
-                      }}
-                      className={`px-2.5 py-1 rounded-md font-medium transition-all ${structures.length === 14 ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-indigo-600'
-                        }`}
-                    >
-                      ปวส. (14 สัปดาห์เรียน)
-                    </button>
-                  </div>
-                  <button onClick={handleOpenCalculator} className="btn bg-indigo-500/10 text-indigo-600 hover:bg-indigo-500/20 border border-indigo-200 flex items-center gap-2 text-xs">
-                    <Calculator className="w-4 h-4" />
-                    คำนวณสัดส่วนอัตโนมัติ
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowExcelImportModal(true)}
-                    className="btn bg-indigo-100 hover:bg-indigo-200 text-indigo-700 cursor-pointer flex items-center gap-2 text-xs font-semibold shadow-xs"
-                    title="เปิดหน้าต่างนำเข้า Blueprint พร้อมดูตัวอย่างรูปแบบและดาวน์โหลดเทมเพลต"
-                  >
-                    <Upload className="w-4 h-4 text-indigo-600" />
-                    <span>นำเข้า Blueprint & ตัวอย่างไฟล์</span>
-                  </button>
-                  <button onClick={saveStructure} disabled={saving} className="btn btn-primary flex items-center gap-2 text-xs">
-                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                    บันทึกโครงสร้าง
-                  </button>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto p-5">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-indigo-100/50 border-b border-indigo-200 text-slate-700 text-xs uppercase tracking-wider">
-                      <th className="p-3 w-16 text-center">สัปดาห์</th>
-                      <th className="p-3">ชื่อบทเรียน/รายละเอียด</th>
-                      <th className="p-3 w-28 text-center text-blue-600">ชั่วโมงเรียน</th>
-                      <th className="p-3 w-40 text-center text-emerald-600">งานเก็บเต็ม (ทักษะ)</th>
-                      <th className="p-3 w-40 text-center text-amber-600">สอบย่อยเต็ม (พุทธิ)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {structures.map((struct, index) => (
-                      <tr key={struct.lesson_number} className="border-b border-indigo-100 hover:bg-indigo-50/50">
-                        <td className="p-3 text-center text-slate-600 font-bold">{struct.lesson_number}</td>
-                        <td className="p-3">
-                          <input
-                            value={struct.lesson_name || ''}
-                            onChange={e => handleStructureChange(index, 'lesson_name', e.target.value)}
-                            className="bg-white border border-indigo-200 rounded-lg px-3 py-1.5 w-full text-slate-800 outline-none focus:border-indigo-500 text-sm"
-                            placeholder="เช่น บทที่ 1 การประมวลผลคำ..."
-                          />
-                        </td>
-                        <td className="p-3">
-                          <input
-                            type="number" min="0"
-                            value={struct.hours || ''}
-                            onChange={e => handleStructureChange(index, 'hours', e.target.value)}
-                            className="bg-indigo-50/50 border border-blue-300 rounded-lg px-3 py-1.5 w-full text-center text-slate-800 outline-none focus:border-blue-500 font-semibold text-sm"
-                          />
-                        </td>
-                        <td className="p-3">
-                          <input
-                            type="number" step="0.1" min="0"
-                            value={struct.max_assignment_score}
-                            onChange={e => handleStructureChange(index, 'max_assignment_score', e.target.value)}
-                            className="bg-white border border-emerald-300 rounded-lg px-3 py-1.5 w-full text-center text-slate-800 outline-none focus:border-emerald-500 font-bold text-sm"
-                          />
-                        </td>
-                        <td className="p-3">
-                          <input
-                            type="number" step="0.1" min="0"
-                            value={struct.max_post_test_score}
-                            onChange={e => handleStructureChange(index, 'max_post_test_score', e.target.value)}
-                            className="bg-white border border-amber-300 rounded-lg px-3 py-1.5 w-full text-center text-slate-800 outline-none focus:border-amber-500 font-bold text-sm"
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <ScoreBlueprintSettingsTab
+              structures={structures}
+              setStructures={setStructures}
+              setCurriculumWeeks={setCurriculumWeeks}
+              isPws={isPws}
+              saving={saving}
+              onOpenCalculator={handleOpenCalculator}
+              onOpenExcelImportModal={() => setShowExcelImportModal(true)}
+              onSaveStructure={saveStructure}
+              onStructureChange={handleStructureChange}
+            />
           )}
 
           {/* ─── TAB: ตารางกรอกคะแนน (Entry) ─── */}
@@ -1622,13 +1218,11 @@ export default function Scores() {
               {/* Control Action Toolbar */}
               <div className="glass p-4 rounded-2xl border border-indigo-100 flex flex-wrap items-center justify-between gap-3 bg-white">
                 <div className="flex items-center gap-2.5 flex-wrap">
-                  {/* Realtime Save Status Badges */}
                   {saving && (
                     <span className="inline-flex items-center gap-1.5 text-xs text-indigo-700 font-bold bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-200 animate-pulse shadow-2xs">
                       <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" /> กำลังบันทึกข้อมูล...
                     </span>
                   )}
-
 
                   {!saving && !hasPendingChanges && lastSavedTime && (
                     <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 font-semibold bg-emerald-50/90 px-3 py-1.5 rounded-xl border border-emerald-200 shadow-2xs">
@@ -1737,7 +1331,7 @@ export default function Scores() {
                         className="text-left border-separate border-spacing-0 text-xs table-fixed"
                         style={{
                           width: 120 + 200 + (structures.length * 104) + 260,
-                          minWidth: 120 + 200 + (structures.length * 104) + 260
+                          minWidth: 120 + 200 + (structures.length * 104) + 260,
                         }}
                       >
                         <colgroup>
@@ -1882,359 +1476,28 @@ export default function Scores() {
 
               {/* MODE 2: Weekly Focus View */}
               {viewMode === 'weekly' && (
-                <div className="glass rounded-2xl overflow-hidden border border-indigo-100 shadow-sm bg-white">
-                  <div className="p-4 border-b border-indigo-100 flex flex-col md:flex-row gap-4 items-end justify-between bg-indigo-50/60">
-                    <div className="w-full md:w-1/3">
-                      <label className="form-label text-indigo-800 font-bold">เลือกบทเรียน / สัปดาห์</label>
-                      <select
-                        value={selectedLesson}
-                        onChange={e => handleLessonChange(e.target.value)}
-                        className="form-input bg-white border-indigo-200"
-                      >
-                        {structures.map(s => {
-                          const dateStr = calculatedWeekDates[s.lesson_number] || weekDateMap[s.lesson_number];
-                          const dateInfo = formatThaiFullDateHeader(dateStr);
-                          const dateText = dateInfo ? ` (${dateInfo.label})` : '';
-                          return (
-                            <option key={s.lesson_number} value={s.lesson_number}>
-                              สัปดาห์ที่ {s.lesson_number}{dateText}: {s.lesson_name || 'ไม่มีชื่อ'}
-                            </option>
-                          );
-                        })}
-                      </select>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-3 text-sm font-medium">
-                      <div className="bg-emerald-500/10 text-emerald-600 px-3 py-1.5 rounded-xl border border-emerald-500/20 text-xs font-bold">
-                        คะแนนงานเก็บเต็ม: {currentStruct.max_assignment_score}
-                      </div>
-                      <div className="bg-amber-500/10 text-amber-600 px-3 py-1.5 rounded-xl border border-amber-500/20 text-xs font-bold">
-                        คะแนนสอบเต็ม: {currentStruct.max_post_test_score}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Attendance Integration Toolbar */}
-                  <div className="p-4 border-b border-indigo-100 bg-slate-50/50 flex flex-col gap-3">
-                    <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          id="show-attendance"
-                          checked={showAttendance}
-                          onChange={e => setShowAttendance(e.target.checked)}
-                          className="w-4 h-4 rounded border-indigo-300 text-indigo-600 focus:ring-indigo-400 cursor-pointer"
-                        />
-                        <label htmlFor="show-attendance" className="text-sm font-semibold text-slate-700 cursor-pointer select-none">
-                          🔗 แสดงสถานะการเข้าเรียนประกอบการกรอกคะแนน
-                        </label>
-                      </div>
-
-                      {showAttendance && (
-                        <div className="flex items-center gap-2.5 flex-wrap">
-                          <span className="text-xs font-semibold text-slate-600 flex items-center gap-1">
-                            <span>📅 วันที่เช็คชื่อ:</span>
-                          </span>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <input
-                              type="date"
-                              value={attendanceDate}
-                              onChange={e => setAttendanceDate(e.target.value)}
-                              className="form-input py-1 px-2.5 text-xs bg-white border-indigo-300 rounded-xl font-medium text-slate-800 focus:border-indigo-500 shadow-2xs cursor-pointer"
-                              title="เลือกวันที่เช็คชื่อที่ต้องการดึงข้อมูลมาแสดง"
-                            />
-                            {(() => {
-                              const weekNum = parseInt(selectedLesson);
-                              const targetWeekDate = !isNaN(weekNum) ? (calculatedWeekDates[weekNum] || weekDateMap[weekNum]) : null;
-                              const isSynced = targetWeekDate ? targetWeekDate === attendanceDate : true;
-                              const dateInfo = formatThaiFullDateHeader(attendanceDate);
-
-                              return (
-                                <div className="flex items-center gap-2">
-                                  {dateInfo && (
-                                    <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-200">
-                                      {dateInfo.label}
-                                    </span>
-                                  )}
-                                  {!isSynced && targetWeekDate && (
-                                    <button
-                                      type="button"
-                                      onClick={() => setAttendanceDate(targetWeekDate)}
-                                      className="btn bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-[11px] py-0.5 px-2 rounded-lg flex items-center gap-1 transition-all shadow-2xs font-semibold"
-                                      title={`คลิกเพื่อรีเซ็ตวันที่ให้ตรงกับสัปดาห์ที่ ${weekNum} (${targetWeekDate})`}
-                                    >
-                                      🔄 ซิงค์ตามสัปดาห์ที่ {weekNum}
-                                    </button>
-                                  )}
-                                </div>
-                              );
-                            })()}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Weekly Focus: Absent & Leave Status & Visibility Controller */}
-                  <div className="p-3 bg-gradient-to-r from-indigo-50/90 via-purple-50/70 to-rose-50/60 border-b border-indigo-100/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-                        <span className="inline-block w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
-                        <span>สถานะสัปดาห์นี้:</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-100/90 text-emerald-800 font-bold border border-emerald-200">
-                          มา: {weeklyAttendanceCounts.present}
-                        </span>
-                        {weeklyAttendanceCounts.late > 0 && (
-                          <span className="px-2 py-0.5 rounded-full bg-amber-100/90 text-amber-800 font-bold border border-amber-200">
-                            สาย: {weeklyAttendanceCounts.late}
-                          </span>
-                        )}
-                        <span className="px-2 py-0.5 rounded-full bg-blue-100/90 text-blue-800 font-bold border border-blue-200">
-                          ลา: {weeklyAttendanceCounts.leave} (คะแนน 0)
-                        </span>
-                        <span className="px-2 py-0.5 rounded-full bg-rose-100/90 text-rose-800 font-black border border-rose-300">
-                          ขาด: {weeklyAttendanceCounts.absent} (คะแนน 0)
-                        </span>
-                        {weeklyAttendanceCounts.noData > 0 && (
-                          <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium border border-slate-200">
-                            ยังไม่เช็ค: {weeklyAttendanceCounts.noData}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 flex-wrap sm:shrink-0">
-                      {/* Toggle hide/show absent students */}
-                      <button
-                        type="button"
-                        onClick={() => setHideAbsentInWeekly(!hideAbsentInWeekly)}
-                        className={`btn text-xs py-1 px-2.5 rounded-xl flex items-center gap-1.5 font-bold transition-all shadow-2xs ${hideAbsentInWeekly
-                          ? 'bg-rose-100/90 hover:bg-rose-200 text-rose-800 border border-rose-300 ring-2 ring-rose-300/30'
-                          : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-300'
-                          }`}
-                        title={hideAbsentInWeekly ? 'กำลังซ่อนคนขาดเรียน (คลิกเพื่อแสดงทุกคน)' : 'กำลังแสดงทุกคน (คลิกเพื่อซ่อนคนขาดเรียน)'}
-                      >
-                        {hideAbsentInWeekly ? (
-                          <>
-                            <EyeOff className="w-3.5 h-3.5 text-rose-600" />
-                            <span>ซ่อนคนขาด ({weeklyAttendanceCounts.absent})</span>
-                          </>
-                        ) : (
-                          <>
-                            <Eye className="w-3.5 h-3.5 text-slate-500" />
-                            <span>แสดงทุกคน ({students.length})</span>
-                          </>
-                        )}
-                      </button>
-
-                      {/* Quick fill zero button */}
-                      <button
-                        type="button"
-                        onClick={() => handleFillZeroForAbsentees(Number(selectedLesson))}
-                        className="btn bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 text-xs py-1 px-2.5 rounded-xl font-bold flex items-center gap-1 transition-all shadow-2xs active:scale-95"
-                        title="เติมคะแนน 0 ให้คนที่ขาดหรือลาในสัปดาห์นี้ทันที"
-                      >
-                        ⚡ ใส่ 0 คนขาด/ลา
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Mobile Weekly Score Cards (Touch-Friendly & iOS-Optimized) */}
-                  <div className="block md:hidden p-3 space-y-3">
-                    {weeklyDisplayedStudents.length === 0 ? (
-                      <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-2">
-                        <p className="text-sm font-semibold text-slate-600">ไม่มีรายชื่อนักเรียนที่ต้องกรอกคะแนนในสัปดาห์นี้</p>
-                        <p className="text-xs text-slate-400">
-                          {weeklyAttendanceCounts.absent > 0 && hideAbsentInWeekly
-                            ? `(มีนักเรียนขาด ${weeklyAttendanceCounts.absent} คน ซึ่งถูกซ่อนและใส่คะแนน 0 ไว้แล้ว)`
-                            : 'ไม่มีข้อมูลนักเรียน'}
-                        </p>
-                        {hideAbsentInWeekly && weeklyAttendanceCounts.absent > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => setHideAbsentInWeekly(false)}
-                            className="mt-2 text-xs font-bold text-indigo-600 underline"
-                          >
-                            คลิกเพื่อแสดงรายชื่อคนที่ขาด
-                          </button>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {weeklyDisplayedStudents.map((student) => {
-                          const scoreData = scores[student.id] || { assignment_score: '', post_test_score: '' };
-                          const attStatus = getStudentAttendanceStatus(student.id, selectedLesson, attendanceDate);
-
-                          return (
-                            <div key={student.id} className="p-3.5 bg-white dark:bg-slate-850 rounded-2xl border border-indigo-100/90 dark:border-slate-800 shadow-xs space-y-3">
-                              {/* Student Info & Quick Zero Button */}
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="font-bold text-slate-800 dark:text-slate-100 text-sm truncate">{student.name}</span>
-                                    {student.grade_level && (
-                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-100/80 dark:border-indigo-800">
-                                        {student.grade_level}
-                                      </span>
-                                    )}
-                                    {getAttendanceBadge(attStatus)}
-                                  </div>
-                                  <p className="text-[11px] text-slate-400 font-mono">รหัส: {student.student_code || '-'}</p>
-                                </div>
-
-                                <button
-                                  type="button"
-                                  onClick={() => handleFillSingleStudentZero(student.id)}
-                                  className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-xs font-bold rounded-xl transition-colors shadow-2xs shrink-0 active:scale-95"
-                                  title="กำหนดคะแนนเป็น 0 สำหรับนักเรียนที่ขาดเรียนหรือลา"
-                                >
-                                  ขาด/ลา = 0
-                                </button>
-                              </div>
-
-                              {/* Score Inputs Grid */}
-                              <div className="grid grid-cols-2 gap-2.5">
-                                <div className="p-2.5 bg-emerald-50/50 rounded-xl border border-emerald-100 space-y-1">
-                                  <div className="flex items-center justify-between text-[11px] font-bold text-emerald-800">
-                                    <span>งานเก็บ</span>
-                                    <span className="text-[10px] text-emerald-600 font-normal">เต็ม {currentStruct.max_assignment_score}</span>
-                                  </div>
-                                  <input
-                                    type="number"
-                                    inputMode="decimal"
-                                    step="0.5"
-                                    min="0"
-                                    max={currentStruct.max_assignment_score}
-                                    value={scoreData.assignment_score}
-                                    onChange={e => handleWeeklyScoreChange(student.id, 'assignment_score', e.target.value)}
-                                    className="w-full text-center text-base py-2 font-black border border-emerald-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-400 focus:outline-none"
-                                    placeholder={`0 - ${currentStruct.max_assignment_score}`}
-                                  />
-                                </div>
-
-                                <div className="p-2.5 bg-amber-50/50 rounded-xl border border-amber-100 space-y-1">
-                                  <div className="flex items-center justify-between text-[11px] font-bold text-amber-800">
-                                    <span>สอบย่อย</span>
-                                    <span className="text-[10px] text-amber-600 font-normal">เต็ม {currentStruct.max_post_test_score}</span>
-                                  </div>
-                                  <input
-                                    type="number"
-                                    inputMode="decimal"
-                                    step="0.5"
-                                    min="0"
-                                    max={currentStruct.max_post_test_score}
-                                    value={scoreData.post_test_score}
-                                    onChange={e => handleWeeklyScoreChange(student.id, 'post_test_score', e.target.value)}
-                                    className="w-full text-center text-base py-2 font-black border border-amber-200 rounded-xl bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
-                                    placeholder={`0 - ${currentStruct.max_post_test_score}`}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Desktop Table View */}
-                  <div className="hidden md:block overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="bg-indigo-100/50 border-b border-indigo-200 font-bold text-slate-700">
-                          <th className="p-3 w-20">รหัส</th>
-                          <th className="p-3">ชื่อ-นามสกุล</th>
-                          <th className="p-3 text-center text-emerald-600 w-44">งานเก็บ (ภาคผลงาน)</th>
-                          <th className="p-3 text-center text-amber-600 w-44">สอบย่อย (ภาคผลงาน)</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {weeklyDisplayedStudents.length === 0 ? (
-                          <tr>
-                            <td colSpan={4} className="p-8 text-center text-slate-500 bg-slate-50/50">
-                              <div className="space-y-1">
-                                <p className="font-semibold text-sm">ไม่มีรายชื่อนักเรียนที่ต้องกรอกคะแนนในสัปดาห์นี้</p>
-                                <p className="text-xs text-slate-400">
-                                  {weeklyAttendanceCounts.absent > 0 && hideAbsentInWeekly
-                                    ? `(มีนักเรียนขาด ${weeklyAttendanceCounts.absent} คน ซึ่งถูกซ่อนและใส่คะแนน 0 ไว้แล้ว)`
-                                    : 'ไม่มีข้อมูลนักเรียน'}
-                                </p>
-                                {hideAbsentInWeekly && weeklyAttendanceCounts.absent > 0 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => setHideAbsentInWeekly(false)}
-                                    className="mt-2 text-xs font-bold text-indigo-600 underline"
-                                  >
-                                    คลิกเพื่อแสดงรายชื่อคนที่ขาด
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ) : (
-                          weeklyDisplayedStudents.map((student) => {
-                            const scoreData = scores[student.id] || { assignment_score: '', post_test_score: '' };
-                            const attStatus = getStudentAttendanceStatus(student.id, selectedLesson, attendanceDate);
-                            return (
-                              <tr key={student.id} className="border-b border-indigo-100 hover:bg-indigo-50/50">
-                                <td className="p-3 text-slate-500 font-medium">{student.student_code || '-'}</td>
-                                <td className="p-3 font-semibold text-slate-800">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <span>{student.name}</span>
-                                      {student.grade_level && (
-                                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100/80">
-                                          {student.grade_level}
-                                        </span>
-                                      )}
-                                      {getAttendanceBadge(attStatus)}
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleFillSingleStudentZero(student.id)}
-                                      className="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-[10px] font-bold rounded-lg transition-colors shadow-2xs"
-                                      title="กำหนดคะแนนเป็น 0 สำหรับนักเรียนที่ขาดเรียนหรือลา"
-                                    >
-                                      ขาด/ลา = 0
-                                    </button>
-                                  </div>
-                                </td>
-                                <td className="p-2 text-center">
-                                  <input
-                                    type="number"
-                                    inputMode="decimal"
-                                    step="0.5"
-                                    min="0"
-                                    max={currentStruct.max_assignment_score}
-                                    value={scoreData.assignment_score}
-                                    onChange={e => handleWeeklyScoreChange(student.id, 'assignment_score', e.target.value)}
-                                    className="form-input text-center text-base md:text-sm py-1 font-bold border-indigo-200"
-                                    placeholder={`/${currentStruct.max_assignment_score}`}
-                                  />
-                                </td>
-                                <td className="p-2 text-center">
-                                  <input
-                                    type="number"
-                                    inputMode="decimal"
-                                    step="0.5"
-                                    min="0"
-                                    max={currentStruct.max_post_test_score}
-                                    value={scoreData.post_test_score}
-                                    onChange={e => handleWeeklyScoreChange(student.id, 'post_test_score', e.target.value)}
-                                    className="form-input text-center text-base md:text-sm py-1 font-bold border-indigo-200"
-                                    placeholder={`/${currentStruct.max_post_test_score}`}
-                                  />
-                                </td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                <WeeklyFocusView
+                  structures={structures}
+                  selectedLesson={selectedLesson}
+                  onLessonChange={handleLessonChange}
+                  calculatedWeekDates={calculatedWeekDates}
+                  weekDateMap={weekDateMap}
+                  currentStruct={currentStruct}
+                  showAttendance={showAttendance}
+                  setShowAttendance={setShowAttendance}
+                  attendanceDate={attendanceDate}
+                  setAttendanceDate={setAttendanceDate}
+                  weeklyAttendanceCounts={weeklyAttendanceCounts}
+                  hideAbsentInWeekly={hideAbsentInWeekly}
+                  setHideAbsentInWeekly={setHideAbsentInWeekly}
+                  studentsCount={students.length}
+                  weeklyDisplayedStudents={weeklyDisplayedStudents}
+                  scores={scores}
+                  getStudentAttendanceStatus={getStudentAttendanceStatus}
+                  onFillZeroForAbsentees={handleFillZeroForAbsentees}
+                  onFillSingleStudentZero={handleFillSingleStudentZero}
+                  onWeeklyScoreChange={handleWeeklyScoreChange}
+                />
               )}
             </div>
           )}
@@ -2293,16 +1556,16 @@ export default function Scores() {
               classroomName={classroomObj?.name || 'ห้องเรียน'}
               students={students}
               structures={structures}
-              onImportScores={async (scores, type) => {
+              onImportScores={async (importedScores, type) => {
                 await api.post(`/scores?classroom_id=${selectedClass}`, {
                   classroom_id: selectedClass,
-                  scores: scores.map(d => ({
+                  scores: importedScores.map(d => ({
                     student_id: d.student_id,
                     lesson_number: d.lesson_number,
-                    ...(type === 'assignment' ? { assignment_score: d.assignment_score } : { post_test_score: d.post_test_score })
-                  }))
+                    ...(type === 'assignment' ? { assignment_score: d.assignment_score } : { post_test_score: d.post_test_score }),
+                  })),
                 });
-                toast.success(`นำเข้าคะแนนสำเร็จ ${scores.length} รายการ`);
+                toast.success(`นำเข้าคะแนนสำเร็จ ${importedScores.length} รายการ`);
                 refetchMatrix();
               }}
               onImportBlueprint={(newStructs) => {
@@ -2316,8 +1579,3 @@ export default function Scores() {
     </div>
   );
 }
-
-
-
-
-

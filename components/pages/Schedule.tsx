@@ -5,66 +5,20 @@ import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
 import { useSemester } from '@/context/SemesterContext';
-import {
-  X, Loader2, Trash2, AlertCircle,
-  UploadCloud, FileText, Table, Download,
-  FileSpreadsheet, Sparkles, CheckCircle2, Info
-} from 'lucide-react';
+import { UploadCloud, Table } from 'lucide-react';
 import toast from '@/lib/toast';
 import {
-  format as _format,
-  startOfMonth as _startOfMonth,
-  endOfMonth as _endOfMonth,
-  startOfWeek as _startOfWeek,
-  endOfWeek as _endOfWeek,
-  addDays as _addDays,
-  addMonths as _addMonths,
-  subMonths as _subMonths,
-  isSameDay as _isSameDay,
-  isSameMonth as _isSameMonth,
-  parseISO as _parseISO
-} from 'date-fns';
-import { th as _th } from 'date-fns/locale';
-void [_format, _startOfMonth, _endOfMonth, _startOfWeek, _endOfWeek, _addDays, _addMonths, _subMonths, _isSameDay, _isSameMonth, _parseISO, _th];
-
-const TIMETABLE_DAYS = ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์', 'อาทิตย์'];
-
-interface ApiError {
-  response?: {
-    data?: {
-      message?: string;
-    };
-  };
-}
-
-interface TimetableEntry {
-  id: string | number;
-  day_of_week: number;
-  start_period: number;
-  end_period: number;
-  subject_code: string;
-  subject_name?: string;
-  room?: string;
-  group_name?: string;
-  entry_type: 'lecture' | 'lab' | 'activity' | 'homeroom' | 'theory' | string;
-  hours?: number;
-  classroom_id?: number | null;
-  instructor?: string;
-  start_time?: string;
-  end_time?: string;
-  color?: string | null;
-}
-
-interface TimetableSummaryItem {
-  subject_code: string;
-  subject_name: string;
-  total_hours: number;
-}
-
-interface HoverTooltip {
-  entry: TimetableEntry;
-  rect: DOMRect;
-}
+  TIMETABLE_DAYS,
+  PERIOD_TIMES,
+  TIME_SLOTS,
+  TimetableUploadModal,
+  TimetableEntryModal,
+  type ApiError,
+  type TimetableEntry,
+  type TimetableSummaryItem,
+  type HoverTooltip,
+  type TimetableFormState,
+} from './schedule/index';
 
 export default function Schedule() {
   const queryClient = useQueryClient();
@@ -80,7 +34,7 @@ export default function Schedule() {
   // Weekly timetable modal states
   const [showTimetableModal, setShowTimetableModal] = useState(false);
   const [editTimetableTarget, setEditTimetableTarget] = useState<TimetableEntry | null>(null);
-  const [timetableForm, setTimetableForm] = useState({
+  const [timetableForm, setTimetableForm] = useState<TimetableFormState>({
     day_of_week: 0,
     start_period: 1,
     end_period: 1,
@@ -93,20 +47,18 @@ export default function Schedule() {
     instructor: '',
     entry_type: 'lecture',
     color: '#3b82f6',
-    classroom_id: '' as string | number
+    classroom_id: '' as string | number,
   });
 
   const isFormHomeroom =
     timetableForm.entry_type === 'homeroom' ||
     Number(timetableForm.start_period) === 0 ||
-    timetableForm.subject_name?.includes('เสาธง') ||
-    timetableForm.subject_name?.includes('โฮมรูม') ||
-    timetableForm.subject_name?.includes('เข้าแถว');
+    Boolean(timetableForm.subject_name?.includes('เสาธง')) ||
+    Boolean(timetableForm.subject_name?.includes('โฮมรูม')) ||
+    Boolean(timetableForm.subject_name?.includes('เข้าแถว'));
 
   const [showUpload, setShowUpload] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [exampleTab, setExampleTab] = useState<'csv' | 'ai'>('csv');
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [draggedEntry, setDraggedEntry] = useState<TimetableEntry | null>(null);
   const [dragType, setDragType] = useState<string | null>(null);
@@ -145,7 +97,7 @@ export default function Schedule() {
       const url = activeSemester?.id ? `/classrooms?semester_id=${activeSemester.id}` : '/classrooms';
       const res = await api.get(url);
       return res.data.data || [];
-    }
+    },
   });
 
   // ─── Query: ดึงข้อมูลตารางเรียนรายสัปดาห์ (Timetable) ───
@@ -160,9 +112,9 @@ export default function Schedule() {
       const data = res.data.data || {};
       return {
         entries: Array.isArray(data.entries) ? data.entries : (Array.isArray(data) ? data : []),
-        summary: Array.isArray(data.summary) ? data.summary : []
+        summary: Array.isArray(data.summary) ? data.summary : [],
       };
-    }
+    },
   });
 
   const rawEntries = (timetableData as { entries?: TimetableEntry[] })?.entries;
@@ -178,22 +130,6 @@ export default function Schedule() {
     : [];
 
   const loading = loadingTimetable;
-
-  const PERIOD_TIMES: Record<number, { start: string; end: string }> = {
-    0: { start: '07:30', end: '08:00' },
-    1: { start: '08:00', end: '09:00' },
-    2: { start: '09:00', end: '10:00' },
-    3: { start: '10:00', end: '11:00' },
-    4: { start: '11:00', end: '12:00' },
-    5: { start: '13:00', end: '14:00' },
-    6: { start: '14:00', end: '15:00' },
-    7: { start: '15:00', end: '16:00' },
-    8: { start: '16:00', end: '17:00' },
-    9: { start: '17:00', end: '18:00' },
-    10: { start: '18:00', end: '19:00' },
-    11: { start: '19:00', end: '20:00' },
-    12: { start: '20:00', end: '21:00' },
-  };
 
   const openCreateTimetable = (dayIdx: number, periodId: number | string) => {
     const period = typeof periodId === 'number' ? periodId : 1;
@@ -213,7 +149,7 @@ export default function Schedule() {
       instructor: '',
       entry_type: period === 0 ? 'homeroom' : 'lecture',
       color: period === 0 ? '#f43f5e' : '#3b82f6',
-      classroom_id: ''
+      classroom_id: '',
     });
     setShowTimetableModal(true);
   };
@@ -233,7 +169,7 @@ export default function Schedule() {
       instructor: entry.instructor || '',
       entry_type: (entry.entry_type === 'theory' ? 'lecture' : entry.entry_type) || 'lecture',
       color: entry.color || '#3b82f6',
-      classroom_id: entry.classroom_id !== null && entry.classroom_id !== undefined ? entry.classroom_id : ''
+      classroom_id: entry.classroom_id !== null && entry.classroom_id !== undefined ? entry.classroom_id : '',
     });
     setShowTimetableModal(true);
   };
@@ -242,14 +178,12 @@ export default function Schedule() {
     setTimetableForm(prev => {
       const nextForm = { ...prev, [field]: val };
 
-      // Keep start <= end
       if (field === 'start_period' && nextForm.start_period > nextForm.end_period) {
         nextForm.end_period = nextForm.start_period;
       } else if (field === 'end_period' && nextForm.end_period < nextForm.start_period) {
         nextForm.start_period = nextForm.end_period;
       }
 
-      // Auto set times based on start/end periods
       const startT = PERIOD_TIMES[nextForm.start_period]?.start;
       const endT = PERIOD_TIMES[nextForm.end_period]?.end;
 
@@ -277,7 +211,7 @@ export default function Schedule() {
     },
     onError: (err: ApiError) => {
       toast.error(err.response?.data?.message || 'บันทึกคาบเรียนไม่สำเร็จ');
-    }
+    },
   });
 
   const handleTimetableSubmit = (e: React.FormEvent) => {
@@ -317,7 +251,7 @@ export default function Schedule() {
       instructor: timetableForm.instructor.trim() || null,
       entry_type: timetableForm.entry_type,
       color: timetableForm.color || null,
-      classroom_id: isHomeroomOrFlagpole ? null : (timetableForm.classroom_id ? Number(timetableForm.classroom_id) : null)
+      classroom_id: isHomeroomOrFlagpole ? null : (timetableForm.classroom_id ? Number(timetableForm.classroom_id) : null),
     };
 
     timetableMutation.mutate(payload);
@@ -336,7 +270,7 @@ export default function Schedule() {
     },
     onError: () => {
       toast.error('ลบคาบเรียนไม่สำเร็จ');
-    }
+    },
   });
 
   const handleDeleteTimetableEntry = () => {
@@ -345,16 +279,11 @@ export default function Schedule() {
     deleteTimetableMutation.mutate(editTimetableTarget.id);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) setUploadFile(file);
-  };
-
   // ─── Mutation: อัพโหลดไฟล์ตารางสอน ───
   const timetableUploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
       return api.post('/timetable/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
     },
     onSuccess: (res) => {
@@ -365,70 +294,8 @@ export default function Schedule() {
     },
     onError: (err: ApiError) => {
       toast.error(err.response?.data?.message || 'อัพโหลดไม่สำเร็จ กรุณาตรวจสอบรูปแบบไฟล์');
-    }
+    },
   });
-
-  const handleDownloadCsvTemplate = () => {
-    const csvContent = '\uFEFF' + [
-      'วัน,คาบเริ่ม,คาบสิ้นสุด,รหัสวิชา,ชื่อวิชา,ห้อง,กลุ่ม,ประเภท,อาจารย์',
-      'จันทร์,1,1,20000-1101,กิจกรรมหน้าเสาธงและโฮมรูม,หน้าเสาธง,ปวช.1/1,โฮมรูม,ครูที่ปรึกษา',
-      'จันทร์,2,4,20001-1005,การใช้คอมพิวเตอร์และสารสนเทศเพื่องานอาชีพ,734,ปวช.1/1,ปฏิบัติ,อ.xxxx',
-      'จันทร์,5,8,21909-2011,การเขียนโปรแกรมเชิงวัตถุ,735,ปวช.2/1,ปฏิบัติ,อ.ณัฐนันท์',
-      'อังคาร,2,4,30001-1003,การประยุกต์ใช้เทคโนโลยีดิจิทัลในอาชีพ,745,ปวส.1/6,ทฤษฎี,อ.xxxx',
-      'พุธ,2,4,30901-1001,การพัฒนาเว็บแอปพลิเคชัน,ห้องคอมฯ ต้นแบบ 2,ปวส.2/2,ปฏิบัติ,อ.xxxx',
-      'พุธ,5,6,20000-2001,กิจกรรมลูกเสือวิสามัญ 1,โดม,ชค.1/1,กิจกรรม,อ.สมชาย',
-      'พฤหัสบดี,1,4,20901-2002,ระบบเครือข่ายคอมพิวเตอร์เบื้องต้น,LAB-1,ชค.2/1,ปฏิบัติ,อ.xxxx',
-      'ศุกร์,2,4,20000-1201,ภาษาอังกฤษเพื่อการสื่อสารในงานอาชีพ,421,ชฟ.2/1,ทฤษฎี,Teacher xxx',
-    ].join('\r\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'เทมเพลต_ตารางสอน.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast.success('ดาวน์โหลดไฟล์ตัวอย่าง CSV สำเร็จ');
-  };
-
-  const handleDownloadExcelTemplate = async () => {
-    try {
-      const XLSX = await import('xlsx');
-      const headers = ['วัน', 'คาบเริ่ม', 'คาบสิ้นสุด', 'รหัสวิชา', 'ชื่อวิชา', 'ห้อง', 'กลุ่ม', 'ประเภท', 'อาจารย์'];
-      const rows = [
-        ['จันทร์', 1, 1, '20000-1101', 'กิจกรรมหน้าเสาธงและโฮมรูม', 'หน้าเสาธง', 'ปวช.1/1', 'โฮมรูม', 'ครูที่ปรึกษา'],
-        ['จันทร์', 2, 4, '20001-1005', 'การใช้คอมพิวเตอร์และสารสนเทศเพื่องานอาชีพ', '734', 'ปวช.1/1', 'ปฏิบัติ', 'อ.xxxx'],
-        ['จันทร์', 5, 8, '21909-2011', 'การเขียนโปรแกรมเชิงวัตถุ', '735', 'ปวช.2/1', 'ปฏิบัติ', 'อ.ณัฐนันท์'],
-        ['อังคาร', 2, 4, '30001-1003', 'การประยุกต์ใช้เทคโนโลยีดิจิทัลในอาชีพ', '745', 'ปวส.1/6', 'ทฤษฎี', 'อ.xxxx'],
-        ['พุธ', 2, 4, '30901-1001', 'การพัฒนาเว็บแอปพลิเคชัน', 'ห้องคอมฯ ต้นแบบ 2', 'ปวส.2/2', 'ปฏิบัติ', 'อ.xxxx'],
-        ['พุธ', 5, 6, '20000-2001', 'กิจกรรมลูกเสือวิสามัญ 1', 'โดม', 'ชค.1/1', 'กิจกรรม', 'อ.สมชาย'],
-        ['พฤหัสบดี', 1, 4, '20901-2002', 'ระบบเครือข่ายคอมพิวเตอร์เบื้องต้น', 'LAB-1', 'ชค.2/1', 'ปฏิบัติ', 'อ.xxxx'],
-        ['ศุกร์', 2, 4, '20000-1201', 'ภาษาอังกฤษเพื่อการสื่อสารในงานอาชีพ', '421', 'ชฟ.2/1', 'ทฤษฎี', 'Teacher xxx'],
-      ];
-
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-      ws['!cols'] = [
-        { wch: 12 },
-        { wch: 10 },
-        { wch: 12 },
-        { wch: 16 },
-        { wch: 38 },
-        { wch: 20 },
-        { wch: 16 },
-        { wch: 14 },
-        { wch: 18 }
-      ];
-      XLSX.utils.book_append_sheet(wb, ws, 'ตารางสอน');
-      XLSX.writeFile(wb, 'เทมเพลต_ตารางสอน.xlsx');
-      toast.success('ดาวน์โหลดไฟล์ตัวอย่าง Excel สำเร็จ');
-    } catch (err) {
-      console.error(err);
-      toast.error('ดาวน์โหลดไฟล์ตัวอย่าง Excel ไม่สำเร็จ');
-    }
-  };
 
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -436,7 +303,6 @@ export default function Schedule() {
 
     const formData = new FormData();
 
-    // Auto-convert .xlsx/.xls to CSV if selected
     if (uploadFile.name.endsWith('.xlsx') || uploadFile.name.endsWith('.xls')) {
       try {
         const XLSX = await import('xlsx');
@@ -470,7 +336,7 @@ export default function Schedule() {
     },
     onError: () => {
       toast.error('ทำรายการไม่สำเร็จ');
-    }
+    },
   });
 
   const clearTimetable = () => {
@@ -517,7 +383,7 @@ export default function Schedule() {
     },
     onError: (err: ApiError) => {
       toast.error(err.response?.data?.message || 'ทำรายการไม่สำเร็จ');
-    }
+    },
   });
 
   const resizeTimetableMutation = useMutation({
@@ -530,7 +396,7 @@ export default function Schedule() {
     },
     onError: (err: ApiError) => {
       toast.error(err.response?.data?.message || 'ทำรายการไม่สำเร็จ');
-    }
+    },
   });
 
   const handleDrop = (e: React.DragEvent, dayIdx: number, slotId: string | number) => {
@@ -580,23 +446,6 @@ export default function Schedule() {
       return 'bg-blue-100/80 border-blue-300 text-blue-800';
     };
 
-    const TIME_SLOTS = [
-      { id: 0, label: 'กิจกรรม', start: '07:30', end: '08:00', isBreak: false },
-      { id: 1, label: '1', start: '08:00', end: '09:00', isBreak: false },
-      { id: 2, label: '2', start: '09:00', end: '10:00', isBreak: false },
-      { id: 3, label: '3', start: '10:00', end: '11:00', isBreak: false },
-      { id: 4, label: '4', start: '11:00', end: '12:00', isBreak: false },
-      { id: 'lunch', label: 'พักกลางวัน', start: '12:00', end: '13:00', isBreak: true },
-      { id: 5, label: '5', start: '13:00', end: '14:00', isBreak: false },
-      { id: 6, label: '6', start: '14:00', end: '15:00', isBreak: false },
-      { id: 7, label: '7', start: '15:00', end: '16:00', isBreak: false },
-      { id: 8, label: '8', start: '16:00', end: '17:00', isBreak: false },
-      { id: 9, label: '9', start: '17:00', end: '18:00', isBreak: false },
-      { id: 10, label: '10', start: '18:00', end: '19:00', isBreak: false },
-      { id: 11, label: '11', start: '19:00', end: '20:00', isBreak: false },
-      { id: 12, label: '12', start: '20:00', end: '21:00', isBreak: false },
-    ];
-
     const slotIndex = (slotId: number | string) => TIME_SLOTS.findIndex(s => s.id === slotId);
     const gridCols = `90px repeat(${TIME_SLOTS.length}, minmax(0, 1fr))`;
 
@@ -630,7 +479,7 @@ export default function Schedule() {
                   ))}
                 </div>
 
-                {/* Day rows — each row is a position:relative container */}
+                {/* Day rows */}
                 {TIMETABLE_DAYS.map((dayName, dayIdx) => {
                   const dayEntries = (entriesByDay[dayIdx] || []).sort((a: TimetableEntry, b: TimetableEntry) => Number(a.start_period) - Number(b.start_period));
                   if (dayEntries.length === 0 && dayIdx > 4) return null;
@@ -641,7 +490,6 @@ export default function Schedule() {
                       className="grid relative"
                       style={{ gridTemplateColumns: gridCols }}
                     >
-                      {/* Day name label — explicit column 1 */}
                       <div
                         className="min-w-0 overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/90 p-2 text-sm font-bold text-slate-700 dark:text-slate-200 text-center flex items-center justify-center"
                         style={{ gridRow: 1, gridColumn: 1 }}
@@ -649,10 +497,9 @@ export default function Schedule() {
                         <span className="truncate">{dayName}</span>
                       </div>
 
-                      {/* Background cells — every cell has explicit gridRow AND gridColumn */}
                       {TIME_SLOTS.map((slot, sIdx) => {
                         const isDragOver = dragOverCell === `${dayIdx}-${slot.id}`;
-                        const colPos = sIdx + 2; // +2 because col 1 = day label
+                        const colPos = sIdx + 2;
 
                         if (slot.isBreak) {
                           return (
@@ -679,7 +526,6 @@ export default function Schedule() {
                         );
                       })}
 
-                      {/* Entry blocks — overlaid on same gridRow:1 with explicit gridColumn spans */}
                       {dayEntries.map((entry: TimetableEntry) => {
                         const startIdx = slotIndex(entry.start_period);
                         const endIdx = slotIndex(entry.end_period);
@@ -704,7 +550,7 @@ export default function Schedule() {
                             style={{
                               gridColumn: `${gridColStart} / ${gridColEnd}`,
                               gridRow: 1,
-                              backgroundColor: entry.color ? `${entry.color}1c` : undefined, // 11% opacity
+                              backgroundColor: entry.color ? `${entry.color}1c` : undefined,
                               borderColor: entry.color ? entry.color : undefined,
                             }}
                             onDragOver={(e) => {
@@ -758,7 +604,6 @@ export default function Schedule() {
                               )}
                             </div>
 
-                            {/* Resize Handle */}
                             <div
                               className="absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-slate-900/20 flex flex-col justify-center items-center opacity-0 group-hover:opacity-100 transition-opacity z-30"
                               draggable={true}
@@ -829,7 +674,7 @@ export default function Schedule() {
           style={{
             top: hoverTooltip.rect.top - 8,
             left: hoverTooltip.rect.left + hoverTooltip.rect.width / 2,
-            transform: 'translate(-50%, -100%)'
+            transform: 'translate(-50%, -100%)',
           }}
         >
           <p className="text-xs font-bold text-slate-800 dark:text-slate-100">{hoverTooltip.entry.subject_name}</p>
@@ -842,530 +687,31 @@ export default function Schedule() {
         document.body
       )}
 
-      {showUpload && createPortal(
-        <div className="modal-overlay" onClick={() => setShowUpload(false)}>
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-3xl p-6 sm:p-7 animate-fade-in-up max-h-[90vh] overflow-y-auto space-y-5" onClick={e => e.stopPropagation()}>
-            {/* Modal Header */}
-            <div className="flex items-start justify-between gap-4 pb-4 border-b border-indigo-50/80">
-              <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/25 shrink-0">
-                  <UploadCloud className="w-6 h-6" />
-                </div>
-                <div>
-                  <h2 className="text-lg sm:text-xl font-black text-slate-800">อัพโหลดตารางสอน & ตัวอย่างรูปแบบไฟล์</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    ตรวจสอบตัวอย่างรูปแบบไฟล์ที่ระบบรองรับ ดาวน์โหลดเทมเพลต หรืออัพโหลดไฟล์เพื่อสร้างตารางสอน
-                  </p>
-                </div>
-              </div>
-              <button onClick={() => setShowUpload(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      <TimetableUploadModal
+        isOpen={showUpload}
+        onClose={() => setShowUpload(false)}
+        uploadFile={uploadFile}
+        setUploadFile={setUploadFile}
+        uploading={uploading}
+        onSubmit={handleUploadSubmit}
+      />
 
-            {/* Guide Tabs & Download Buttons */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="flex bg-slate-100/90 p-1 rounded-2xl border border-slate-200/60">
-                  <button
-                    type="button"
-                    onClick={() => setExampleTab('csv')}
-                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${exampleTab === 'csv'
-                      ? 'bg-white text-indigo-600 shadow-sm'
-                      : 'text-slate-600 hover:text-indigo-600'
-                      }`}
-                  >
-                    <FileSpreadsheet className="w-4 h-4" />
-                    <span>ตัวอย่างไฟล์ CSV / Excel (แนะนำ)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setExampleTab('ai')}
-                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${exampleTab === 'ai'
-                      ? 'bg-white text-indigo-600 shadow-sm'
-                      : 'text-slate-600 hover:text-indigo-600'
-                      }`}
-                  >
-                    <Sparkles className="w-4 h-4 text-amber-500" />
-                    <span>ตัวอย่างรูปภาพ & PDF (AI)</span>
-                  </button>
-                </div>
-
-                {exampleTab === 'csv' && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={handleDownloadCsvTemplate}
-                      className="btn bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all cursor-pointer"
-                      title="ดาวน์โหลดไฟล์ตัวอย่าง .csv สำหรับเปิดใน Excel หรือโปรแกรมสเปรดชีต"
-                    >
-                      <Download className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>ดาวน์โหลดตัวอย่าง CSV</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleDownloadExcelTemplate}
-                      className="btn bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all cursor-pointer"
-                      title="ดาวน์โหลดไฟล์ตัวอย่าง .xlsx พร้อมตารางและสูตร"
-                    >
-                      <Download className="w-3.5 h-3.5 text-indigo-600" />
-                      <span>ดาวน์โหลดตัวอย่าง Excel</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Tab 1: CSV / Excel Guide & Preview */}
-              {exampleTab === 'csv' ? (
-                <div className="bg-gradient-to-br from-indigo-50/70 via-slate-50 to-purple-50/40 p-4 rounded-2xl border border-indigo-100/80 space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-black text-indigo-900">โครงสร้างคอลัมน์ที่ระบบรองรับ (Header)</span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                          แม่นยำ 100%
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-600 mt-0.5">
-                        แถวแรกต้องเป็นชื่อคอลัมน์ (รองรับทั้งภาษาไทยและอังกฤษ: วัน, คาบเริ่ม, คาบสิ้นสุด, รหัสวิชา, ชื่อวิชา, ห้อง, กลุ่ม, ประเภท, อาจารย์)
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Table Sample Preview */}
-                  <div className="overflow-x-auto rounded-xl border border-slate-200/90 bg-white shadow-2xs max-h-48 custom-scrollbar">
-                    <table className="w-full text-[11px] text-left border-collapse">
-                      <thead>
-                        <tr className="bg-indigo-50/80 border-b border-indigo-100 text-slate-700 font-bold">
-                          <th className="p-2 border-r border-indigo-100/60 whitespace-nowrap">วัน</th>
-                          <th className="p-2 border-r border-indigo-100/60 whitespace-nowrap text-center">คาบเริ่ม</th>
-                          <th className="p-2 border-r border-indigo-100/60 whitespace-nowrap text-center">คาบสิ้นสุด</th>
-                          <th className="p-2 border-r border-indigo-100/60 whitespace-nowrap">รหัสวิชา</th>
-                          <th className="p-2 border-r border-indigo-100/60 whitespace-nowrap min-w-[160px]">ชื่อวิชา</th>
-                          <th className="p-2 border-r border-indigo-100/60 whitespace-nowrap">ห้อง</th>
-                          <th className="p-2 border-r border-indigo-100/60 whitespace-nowrap">กลุ่ม</th>
-                          <th className="p-2 border-r border-indigo-100/60 whitespace-nowrap">ประเภท</th>
-                          <th className="p-2 whitespace-nowrap">อาจารย์</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
-                        <tr className="hover:bg-slate-50">
-                          <td className="p-2 border-r border-slate-100 font-bold text-indigo-700">จันทร์</td>
-                          <td className="p-2 border-r border-slate-100 text-center font-mono">1</td>
-                          <td className="p-2 border-r border-slate-100 text-center font-mono">1</td>
-                          <td className="p-2 border-r border-slate-100 font-mono text-slate-500">20000-1101</td>
-                          <td className="p-2 border-r border-slate-100">กิจกรรมหน้าเสาธงและโฮมรูม</td>
-                          <td className="p-2 border-r border-slate-100">หน้าเสาธง</td>
-                          <td className="p-2 border-r border-slate-100">ปวช.1/1</td>
-                          <td className="p-2 border-r border-slate-100"><span className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 text-[10px] font-bold">โฮมรูม</span></td>
-                          <td className="p-2 text-slate-500">ครูที่ปรึกษา</td>
-                        </tr>
-                        <tr className="hover:bg-slate-50">
-                          <td className="p-2 border-r border-slate-100 font-bold text-indigo-700">จันทร์</td>
-                          <td className="p-2 border-r border-slate-100 text-center font-mono">2</td>
-                          <td className="p-2 border-r border-slate-100 text-center font-mono">4</td>
-                          <td className="p-2 border-r border-slate-100 font-mono font-bold text-slate-800">20001-1005</td>
-                          <td className="p-2 border-r border-slate-100">การใช้คอมพิวเตอร์และสารสนเทศฯ</td>
-                          <td className="p-2 border-r border-slate-100">734</td>
-                          <td className="p-2 border-r border-slate-100">ปวช.1/1</td>
-                          <td className="p-2 border-r border-slate-100"><span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 text-[10px] font-bold">ปฏิบัติ</span></td>
-                          <td className="p-2 text-slate-500">อ.xxxx</td>
-                        </tr>
-                        <tr className="hover:bg-slate-50">
-                          <td className="p-2 border-r border-slate-100 font-bold text-indigo-700">อังคาร</td>
-                          <td className="p-2 border-r border-slate-100 text-center font-mono">2</td>
-                          <td className="p-2 border-r border-slate-100 text-center font-mono">4</td>
-                          <td className="p-2 border-r border-slate-100 font-mono font-bold text-slate-800">30001-1003</td>
-                          <td className="p-2 border-r border-slate-100">การประยุกต์ใช้เทคโนโลยีดิจิทัลในอาชีพ</td>
-                          <td className="p-2 border-r border-slate-100">745</td>
-                          <td className="p-2 border-r border-slate-100">ปวส.1/6</td>
-                          <td className="p-2 border-r border-slate-100"><span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-bold">ทฤษฎี</span></td>
-                          <td className="p-2 text-slate-500">อ.xxxx</td>
-                        </tr>
-                        <tr className="hover:bg-slate-50">
-                          <td className="p-2 border-r border-slate-100 font-bold text-indigo-700">พุธ</td>
-                          <td className="p-2 border-r border-slate-100 text-center font-mono">5</td>
-                          <td className="p-2 border-r border-slate-100 text-center font-mono">6</td>
-                          <td className="p-2 border-r border-slate-100 font-mono text-slate-500">20000-2001</td>
-                          <td className="p-2 border-r border-slate-100">กิจกรรมลูกเสือวิสามัญ 1</td>
-                          <td className="p-2 border-r border-slate-100">โดม</td>
-                          <td className="p-2 border-r border-slate-100">ชค.1/1</td>
-                          <td className="p-2 border-r border-slate-100"><span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold">กิจกรรม</span></td>
-                          <td className="p-2 text-slate-500">อ.สมชาย</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ) : (
-                /* Tab 2: AI Image & PDF Guide */
-                <div className="bg-gradient-to-br from-purple-50/70 via-indigo-50/50 to-pink-50/40 p-4 rounded-2xl border border-purple-100/80 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-purple-900">รูปแบบตารางสอนที่ AI (Gemini) ถอดความได้ดีที่สุด</span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
-                      OCR & AI วิเคราะห์
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                    <div className="p-3 bg-white/90 rounded-xl border border-purple-100/90 shadow-2xs space-y-1.5">
-                      <div className="flex items-center gap-1.5 font-bold text-slate-800">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span>ตารางสอนรายสัปดาห์ / ตารางครูผู้สอน</span>
-                      </div>
-                      <p className="text-[11px] text-slate-600 leading-relaxed">
-                        ตารางมาตรฐานจากระบบ ศธ.02, RMS หรือแบบฟอร์มวิทยาลัย ที่มีแถววัน (จันทร์-ศุกร์) และคาบเวลา (1-10) ชัดเจน
-                      </p>
-                    </div>
-
-                    <div className="p-3 bg-white/90 rounded-xl border border-purple-100/90 shadow-2xs space-y-1.5">
-                      <div className="flex items-center gap-1.5 font-bold text-slate-800">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span>มีรหัสวิชาและชื่อห้องเรียนระบุ</span>
-                      </div>
-                      <p className="text-[11px] text-slate-600 leading-relaxed">
-                        ควรมีรหัสวิชา 5 หลักหรือ 5 หลักขีด 4 หลัก (เช่น <code className="bg-slate-100 px-1 py-0.5 rounded text-indigo-600 font-mono">30001-1003</code>) และกลุ่มเรียน เพื่อให้ AI จัดกลุ่มวิชาได้อัตโนมัติ
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="bg-amber-50/90 p-2.5 rounded-xl border border-amber-200/80 text-[11px] text-amber-900 flex items-start gap-2">
-                    <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                    <span>
-                      <strong>เคล็ดลับ:</strong> ถ่ายรูปให้ตรง แสงสว่างเพียงพอ ไม่เบลอ ไม่เอียง และครอบตัดให้เห็นเฉพาะตารางสอนเพื่อความแม่นยำสูงสุด
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Upload Form */}
-            <form onSubmit={handleUploadSubmit} className="space-y-4 pt-1">
-              <div
-                className={`border-2 border-dashed rounded-2xl p-6 sm:p-7 text-center transition-all cursor-pointer ${uploadFile
-                  ? 'border-indigo-400 bg-indigo-50/40 ring-2 ring-indigo-200/50'
-                  : 'border-indigo-200 hover:border-indigo-400 bg-indigo-50/20 hover:bg-indigo-50/40'
-                  }`}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <div className="w-12 h-12 rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center mx-auto mb-3 shadow-2xs">
-                  <FileText className="w-6 h-6" />
-                </div>
-                <p className="text-sm font-bold text-slate-800">
-                  {uploadFile ? 'เปลี่ยนไฟล์ที่เลือก' : 'คลิกเพื่อเลือกไฟล์ หรือลากไฟล์มาวางที่นี่'}
-                </p>
-                <p className="text-xs text-slate-500 mt-1">
-                  รองรับไฟล์ภาพ <strong className="text-slate-700">.JPG, .PNG</strong>, เอกสาร <strong className="text-slate-700">.PDF</strong>, และตาราง <strong className="text-slate-700">.CSV, .XLSX</strong> (สูงสุด 5MB)
-                </p>
-
-                {uploadFile && (
-                  <div className="mt-3 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white border border-indigo-200 text-indigo-900 text-xs font-bold shadow-xs">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    <span className="truncate max-w-[260px] sm:max-w-md">{uploadFile.name}</span>
-                    <span className="text-[10px] text-slate-400 font-normal">({(uploadFile.size / 1024).toFixed(1)} KB)</span>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setUploadFile(null);
-                        if (fileInputRef.current) fileInputRef.current.value = '';
-                      }}
-                      className="text-slate-400 hover:text-red-500 ml-1 p-0.5"
-                      title="ล้างไฟล์ที่เลือก"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )}
-
-                <input
-                  type="file"
-                  accept=".jpg,.jpeg,.png,.csv,.pdf,.xlsx,.xls,application/pdf,text/csv,image/jpeg,image/png,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-                  className="hidden"
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                />
-              </div>
-
-              {/* Warning Notice */}
-              <div className="bg-amber-50/80 rounded-2xl p-3 border border-amber-200/80 flex items-center gap-2.5">
-                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                <p className="text-xs text-amber-900 font-medium leading-tight">
-                  การอัพโหลดตารางสอนใหม่จะแทนที่ข้อมูลตารางเรียนเดิมทั้งหมดในระบบ
-                </p>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowUpload(false)}
-                  className="btn px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold hover:bg-slate-50 transition-all text-xs"
-                >
-                  ยกเลิก
-                </button>
-                <button
-                  type="submit"
-                  disabled={uploading || !uploadFile}
-                  className="btn btn-primary flex-1 py-2.5 shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 text-xs font-bold disabled:opacity-50"
-                >
-                  {uploading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>กำลังให้ AI ประมวลผลตารางเรียน (อาจใช้เวลาสักครู่)...</span>
-                    </>
-                  ) : (
-                    <>
-                      <UploadCloud className="w-4 h-4" />
-                      <span>อัพโหลดและสร้างตารางสอน</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* Timetable Entry Modal */}
-      {showTimetableModal && createPortal(
-        <div className="modal-overlay" onClick={() => { setShowTimetableModal(false); setEditTimetableTarget(null); }}>
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-lg p-7 animate-fade-in-up max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-200">
-                  <Table className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-slate-800">
-                    {editTimetableTarget ? 'แก้ไขคาบเรียนตารางสอน' : 'เพิ่มคาบเรียนในตาราง'}
-                  </h2>
-                  <p className="text-xs text-slate-400">กำหนดรายละเอียดคาบเรียนสำหรับตารางเรียนประจำสัปดาห์</p>
-                </div>
-              </div>
-              <button onClick={() => { setShowTimetableModal(false); setEditTimetableTarget(null); }} className="p-2 hover:bg-indigo-50 rounded-xl">
-                <X className="w-5 h-5 text-slate-500" />
-              </button>
-            </div>
-
-            <form onSubmit={handleTimetableSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="form-label text-slate-700 dark:text-slate-200 font-bold mb-1.5 block">
-                    รหัสวิชา {!isFormHomeroom && '*'}
-                    {isFormHomeroom && (
-                      <span className="text-[11px] font-normal text-slate-400 ml-1">(ไม่บังคับสำหรับกิจกรรม)</span>
-                    )}
-                  </label>
-                  <input
-                    type="text"
-                    value={timetableForm.subject_code}
-                    onChange={e => setTimetableForm(f => ({ ...f, subject_code: e.target.value }))}
-                    className="form-input"
-                    placeholder={isFormHomeroom ? 'เว้นว่างได้' : 'เช่น ค21101'}
-                    required={!isFormHomeroom}
-                  />
-                </div>
-                <div>
-                  <label className="form-label text-slate-700 dark:text-slate-200 font-bold mb-1.5 block">
-                    ชื่อวิชา / กิจกรรม
-                  </label>
-                  <input
-                    type="text"
-                    value={timetableForm.subject_name}
-                    onChange={e => setTimetableForm(f => ({ ...f, subject_name: e.target.value }))}
-                    className="form-input"
-                    placeholder={isFormHomeroom ? 'เช่น กิจกรรมหน้าเสาธง, โฮมรูม' : 'เช่น คณิตศาสตร์'}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="form-label text-slate-700 font-bold mb-1.5 block">วันในสัปดาห์ *</label>
-                  <select
-                    value={timetableForm.day_of_week}
-                    onChange={e => setTimetableForm(f => ({ ...f, day_of_week: Number(e.target.value) }))}
-                    className="form-input"
-                    required
-                  >
-                    {TIMETABLE_DAYS.map((day, idx) => (
-                      <option key={idx} value={idx}>{day}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="form-label text-slate-700 font-bold mb-1.5 block">ประเภทวิชา *</label>
-                  <select
-                    value={timetableForm.entry_type}
-                    onChange={e => setTimetableForm(f => ({ ...f, entry_type: e.target.value }))}
-                    className="form-input"
-                    required
-                  >
-                    <option value="lecture">ทฤษฎี (Theory / Lecture)</option>
-                    <option value="lab">ปฏิบัติ (Lab)</option>
-                    <option value="activity">กิจกรรม (Activity)</option>
-                    <option value="homeroom">โฮมรูม (Homeroom)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="form-label text-slate-700 font-bold mb-1.5 block">คาบเริ่มต้น *</label>
-                  <select
-                    value={timetableForm.start_period}
-                    onChange={e => handlePeriodChange('start_period', Number(e.target.value))}
-                    className="form-input"
-                    required
-                  >
-                    <option value="0">คาบกิจกรรม (07:30 - 08:00)</option>
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map(p => (
-                      <option key={p} value={p}>คาบที่ {p}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="form-label text-slate-700 font-bold mb-1.5 block">คาบสิ้นสุด *</label>
-                  <select
-                    value={timetableForm.end_period}
-                    onChange={e => handlePeriodChange('end_period', Number(e.target.value))}
-                    className="form-input"
-                    required
-                  >
-                    <option value="0">คาบกิจกรรม (07:30 - 08:00)</option>
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map(p => (
-                      <option key={p} value={p}>คาบที่ {p}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="form-label text-slate-700 font-bold mb-1.5 block">เวลาเริ่มต้น *</label>
-                  <input
-                    type="time"
-                    value={timetableForm.start_time}
-                    onChange={e => setTimetableForm(f => ({ ...f, start_time: e.target.value }))}
-                    className="form-input"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="form-label text-slate-700 font-bold mb-1.5 block">เวลาสิ้นสุด *</label>
-                  <input
-                    type="time"
-                    value={timetableForm.end_time}
-                    onChange={e => setTimetableForm(f => ({ ...f, end_time: e.target.value }))}
-                    className="form-input"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="form-label text-slate-700 font-bold mb-1.5 block">ห้องเรียน (สถานที่)</label>
-                  <input
-                    type="text"
-                    value={timetableForm.room}
-                    onChange={e => setTimetableForm(f => ({ ...f, room: e.target.value }))}
-                    className="form-input"
-                    placeholder="เช่น 311"
-                  />
-                </div>
-                <div>
-                  <label className="form-label text-slate-700 font-bold mb-1.5 block">กลุ่มเรียน / ชั้นเรียน</label>
-                  <input
-                    type="text"
-                    value={timetableForm.group_name}
-                    onChange={e => setTimetableForm(f => ({ ...f, group_name: e.target.value }))}
-                    className="form-input"
-                    placeholder="เช่น ม.1/1"
-                  />
-                </div>
-                <div>
-                  <label className="form-label text-slate-700 font-bold mb-1.5 block">ผู้สอน</label>
-                  <input
-                    type="text"
-                    value={timetableForm.instructor}
-                    onChange={e => setTimetableForm(f => ({ ...f, instructor: e.target.value }))}
-                    className="form-input"
-                    placeholder="เช่น ครูสมชาย"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="form-label text-slate-700 font-bold mb-1.5 block">เชื่อมห้องเรียนในระบบ</label>
-                  {(timetableForm.entry_type === 'homeroom' || Number(timetableForm.start_period) === 0 || timetableForm.subject_name?.includes('เสาธง') || timetableForm.subject_name?.includes('โฮมรูม') || timetableForm.subject_name?.includes('เข้าแถว')) ? (
-                    <div className="text-xs text-amber-700 bg-amber-50 p-2.5 rounded-xl border border-amber-200/80 flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
-                      <span>กิจกรรมหน้าเสาธง/โฮมรูม ไม่ต้องเชื่อมห้องเรียน (ไม่นับเป็นคาบสอน)</span>
-                    </div>
-                  ) : (
-                    <select
-                      value={timetableForm.classroom_id}
-                      onChange={e => setTimetableForm(f => ({ ...f, classroom_id: e.target.value }))}
-                      className="form-input"
-                    >
-                      <option value="">-- ไม่เชื่อม --</option>
-                      {(Array.isArray(classroomsList) ? classroomsList : []).map(c => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-                <div>
-                  <label className="form-label text-slate-700 font-bold mb-1.5 block">สีประจำวิชา</label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="color"
-                      value={timetableForm.color || '#3b82f6'}
-                      onChange={e => setTimetableForm(f => ({ ...f, color: e.target.value }))}
-                      className="w-10 h-10 border border-slate-200 rounded-lg cursor-pointer p-0"
-                    />
-                    <span className="text-xs text-slate-500 font-mono">
-                      {timetableForm.color || '#3b82f6'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-4 border-t border-slate-100 mt-6">
-                <button type="submit" disabled={savingTimetable} className="btn btn-primary flex-1">
-                  {savingTimetable ? <Loader2 className="w-4 h-4 animate-spin" /> : editTimetableTarget ? 'บันทึกการแก้ไข' : 'เพิ่มคาบเรียน'}
-                </button>
-                {editTimetableTarget && (
-                  <button
-                    type="button"
-                    onClick={handleDeleteTimetableEntry}
-                    className="btn border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 px-3.5 flex items-center gap-1.5 font-medium transition-colors"
-                    title="ลบคาบเรียนนี้ออกจากตาราง"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    <span>ลบคาบนี้</span>
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowTimetableModal(false);
-                    setEditTimetableTarget(null);
-                  }}
-                  className="btn btn-ghost px-5"
-                >
-                  ยกเลิก
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>,
-        document.body
-      )}
+      <TimetableEntryModal
+        isOpen={showTimetableModal}
+        onClose={() => {
+          setShowTimetableModal(false);
+          setEditTimetableTarget(null);
+        }}
+        editTarget={editTimetableTarget}
+        form={timetableForm}
+        setForm={setTimetableForm}
+        isFormHomeroom={isFormHomeroom}
+        classroomsList={classroomsList}
+        saving={savingTimetable}
+        onPeriodChange={handlePeriodChange}
+        onSubmit={handleTimetableSubmit}
+        onDelete={handleDeleteTimetableEntry}
+      />
     </div>
   );
 }

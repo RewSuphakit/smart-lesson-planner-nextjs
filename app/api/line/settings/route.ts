@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
 import { encrypt, isEncryptionConfigured } from '@/lib/encryption';
+import { invalidateCache } from '@/lib/cache';
 
 // GET — Retrieve current teacher's LINE channel config
 export async function GET(request: NextRequest) {
@@ -67,8 +68,11 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Get webhook URL info
-    const webhookUrl = `${getBaseUrl(request)}/api/line/webhook`;
+    // Get webhook URL info (O(1) channel-specific URL; base /api/line/webhook remains supported)
+    const webhookUrl =
+      effectiveConfig.channelId && effectiveConfig.channelId !== 'env-configured'
+        ? `${getBaseUrl(request)}/api/line/webhook/${encodeURIComponent(effectiveConfig.channelId)}`
+        : `${getBaseUrl(request)}/api/line/webhook`;
 
     return NextResponse.json({
       data: {
@@ -148,7 +152,8 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const webhookUrl = `${getBaseUrl(request)}/api/line/webhook`;
+    invalidateCache('line:');
+    const webhookUrl = `${getBaseUrl(request)}/api/line/webhook/${encodeURIComponent(config.channelId)}`;
 
     return NextResponse.json({
       message: 'บันทึกการตั้งค่า LINE Bot สำเร็จ',
@@ -187,6 +192,7 @@ export async function PATCH(request: NextRequest) {
       where: { userId: user.id },
       data: { isActive },
     });
+    invalidateCache('line:');
 
     return NextResponse.json({
       message: isActive ? 'เปิดใช้งาน LINE Bot แล้ว' : 'ปิดใช้งาน LINE Bot แล้ว',
@@ -231,6 +237,7 @@ export async function DELETE(request: NextRequest) {
     await prisma.lineChannelConfig.delete({
       where: { userId: user.id },
     });
+    invalidateCache('line:');
 
     return NextResponse.json({
       message: 'ลบการตั้งค่า LINE Bot และข้อมูลการผูกบัญชีทั้งหมดเรียบร้อย',

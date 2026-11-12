@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
 import prisma from '@/lib/prisma';
 import { getAuthUser, verifyPortalSession, handleAuthError } from '@/lib/auth';
-
-const DATA_URI = /^data:(image\/(?:webp|jpeg|png|gif));base64,([A-Za-z0-9+/=]+)$/;
+import { readAvatarBinary } from '@/lib/avatarStorage';
 
 /**
  * GET /api/students/:id/avatar
@@ -56,22 +54,24 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.redirect(avatar, 302);
     }
 
-    const match = DATA_URI.exec(avatar);
-    if (!match) return new NextResponse(null, { status: 204 });
+    const binary = readAvatarBinary(avatar);
+    if (!binary) return new NextResponse(null, { status: 204 });
 
-    const etag = `"${crypto.createHash('sha1').update(avatar).digest('hex')}"`;
     const headers = {
-      ETag: etag,
+      ETag: binary.etag,
       'Cache-Control': 'private, max-age=300, stale-while-revalidate=3600',
     };
-    if (request.headers.get('if-none-match') === etag) {
+    if (request.headers.get('if-none-match') === binary.etag) {
       return new NextResponse(null, { status: 304, headers });
     }
 
-    const body = Buffer.from(match[2], 'base64');
-    return new NextResponse(body, {
+    return new NextResponse(new Uint8Array(binary.buffer), {
       status: 200,
-      headers: { ...headers, 'Content-Type': match[1], 'Content-Length': String(body.length) },
+      headers: {
+        ...headers,
+        'Content-Type': binary.contentType,
+        'Content-Length': String(binary.buffer.length),
+      },
     });
   } catch {
     return NextResponse.json({ message: 'Failed to get avatar' }, { status: 500 });

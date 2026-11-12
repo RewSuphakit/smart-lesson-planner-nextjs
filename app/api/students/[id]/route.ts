@@ -3,6 +3,8 @@ import prisma from '@/lib/prisma';
 import { withAuth } from '@/lib/apiHandler';
 import { invalidateCache, userCacheKey } from '@/lib/cache';
 import { normalizeGradeLevel, normalizeBranchDisplay } from '@/lib/studentSections';
+import { sanitizeFinalExamPayload } from '@/lib/sanitize';
+import { persistAvatarDataUri, removeAvatarFileIfLocal } from '@/lib/avatarStorage';
 
 export const GET = withAuth<{ id: string }>(async (request, user, { params }) => {
   const { id } = await params;
@@ -88,31 +90,33 @@ export const PUT = withAuth<{ id: string }>(async (request, user, { params }) =>
         } else {
           val = null;
         }
-      } else if (prismaKey === 'midtermScore' || prismaKey === 'finalScore') {
+      } else if (prismaKey === 'midtermScore') {
         if (val === '' || val === null || val === undefined) {
           val = null;
         } else {
           const num = Number(val);
-          if (isNaN(num)) {
-            val = null;
-          } else if (num === -1 || num === -2) {
-            // Special scores: -1 = ขาดสอบ (absent), -2 = หมดสิทธิ์สอบ (no rights)
-            val = num;
-          } else {
-            const maxScore = prismaKey === 'midtermScore' ? classroomMaxScores.midterm : classroomMaxScores.final;
-            val = Math.min(maxScore, Math.max(0, num));
-          }
+          val = isNaN(num) ? null : Math.min(classroomMaxScores.midterm, Math.max(0, num));
         }
+      } else if (prismaKey === 'finalScore') {
+        const { finalScore, examStatus } = sanitizeFinalExamPayload(
+          val,
+          body.exam_status,
+          classroomMaxScores.final
+        );
+        val = finalScore;
+        updateData.examStatus = examStatus;
       } else if (prismaKey === 'avatar') {
         if (body.remove_avatar === true) {
+          removeAvatarFileIfLocal(student.avatar);
           val = null;
         } else if (val && String(val).trim()) {
           val = String(val).trim();
           // Ignore avatar endpoint URLs echoed back by list responses; enforce size cap
-          if (val.startsWith('/api/students/')) continue;
+          if (val.startsWith('/api/students/') || val.startsWith('/uploads/avatars/')) continue;
           if (val.length > 150_000) {
             return NextResponse.json({ message: 'Avatar is too large' }, { status: 400 });
           }
+          val = persistAvatarDataUri(val, `student-${numericId}`, student.avatar);
         } else {
           // Keep existing avatar if not explicitly set or removed
           continue;

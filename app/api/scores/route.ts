@@ -51,6 +51,7 @@ export const GET = withAuth(async (request, user) => {
               classroomId: true,
               midtermScore: true,
               finalScore: true,
+              examStatus: true,
               affectiveScore: true,
             },
             orderBy: [{ gradeLevel: 'asc' }, { studentCode: 'asc' }, { name: 'asc' }],

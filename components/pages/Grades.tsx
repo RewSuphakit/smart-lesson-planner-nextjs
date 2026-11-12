@@ -1,17 +1,22 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
 import {
   Loader2, Save, Settings, AlertCircle,
-  FileSpreadsheet, Printer, Zap, AlertTriangle, Search, Award, Download,
+  FileSpreadsheet, Printer, Zap, Search, Award, Download,
   LayoutGrid, Table as TableIcon, Grid
 } from 'lucide-react';
 import toast from '@/lib/toast';
 import Pagination from '@/components/Pagination';
 import dynamic from 'next/dynamic';
 import { calculateAffectiveScore } from '@/lib/affective';
+import {
+  extractClassroomWeights,
+  normalizeGradeCriteria,
+  calculateStudentGradeSummary,
+} from '@/lib/gradeCalculator';
 import ClassroomCardPicker from '@/components/ClassroomCardPicker';
 import SectionSwitcher from '@/components/SectionSwitcher';
 import { parseClassroomName } from '@/lib/classroom';
@@ -21,102 +26,19 @@ import GradesAnalyticsHeader from '@/components/GradesAnalyticsHeader';
 const GradePdfModal = dynamic(() => import('@/components/GradePdfModal'), { ssr: false });
 const GradeCsvModal = dynamic(() => import('@/components/GradeCsvModal'), { ssr: false });
 import { useAuth } from '@/context/AuthContext';
-import UserAvatar from '@/components/UserAvatar';
+import {
+  Classroom,
+  Criterion,
+  ReportStudent,
+  Weights,
+  EMPTY_CLASSROOMS,
+  DEFAULT_CRITERIA,
+  DEFAULT_WEIGHTS,
+  GradeTableRow,
+  GradeMobileCard,
+} from './grades/index';
 
-export interface Classroom {
-  id: string;
-  name: string;
-  student_count?: number;
-  total_classes?: number;
-  total_weeks?: number;
-  curriculum_type?: string;
-  assignment_weight?: number;
-  post_test_weight?: number;
-  affective_weight?: number;
-  midterm_weight?: number;
-  final_weight?: number;
-  midterm_max_score?: number;
-  final_max_score?: number;
-}
-
-export interface Criterion {
-  grade: string;
-  min_score: number;
-}
-
-export interface ReportStudent {
-  id?: string | number;
-  student_id: string;
-  student_code?: string;
-  grade_level?: string | null;
-  branch?: string | null;
-  name: string;
-  avatar?: string | null;
-  raw_assign?: number;
-  max_assign?: number;
-  scaled_assign?: number;
-  precise_scaled_assign?: number;
-  raw_post_test?: number;
-  max_post_test?: number;
-  scaled_post_test?: number;
-  precise_scaled_post_test?: number;
-  midterm_score?: number | string;
-  scaled_midterm?: number;
-  precise_scaled_midterm?: number;
-  final_score?: number | string;
-  is_absent_final?: boolean;
-  is_incomplete?: boolean;
-  scaled_final?: number;
-  precise_scaled_final?: number;
-  affective_score?: number | string;
-  is_f?: boolean;
-  total_score_precise?: number;
-  total_score?: number | string;
-  percentage?: string;
-  attendance_percent?: number;
-  grade?: string;
-  absent_count?: number;
-  late_count?: number;
-  max_allowed_absences?: number;
-  remaining_absences?: number;
-}
-
-export interface Weights {
-  assignment_weight: number;
-  post_test_weight: number;
-  affective_weight: number;
-  midterm_weight: number;
-  final_weight: number;
-  midterm_max_score: number;
-  final_max_score: number;
-  target_weeks?: number;
-  is_pws?: boolean;
-  max_assign_raw?: number;
-  max_post_test_raw?: number;
-}
-
-const EMPTY_CLASSROOMS: Classroom[] = [];
-
-const DEFAULT_CRITERIA: Criterion[] = [
-  { grade: '4', min_score: 80 },
-  { grade: '3.5', min_score: 75 },
-  { grade: '3', min_score: 70 },
-  { grade: '2.5', min_score: 65 },
-  { grade: '2', min_score: 60 },
-  { grade: '1.5', min_score: 55 },
-  { grade: '1', min_score: 50 },
-  { grade: '0', min_score: 0 },
-];
-
-const DEFAULT_WEIGHTS: Weights = {
-  assignment_weight: 10,
-  post_test_weight: 70,
-  affective_weight: 20,
-  midterm_weight: 0,
-  final_weight: 0,
-  midterm_max_score: 100,
-  final_max_score: 100
-};
+export type { Classroom, Criterion, ReportStudent, Weights };
 
 export default function Grades() {
   const queryClient = useQueryClient();
@@ -371,97 +293,114 @@ export default function Grades() {
     return filteredReport.slice(start, start + itemsPerPage);
   }, [filteredReport, currentPage, itemsPerPage]);
 
-  const handleExamScoreChange = (studentId: string, field: 'midterm_score' | 'final_score' | 'affective_score', value: string) => {
-    setHasUnsavedChanges(true);
-    setReport(prev => prev.map(student => {
-      if (student.student_id === studentId) {
-        let valNum: number | string = value === '' ? '' : parseFloat(value);
-        let isAbsentFinal = student.is_absent_final;
-        let isIncomplete = student.is_incomplete;
+  const handleExamScoreChange = useCallback(
+    (studentId: string, field: 'midterm_score' | 'final_score' | 'affective_score', value: string) => {
+      setHasUnsavedChanges(true);
+      const weightsConfig = extractClassroomWeights(weights);
+      const normalizedCriteria = normalizeGradeCriteria(criteria);
 
-        if (field === 'final_score') {
-          if (valNum === -1 || value === 'ข.ส.' || value === 'ขาดสอบ') {
-            valNum = -1;
-            isAbsentFinal = true;
-            isIncomplete = false;
-          } else if (valNum === -2 || value === 'ม.ส.' || value === 'ไม่สมบูรณ์') {
-            valNum = -2;
-            isAbsentFinal = false;
-            isIncomplete = true;
-          } else {
-            isAbsentFinal = false;
-            isIncomplete = false;
-            if (typeof valNum === 'number' && valNum < 0) {
-              valNum = 0;
+      setReport((prev) =>
+        prev.map((student) => {
+          if (student.student_id !== studentId) return student;
+
+          let valNum: number | string = value === '' ? '' : parseFloat(value);
+          let examStatus = student.exam_status ?? 'normal';
+
+          if (field === 'final_score') {
+            if (valNum === -1 || value === 'ข.ส.' || value === 'ขาดสอบ') {
+              valNum = -1;
+              examStatus = 'absent_final';
+            } else if (valNum === -2 || value === 'ม.ส.' || value === 'ไม่สมบูรณ์') {
+              valNum = -2;
+              examStatus = 'incomplete';
+            } else {
+              examStatus = 'normal';
+              if (typeof valNum === 'number' && valNum < 0) {
+                valNum = 0;
+              }
             }
+          } else if (typeof valNum === 'number' && valNum < 0) {
+            valNum = 0;
           }
-        } else if (typeof valNum === 'number' && valNum < 0) {
-          valNum = 0;
-        }
 
-        const updatedStudent = {
-          ...student,
-          [field]: valNum,
-          ...(field === 'final_score' ? { is_absent_final: isAbsentFinal, is_incomplete: isIncomplete } : {})
-        };
+          const updatedStudent: ReportStudent = {
+            ...student,
+            [field]: valNum,
+            ...(field === 'final_score' ? { exam_status: examStatus } : {}),
+          };
 
-        const mScore = Math.max(0, parseFloat(String(updatedStudent.midterm_score)) || 0);
-        const rawF = parseFloat(String(updatedStudent.final_score));
-        const fScore = (isNaN(rawF) || rawF < 0) ? 0 : rawF;
-        const preciseAssign = Number(updatedStudent.precise_scaled_assign ?? 0);
-        const precisePost = Number(updatedStudent.precise_scaled_post_test ?? 0);
+          const calc = calculateStudentGradeSummary({
+            sumAssignRaw: Number(updatedStudent.raw_assign ?? 0),
+            maxAssignRaw: Number(updatedStudent.max_assign ?? 100),
+            sumPostTestRaw: Number(updatedStudent.raw_post_test ?? 0),
+            maxPostTestRaw: Number(updatedStudent.max_post_test ?? 100),
+            midtermScore: updatedStudent.midterm_score,
+            finalScore: updatedStudent.final_score,
+            examStatus: updatedStudent.exam_status,
+            baseAffectiveScore:
+              updatedStudent.affective_score === '' || updatedStudent.affective_score === undefined
+                ? 0
+                : updatedStudent.affective_score,
+            absentCount: updatedStudent.absent_count || 0,
+            lateCount: updatedStudent.late_count || 0,
+            isF: Boolean(updatedStudent.is_f),
+            weights: weightsConfig,
+            criteria: normalizedCriteria,
+          });
 
-        const preciseMidterm = weights.midterm_max_score > 0 ? (mScore / weights.midterm_max_score) * weights.midterm_weight : 0;
-        const preciseFinal = weights.final_max_score > 0 ? (fScore / weights.final_max_score) * weights.final_weight : 0;
-
-        updatedStudent.precise_scaled_midterm = preciseMidterm;
-        updatedStudent.scaled_midterm = Math.round(preciseMidterm);
-        updatedStudent.precise_scaled_final = preciseFinal;
-        updatedStudent.scaled_final = Math.round(preciseFinal);
-
-        const affective = Math.max(0, parseFloat(String(updatedStudent.affective_score ?? 0)) || 0);
-
-        const totalPrecise = preciseAssign + precisePost + affective + preciseMidterm + preciseFinal;
-        updatedStudent.total_score_precise = totalPrecise;
-        updatedStudent.total_score = Math.round(totalPrecise);
-
-        const percentage = totalWeightSum > 0 ? (totalPrecise / totalWeightSum) * 100 : 0;
-        updatedStudent.percentage = percentage.toFixed(2);
-
-        let finalGrade = null;
-        if (updatedStudent.is_f) {
-          finalGrade = 'ข.ร.';
-        } else if (updatedStudent.is_absent_final) {
-          finalGrade = 'ข.ส.';
-        } else if (updatedStudent.is_incomplete) {
-          finalGrade = 'ม.ส.';
-        } else {
-          for (const c of criteria) {
-            if (percentage >= Number(c.min_score)) {
-              finalGrade = c.grade;
-              break;
-            }
-          }
-        }
-        updatedStudent.grade = finalGrade || 'ไม่มีเกรด';
-
-        return updatedStudent;
-      }
-      return student;
-    }));
-  };
+          return {
+            ...updatedStudent,
+            exam_status: calc.examStatus,
+            is_absent_final: calc.isAbsentFinal,
+            is_incomplete: calc.isIncomplete,
+            precise_scaled_midterm: calc.preciseScaledMidterm,
+            scaled_midterm: calc.scaledMidterm,
+            precise_scaled_final: calc.preciseScaledFinal,
+            scaled_final: calc.scaledFinal,
+            total_score_precise: calc.totalScorePrecise,
+            total_score: calc.totalScore,
+            percentage: calc.percentage,
+            grade: calc.grade || 'ไม่มีเกรด',
+          };
+        })
+      );
+    },
+    [weights, criteria]
+  );
 
   // ─── Mutation: บันทึกคะแนนสอบ ───
   const saveExamsMutation = useMutation({
     mutationFn: async () => {
-      const scores = report.map(s => ({
-        student_id: s.student_id,
-        midterm_score: s.midterm_score === '' || s.midterm_score === undefined || s.midterm_score === null ? 0 : Number(s.midterm_score),
-        final_score: s.final_score === '' || s.final_score === undefined || s.final_score === null
-          ? 0
-          : Number(s.final_score),
-        affective_score: s.affective_score === undefined || s.affective_score === null ? null : Number(s.affective_score)
-      }));
+      const scores = report.map((s) => {
+        const isKs = s.is_absent_final || s.exam_status === 'absent_final' || s.final_score === -1;
+        const isMs = s.is_incomplete || s.exam_status === 'incomplete' || s.final_score === -2;
+        const examStatus: 'normal' | 'absent_final' | 'incomplete' = isKs
+          ? 'absent_final'
+          : isMs
+            ? 'incomplete'
+            : 'normal';
+
+        return {
+          student_id: s.student_id,
+          midterm_score:
+            s.midterm_score === '' || s.midterm_score === undefined || s.midterm_score === null
+              ? 0
+              : Number(s.midterm_score),
+          final_score:
+            isKs
+              ? -1
+              : isMs
+                ? -2
+                : s.final_score === '' || s.final_score === undefined || s.final_score === null
+                  ? 0
+                  : Number(s.final_score),
+          exam_status: examStatus,
+          affective_score:
+            s.affective_score === undefined || s.affective_score === null || s.affective_score === ''
+              ? null
+              : Number(s.affective_score),
+        };
+      });
       return api.put('/students/exams', { scores });
     },
     onSuccess: () => {
@@ -480,44 +419,44 @@ export default function Grades() {
   const autoCalculateAffective = () => {
     let count = 0;
     setHasUnsavedChanges(true);
-    setReport(prev => prev.map(student => {
-      const autoScore = calculateAffectiveScore({
-        maxWeight: weights.affective_weight,
-        absentCount: student.absent_count || 0,
-        lateCount: student.late_count || 0,
-      });
-      const updatedStudent = { ...student, affective_score: autoScore };
+    const weightsConfig = extractClassroomWeights(weights);
+    const normalizedCriteria = normalizeGradeCriteria(criteria);
 
-      const preciseAssign = Number(updatedStudent.precise_scaled_assign ?? 0);
-      const precisePost = Number(updatedStudent.precise_scaled_post_test ?? 0);
-      const preciseMidterm = Number(updatedStudent.precise_scaled_midterm ?? 0);
-      const preciseFinal = Number(updatedStudent.precise_scaled_final ?? 0);
+    setReport((prev) =>
+      prev.map((student) => {
+        const autoScore = calculateAffectiveScore({
+          maxWeight: weights.affective_weight,
+          absentCount: student.absent_count || 0,
+          lateCount: student.late_count || 0,
+        });
 
-      const totalPrecise = preciseAssign + precisePost + autoScore + preciseMidterm + preciseFinal;
-      updatedStudent.total_score_precise = totalPrecise;
-      updatedStudent.total_score = Math.round(totalPrecise);
-      const percentage = totalWeightSum > 0 ? (totalPrecise / totalWeightSum) * 100 : 0;
-      updatedStudent.percentage = percentage.toFixed(2);
+        const calc = calculateStudentGradeSummary({
+          sumAssignRaw: Number(student.raw_assign ?? 0),
+          maxAssignRaw: Number(student.max_assign ?? 100),
+          sumPostTestRaw: Number(student.raw_post_test ?? 0),
+          maxPostTestRaw: Number(student.max_post_test ?? 100),
+          midtermScore: student.midterm_score,
+          finalScore: student.final_score,
+          examStatus: student.exam_status,
+          baseAffectiveScore: autoScore,
+          absentCount: student.absent_count || 0,
+          lateCount: student.late_count || 0,
+          isF: Boolean(student.is_f),
+          weights: weightsConfig,
+          criteria: normalizedCriteria,
+        });
 
-      let finalGrade = null;
-      if (updatedStudent.is_f) {
-        finalGrade = 'ข.ร.';
-      } else if (updatedStudent.is_absent_final) {
-        finalGrade = 'ข.ส.';
-      } else if (updatedStudent.is_incomplete) {
-        finalGrade = 'ม.ส.';
-      } else {
-        for (const c of criteria) {
-          if (percentage >= Number(c.min_score)) {
-            finalGrade = c.grade;
-            break;
-          }
-        }
-      }
-      updatedStudent.grade = finalGrade || 'ไม่มีเกรด';
-      count++;
-      return updatedStudent;
-    }));
+        count++;
+        return {
+          ...student,
+          affective_score: autoScore,
+          total_score_precise: calc.totalScorePrecise,
+          total_score: calc.totalScore,
+          percentage: calc.percentage,
+          grade: calc.grade || 'ไม่มีเกรด',
+        };
+      })
+    );
     toast.success(`คำนวณจิตพิสัยอัตโนมัติจากสถิติเวลาเรียนเสร็จ ${count} คน`);
   };
 
@@ -677,16 +616,6 @@ export default function Grades() {
     },
   });
 
-
-  const getGradeStyle = (grade?: string) => {
-    if (grade === 'ข.ร.' || grade === 'ขร' || grade === 'F') return 'bg-rose-600 text-white shadow-sm shadow-rose-500/20';
-    if (grade === 'ข.ส.') return 'bg-amber-500 text-white shadow-sm shadow-amber-500/20';
-    if (grade === 'ม.ส.') return 'bg-purple-600 text-white shadow-sm shadow-purple-500/20';
-    if (grade === '4' || grade === '3.5' || grade === '3' || grade === 'A') return 'bg-emerald-600 text-white shadow-sm shadow-emerald-500/20';
-    if (grade === '2.5' || grade === '2' || grade === '1.5' || grade === '1' || grade === 'B' || grade === 'C') return 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/20';
-    if (grade === '0' || grade === 'D') return 'bg-rose-500 text-white shadow-sm shadow-rose-500/20';
-    return 'bg-slate-100 text-slate-700';
-  };
 
   if (loadingClassrooms) return (
     <div className="flex flex-col items-center justify-center h-64 gap-3">
@@ -1029,214 +958,16 @@ export default function Grades() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
-                    {paginatedReport.map((student, idx) => {
-                      const totalScore = Number(student.total_score_precise ?? student.total_score ?? 0);
-                      const isKr = student.is_f || student.grade === 'ข.ร.' || student.grade === 'ขร';
-                      const isKs = student.grade === 'ข.ส.' || student.is_absent_final || student.final_score === -1;
-                      const isMs = student.grade === 'ม.ส.' || student.is_incomplete || student.final_score === -2;
-                      const isAtRisk = !isKr && !isKs && !isMs && (totalScore < 50 || (student.remaining_absences !== undefined && student.remaining_absences <= 2 && student.remaining_absences >= 0));
-
-                      let rowClass = 'bg-white dark:bg-slate-900 hover:bg-slate-50/80 dark:hover:bg-slate-800/50';
-                      let stickyClass = 'bg-white dark:bg-slate-900';
-                      let borderAccent = 'border-l-4 border-l-transparent';
-
-                      if (isKr) {
-                        rowClass = 'bg-rose-50/25 dark:bg-rose-950/20 hover:bg-rose-50/45 dark:hover:bg-rose-950/30';
-                        stickyClass = 'bg-rose-50/50 dark:bg-slate-900';
-                        borderAccent = 'border-l-4 border-l-rose-500';
-                      } else if (isKs) {
-                        rowClass = 'bg-amber-50/25 dark:bg-amber-950/20 hover:bg-amber-50/45 dark:hover:bg-amber-950/30';
-                        stickyClass = 'bg-amber-50/50 dark:bg-slate-900';
-                        borderAccent = 'border-l-4 border-l-amber-500';
-                      } else if (isMs) {
-                        rowClass = 'bg-purple-50/25 dark:bg-purple-950/20 hover:bg-purple-50/45 dark:hover:bg-purple-950/30';
-                        stickyClass = 'bg-purple-50/50 dark:bg-slate-900';
-                        borderAccent = 'border-l-4 border-l-purple-500';
-                      } else if (isAtRisk) {
-                        rowClass = 'bg-amber-50/15 dark:bg-amber-950/10 hover:bg-amber-50/30 dark:hover:bg-amber-950/20';
-                        stickyClass = 'bg-amber-50/30 dark:bg-slate-900';
-                        borderAccent = 'border-l-4 border-l-amber-400';
-                      } else if (idx % 2 === 1) {
-                        rowClass = 'bg-slate-50/40 dark:bg-slate-800/25 hover:bg-slate-100/60 dark:hover:bg-slate-800/50';
-                        stickyClass = 'bg-slate-50/60 dark:bg-slate-900';
-                      }
-
-                      return (
-                        <tr
-                          key={student.student_id}
-                          className={`transition-colors ${rowClass} ${borderAccent}`}
-                        >
-                          <td className="py-2 px-1 text-slate-500 dark:text-slate-400 font-semibold text-center font-mono text-xs whitespace-nowrap">
-                            {student.student_code || '-'}
-                          </td>
-                          <td
-                            className={`py-2 px-2.5 font-semibold text-slate-800 dark:text-slate-100 border-r border-slate-200 dark:border-slate-800 sticky left-0 z-10 ${stickyClass} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] dark:shadow-[2px_0_5px_-2px_rgba(0,0,0,0.3)]`}
-                            style={activeNameStyle}
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <UserAvatar
-                                  avatar={student.avatar}
-                                  name={student.name}
-                                  userId={student.student_id}
-                                  size="sm"
-                                  className="w-7 h-7 rounded-full border border-slate-200 dark:border-slate-700 shadow-2xs shrink-0"
-                                />
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="font-bold text-slate-800 dark:text-slate-100 text-xs truncate" title={student.name}>
-                                      {student.name}
-                                    </span>
-                                    {student.grade_level && (
-                                      <span className="shrink-0 px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-100/80 dark:border-indigo-800">
-                                        {student.grade_level}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">
-                                    #{student.student_code || '-'}
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="shrink-0 flex items-center gap-1">
-                                {isKr && (
-                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 text-[9px] font-extrabold border border-rose-200 dark:border-rose-800">
-                                    <AlertTriangle className="w-2.5 h-2.5 text-rose-600 dark:text-rose-400" /> ข.ร.
-                                  </span>
-                                )}
-                                {isKs && (
-                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 text-[9px] font-extrabold border border-amber-200 dark:border-amber-800">
-                                    <AlertCircle className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" /> ข.ส.
-                                  </span>
-                                )}
-                                {isMs && (
-                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/80 text-purple-800 dark:text-purple-300 text-[9px] font-extrabold border border-purple-200 dark:border-purple-800">
-                                    <AlertCircle className="w-2.5 h-2.5 text-purple-600 dark:text-purple-400" /> ม.ส.
-                                  </span>
-                                )}
-                                {isAtRisk && student.remaining_absences !== undefined && student.remaining_absences <= 2 && (
-                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 text-[9px] font-extrabold border border-amber-200 dark:border-amber-800">
-                                    ขาดได้อีก {student.remaining_absences}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-
-                          {/* Affective Editable Score */}
-                          <td className="py-2 px-1 text-center border-r border-slate-100 dark:border-slate-800/80">
-                            <input
-                              type="number" step="0.5" min="0" max={weights.affective_weight}
-                              value={student.affective_score ?? ''}
-                              onChange={e => handleExamScoreChange(student.student_id, 'affective_score', e.target.value)}
-                              className="text-center font-bold font-mono text-xs w-14 py-1 px-1 rounded-xl border border-pink-200 dark:border-pink-900/60 bg-white dark:bg-slate-800 text-pink-700 dark:text-pink-300 focus:outline-none focus:ring-2 focus:ring-pink-500/30 focus:border-pink-500 shadow-2xs transition-all mx-auto"
-                              placeholder="0"
-                            />
-                          </td>
-
-                          {/* Raw & Scaled Post-test Breakdown */}
-                          <td className="py-2 px-1 text-center border-r border-slate-100 dark:border-slate-800/80">
-                            <div className="font-black text-amber-600 dark:text-amber-400 text-xs font-mono">{Number(student.precise_scaled_post_test || student.scaled_post_test || 0).toFixed(1)}</div>
-                            <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">ดิบ: {Number(student.raw_post_test || 0).toFixed(1)}/{student.max_post_test || 0}</div>
-                          </td>
-
-                          {/* Raw & Scaled Assignment Breakdown */}
-                          <td className="py-2 px-1 text-center border-r border-slate-100 dark:border-slate-800/80">
-                            <div className="font-black text-emerald-600 dark:text-emerald-400 text-xs font-mono">{Number(student.precise_scaled_assign || student.scaled_assign || 0).toFixed(1)}</div>
-                            <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">ดิบ: {Number(student.raw_assign || 0).toFixed(1)}/{student.max_assign || 0}</div>
-                          </td>
-
-                          {/* Midterm Editable Score */}
-                          <td className="py-2 px-1 text-center border-r border-slate-100 dark:border-slate-800/80">
-                            <div className="flex flex-col items-center">
-                              <input
-                                type="number" step="0.5" min="0" max={weights.midterm_max_score}
-                                value={student.midterm_score ?? ''}
-                                onChange={e => handleExamScoreChange(student.student_id, 'midterm_score', e.target.value)}
-                                className="text-center font-bold font-mono text-xs w-14 py-1 px-1 rounded-xl border border-cyan-200 dark:border-cyan-900/60 bg-white dark:bg-slate-800 text-cyan-700 dark:text-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 shadow-2xs transition-all mx-auto"
-                                placeholder="0"
-                              />
-                              <div className="text-[10px] text-cyan-600 dark:text-cyan-400 font-semibold mt-0.5 font-mono">ได้: {Number(student.precise_scaled_midterm || student.scaled_midterm || 0).toFixed(1)}</div>
-                            </div>
-                          </td>
-
-                          {/* Final Editable Score with Std02 Vocational Controls */}
-                          <td className="py-2 px-1 text-center border-r border-slate-100 dark:border-slate-800/80">
-                            {student.final_score === -1 || student.is_absent_final ? (
-                              <div className="flex flex-col items-center gap-0.5">
-                                <span className="px-1.5 py-0.2 rounded-md text-[9px] font-black bg-amber-500 text-white shadow-xs">
-                                  ข.ส.
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleExamScoreChange(student.student_id, 'final_score', '0')}
-                                  className="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline font-semibold"
-                                >
-                                  กรอกคะแนน
-                                </button>
-                              </div>
-                            ) : student.final_score === -2 || student.is_incomplete ? (
-                              <div className="flex flex-col items-center gap-0.5">
-                                <span className="px-1.5 py-0.2 rounded-md text-[9px] font-black bg-purple-600 text-white shadow-xs">
-                                  ม.ส.
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleExamScoreChange(student.student_id, 'final_score', '0')}
-                                  className="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline font-semibold"
-                                >
-                                  กรอกคะแนน
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="flex flex-col items-center">
-                                <input
-                                  type="number" step="0.5" min="0" max={weights.final_max_score}
-                                  value={student.final_score ?? ''}
-                                  onChange={e => handleExamScoreChange(student.student_id, 'final_score', e.target.value)}
-                                  className="text-center font-bold font-mono text-xs w-14 py-1 px-1 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 shadow-2xs transition-all mx-auto"
-                                  placeholder="0"
-                                />
-                                <div className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold mt-0.5 font-mono">ได้: {Number(student.precise_scaled_final || student.scaled_final || 0).toFixed(1)}</div>
-                                <div className="flex items-center justify-center gap-1 mt-0.5">
-                                  <button
-                                    type="button"
-                                    title="ทำเครื่องหมายขาดสอบ (ข.ส.)"
-                                    onClick={() => handleExamScoreChange(student.student_id, 'final_score', '-1')}
-                                    className="px-1 py-0.2 rounded text-[8px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/80 border border-amber-200 dark:border-amber-800 transition-colors"
-                                  >
-                                    ข.ส.
-                                  </button>
-                                  <button
-                                    type="button"
-                                    title="ทำเครื่องหมายผลการเรียนไม่สมบูรณ์ (ม.ส.)"
-                                    onClick={() => handleExamScoreChange(student.student_id, 'final_score', '-2')}
-                                    className="px-1 py-0.2 rounded text-[8px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/80 border border-purple-200 dark:border-purple-800 transition-colors"
-                                  >
-                                    ม.ส.
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </td>
-
-                          {/* Precise Total Score */}
-                          <td className="py-2 px-1 text-center border-r border-slate-100 dark:border-slate-800/80">
-                            <span className="inline-block px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 font-black text-slate-800 dark:text-slate-100 text-xs font-mono shadow-2xs border border-slate-200/60 dark:border-slate-700/60">
-                              {totalScore.toFixed(1)}
-                            </span>
-                          </td>
-
-                          {/* Grade Pill Badge */}
-                          <td className="py-2 px-1 text-center">
-                            <span className={`inline-flex items-center justify-center min-w-[2.5rem] px-2 py-0.5 rounded-lg font-black text-xs shadow-xs transition-transform hover:scale-105 ${getGradeStyle(student.grade)}`}>
-                              {student.grade}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {paginatedReport.map((student, idx) => (
+                      <GradeTableRow
+                        key={student.student_id}
+                        student={student}
+                        idx={idx}
+                        weights={weights}
+                        activeNameStyle={activeNameStyle}
+                        onExamScoreChange={handleExamScoreChange}
+                      />
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -1244,175 +975,14 @@ export default function Grades() {
               /* ==================== VIEW MODE 2: MOBILE-FIRST CARD VIEW ==================== */
               <div className="p-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                  {paginatedReport.map((student) => {
-                    const totalScore = Number(student.total_score_precise ?? student.total_score ?? 0);
-                    const isKr = student.is_f || student.grade === 'ข.ร.' || student.grade === 'ขร';
-                    const isKs = student.grade === 'ข.ส.' || student.is_absent_final || student.final_score === -1;
-                    const isMs = student.grade === 'ม.ส.' || student.is_incomplete || student.final_score === -2;
-
-                    return (
-                    <div
+                  {paginatedReport.map((student) => (
+                    <GradeMobileCard
                       key={student.student_id}
-                      className={`p-4 rounded-3xl border transition-all space-y-3 ${isKr
-                        ? 'bg-rose-50/70 border-rose-200 dark:bg-rose-950/40 dark:border-rose-900/60'
-                        : isKs
-                          ? 'bg-amber-50/70 border-amber-200 dark:bg-amber-950/40 dark:border-amber-900/60'
-                          : isMs
-                            ? 'bg-purple-50/70 border-purple-200 dark:bg-purple-950/40 dark:border-purple-900/60'
-                            : 'bg-white dark:bg-slate-800/80 border-slate-200/90 dark:border-slate-700/80 hover:border-indigo-300 dark:hover:border-slate-600 shadow-xs'
-                        }`}
-                    >
-                      {/* Card Header: Avatar, Name, Student Code, Grade Badge */}
-                      <div className="flex items-start justify-between gap-2.5">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <UserAvatar
-                            avatar={student.avatar}
-                            name={student.name}
-                            userId={student.student_id}
-                            size="md"
-                            className="rounded-2xl border border-indigo-100 dark:border-slate-700 shadow-xs shrink-0"
-                          />
-                          <div className="min-w-0">
-                            <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{student.name}</h4>
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">รหัส: {student.student_code || '-'}</p>
-                              {student.grade_level && (
-                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-100/80 dark:border-indigo-800">
-                                  {student.grade_level}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        <span className={`inline-flex items-center justify-center px-3 py-1 rounded-xl font-black text-xs shadow-xs shrink-0 ${getGradeStyle(student.grade)}`}>
-                          เกรด {student.grade}
-                        </span>
-                      </div>
-
-                      {/* Warnings / Special Status Pills */}
-                      {(isKr || isKs || isMs || (student.remaining_absences !== undefined && student.remaining_absences <= 2)) && (
-                        <div className="flex flex-wrap gap-1.5 pt-1">
-                          {isKr && (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
-                              ⚠️ หมดสิทธิ์สอบ (ข.ร.)
-                            </span>
-                          )}
-                          {isKs && (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-                              ⚠️ ขาดสอบ (ข.ส.)
-                            </span>
-                          )}
-                          {isMs && (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/80 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                              ⚠️ ผลการเรียนไม่สมบูรณ์ (ม.ส.)
-                            </span>
-                          )}
-                          {!isKr && student.remaining_absences !== undefined && student.remaining_absences <= 2 && (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-                              ขาดได้อีก {student.remaining_absences} ครั้ง
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Scores Grid */}
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1 text-xs">
-                        <div className="p-2.5 rounded-2xl bg-pink-50/50 dark:bg-pink-950/30 border border-pink-100 dark:border-pink-900/50">
-                          <span className="text-[10px] font-bold text-pink-700 dark:text-pink-300 uppercase">จิตพิสัย ({weights.affective_weight}%)</span>
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            step="0.5" min="0" max={weights.affective_weight}
-                            value={student.affective_score ?? ''}
-                            onChange={e => handleExamScoreChange(student.student_id, 'affective_score', e.target.value)}
-                            className="form-input text-center py-1.5 px-1 w-full text-pink-900 dark:text-pink-200 font-bold border-pink-200 dark:border-pink-800 focus:border-pink-500 text-base md:text-xs rounded-xl bg-white dark:bg-slate-800 mt-1"
-                            placeholder="0"
-                          />
-                        </div>
-
-                        <div className="p-2.5 rounded-2xl bg-amber-50/50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900/50">
-                          <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 uppercase">สอบย่อย ({weights.post_test_weight}%)</span>
-                          <div className="font-extrabold text-amber-800 dark:text-amber-200 text-base font-mono">
-                            {Number(student.precise_scaled_post_test || student.scaled_post_test || 0).toFixed(1)}
-                          </div>
-                          <span className="text-[9px] text-slate-400 dark:text-slate-500">ดิบ {Number(student.raw_post_test || 0).toFixed(0)}/{student.max_post_test || 0}</span>
-                        </div>
-
-                        <div className="p-2.5 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/50">
-                          <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 uppercase">งานเก็บ ({weights.assignment_weight}%)</span>
-                          <div className="font-extrabold text-emerald-800 dark:text-emerald-200 text-base font-mono">
-                            {Number(student.precise_scaled_assign || student.scaled_assign || 0).toFixed(1)}
-                          </div>
-                          <span className="text-[9px] text-slate-400 dark:text-slate-500">ดิบ {Number(student.raw_assign || 0).toFixed(0)}/{student.max_assign || 0}</span>
-                        </div>
-
-                        <div className="p-2.5 rounded-2xl bg-cyan-50/50 dark:bg-cyan-950/30 border border-cyan-100 dark:border-cyan-900/50">
-                          <span className="text-[10px] font-bold text-cyan-700 dark:text-cyan-300 uppercase">กลางภาค ({weights.midterm_weight}%)</span>
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            step="0.5" min="0" max={weights.midterm_max_score}
-                            value={student.midterm_score ?? ''}
-                            onChange={e => handleExamScoreChange(student.student_id, 'midterm_score', e.target.value)}
-                            className="form-input text-center py-1.5 px-1 w-full text-cyan-900 dark:text-cyan-200 font-bold border-cyan-200 dark:border-cyan-800 focus:border-cyan-500 text-base md:text-xs rounded-xl bg-white dark:bg-slate-800 mt-1"
-                            placeholder="0"
-                          />
-                        </div>
-
-                        <div className="p-2.5 rounded-2xl bg-blue-50/50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 uppercase">ปลายภาค ({weights.final_weight}%)</span>
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                title="ขาดสอบ (ข.ส.)"
-                                onClick={() => handleExamScoreChange(student.student_id, 'final_score', '-1')}
-                                className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-amber-100 dark:hover:bg-amber-950/60 hover:text-amber-800 dark:hover:text-amber-300 transition-colors border border-slate-200 dark:border-slate-700 shadow-2xs"
-                              >
-                                ข.ส.
-                              </button>
-                              <button
-                                type="button"
-                                title="ไม่สมบูรณ์ (ม.ส.)"
-                                onClick={() => handleExamScoreChange(student.student_id, 'final_score', '-2')}
-                                className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-purple-100 dark:hover:bg-purple-950/60 hover:text-purple-800 dark:hover:text-purple-300 transition-colors border border-slate-200 dark:border-slate-700 shadow-2xs"
-                              >
-                                ม.ส.
-                              </button>
-                            </div>
-                          </div>
-                          {student.final_score === -1 || student.is_absent_final ? (
-                            <div className="mt-1 flex items-center justify-between">
-                              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-amber-600 text-white inline-block shadow-2xs">ข.ส.</span>
-                              <button type="button" onClick={() => handleExamScoreChange(student.student_id, 'final_score', '0')} className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-bold">แก้คะแนน</button>
-                            </div>
-                          ) : student.final_score === -2 || student.is_incomplete ? (
-                            <div className="mt-1 flex items-center justify-between">
-                              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-purple-600 text-white inline-block shadow-2xs">ม.ส.</span>
-                              <button type="button" onClick={() => handleExamScoreChange(student.student_id, 'final_score', '0')} className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-bold">แก้คะแนน</button>
-                            </div>
-                          ) : (
-                            <input
-                              type="number"
-                              inputMode="decimal"
-                              step="0.5" min="0" max={weights.final_max_score}
-                              value={student.final_score ?? ''}
-                              onChange={e => handleExamScoreChange(student.student_id, 'final_score', e.target.value)}
-                              className="form-input text-center py-1.5 px-1 w-full text-blue-900 dark:text-blue-200 font-bold border-blue-200 dark:border-blue-800 focus:border-blue-500 text-base md:text-xs rounded-xl bg-white dark:bg-slate-800 mt-1"
-                              placeholder="0"
-                            />
-                          )}
-                        </div>
-
-                        <div className="p-2.5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900/60 flex flex-col justify-center text-center">
-                          <span className="text-[10px] font-bold text-indigo-700 dark:text-indigo-300 uppercase">รวม (100)</span>
-                          <span className="text-lg font-black text-indigo-900 dark:text-indigo-200 font-mono">{totalScore.toFixed(1)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                      student={student}
+                      weights={weights}
+                      onExamScoreChange={handleExamScoreChange}
+                    />
+                  ))}
                 </div>
               </div>
             )}

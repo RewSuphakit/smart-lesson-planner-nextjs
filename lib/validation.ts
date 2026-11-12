@@ -90,6 +90,7 @@ export const UpdateStudentExamScoresSchema = z.object({
       student_id: z.union([z.number(), z.string()]),
       midterm_score: z.union([z.number(), z.string(), z.null()]).optional(),
       final_score: z.union([z.number(), z.string(), z.null()]).optional(),
+      exam_status: z.enum(['normal', 'absent_final', 'incomplete']).optional(),
       affective_score: z.union([z.number(), z.string(), z.null()]).optional(),
     })
   ).min(1, 'At least one score entry is required'),

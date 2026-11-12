@@ -28,6 +28,7 @@ function getMaxTtlSeconds(): number {
 
 export class MemoryCache {
   private cache = new Map<string, CacheEntry<unknown>>();
+  private inFlight = new Map<string, Promise<unknown>>();
   private maxEntries: number;
   private hits = 0;
   private misses = 0;
@@ -88,6 +89,7 @@ export class MemoryCache {
    * Delete a single key from cache.
    */
   delete(key: string): boolean {
+    this.inFlight.delete(key);
     return this.cache.delete(key);
   }
 
@@ -104,6 +106,11 @@ export class MemoryCache {
         count++;
       }
     }
+    for (const key of Array.from(this.inFlight.keys())) {
+      if (key.startsWith(prefix)) {
+        this.inFlight.delete(key);
+      }
+    }
     return count;
   }
 
@@ -112,8 +119,44 @@ export class MemoryCache {
    */
   clear(): void {
     this.cache.clear();
+    this.inFlight.clear();
     this.hits = 0;
     this.misses = 0;
+  }
+
+  /**
+   * Deduplicate concurrent in-flight fetches for the same cache key (prevents cache stampedes).
+   */
+  async getOrFetch<T>(key: string, ttlSeconds: number, fetcher: () => Promise<T>): Promise<T> {
+    const cached = this.get<T>(key);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const existingPromise = this.inFlight.get(key) as Promise<T> | undefined;
+    if (existingPromise) {
+      this.hits++;
+      return existingPromise;
+    }
+
+    let promise!: Promise<T>;
+    promise = (async () => {
+      try {
+        const freshData = await fetcher();
+        // Only store in cache if the in-flight entry wasn't invalidated while fetching
+        if (this.inFlight.get(key) === promise) {
+          this.set(key, freshData, ttlSeconds);
+        }
+        return freshData;
+      } finally {
+        if (this.inFlight.get(key) === promise) {
+          this.inFlight.delete(key);
+        }
+      }
+    })();
+
+    this.inFlight.set(key, promise);
+    return promise;
   }
 
   /**
@@ -163,20 +206,14 @@ export function userCacheKey(
 
 /**
  * Helper to get cached data or fetch and cache it if not present.
+ * Includes automatic in-flight request deduplication to prevent cache stampedes.
  */
 export async function getOrSetCache<T>(
   key: string,
   ttlSeconds: number,
   fetcher: () => Promise<T>
 ): Promise<T> {
-  const cached = memoryCache.get<T>(key);
-  if (cached !== undefined) {
-    return cached;
-  }
-
-  const freshData = await fetcher();
-  memoryCache.set(key, freshData, ttlSeconds);
-  return freshData;
+  return memoryCache.getOrFetch(key, ttlSeconds, fetcher);
 }
 
 /**
