@@ -2,9 +2,9 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Smart Lesson Planner — ระบบวางแผนการสอนอัจฉริยะ',
+    name: 'Smart Lesson Planner',
     short_name: 'SmartPlanner',
-    description: 'ระบบวางแผนการสอน เช็คชื่อ ตัดเกรด และรายงานผลการเรียนรู้สำหรับครูไทย',
+    description: 'ระบบวางแผนการสอน เช็คชื่อ ตัดเกรด',
     start_url: '/',
     id: '/',
     scope: '/',

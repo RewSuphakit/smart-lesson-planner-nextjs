@@ -97,9 +97,14 @@ export default function Affective() {
     return currentClassroom?.late_deduction_score ?? 1;
   }, [currentClassroom]);
 
+  const affectiveQueryKey = useMemo(
+    () => ['affective-students', selectedClass, maxAffectiveWeight, absentDeduction, lateDeduction] as const,
+    [selectedClass, maxAffectiveWeight, absentDeduction, lateDeduction]
+  );
+
   // ─── Query: ดึงข้อมูลนักเรียนและสถิติพฤติกรรม ───
   const { data: students = [], isLoading: loadingStudents } = useQuery<Student[]>({
-    queryKey: ['affective-students', selectedClass, maxAffectiveWeight, absentDeduction, lateDeduction],
+    queryKey: affectiveQueryKey,
     queryFn: async () => {
       const [studRes, gradesRes] = await Promise.all([
         api.get(`/students?classroom_id=${selectedClass}&include_avatar=true`),
@@ -183,35 +188,50 @@ export default function Affective() {
 
   // ─── Mutation: อัปเดตคะแนนจิตพิสัยนักเรียนรายคน ───
   const updateScoreMutation = useMutation({
+    mutationKey: ['affective-update-score', selectedClass],
     mutationFn: async ({ studentId, score }: { studentId: string | number; score: number }) => {
       return api.put('/students/exams?type=behavior', {
         scores: [{ student_id: studentId, affective_score: score }]
       });
     },
     onMutate: async ({ studentId, score }) => {
-      await queryClient.cancelQueries({ queryKey: ['affective-students', selectedClass, maxAffectiveWeight] });
+      const targetQueryKey = affectiveQueryKey;
+      const classroomId = selectedClass;
+      await queryClient.cancelQueries({ queryKey: targetQueryKey });
 
-      const previousStudents = queryClient.getQueryData<Student[]>(['affective-students', selectedClass, maxAffectiveWeight]);
+      const previousStudents = queryClient.getQueryData<Student[]>(targetQueryKey);
+      const previousScore = previousStudents?.find(s => String(s.id) === String(studentId))?.affective_score;
 
       queryClient.setQueryData<Student[]>(
-        ['affective-students', selectedClass, maxAffectiveWeight],
-        old => old?.map(s => s.id === studentId ? { ...s, affective_score: score } : s) ?? []
+        targetQueryKey,
+        old => old?.map(s => String(s.id) === String(studentId) ? { ...s, affective_score: score } : s)
       );
 
       setUpdatingStudentIds(prev => ({ ...prev, [studentId]: true }));
 
-      return { previousStudents };
+      return { targetQueryKey, classroomId, previousScore };
     },
     onError: (_err, { studentId }, context) => {
       toast.error('บันทึกคะแนนไม่สำเร็จ กรุณาลองใหม่');
-      if (context?.previousStudents) {
-        queryClient.setQueryData(['affective-students', selectedClass, maxAffectiveWeight], context.previousStudents);
+      if (context?.previousScore !== undefined) {
+        const rollbackScore = context.previousScore;
+        queryClient.setQueryData<Student[]>(
+          context.targetQueryKey,
+          old => old?.map(s => String(s.id) === String(studentId) ? { ...s, affective_score: rollbackScore } : s)
+        );
       }
       setUpdatingStudentIds(prev => ({ ...prev, [studentId]: false }));
     },
-    onSuccess: (_data, { studentId }) => {
+    onSuccess: (_data, { studentId }, context) => {
       setUpdatingStudentIds(prev => ({ ...prev, [studentId]: false }));
-      queryClient.invalidateQueries({ queryKey: ['grades', selectedClass] });
+      queryClient.invalidateQueries({ queryKey: ['grades', context?.classroomId ?? selectedClass] });
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+    },
+    onSettled: (_data, _err, _vars, context) => {
+      const classroomId = context?.classroomId ?? selectedClass;
+      if (queryClient.isMutating({ mutationKey: ['affective-update-score', classroomId] }) <= 1) {
+        queryClient.invalidateQueries({ queryKey: ['affective-students', classroomId] });
+      }
     },
   });
 
@@ -220,9 +240,18 @@ export default function Affective() {
     mutationFn: async (batchScores: { student_id: string | number; affective_score: number }[]) => {
       return api.put('/students/exams?type=behavior', { scores: batchScores });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['affective-students', selectedClass, maxAffectiveWeight] });
+    onSuccess: (_data, batchScores) => {
+      const scoreMap = new Map(batchScores.map(item => [String(item.student_id), item.affective_score]));
+      queryClient.setQueryData<Student[]>(
+        affectiveQueryKey,
+        old => old?.map(s => {
+          const updated = scoreMap.get(String(s.id));
+          return updated !== undefined ? { ...s, affective_score: updated } : s;
+        })
+      );
+      queryClient.invalidateQueries({ queryKey: ['affective-students', selectedClass] });
       queryClient.invalidateQueries({ queryKey: ['grades', selectedClass] });
+      queryClient.invalidateQueries({ queryKey: ['students'] });
     },
     onError: () => {
       toast.error('บันทึกคะแนนกลุ่มไม่สำเร็จ');
@@ -261,16 +290,18 @@ export default function Affective() {
     },
   });
 
+  const clampAffectiveScore = (value: number) =>
+    Math.round(Math.min(maxAffectiveWeight, Math.max(0, value)) * 100) / 100;
+
   // Handle score updates for a student
   const updateStudentScore = (studentId: string | number, newScore: number) => {
-    const clampedScore = Math.min(maxAffectiveWeight, Math.max(0, newScore));
+    const clampedScore = clampAffectiveScore(newScore);
     updateScoreMutation.mutate({ studentId, score: clampedScore });
   };
 
   // Adjust score by value (+/-)
   const handleScoreAdjust = (studentId: string | number, currentScore: number, amount: number, presetLabel?: string) => {
-    const nextScore = currentScore + amount;
-    const clamped = Math.min(maxAffectiveWeight, Math.max(0, nextScore));
+    const clamped = clampAffectiveScore(currentScore + amount);
 
     if (clamped === currentScore) {
       if (amount < 0) {
@@ -691,7 +722,7 @@ export default function Affective() {
               {processedStudents.map((s) => {
                 const absent = s.absent_count || 0;
                 const late = s.late_count || 0;
-                const attendancePenalty = (absent * 2) + (late * 1);
+                const attendancePenalty = (absent * absentDeduction) + (late * lateDeduction);
                 const scorePercent = maxAffectiveWeight > 0 ? (s.affective_score / maxAffectiveWeight) * 100 : 0;
                 const isUpdating = updatingStudentIds[s.id];
 

@@ -468,6 +468,8 @@ export default function Grades() {
       toast.success('บันทึกคะแนนสอบและจิตพิสัยเรียบร้อยแล้ว');
       setHasUnsavedChanges(false);
       queryClient.invalidateQueries({ queryKey: ['grades', selectedClass] });
+      queryClient.invalidateQueries({ queryKey: ['affective-students', selectedClass] });
+      queryClient.invalidateQueries({ queryKey: ['students'] });
     },
     onError: () => {
       toast.error('บันทึกคะแนนสอบไม่สำเร็จ');
@@ -667,6 +669,8 @@ export default function Grades() {
       setShowSettings(false);
       queryClient.invalidateQueries({ queryKey: ['classrooms'] });
       queryClient.invalidateQueries({ queryKey: ['grades', selectedClass] });
+      queryClient.invalidateQueries({ queryKey: ['affective-students', selectedClass] });
+      queryClient.invalidateQueries({ queryKey: ['students'] });
     },
     onError: () => {
       toast.error('บันทึกการตั้งค่าไม่สำเร็จ');
