@@ -283,7 +283,7 @@ export default function GradePdfModal({
       if (g === 'ข.ร.' || g === 'ขร' || s.is_f) { krCount++; failCount++; }
       else if (g === 'ข.ส.' || s.is_absent_final) { ksCount++; failCount++; }
       else if (g === 'ม.ส.' || s.is_incomplete) { msCount++; failCount++; }
-      else if (g === '0' || g === 'F') { failCount++; }
+      else if (g === '0' || g === 'F' || g === 'ไม่มีเกรด') { failCount++; }
       else { passCount++; }
     });
 
@@ -308,6 +308,14 @@ export default function GradePdfModal({
     });
 
     const isLand = paperOrientation === 'landscape';
+    const esc = (val: unknown) =>
+      String(val ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    const gradeLabels = criteria && criteria.length > 0 ? criteria.map(c => c.grade) : ['4', '3.5', '3', '2.5', '2', '1.5', '1', '0'];
 
     printWindow.document.write(`<!DOCTYPE html>
 <html lang="th">
@@ -516,7 +524,7 @@ export default function GradePdfModal({
 <body>
   <div class="print-sheet">
     <div class="header-block">
-      <div class="emblem-title">${institutionName}</div>
+      <div class="emblem-title">${esc(institutionName)}</div>
       <div class="emblem-sub">แบบรายงานและบันทึกผลการเรียนรายวิชา</div>
       <div class="emblem-dept">สังกัดสำนักงานคณะกรรมการการอาชีวศึกษา (สอศ.) กระทรวงศึกษาธิการ</div>
     </div>
@@ -524,13 +532,13 @@ export default function GradePdfModal({
     <div class="meta-grid">
       <div class="meta-row">
         <div class="meta-cell-left">
-          <div><span class="strong">รายวิชา / ห้องเรียน:</span> ${subjectCodeAndName}</div>
-          <div><span class="strong">หลักสูตร:</span> ${curriculumLevel}</div>
-          <div><span class="strong">แผนกวิชา:</span> ${departmentName}</div>
+          <div><span class="strong">รายวิชา / ห้องเรียน:</span> ${esc(subjectCodeAndName)}</div>
+          <div><span class="strong">หลักสูตร:</span> ${esc(curriculumLevel)}</div>
+          <div><span class="strong">แผนกวิชา:</span> ${esc(departmentName)}</div>
         </div>
         <div class="meta-cell-right">
-          <div><span class="strong">ภาคเรียน / ปีการศึกษา:</span> ${academicYear}</div>
-          <div><span class="strong">ครูผู้สอน:</span> ${teacherName}</div>
+          <div><span class="strong">ภาคเรียน / ปีการศึกษา:</span> ${esc(academicYear)}</div>
+          <div><span class="strong">ครูผู้สอน:</span> ${esc(teacherName)}</div>
           <div><span class="strong">จำนวนผู้เรียนทั้งหมด:</span> ${report.length} คน</div>
         </div>
       </div>
@@ -568,8 +576,8 @@ export default function GradePdfModal({
 
         return `<tr class="${rowClass}">
             <td>${idx + 1}</td>
-            ${showStudentCode ? `<td style="font-family: monospace, monospace;">${s.student_code || '-'}</td>` : ''}
-            <td class="name">${s.name}</td>
+            ${showStudentCode ? `<td style="font-family: monospace, monospace;">${esc(s.student_code || '-')}</td>` : ''}
+            <td class="name">${esc(s.name)}</td>
             ${showAffective ? `<td>${Number(s.affective_score || 0).toFixed(1)}</td>` : ''}
             ${showPostTest ? `<td>${Number(s.precise_scaled_post_test || s.scaled_post_test || 0).toFixed(1)}${rawPostHint}</td>` : ''}
             ${showAssignment ? `<td>${Number(s.precise_scaled_assign || s.scaled_assign || 0).toFixed(1)}${rawAssignHint}</td>` : ''}
@@ -577,7 +585,7 @@ export default function GradePdfModal({
             ${showFinal ? `<td>${finalVal}</td>` : ''}
             ${showTotal ? `<td class="col-total">${totalVal}</td>` : ''}
             ${showAttendance ? `<td>${s.attendance_percent ?? 100}%</td>` : ''}
-            ${showGrade ? `<td class="col-grade">${s.grade || '-'}</td>` : ''}
+            ${showGrade ? `<td class="col-grade">${esc(s.grade || '-')}</td>` : ''}
           </tr>`;
       }).join('')}
       </tbody>
@@ -590,7 +598,7 @@ export default function GradePdfModal({
         <thead>
           <tr>
             <th>เกรด</th>
-            <th>4</th><th>3.5</th><th>3</th><th>2.5</th><th>2</th><th>1.5</th><th>1</th><th>0</th>
+            ${gradeLabels.map(g => `<th>${esc(g)}</th>`).join('')}
             <th>ข.ร.</th><th>ข.ส.</th><th>ม.ส.</th>
             <th>รวม (คน)</th>
             <th>คะแนนเฉลี่ย</th>
@@ -600,14 +608,7 @@ export default function GradePdfModal({
         <tbody>
           <tr>
             <td style="font-weight: 700;">จำนวน</td>
-            <td>${analytics.dist['4'] || 0}</td>
-            <td>${analytics.dist['3.5'] || 0}</td>
-            <td>${analytics.dist['3'] || 0}</td>
-            <td>${analytics.dist['2.5'] || 0}</td>
-            <td>${analytics.dist['2'] || 0}</td>
-            <td>${analytics.dist['1.5'] || 0}</td>
-            <td>${analytics.dist['1'] || 0}</td>
-            <td>${analytics.dist['0'] || 0}</td>
+            ${gradeLabels.map(g => `<td>${analytics.dist[g] || 0}</td>`).join('')}
             <td style="color: #b91c1c; font-weight: 700;">${analytics.krCount}</td>
             <td style="color: #b45309; font-weight: 700;">${analytics.ksCount}</td>
             <td style="color: #7e22ce; font-weight: 700;">${analytics.msCount}</td>

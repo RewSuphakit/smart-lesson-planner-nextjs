@@ -125,7 +125,7 @@ export default function Affective() {
           classroom_id: s.classroom_id,
           avatar: s.avatar || (gradeInfo as any)?.avatar || null,
           affective_score: s.affective_score !== null && s.affective_score !== undefined
-            ? Number(s.affective_score)
+            ? Math.min(maxAffectiveWeight, Math.max(0, Number(s.affective_score)))
             : Math.max(0, maxAffectiveWeight - ((gradeInfo?.absent_count || 0) * absentDeduction + (gradeInfo?.late_count || 0) * lateDeduction)),
           absent_count: gradeInfo?.absent_count || 0,
           late_count: gradeInfo?.late_count || 0
@@ -349,23 +349,22 @@ export default function Affective() {
     setShowCalcModal(true);
   };
 
-  const executeAutoCalculate = () => {
+  const executeAutoCalculate = async () => {
     if (sectionScopedStudents.length === 0) return;
 
-    // Persist customized deduction rates to classroom settings if changed
+    // Persist customized deduction rates to classroom settings first if changed
     if (
       currentClassroom &&
       (customAbsentDeduct !== absentDeduction || customLateDeduct !== lateDeduction)
     ) {
-      api.put(`/classrooms/${selectedClass}`, {
-        absent_deduction_score: customAbsentDeduct,
-        late_deduction_score: customLateDeduct,
-      }).then(() => {
-        queryClient.invalidateQueries({ queryKey: ['classrooms'] });
-        queryClient.invalidateQueries({ queryKey: ['grades'] });
-      }).catch(err => {
+      try {
+        await api.put(`/classrooms/${selectedClass}`, {
+          absent_deduction_score: customAbsentDeduct,
+          late_deduction_score: customLateDeduct,
+        });
+      } catch (err) {
         console.error('Failed to update classroom deduction rates:', err);
-      });
+      }
     }
 
     const batchScores = sectionScopedStudents.map(s => {
@@ -388,6 +387,8 @@ export default function Affective() {
 
     updateBatchScoresMutation.mutate(batchScores, {
       onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['classrooms'] });
+        queryClient.invalidateQueries({ queryKey: ['grades'] });
         setShowCalcModal(false);
         const targetScopeName = activeSectionGroup ? `ห้อง "${activeSectionGroup.label}" (${sectionScopedStudents.length} คน)` : `ทุกคน (${students.length} คน)`;
         toast.success(
@@ -789,24 +790,23 @@ export default function Affective() {
 
                           {/* Score Input Display */}
                           <div className="flex items-center gap-1 text-center">
-                            {isUpdating ? (
-                              <Loader2 className="w-5 h-5 animate-spin text-indigo-500 shrink-0 mx-2" />
-                            ) : (
-                              <input
-                                type="number"
-                                step="0.5"
-                                value={s.affective_score}
-                                onChange={(e) => {
-                                  const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                                  if (!isNaN(val)) updateStudentScore(s.id, val);
-                                }}
-                                className="form-input text-center font-black text-lg py-0.5 px-1 w-16 h-8 bg-indigo-50/50 dark:bg-slate-800 border-indigo-200 dark:border-slate-700 text-indigo-900 dark:text-indigo-200 rounded-lg"
-                                min="0"
-                                max={maxAffectiveWeight}
-                                aria-label="คะแนนจิตพิสัยนักเรียนคนนี้"
-                              />
-                            )}
+                            <input
+                              type="number"
+                              step="0.5"
+                              value={s.affective_score}
+                              onChange={(e) => {
+                                const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                                if (!isNaN(val)) updateStudentScore(s.id, val);
+                              }}
+                              className="form-input text-center font-black text-lg py-0.5 px-1 w-16 h-8 bg-indigo-50/50 dark:bg-slate-800 border-indigo-200 dark:border-slate-700 text-indigo-900 dark:text-indigo-200 rounded-lg"
+                              min="0"
+                              max={maxAffectiveWeight}
+                              aria-label="คะแนนจิตพิสัยนักเรียนคนนี้"
+                            />
                             <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">/ {maxAffectiveWeight}</span>
+                            {isUpdating && (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-500 shrink-0 ml-0.5" />
+                            )}
                           </div>
 
                           <button

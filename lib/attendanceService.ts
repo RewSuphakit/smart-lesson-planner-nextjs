@@ -250,15 +250,17 @@ export async function processBulkAttendance(
     }
   }
 
-  // Verify student ownership for all students in the request
+  // Verify student ownership and classroom membership for all students in the request
   const studentIds = Array.from(new Set(records.map(r => r.student_id)));
   const ownedStudents = await prisma.student.findMany({
     where: { id: { in: studentIds }, userId },
-    select: { id: true },
+    select: { id: true, classroomId: true },
   });
-  const ownedStudentIds = new Set(ownedStudents.map(s => s.id));
-  const unauthorizedIds = studentIds.filter(id => !ownedStudentIds.has(id));
-  if (unauthorizedIds.length > 0) {
+  const studentClassroomMap = new Map(ownedStudents.map(s => [s.id, s.classroomId]));
+  const hasInvalidMembership = records.some(
+    r => !studentClassroomMap.has(r.student_id) || studentClassroomMap.get(r.student_id) !== r.classroom_id
+  );
+  if (hasInvalidMembership) {
     return { success: false, status: 403, message: 'Some students not found or unauthorized' };
   }
 
@@ -359,7 +361,7 @@ export async function processSingleAttendance(
       select: { id: true },
     }),
     prisma.student.findFirst({
-      where: { id: record.student_id, userId },
+      where: { id: record.student_id, classroomId: record.classroom_id, userId },
       select: { id: true },
     }),
   ]);

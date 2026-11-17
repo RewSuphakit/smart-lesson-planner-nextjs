@@ -114,6 +114,8 @@ export const POST = withAuth<{ id: string }>(async (request, user, { params }) =
           assignmentWeight: sourceClassroom.assignmentWeight,
           postTestWeight: sourceClassroom.postTestWeight,
           affectiveWeight: sourceClassroom.affectiveWeight,
+          lateDeductionScore: sourceClassroom.lateDeductionScore,
+          absentDeductionScore: sourceClassroom.absentDeductionScore,
           midtermWeight: sourceClassroom.midtermWeight,
           finalWeight: sourceClassroom.finalWeight,
           midtermMaxScore: sourceClassroom.midtermMaxScore,
@@ -222,7 +224,10 @@ export const POST = withAuth<{ id: string }>(async (request, user, { params }) =
   });
 
   invalidateCache(userCacheKey(user.id, 'semester'));
+  invalidateCache(userCacheKey(user.id, 'semesters'));
   invalidateCache(userCacheKey(user.id, 'classrooms'));
+  invalidateCache(userCacheKey(user.id, 'students'));
+  invalidateCache(userCacheKey(user.id, 'timetable'));
   invalidateCache(userCacheKey(user.id, 'dashboard'));
 
   return NextResponse.json({

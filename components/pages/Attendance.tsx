@@ -24,6 +24,7 @@ import OfflineBanner from '@/components/OfflineBanner';
 import {
   enqueueOfflineAttendance,
   enqueueBatchOfflineAttendance,
+  dequeueOfflineAttendance,
   cacheClassroomRoster,
   cacheAttendanceState,
 } from '@/lib/offlineAttendance';
@@ -75,6 +76,8 @@ export default function Attendance({
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [students, setStudents] = useState<Student[]>([]);
   const [attendance, setAttendance] = useState<Record<string, string>>({});
+  const [baselineAttendance, setBaselineAttendance] = useState<Record<string, string>>({});
+  const [checkedAtMap, setCheckedAtMap] = useState<Record<string, string>>({});
   const [stats, setStats] = useState<StudentStats[]>([]);
 
   // Filters hook
@@ -247,14 +250,23 @@ export default function Attendance({
       const existing = attRes.data.data || [];
 
       const newAtt: Record<string, string> = {};
+      const newCheckedAt: Record<string, string> = {};
       classStudents.forEach((s: Student) => {
-        const found = existing.find((e: { student_id: string | number }) => String(e.student_id) === String(s.id));
+        const found = existing.find(
+          (e: { student_id: string | number; status: string; updated_at?: string; created_at?: string }) =>
+            String(e.student_id) === String(s.id)
+        );
         newAtt[s.id] = found ? found.status : '';
+        if (found && (found.updated_at || found.created_at)) {
+          newCheckedAt[s.id] = found.updated_at || found.created_at || '';
+        }
       });
 
       return {
         students: classStudents,
         attendance: newAtt,
+        baselineAttendance: { ...newAtt },
+        checkedAtMap: newCheckedAt,
         stats: statsRes.data.data || []
       };
     },
@@ -264,26 +276,58 @@ export default function Attendance({
 
   // Ref to track which classroom+date combination has been initialized
   const initializedClassAndDate = useRef<string>('');
+  const dirtyManualIdsRef = useRef<Set<string>>(new Set());
+  const attendanceRef = useRef<Record<string, string>>({});
+  attendanceRef.current = attendance;
 
   // Sync daily query data to local editing states
   useEffect(() => {
     if (attendanceData) {
       setStudents(attendanceData.students);
       setStats(attendanceData.stats);
+      setBaselineAttendance(attendanceData.baselineAttendance || attendanceData.attendance);
 
       const currentKey = `${selectedClass}_${date}`;
       if (initializedClassAndDate.current !== currentKey) {
         initializedClassAndDate.current = currentKey;
+        dirtyManualIdsRef.current.clear();
         setAttendance(attendanceData.attendance);
+        setCheckedAtMap(attendanceData.checkedAtMap || {});
       } else {
-        // Prevent background refetches from overwriting active user clicks
-        setAttendance((prev) => ({
-          ...attendanceData.attendance,
-          ...prev,
-        }));
+        // Preserve only actively pending auto-save clicks or unsaved manual edits;
+        // let fresh server updates (from Matrix, History delete, or Excel import) flow through cleanly
+        setAttendance((prev) => {
+          const next = { ...attendanceData.attendance };
+          for (const [sId, pendingStatus] of pendingAutoSaveRef.current.entries()) {
+            next[sId] = pendingStatus;
+          }
+          if (!autoSave) {
+            dirtyManualIdsRef.current.forEach((sId) => {
+              if (sId in prev) next[sId] = prev[sId];
+            });
+          }
+          return next;
+        });
+        setCheckedAtMap((prev) => {
+          const next = { ...(attendanceData.checkedAtMap || {}) };
+          for (const [sId, pendingStatus] of pendingAutoSaveRef.current.entries()) {
+            if (!pendingStatus) {
+              delete next[sId];
+            } else if (prev[sId]) {
+              next[sId] = prev[sId];
+            }
+          }
+          if (!autoSave) {
+            dirtyManualIdsRef.current.forEach((sId) => {
+              if (prev[sId]) next[sId] = prev[sId];
+              else delete next[sId];
+            });
+          }
+          return next;
+        });
       }
     }
-  }, [attendanceData, selectedClass, date]);
+  }, [attendanceData, selectedClass, date, autoSave]);
 
   // Reset local state if no class is selected, and reset section filter when switching classrooms
   useEffect(() => {
@@ -292,6 +336,8 @@ export default function Attendance({
     if (!selectedClass) {
       setStudents([]);
       setAttendance({});
+      setBaselineAttendance({});
+      setCheckedAtMap({});
       setStats([]);
     }
   }, [selectedClass]);
@@ -502,7 +548,7 @@ export default function Attendance({
 
       if (idsToDelete.length > 0) {
         if (typeof navigator !== 'undefined' && !navigator.onLine) {
-          // Handled offline
+          dequeueOfflineAttendance(idsToDelete.map((sId) => `${sId}_${selectedClass}_${date}`));
         } else {
           for (const sId of idsToDelete) {
             promises.push(
@@ -517,22 +563,42 @@ export default function Attendance({
       await Promise.all(promises);
 
       // Optimistically update TanStack Query cache in memory (ZERO network refetch & zero flickering)
+      const savedAtIso = new Date().toISOString();
       queryClient.setQueryData(['attendance-data', selectedClass, date], (old: unknown) => {
         if (!old || typeof old !== 'object') return old;
-        const currentData = old as { attendance?: Record<string, string>; [key: string]: unknown };
+        const currentData = old as {
+          attendance?: Record<string, string>;
+          checkedAtMap?: Record<string, string>;
+          [key: string]: unknown;
+        };
         const updatedAttendance = { ...(currentData.attendance || {}) };
+        const updatedCheckedAt = { ...(currentData.checkedAtMap || {}) };
         for (const [studentId, status] of changes.entries()) {
           if (status === '') {
             delete updatedAttendance[studentId];
+            delete updatedCheckedAt[studentId];
           } else {
             updatedAttendance[studentId] = status;
+            updatedCheckedAt[studentId] = savedAtIso;
           }
         }
         return {
           ...currentData,
           attendance: updatedAttendance,
+          checkedAtMap: updatedCheckedAt,
         };
       });
+
+      // Invalidate other cached dates for this classroom, matrix view, and grades so stats stay consistent
+      queryClient.invalidateQueries({
+        predicate: (q) =>
+          Array.isArray(q.queryKey) &&
+          q.queryKey[0] === 'attendance-data' &&
+          q.queryKey[1] === selectedClass &&
+          q.queryKey[2] !== date,
+      });
+      queryClient.invalidateQueries({ queryKey: ['attendance-matrix', selectedClass] });
+      queryClient.invalidateQueries({ queryKey: ['grades'] });
 
       setAutoSaveStatus('saved');
     } catch (err) {
@@ -553,48 +619,81 @@ export default function Attendance({
 
   const handleStatusChange = useCallback(
     (studentId: string, status: string) => {
-      setAttendance((prev) => {
-        const current = prev[studentId];
-        // Toggle off if clicking the active status
-        const newStatus = current === status ? '' : status;
+      const nowIso = new Date().toISOString();
+      const current = attendanceRef.current[studentId];
+      // Toggle off if clicking the active status
+      const newStatus = current === status ? '' : status;
+      attendanceRef.current = { ...attendanceRef.current, [studentId]: newStatus };
 
-        if (autoSave) {
-          pendingAutoSaveRef.current.set(studentId, newStatus);
-          setAutoSaveStatus('saving');
-
-          if (autoSaveTimerRef.current) {
-            clearTimeout(autoSaveTimerRef.current);
-          }
-          // Debounce 400ms: collects consecutive rapid clicks into a single batch
-          autoSaveTimerRef.current = setTimeout(() => {
-            flushPendingAutoSave();
-          }, 400);
+      setAttendance((prev) => ({ ...prev, [studentId]: newStatus }));
+      setCheckedAtMap((prevTimes) => {
+        const nextTimes = { ...prevTimes };
+        if (newStatus === '') {
+          delete nextTimes[studentId];
+        } else {
+          nextTimes[studentId] = nowIso;
         }
-
-        return { ...prev, [studentId]: newStatus };
+        return nextTimes;
       });
+
+      if (autoSave) {
+        pendingAutoSaveRef.current.set(studentId, newStatus);
+        setAutoSaveStatus('saving');
+
+        if (autoSaveTimerRef.current) {
+          clearTimeout(autoSaveTimerRef.current);
+        }
+        // Debounce 400ms: collects consecutive rapid clicks into a single batch
+        autoSaveTimerRef.current = setTimeout(() => {
+          flushPendingAutoSave();
+        }, 400);
+      } else {
+        dirtyManualIdsRef.current.add(studentId);
+      }
     },
     [autoSave, flushPendingAutoSave]
   );
 
   // ─── Mutation: บันทึกข้อมูลการเข้าเรียนด้วยตนเอง (Manual Save with Offline Fallback) ───
   const saveMutation = useMutation({
-    mutationFn: async (records: Array<{ student_id: number; classroom_id: number; date: string; status: string }>) => {
-      return api.post('/attendance', { records });
+    mutationFn: async ({
+      records,
+      idsToDelete = [],
+    }: {
+      records: Array<{ student_id: number; classroom_id: number; date: string; status: string }>;
+      idsToDelete?: string[];
+    }) => {
+      const ops: Promise<unknown>[] = [];
+      if (records.length > 0) {
+        ops.push(api.post('/attendance', { records }));
+      }
+      if (idsToDelete.length > 0) {
+        ops.push(
+          api.delete(`/attendance?classroom_id=${selectedClass}&date=${date}&student_ids=${idsToDelete.join(',')}`)
+        );
+      }
+      return Promise.all(ops);
     },
     onSuccess: () => {
+      dirtyManualIdsRef.current.clear();
       toast.success('บันทึกการเช็คชื่อเรียบร้อยแล้ว');
-      queryClient.invalidateQueries({ queryKey: ['attendance-data', selectedClass, date] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-data', selectedClass] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-matrix', selectedClass] });
       queryClient.invalidateQueries({ queryKey: ['grades'] });
     },
     onError: (_err, variables) => {
       // If network failed, save to offline queue as fallback
-      enqueueBatchOfflineAttendance(variables.map(r => ({
-        studentId: r.student_id,
-        classroomId: r.classroom_id,
-        date: r.date,
-        status: r.status,
-      })));
+      if (variables.records.length > 0) {
+        enqueueBatchOfflineAttendance(variables.records.map(r => ({
+          studentId: r.student_id,
+          classroomId: r.classroom_id,
+          date: r.date,
+          status: r.status,
+        })));
+      }
+      if (variables.idsToDelete && variables.idsToDelete.length > 0) {
+        dequeueOfflineAttendance(variables.idsToDelete.map(sId => `${sId}_${selectedClass}_${date}`));
+      }
       toast.success('บันทึกข้อมูลการเช็คชื่อลงเครื่องแล้ว (จะซิงค์ขึ้นระบบเมื่อมีอินเทอร์เน็ต)', { icon: '💾' });
     }
   });
@@ -602,13 +701,17 @@ export default function Attendance({
   const handleSave = () => {
     if (!selectedClass || sectionScopedStudents.length === 0) return;
 
+    const idsToDelete = students
+      .filter(s => Boolean(baselineAttendance[s.id]) && !attendance[s.id])
+      .map(s => String(s.id));
+
     const uncheckedInScope = sectionScopedStudents.filter(s => !attendance[s.id]);
     if (activeSectionGroup) {
-      if (uncheckedInScope.length > 0) {
+      if (uncheckedInScope.length > 0 && idsToDelete.length === 0) {
         toast.error(`กรุณาเช็คชื่อนักเรียนห้อง ${activeSectionGroup.label} ให้ครบทุกคนก่อนบันทึก (เหลืออีก ${uncheckedInScope.length} คน)`);
         return;
       }
-    } else if (uncheckedInScope.length > 0) {
+    } else if (uncheckedInScope.length > 0 && idsToDelete.length === 0) {
       const checkedCount = sectionScopedStudents.length - uncheckedInScope.length;
       if (!hasMultipleSections || checkedCount === 0) {
         toast.error(`กรุณาเช็คชื่อนักเรียนให้ครบทุกคนก่อนบันทึก (เหลืออีก ${uncheckedInScope.length} คน)`);
@@ -628,20 +731,25 @@ export default function Attendance({
         status: attendance[s.id]
       }));
 
-    if (records.length === 0) return;
+    if (records.length === 0 && idsToDelete.length === 0) return;
 
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      enqueueBatchOfflineAttendance(records.map(r => ({
-        studentId: r.student_id,
-        classroomId: r.classroom_id,
-        date: r.date,
-        status: r.status,
-      })));
+      if (records.length > 0) {
+        enqueueBatchOfflineAttendance(records.map(r => ({
+          studentId: r.student_id,
+          classroomId: r.classroom_id,
+          date: r.date,
+          status: r.status,
+        })));
+      }
+      if (idsToDelete.length > 0) {
+        dequeueOfflineAttendance(idsToDelete.map(sId => `${sId}_${selectedClass}_${date}`));
+      }
       toast.success('บันทึกข้อมูลการเช็คชื่อลงเครื่องเรียบร้อย (โหมดออฟไลน์) จะซิงค์เมื่อมีเน็ต', { icon: '💾' });
       return;
     }
 
-    saveMutation.mutate(records);
+    saveMutation.mutate({ records, idsToDelete });
   };
 
   // ─── Mutation: อัปเดตข้อมูลเข้าเรียน Matrix (พร้อมโหมดออฟไลน์) ───
@@ -702,6 +810,7 @@ export default function Attendance({
       toast.success('ลบข้อมูลการเข้าเรียนเรียบร้อย');
       queryClient.invalidateQueries({ queryKey: ['attendance-matrix', selectedClass, matrixStartDate, matrixEndDate] });
       queryClient.invalidateQueries({ queryKey: ['attendance-data', selectedClass] });
+      queryClient.invalidateQueries({ queryKey: ['grades'] });
     },
     onError: () => {
       toast.error('ลบข้อมูลไม่สำเร็จ');
@@ -718,11 +827,80 @@ export default function Attendance({
     matrixCellDeleteMutation.mutate(record.id);
   };
 
+  const selectedClassData = classrooms.find(c => String(c.id) === String(selectedClass));
+  const lateToAbsentRatio = Number(selectedClassData?.late_to_absent_ratio) || 3;
+  const leaveToAbsentRatio = Number(selectedClassData?.leave_to_absent_ratio) || 2;
+  const maxAllowedAbsences = selectedClassData
+    ? Math.floor((Number(selectedClassData.total_classes) || 40) * (100 - (Number(selectedClassData.min_attendance_percent) || 80)) / 100)
+    : 0;
+
+  // Live student stats: combines baseline DB stats with real-time delta on the active date
   const statsMap = useMemo(() => {
-    const map = new Map<string, (typeof stats)[number]>();
-    (stats || []).forEach(s => map.set(String(s.student_id), s));
-    return map;
-  }, [stats]);
+    const baseMap = new Map<string, (typeof stats)[number]>();
+    (stats || []).forEach(s => baseMap.set(String(s.student_id), s));
+
+    const liveMap = new Map<string, StudentStats>();
+    const allStudentIds = new Set<string>([
+      ...students.map(s => String(s.id)),
+      ...Array.from(baseMap.keys()),
+    ]);
+
+    allStudentIds.forEach(sId => {
+      const base = baseMap.get(sId) || {
+        student_id: sId,
+        present_count: 0,
+        late_count: 0,
+        absent_count: 0,
+        leave_count: 0,
+        converted_absent_count: 0,
+        remaining_late_count: 0,
+        remaining_leave_count: 0,
+        is_f: false,
+      };
+
+      const oldStatus = baselineAttendance[sId] || '';
+      const newStatus = attendance[sId] || '';
+
+      let present = Number(base.present_count) || 0;
+      let late = Number(base.late_count) || 0;
+      let absent = Number(base.absent_count) || 0;
+      let leave = Number(base.leave_count) || 0;
+
+      if (oldStatus !== newStatus) {
+        if (oldStatus === 'present') present = Math.max(0, present - 1);
+        else if (oldStatus === 'late') late = Math.max(0, late - 1);
+        else if (oldStatus === 'absent') absent = Math.max(0, absent - 1);
+        else if (oldStatus === 'leave') leave = Math.max(0, leave - 1);
+
+        if (newStatus === 'present') present += 1;
+        else if (newStatus === 'late') late += 1;
+        else if (newStatus === 'absent') absent += 1;
+        else if (newStatus === 'leave') leave += 1;
+      }
+
+      const convertedFromLate = Math.floor(late / lateToAbsentRatio);
+      const convertedFromLeave = Math.floor(leave / leaveToAbsentRatio);
+      const convertedAbsentCount = absent + convertedFromLate + convertedFromLeave;
+      const remainingLateCount = late % lateToAbsentRatio;
+      const remainingLeaveCount = leave % leaveToAbsentRatio;
+      const isF = convertedAbsentCount > maxAllowedAbsences;
+
+      liveMap.set(sId, {
+        ...base,
+        student_id: sId,
+        present_count: present,
+        late_count: late,
+        absent_count: absent,
+        leave_count: leave,
+        converted_absent_count: convertedAbsentCount,
+        remaining_late_count: remainingLateCount,
+        remaining_leave_count: remainingLeaveCount,
+        is_f: isF,
+      });
+    });
+
+    return liveMap;
+  }, [stats, students, baselineAttendance, attendance, lateToAbsentRatio, leaveToAbsentRatio, maxAllowedAbsences]);
 
   const getStudentStats = useCallback((studentId: string) => {
     return statsMap.get(String(studentId)) || {
@@ -757,6 +935,8 @@ export default function Attendance({
       toast.success('ลบประวัติเรียบร้อยแล้ว');
       queryClient.invalidateQueries({ queryKey: ['attendance-history', selectedClass, historyStudent?.id] });
       queryClient.invalidateQueries({ queryKey: ['attendance-data', selectedClass] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-matrix', selectedClass] });
+      queryClient.invalidateQueries({ queryKey: ['grades'] });
     },
     onError: () => {
       toast.error('ลบประวัติไม่สำเร็จ');
@@ -777,9 +957,23 @@ export default function Attendance({
       return api.delete(`/attendance?classroom_id=${selectedClass}&date=${date}${idsQuery}`);
     },
     onSuccess: (_res, params) => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
       if (params?.studentIds && params.studentIds.length > 0) {
         const idSet = new Set(params.studentIds.map(String));
+        idSet.forEach(id => {
+          pendingAutoSaveRef.current.delete(id);
+          dirtyManualIdsRef.current.delete(id);
+        });
         setAttendance(prev => {
+          const next = { ...prev };
+          idSet.forEach(id => {
+            delete next[id];
+          });
+          return next;
+        });
+        setCheckedAtMap(prev => {
           const next = { ...prev };
           idSet.forEach(id => {
             delete next[id];
@@ -788,11 +982,16 @@ export default function Attendance({
         });
         toast.success(`ลบข้อมูลการเช็คชื่อห้อง ${params.sectionLabel || ''} ของวันที่เลือกเรียบร้อยแล้ว`);
       } else {
+        pendingAutoSaveRef.current.clear();
+        dirtyManualIdsRef.current.clear();
         setAttendance({});
+        setCheckedAtMap({});
         toast.success('ลบข้อมูลการเช็คชื่อของวันที่เลือกเรียบร้อยแล้ว');
       }
-      queryClient.invalidateQueries({ queryKey: ['attendance-data', selectedClass, date] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-data', selectedClass] });
       queryClient.invalidateQueries({ queryKey: ['attendance-matrix', selectedClass] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-history', selectedClass] });
+      queryClient.invalidateQueries({ queryKey: ['grades'] });
     },
     onError: () => {
       toast.error('ลบข้อมูลไม่สำเร็จ');
@@ -837,6 +1036,15 @@ export default function Attendance({
   // ─── Mutation: เลือกสถานะทั้งหมด ───
   const markAllMutation = useMutation({
     mutationFn: async ({ records }: { status?: string; records: Array<{ student_id: number; classroom_id: number; date: string; status: string }> }) => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        enqueueBatchOfflineAttendance(records.map(r => ({
+          studentId: r.student_id,
+          classroomId: r.classroom_id,
+          date: r.date,
+          status: r.status,
+        })));
+        return { offline: true };
+      }
       return api.post('/attendance', { records });
     },
     onMutate: () => {
@@ -844,21 +1052,46 @@ export default function Attendance({
     },
     onSuccess: () => {
       setAutoSaveStatus('saved');
-      queryClient.invalidateQueries({ queryKey: ['attendance-data', selectedClass, date] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-data', selectedClass] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-matrix', selectedClass] });
       queryClient.invalidateQueries({ queryKey: ['grades'] });
     },
-    onError: () => {
-      setAutoSaveStatus('error');
-      toast.error('บันทึกอัตโนมัติไม่สำเร็จ');
+    onError: (_err, variables) => {
+      enqueueBatchOfflineAttendance(variables.records.map(r => ({
+        studentId: r.student_id,
+        classroomId: r.classroom_id,
+        date: r.date,
+        status: r.status,
+      })));
+      setAutoSaveStatus('saved');
     }
   });
 
   const handleMarkStudents = useCallback((targetStudents: Student[], status: string, scopeLabel?: string) => {
     if (targetStudents.length === 0) return;
+    const nowIso = new Date().toISOString();
+    targetStudents.forEach(student => {
+      pendingAutoSaveRef.current.delete(student.id);
+      if (!autoSave) {
+        dirtyManualIdsRef.current.add(student.id);
+      }
+    });
+    if (pendingAutoSaveRef.current.size === 0 && autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
     setAttendance(prev => {
       const next = { ...prev };
       targetStudents.forEach(student => {
         next[student.id] = status;
+      });
+      attendanceRef.current = next;
+      return next;
+    });
+    setCheckedAtMap(prev => {
+      const next = { ...prev };
+      targetStudents.forEach(student => {
+        next[student.id] = nowIso;
       });
       return next;
     });
@@ -881,8 +1114,17 @@ export default function Attendance({
   };
 
   const handleResetDraft = () => {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+    pendingAutoSaveRef.current.clear();
+    dirtyManualIdsRef.current.clear();
     if (attendanceData) {
-      setAttendance(attendanceData.attendance);
+      const baseAtt = attendanceData.baselineAttendance || attendanceData.attendance;
+      attendanceRef.current = { ...baseAtt };
+      setAttendance({ ...baseAtt });
+      setCheckedAtMap(attendanceData.checkedAtMap || {});
     }
     toast.success('คืนค่าการกรอกข้อมูลแล้ว');
   };
@@ -962,8 +1204,20 @@ export default function Attendance({
     });
     return map;
   }, [matrixRecords]);
-  const selectedClassData = classrooms.find(c => String(c.id) === String(selectedClass));
-  const maxAllowedAbsences = selectedClassData ? Math.floor((Number(selectedClassData.total_classes) || 40) * (100 - (Number(selectedClassData.min_attendance_percent) || 80)) / 100) : 0;
+
+  const matrixTimeMap = useMemo(() => {
+    const map = new Map<string, string>();
+    matrixRecords.forEach(r => {
+      if (r.date && r.student_id !== undefined) {
+        const dStr = r.date.split('T')[0];
+        const ts = r.updated_at || r.created_at;
+        if (dStr && ts) {
+          map.set(`${r.student_id}_${dStr}`, ts);
+        }
+      }
+    });
+    return map;
+  }, [matrixRecords]);
 
   const activeParsed = useMemo(() => {
     return selectedClassData ? parseClassroomName(selectedClassData.name) : null;
@@ -1058,6 +1312,7 @@ export default function Attendance({
 
       {matrixDates.map(dateStr => {
         const status = matrixRecordMap.get(`${student.id}_${dateStr}`) ?? null;
+        const checkedAt = matrixTimeMap.get(`${student.id}_${dateStr}`) ?? null;
         const isEditing = matrixEditingCell?.studentId === student.id && matrixEditingCell?.date === dateStr;
         const holiday = holidayMap[dateStr] || checkThaiHoliday(dateStr);
 
@@ -1065,6 +1320,7 @@ export default function Attendance({
           <MemoizedAttendanceCell
             key={dateStr}
             status={status}
+            checkedAt={checkedAt}
             isEditing={isEditing}
             onEditClick={() => setMatrixEditingCell({ studentId: student.id, date: dateStr })}
             onStatusSelect={(statusVal: string) => handleMatrixCellUpdate(student.id, dateStr, statusVal)}
@@ -1364,8 +1620,11 @@ export default function Attendance({
                                   key={student.id}
                                   student={student}
                                   status={attendance[student.id]}
+                                  checkedAt={checkedAtMap[student.id]}
                                   stats={getStudentStats(student.id)}
                                   maxAllowedAbsences={maxAllowedAbsences}
+                                  lateToAbsentRatio={lateToAbsentRatio}
+                                  leaveToAbsentRatio={leaveToAbsentRatio}
                                   sectionBadge={grp.label}
                                   onStatusSelect={handleStatusChange}
                                   onViewHistory={setHistoryStudent}
@@ -1383,8 +1642,11 @@ export default function Attendance({
                           key={student.id}
                           student={student}
                           status={attendance[student.id]}
+                          checkedAt={checkedAtMap[student.id]}
                           stats={getStudentStats(student.id)}
                           maxAllowedAbsences={maxAllowedAbsences}
+                          lateToAbsentRatio={lateToAbsentRatio}
+                          leaveToAbsentRatio={leaveToAbsentRatio}
                           sectionBadge={hasMultipleSections ? (student.grade_level || null) : null}
                           onStatusSelect={handleStatusChange}
                           onViewHistory={setHistoryStudent}
@@ -1492,8 +1754,11 @@ export default function Attendance({
                                     idx={idx}
                                     showRoomPill={Boolean(searchQuery.trim())}
                                     status={attendance[student.id]}
+                                    checkedAt={checkedAtMap[student.id]}
                                     stats={getStudentStats(student.id)}
                                     maxAllowedAbsences={maxAllowedAbsences}
+                                    lateToAbsentRatio={lateToAbsentRatio}
+                                    leaveToAbsentRatio={leaveToAbsentRatio}
                                     onStatusSelect={handleStatusChange}
                                     onViewHistory={setHistoryStudent}
                                   />
@@ -1511,8 +1776,11 @@ export default function Attendance({
                           idx={idx}
                           showRoomPill={false}
                           status={attendance[student.id]}
+                          checkedAt={checkedAtMap[student.id]}
                           stats={getStudentStats(student.id)}
                           maxAllowedAbsences={maxAllowedAbsences}
+                          lateToAbsentRatio={lateToAbsentRatio}
+                          leaveToAbsentRatio={leaveToAbsentRatio}
                           onStatusSelect={handleStatusChange}
                           onViewHistory={setHistoryStudent}
                         />
@@ -1893,7 +2161,11 @@ export default function Attendance({
           students={students}
           currentDate={date}
           onSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: ['attendance'] });
+            dirtyManualIdsRef.current.clear();
+            queryClient.invalidateQueries({ queryKey: ['attendance-data', selectedClass] });
+            queryClient.invalidateQueries({ queryKey: ['attendance-matrix', selectedClass] });
+            queryClient.invalidateQueries({ queryKey: ['attendance-history', selectedClass] });
+            queryClient.invalidateQueries({ queryKey: ['grades'] });
             toast.success('อัปเดตข้อมูลการเช็คชื่อในตารางเรียบร้อยแล้ว');
           }}
         />

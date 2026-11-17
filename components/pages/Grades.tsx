@@ -153,7 +153,9 @@ export default function Grades() {
           midterm_weight: c.midterm_weight ?? 0,
           final_weight: c.final_weight ?? 0,
           midterm_max_score: c.midterm_max_score ?? 100,
-          final_max_score: c.final_max_score ?? 100
+          final_max_score: c.final_max_score ?? 100,
+          late_deduction_score: c.late_deduction_score ?? 1,
+          absent_deduction_score: c.absent_deduction_score ?? 2,
         };
         if (
           prev.assignment_weight === nextWeights.assignment_weight &&
@@ -162,7 +164,9 @@ export default function Grades() {
           prev.midterm_weight === nextWeights.midterm_weight &&
           prev.final_weight === nextWeights.final_weight &&
           prev.midterm_max_score === nextWeights.midterm_max_score &&
-          prev.final_max_score === nextWeights.final_max_score
+          prev.final_max_score === nextWeights.final_max_score &&
+          prev.late_deduction_score === nextWeights.late_deduction_score &&
+          prev.absent_deduction_score === nextWeights.absent_deduction_score
         ) {
           return prev;
         }
@@ -282,10 +286,27 @@ export default function Grades() {
       if (gradeFilter === 'KR') return student.is_f || student.grade === 'ข.ร.' || student.grade === 'ขร';
       if (gradeFilter === 'KS') return student.grade === 'ข.ส.' || student.is_absent_final;
       if (gradeFilter === 'MS') return student.grade === 'ม.ส.' || student.is_incomplete;
-      if (gradeFilter === 'FAIL') return student.grade === '0' || student.grade === 'F' || student.grade === 'ข.ร.' || student.grade === 'ข.ส.' || student.grade === 'ม.ส.' || student.is_f;
+      if (gradeFilter === 'FAIL') {
+        return (
+          student.grade === '0' ||
+          student.grade === 'F' ||
+          student.grade === 'ข.ร.' ||
+          student.grade === 'ขร' ||
+          student.grade === 'ข.ส.' ||
+          student.grade === 'ม.ส.' ||
+          student.grade === 'ไม่มีเกรด' ||
+          Boolean(student.is_f) ||
+          Boolean(student.is_absent_final) ||
+          Boolean(student.is_incomplete)
+        );
+      }
       return student.grade === gradeFilter;
     });
   }, [sectionScopedReport, searchQuery, gradeFilter]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, gradeFilter]);
 
   // Paginated report subset
   const paginatedReport = useMemo(() => {
@@ -338,8 +359,10 @@ export default function Grades() {
             finalScore: updatedStudent.final_score,
             examStatus: updatedStudent.exam_status,
             baseAffectiveScore:
-              updatedStudent.affective_score === '' || updatedStudent.affective_score === undefined
-                ? 0
+              updatedStudent.affective_score === '' ||
+              updatedStudent.affective_score === undefined ||
+              updatedStudent.affective_score === null
+                ? null
                 : updatedStudent.affective_score,
             absentCount: updatedStudent.absent_count || 0,
             lateCount: updatedStudent.late_count || 0,
@@ -428,6 +451,8 @@ export default function Grades() {
           maxWeight: weights.affective_weight,
           absentCount: student.absent_count || 0,
           lateCount: student.late_count || 0,
+          absentDeduction: weightsConfig.absentDeductionScore,
+          lateDeduction: weightsConfig.lateDeductionScore,
         });
 
         const calc = calculateStudentGradeSummary({
@@ -763,7 +788,15 @@ export default function Grades() {
       ) : showSettings ? (
         <GradesSettingsDrawer
           isOpen={showSettings}
-          onClose={() => setShowSettings(false)}
+          onClose={() => {
+            if (gradesData) {
+              setCriteria(gradesData.criteria || []);
+              if (gradesData.weights) {
+                setWeights(prev => ({ ...prev, ...gradesData.weights }));
+              }
+            }
+            setShowSettings(false);
+          }}
           weights={weights}
           setWeights={setWeights}
           criteria={criteria}
@@ -783,7 +816,7 @@ export default function Grades() {
           {/* ==================== ANALYTICS SUMMARY CARDS & DISTRIBUTION ==================== */}
           <GradesAnalyticsHeader
             analytics={analytics}
-            totalStudents={report.length}
+            totalStudents={sectionScopedReport.length}
             gradeFilter={gradeFilter}
             setGradeFilter={setGradeFilter}
           />

@@ -8,7 +8,12 @@ export interface AttendanceStatsBarProps {
 }
 
 export const AttendanceStatsBar = ({ dailyStats }: AttendanceStatsBarProps) => {
-  const percentage = Math.round((dailyStats.marked / (dailyStats.total || 1)) * 100);
+  const total = dailyStats.total || 1;
+  const percentage = Math.round((dailyStats.marked / total) * 100);
+  const presentPct = (dailyStats.present / total) * 100;
+  const latePct = (dailyStats.late / total) * 100;
+  const absentPct = (dailyStats.absent / total) * 100;
+  const leavePct = (dailyStats.leave / total) * 100;
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
@@ -74,11 +79,34 @@ export const AttendanceStatsBar = ({ dailyStats }: AttendanceStatsBarProps) => {
             {percentage}%
           </div>
         </div>
-        <div className="w-full bg-indigo-100/70 dark:bg-slate-800 h-2 rounded-full overflow-hidden mt-2.5">
-          <div
-            className="h-full bg-gradient-to-r from-indigo-500 to-violet-600 rounded-full transition-all duration-300"
-            style={{ width: `${Math.min(100, percentage)}%` }}
-          />
+        <div
+          className="w-full bg-indigo-100/70 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden mt-2.5 flex"
+          title={`มาเรียน ${dailyStats.present} | สาย ${dailyStats.late} | ขาด ${dailyStats.absent} | ลา ${dailyStats.leave}`}
+        >
+          {presentPct > 0 && (
+            <div
+              className="h-full bg-emerald-500 transition-all duration-300"
+              style={{ width: `${presentPct}%` }}
+            />
+          )}
+          {latePct > 0 && (
+            <div
+              className="h-full bg-amber-500 transition-all duration-300"
+              style={{ width: `${latePct}%` }}
+            />
+          )}
+          {absentPct > 0 && (
+            <div
+              className="h-full bg-rose-500 transition-all duration-300"
+              style={{ width: `${absentPct}%` }}
+            />
+          )}
+          {leavePct > 0 && (
+            <div
+              className="h-full bg-sky-500 transition-all duration-300"
+              style={{ width: `${leavePct}%` }}
+            />
+          )}
         </div>
       </div>
     </div>

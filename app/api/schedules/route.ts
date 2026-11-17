@@ -42,8 +42,8 @@ export const GET = withAuth(async (request, user) => {
   }
 
   // Normalize boundaries in UTC
-  const startUtc = new Date(Date.UTC(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0));
-  const endUtc = new Date(Date.UTC(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999));
+  const startUtc = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate(), 0, 0, 0));
+  const endUtc = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate(), 23, 59, 59, 999));
 
   // Scope weekly slots to the active semester (same rule as dashboard); cached lookup
   const activeSemesterId = await getActiveSemesterId(user.id);
@@ -273,7 +273,7 @@ export const POST = withAuth(async (request, user) => {
       const allDone = linkedClassrooms.every(room => classroomCounts[room.id] >= room.totalClasses);
       if (allDone) break;
 
-      const jsDay = currentDate.getDay();
+      const jsDay = currentDate.getUTCDay();
       const dbDay = jsDay === 0 ? 6 : jsDay - 1; // Convert: Sun=6, Mon=0, etc.
 
       const daySlots = weeklySchedules.filter(ws => ws.dayOfWeek === dbDay);
@@ -301,7 +301,7 @@ export const POST = withAuth(async (request, user) => {
         classroomCounts[room.id]++;
       }
 
-      currentDate.setDate(currentDate.getDate() + 1);
+      currentDate.setUTCDate(currentDate.getUTCDate() + 1);
       daysProcessed++;
     }
 

@@ -20,6 +20,7 @@ import {
   type ClassroomSemesterFields,
 } from '@/lib/semester';
 import { getAttendanceConfig, computeAbsentConversion } from '@/lib/formatters';
+import { resolveStudentAvatarUrl } from '@/lib/avatarStorage';
 
 // ==================== Interfaces ====================
 
@@ -247,9 +248,7 @@ export async function calculateAtRiskStudents(
     );
     const avatarMap = new Map(
       studentAvatars.map((a) => {
-        const avatarUrl = a.avatar?.startsWith('data:image/')
-          ? `/api/students/${a.id}/avatar?v=${a.updatedAt ? a.updatedAt.getTime() : 0}`
-          : a.avatar || null;
+        const avatarUrl = resolveStudentAvatarUrl(a.id, a.avatar, a.updatedAt);
         return [a.id, avatarUrl] as const;
       })
     );

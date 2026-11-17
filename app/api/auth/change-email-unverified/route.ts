@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
       message: 'รหัสยืนยัน OTP ได้ถูกส่งไปยังอีเมลใหม่เรียบร้อยแล้ว กรุณาตรวจสอบกล่องจดหมาย',
       newEmail: cleanNew,
       isDevMode: emailResult.isDevMode,
-      devCode: emailResult.isDevMode ? otp : undefined,
+      devCode: process.env.NODE_ENV !== 'production' && emailResult.isDevMode ? otp : undefined,
     });
   } catch (error) {
     console.error('Change unverified email request error:', error);

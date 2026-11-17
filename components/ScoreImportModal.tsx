@@ -240,7 +240,8 @@ export default function ScoreImportModal({
             let matched = null;
             if (studentCode) matched = students.find(s => s.student_code === studentCode);
             if (!matched && fullName) {
-              matched = students.find(s => fullName.includes(s.name) || s.name.includes(fullName.replace(/นาย|นางสาว|เด็กชาย|เด็กหญิง/g, '').trim()));
+              const strippedName = fullName.replace(/นาย|นางสาว|เด็กชาย|เด็กหญิง/g, '').trim();
+              matched = students.find(s => fullName.includes(s.name) || (strippedName.length > 0 && s.name.includes(strippedName)));
             }
 
             if (matched) {
@@ -270,12 +271,13 @@ export default function ScoreImportModal({
           }
         } else {
           // Blueprint parse
-          let lessonCol = -1, hoursCol = -1, skillCol = -1, postTestCol = -1;
+          let lessonCol = -1, lessonNameCol = -1, hoursCol = -1, skillCol = -1, postTestCol = -1;
           for (let i = 0; i < Math.min(20, data.length); i++) {
             const row = data[i] || [];
             for (let j = 0; j < row.length; j++) {
               const cell = String(row[j] || '').trim().toLowerCase();
               if (cell.includes('บทเรียนที่') || cell.includes('หน่วยที่')) lessonCol = j;
+              else if (cell.includes('ชื่อบทเรียน') || cell.includes('ชื่อหน่วย') || cell === 'ชื่อ') lessonNameCol = j;
               if (cell.includes('ชั่วโมง')) hoursCol = j;
               if (cell.includes('คะแนนทักษะ') && !cell.includes('ใหม่')) skillCol = j;
               if (cell.includes('คะแนนรายบทเรียนใหม่') || cell.includes('พุทธิพิสัย')) postTestCol = j;
@@ -293,9 +295,10 @@ export default function ScoreImportModal({
             const row = data[i] || [];
             const lessonNum = parseInt(String(row[lessonCol] || '').trim());
             if (!isNaN(lessonNum) && lessonNum > 0) {
+              const rawLessonName = lessonNameCol !== -1 ? String(row[lessonNameCol] ?? '').trim() : '';
               newStructs.push({
                 lesson_number: lessonNum,
-                lesson_name: `บทเรียนที่ ${lessonNum}`,
+                lesson_name: rawLessonName || `บทเรียนที่ ${lessonNum}`,
                 hours: hoursCol !== -1 ? (parseFloat(row[hoursCol]) || 4) : 4,
                 max_assignment_score: parseFloat(row[skillCol]) || 0,
                 max_post_test_score: parseFloat(row[postTestCol]) || 0,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError, generateToken, setAuthCookie } from '@/lib/auth';
 import { protectRequest, authLimiter } from '@/lib/arcjet';
+import { verifyOtp } from '@/lib/email';
 
 export async function POST(request: NextRequest) {
   try {
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (user.verificationCode !== cleanCode) {
+    if (!verifyOtp(cleanCode, user.verificationCode)) {
       const newAttempts = currentAttempts + 1;
       if (newAttempts >= MAX_VERIFY_ATTEMPTS) {
         await prisma.user.update({
@@ -126,6 +127,7 @@ export async function POST(request: NextRequest) {
         pendingEmail: null,
         verificationCode: null,
         verificationCodeExpiry: null,
+        verificationAttempts: 0,
         emailVerified: true,
       },
       select: {
@@ -139,11 +141,15 @@ export async function POST(request: NextRequest) {
     });
 
     // Generate fresh JWT token with the new email
-    const token = generateToken({
-      id: updatedUser.id,
-      email: updatedUser.email,
-      role: updatedUser.role,
-    });
+    const token = generateToken(
+      {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        role: updatedUser.role,
+      },
+      undefined,
+      authUser.authMethod
+    );
 
     const response = NextResponse.json({
       message: 'เปลี่ยนที่อยู่อีเมลสำเร็จเรียบร้อยแล้ว ข้อมูลเดิมทั้งหมดของคุณยังคงอยู่ครบถ้วน 🎉',

@@ -147,6 +147,10 @@ export default function GradeCsvModal({
     availableColumns.filter(c => c.defaultChecked).map(c => c.id)
   );
 
+  useEffect(() => {
+    setSelectedColIds(availableColumns.filter(c => c.defaultChecked).map(c => c.id));
+  }, [classroom?.id, weights.midterm_weight]);
+
   const activeColumns = useMemo(() => {
     return availableColumns.filter(c => selectedColIds.includes(c.id));
   }, [availableColumns, selectedColIds]);

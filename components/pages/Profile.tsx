@@ -215,6 +215,7 @@ export default function ProfilePage() {
 
         const compressedDataUrl = canvas.toDataURL('image/webp', 0.88);
         setSelectedAvatar(compressedDataUrl);
+        setIsCustomAvatar(false);
         setAvatarType('upload');
         toast.success('เลือกรูปภาพสำเร็จ กด "บันทึกการเปลี่ยนแปลง" เพื่อใช้งาน');
       };
@@ -329,7 +330,7 @@ export default function ProfilePage() {
     return { score, label: 'ปลอดภัยสูง', color: 'bg-emerald-500' };
   };
 
-  const currentAvatarDisplay = isCustomAvatar
+  const currentAvatarDisplay = avatarType === 'emoji' && isCustomAvatar
     ? customAvatar.trim() || selectedAvatar
     : selectedAvatar || ANIMAL_AVATARS[(user?.id || 1) % ANIMAL_AVATARS.length];
 
@@ -530,7 +531,10 @@ export default function ProfilePage() {
                   <div className="flex gap-2 p-1 bg-slate-100 rounded-2xl border border-slate-200/80">
                     <button
                       type="button"
-                      onClick={() => setAvatarType('upload')}
+                      onClick={() => {
+                        setIsCustomAvatar(false);
+                        setAvatarType('upload');
+                      }}
                       className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${avatarType === 'upload'
                         ? 'bg-white text-indigo-600 shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
@@ -555,6 +559,7 @@ export default function ProfilePage() {
                         type="button"
                         onClick={() => {
                           setSelectedAvatar(googleAvatar);
+                          setIsCustomAvatar(false);
                           setAvatarType('upload');
                         }}
                         className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${selectedAvatar === googleAvatar
@@ -605,6 +610,7 @@ export default function ProfilePage() {
                                 type="button"
                                 onClick={() => {
                                   setSelectedAvatar(ANIMAL_AVATARS[0]);
+                                  setIsCustomAvatar(false);
                                   setAvatarType('emoji');
                                 }}
                                 className="btn bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 text-xs font-semibold px-3 py-1.5 rounded-xl border border-slate-200 flex items-center gap-1.5"

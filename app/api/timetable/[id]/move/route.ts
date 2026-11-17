@@ -18,20 +18,20 @@ export const PUT = withAuth<{ id: string }>(async (request, user, { params }) =>
     return NextResponse.json({ message: 'Entry not found' }, { status: 404 });
   }
 
-  const dayOfWeek = body.day_of_week !== undefined ? body.day_of_week : entry.dayOfWeek;
-  const startPeriod = body.start_period !== undefined ? body.start_period : entry.startPeriod;
+  const dayOfWeek = body.day_of_week !== undefined ? Number(body.day_of_week) : entry.dayOfWeek;
+  const startPeriod = body.start_period !== undefined ? Number(body.start_period) : entry.startPeriod;
   
   // Maintain the same duration span when moving
   const span = entry.endPeriod - entry.startPeriod;
   const endPeriod = startPeriod + span;
 
-  if (dayOfWeek < 0 || dayOfWeek > 6) {
+  if (!Number.isFinite(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
     return NextResponse.json({ message: 'Invalid day of week (0-6)' }, { status: 400 });
   }
-  if (startPeriod < 0 || startPeriod > 12) {
+  if (!Number.isFinite(startPeriod) || startPeriod < 0 || startPeriod > 12) {
     return NextResponse.json({ message: 'Invalid start period (0-12)' }, { status: 400 });
   }
-  if (endPeriod < startPeriod) {
+  if (!Number.isFinite(endPeriod) || endPeriod < startPeriod) {
     return NextResponse.json({ message: 'End period cannot be less than start period' }, { status: 400 });
   }
   if (endPeriod > 12) {

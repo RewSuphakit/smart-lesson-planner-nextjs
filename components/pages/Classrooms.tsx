@@ -142,7 +142,22 @@ function ClassroomCard({ c, onEdit, onDelete, onTogglePortal, isTogglingPortal }
   const isCustom = c.curriculum_type === 'custom';
   const weeks = c.total_weeks || (isPvs ? 15 : 18);
   const endDate = c.semester_end_date || calculateEndDate(c.semester_start_date, weeks);
-  const status = getSemesterStatus(c.semester_start_date, endDate, weeks, c.current_week);
+  const status = getSemesterStatus(
+    c.semester_start_date,
+    endDate,
+    weeks,
+    c.current_week || (() => {
+      if (!c.semester_start_date) return null;
+      const nowThai = new Date(Date.now() + 7 * 60 * 60 * 1000);
+      const todayStr = nowThai.toISOString().split('T')[0];
+      if (todayStr < c.semester_start_date || (endDate && todayStr > endDate)) return null;
+      const startMs = new Date(`${c.semester_start_date}T00:00:00Z`).getTime();
+      const todayMs = new Date(`${todayStr}T00:00:00Z`).getTime();
+      if (Number.isNaN(startMs) || Number.isNaN(todayMs) || todayMs < startMs) return null;
+      const diffDays = Math.floor((todayMs - startMs) / (1000 * 60 * 60 * 24));
+      return Math.min(weeks, Math.max(1, Math.floor(diffDays / 7) + 1));
+    })()
+  );
   const isPortalEnabled = c.is_portal_enabled !== false;
 
   return (
@@ -304,6 +319,7 @@ export default function Classrooms({
 
   // ─── Query: ดึงข้อมูลห้องเรียน ───
   const { data: classrooms = [], isLoading } = useQuery<Classroom[]>({
+    initialData: initialClassrooms && initialClassrooms.length > 0 ? initialClassrooms : undefined,
     queryKey: ['classrooms'],
     queryFn: async () => {
       const res = await api.get('/classrooms');
@@ -443,6 +459,11 @@ export default function Classrooms({
     },
     onSuccess: async (res) => {
       toast.success(editing ? 'อัปเดตข้อมูลห้องเรียนเรียบร้อย' : 'เพิ่มห้องเรียนเรียบร้อย');
+      queryClient.invalidateQueries({ queryKey: ['grades'] });
+      queryClient.invalidateQueries({ queryKey: ['affective-students'] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-data'] });
+      queryClient.invalidateQueries({ queryKey: ['scores-matrix-data'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
 
       // เชื่อมโยงคาบในตารางสอนอัตโนมัติหากเลือกมาจากตาราง
       if (selectedTimetableIds.length > 0) {
@@ -527,6 +548,12 @@ export default function Classrooms({
     mutationFn: (id: string | number) => api.delete('/classrooms/' + id),
     onSuccess: () => {
       toast.success('ลบห้องเรียนแล้ว');
+      queryClient.invalidateQueries({ queryKey: ['grades'] });
+      queryClient.invalidateQueries({ queryKey: ['affective-students'] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-data'] });
+      queryClient.invalidateQueries({ queryKey: ['scores-matrix-data'] });
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['classrooms'] });
     },
     onError: () => {

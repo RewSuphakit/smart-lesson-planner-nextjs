@@ -189,21 +189,28 @@ export const POST = withAuth(async (request, user) => {
       .filter((op): op is NonNullable<typeof op> => op !== null);
 
     if (structOperations.length > 0) {
-      await prisma.$transaction(structOperations);
-
-      // Delete any leftover structures beyond the highest submitted lesson number (e.g. switching from 18 to 15 weeks)
       const validLessonNums = structures
         .map((s) => Number(s.lesson_number))
         .filter((n) => !isNaN(n) && n > 0);
       const maxLesson = Math.max(...validLessonNums);
-      if (maxLesson > 0) {
-        await prisma.scoreStructure.deleteMany({
-          where: {
-            classroomId,
-            lessonNumber: { gt: maxLesson },
-          },
-        });
-      }
+      const isFullSequenceFromOne =
+        maxLesson > 0 &&
+        validLessonNums.includes(1) &&
+        new Set(validLessonNums).size === maxLesson;
+
+      await prisma.$transaction([
+        ...structOperations,
+        ...(isFullSequenceFromOne
+          ? [
+              prisma.scoreStructure.deleteMany({
+                where: {
+                  classroomId,
+                  lessonNumber: { gt: maxLesson },
+                },
+              }),
+            ]
+          : []),
+      ]);
     }
     invalidateCache(userCacheKey(user.id, 'scores:structure', classroomId));
     invalidateCache(userCacheKey(user.id, 'scores:matrix', classroomId));
@@ -221,7 +228,7 @@ export const POST = withAuth(async (request, user) => {
     const studentIds = Array.from(new Set(scores.map((s) => Number(s.student_id)).filter((id) => !isNaN(id))));
 
     const ownedStudents = await prisma.student.findMany({
-      where: { id: { in: studentIds }, userId: user.id },
+      where: { id: { in: studentIds }, classroomId, userId: user.id },
       select: { id: true },
     });
     const ownedStudentIds = new Set(ownedStudents.map((s) => s.id));
@@ -320,7 +327,7 @@ export const POST = withAuth(async (request, user) => {
     const studentIds = Array.from(new Set(bulkScores.map((s) => Number(s.student_id)).filter((id) => !isNaN(id))));
 
     const ownedStudents = await prisma.student.findMany({
-      where: { id: { in: studentIds }, userId: user.id },
+      where: { id: { in: studentIds }, classroomId, userId: user.id },
       select: { id: true },
     });
     const ownedStudentIds = new Set(ownedStudents.map((s) => s.id));

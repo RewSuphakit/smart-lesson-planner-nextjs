@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
+import { useSemester } from '@/context/SemesterContext';
 import api from '@/services/api';
 import UserAvatar from '@/components/UserAvatar';
 import {
@@ -154,14 +155,19 @@ export default function DashboardClient({
   initialData?: DashboardData | null;
 }) {
   const { user } = useAuth();
+  const { activeSemester } = useSemester();
+  const isInitialSemesterMatch =
+    !activeSemester ||
+    !initialData?.activeSemester ||
+    activeSemester.id === initialData.activeSemester.id;
   // Fetch Dashboard Data with TanStack Query (SSR hydrated + Instant navigation caching)
-  const { data = initialData, isLoading } = useQuery<DashboardData | null>({
-    queryKey: ['dashboard'],
+  const { data = isInitialSemesterMatch ? initialData : null, isLoading } = useQuery<DashboardData | null>({
+    queryKey: ['dashboard', activeSemester?.id ?? 'default'],
     queryFn: async () => {
       const res = await api.get('/dashboard');
       return res.data.data;
     },
-    initialData: initialData ?? undefined,
+    initialData: isInitialSemesterMatch ? (initialData ?? undefined) : undefined,
     staleTime: 1000 * 60, // 1 minute fresh cache
   });
   const loading = isLoading && !data;

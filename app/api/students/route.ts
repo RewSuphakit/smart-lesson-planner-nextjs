@@ -213,7 +213,15 @@ export const POST = withAuth(async (request, user) => {
   invalidateCache(userCacheKey(user.id, 'grades'));
   invalidateCache(userCacheKey(user.id, 'scores'));
 
-  return NextResponse.json({ data: formatStudentListItem(student) }, { status: 201 });
+  return NextResponse.json(
+    {
+      data: formatStudentListItem({
+        ...student,
+        avatar: resolveStudentAvatarUrl(student.id, student.avatar, student.updatedAt),
+      }),
+    },
+    { status: 201 }
+  );
 }, 'Failed to create student');
 
 export const PATCH = withAuth(async (request, user) => {
@@ -319,6 +327,9 @@ export const PATCH = withAuth(async (request, user) => {
     if (updateOperations.length > 0) {
       await prisma.$transaction(updateOperations);
     }
+    invalidateCache(userCacheKey(user.id, 'students'));
+    invalidateCache(userCacheKey(user.id, 'grades'));
+    invalidateCache(userCacheKey(user.id, 'scores'));
     invalidateCache(userCacheKey(user.id, 'dashboard'));
     invalidateCache(userCacheKey(user.id, 'classrooms'));
     return NextResponse.json({ message: 'Scores updated' });

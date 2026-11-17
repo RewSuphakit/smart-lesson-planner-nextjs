@@ -207,7 +207,7 @@ export default function WeeklyFocusView({
             {hideAbsentInWeekly ? (
               <>
                 <EyeOff className="w-3.5 h-3.5 text-rose-600" />
-                <span>ซ่อนคนขาด ({weeklyAttendanceCounts.absent})</span>
+                <span>ซ่อนคนขาด/ลา ({weeklyAttendanceCounts.absent + weeklyAttendanceCounts.leave})</span>
               </>
             ) : (
               <>
@@ -234,17 +234,17 @@ export default function WeeklyFocusView({
           <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-2">
             <p className="text-sm font-semibold text-slate-600">ไม่มีรายชื่อนักเรียนที่ต้องกรอกคะแนนในสัปดาห์นี้</p>
             <p className="text-xs text-slate-400">
-              {weeklyAttendanceCounts.absent > 0 && hideAbsentInWeekly
-                ? `(มีนักเรียนขาด ${weeklyAttendanceCounts.absent} คน ซึ่งถูกซ่อนและใส่คะแนน 0 ไว้แล้ว)`
+              {(weeklyAttendanceCounts.absent + weeklyAttendanceCounts.leave) > 0 && hideAbsentInWeekly
+                ? `(มีนักเรียนขาด/ลา ${weeklyAttendanceCounts.absent + weeklyAttendanceCounts.leave} คน ซึ่งถูกซ่อนและใส่คะแนน 0 ไว้แล้ว)`
                 : 'ไม่มีข้อมูลนักเรียน'}
             </p>
-            {hideAbsentInWeekly && weeklyAttendanceCounts.absent > 0 && (
+            {hideAbsentInWeekly && (weeklyAttendanceCounts.absent + weeklyAttendanceCounts.leave) > 0 && (
               <button
                 type="button"
                 onClick={() => setHideAbsentInWeekly(false)}
                 className="mt-2 text-xs font-bold text-indigo-600 underline"
               >
-                คลิกเพื่อแสดงรายชื่อคนที่ขาด
+                คลิกเพื่อแสดงรายชื่อคนที่ขาด/ลา
               </button>
             )}
           </div>
@@ -342,17 +342,17 @@ export default function WeeklyFocusView({
                   <div className="space-y-1">
                     <p className="font-semibold text-sm">ไม่มีรายชื่อนักเรียนที่ต้องกรอกคะแนนในสัปดาห์นี้</p>
                     <p className="text-xs text-slate-400">
-                      {weeklyAttendanceCounts.absent > 0 && hideAbsentInWeekly
-                        ? `(มีนักเรียนขาด ${weeklyAttendanceCounts.absent} คน ซึ่งถูกซ่อนและใส่คะแนน 0 ไว้แล้ว)`
+                      {(weeklyAttendanceCounts.absent + weeklyAttendanceCounts.leave) > 0 && hideAbsentInWeekly
+                        ? `(มีนักเรียนขาด/ลา ${weeklyAttendanceCounts.absent + weeklyAttendanceCounts.leave} คน ซึ่งถูกซ่อนและใส่คะแนน 0 ไว้แล้ว)`
                         : 'ไม่มีข้อมูลนักเรียน'}
                     </p>
-                    {hideAbsentInWeekly && weeklyAttendanceCounts.absent > 0 && (
+                    {hideAbsentInWeekly && (weeklyAttendanceCounts.absent + weeklyAttendanceCounts.leave) > 0 && (
                       <button
                         type="button"
                         onClick={() => setHideAbsentInWeekly(false)}
                         className="mt-2 text-xs font-bold text-indigo-600 underline"
                       >
-                        คลิกเพื่อแสดงรายชื่อคนที่ขาด
+                        คลิกเพื่อแสดงรายชื่อคนที่ขาด/ลา
                       </button>
                     )}
                   </div>

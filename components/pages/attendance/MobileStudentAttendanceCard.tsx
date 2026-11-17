@@ -3,13 +3,16 @@
 import { memo } from 'react';
 import { CheckCircle, Clock, XCircle, FileText, History } from 'lucide-react';
 import UserAvatar from '@/components/UserAvatar';
-import { Student, StudentStats } from './types';
+import { Student, StudentStats, formatCheckInTime, formatCheckInFullDateTime } from './types';
 
 export interface MobileStudentAttendanceCardProps {
   student: Student;
   status: string | undefined;
+  checkedAt?: string | null;
   stats: StudentStats;
   maxAllowedAbsences: number;
+  lateToAbsentRatio?: number;
+  leaveToAbsentRatio?: number;
   sectionBadge?: string | null;
   onStatusSelect: (studentId: string, status: string) => void;
   onViewHistory: (student: Student) => void;
@@ -18,13 +21,25 @@ export interface MobileStudentAttendanceCardProps {
 export const MobileStudentAttendanceCard = memo(({
   student,
   status,
+  checkedAt,
   stats,
   maxAllowedAbsences,
+  lateToAbsentRatio = 3,
+  leaveToAbsentRatio = 2,
   sectionBadge,
   onStatusSelect,
   onViewHistory,
 }: MobileStudentAttendanceCardProps) => {
   const isCloseToFRisk = stats.converted_absent_count >= maxAllowedAbsences * 0.75;
+  const formattedTime = formatCheckInTime(checkedAt);
+  const formattedFullTime = formatCheckInFullDateTime(checkedAt);
+
+  const safeMaxAbsences = maxAllowedAbsences || 1;
+  const convertedWidth = Math.min((stats.converted_absent_count / safeMaxAbsences) * 100, 100);
+  const partialAbsenceUnits =
+    (stats.remaining_late_count / Math.max(1, lateToAbsentRatio)) +
+    (stats.remaining_leave_count / Math.max(1, leaveToAbsentRatio));
+  const partialWidth = Math.min(100 - convertedWidth, (partialAbsenceUnits / safeMaxAbsences) * 100);
 
   return (
     <div className="p-3.5 bg-white dark:bg-slate-850 rounded-2xl border border-indigo-100/90 dark:border-slate-800 shadow-sm space-y-2.5 transition-all">
@@ -51,6 +66,15 @@ export const MobileStudentAttendanceCard = memo(({
                   {sectionBadge}
                 </span>
               )}
+              {status && formattedTime && (
+                <span
+                  className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/70"
+                  title={formattedFullTime || undefined}
+                >
+                  <Clock className="w-2.5 h-2.5 shrink-0" />
+                  <span>เช็คเมื่อ {formattedTime}</span>
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -72,6 +96,26 @@ export const MobileStudentAttendanceCard = memo(({
             </span>
           )}
         </div>
+      </div>
+
+      {/* Mobile Quota Progress Bar */}
+      <div className="w-full bg-slate-200/80 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden flex">
+        <div
+          className={`h-full transition-all duration-300 ${
+            isCloseToFRisk
+              ? 'bg-rose-500 animate-pulse'
+              : stats.converted_absent_count >= maxAllowedAbsences * 0.5
+              ? 'bg-amber-500'
+              : 'bg-indigo-500'
+          }`}
+          style={{ width: `${convertedWidth}%` }}
+        />
+        {partialWidth > 0 && (
+          <div
+            className="h-full bg-amber-400/85 dark:bg-amber-500/75 transition-all duration-300"
+            style={{ width: `${partialWidth}%` }}
+          />
+        )}
       </div>
 
       {/* Status Buttons Grid - 4 large thumb-friendly buttons (min-h-[44px]) */}
@@ -125,10 +169,11 @@ export const MobileStudentAttendanceCard = memo(({
         </button>
       </div>
 
-      {(stats.remaining_late_count > 0 || stats.remaining_leave_count > 0) && (
-        <div className="flex gap-2 text-[10px] text-slate-500 dark:text-slate-400 pt-0.5">
-          {stats.remaining_late_count > 0 && <span>สายสะสม {stats.remaining_late_count}</span>}
-          {stats.remaining_leave_count > 0 && <span>ลาสะสม {stats.remaining_leave_count}</span>}
+      {(stats.present_count > 0 || stats.remaining_late_count > 0 || stats.remaining_leave_count > 0) && (
+        <div className="flex gap-2 text-[10px] text-slate-500 dark:text-slate-400 pt-0.5 flex-wrap">
+          {stats.present_count > 0 && <span className="text-emerald-600 dark:text-emerald-400 font-semibold">มาสะสม {stats.present_count}</span>}
+          {stats.remaining_late_count > 0 && <span className="text-amber-600 dark:text-amber-400 font-semibold">สายสะสม {stats.remaining_late_count}</span>}
+          {stats.remaining_leave_count > 0 && <span className="text-sky-600 dark:text-sky-400 font-semibold">ลาสะสม {stats.remaining_leave_count}</span>}
         </div>
       )}
     </div>

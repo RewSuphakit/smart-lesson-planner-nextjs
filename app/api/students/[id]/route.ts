@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { withAuth } from '@/lib/apiHandler';
 import { invalidateCache, userCacheKey } from '@/lib/cache';
+import { formatStudentListItem } from '@/lib/formatters';
 import { normalizeGradeLevel, normalizeBranchDisplay } from '@/lib/studentSections';
-import { sanitizeFinalExamPayload } from '@/lib/sanitize';
-import { persistAvatarDataUri, removeAvatarFileIfLocal } from '@/lib/avatarStorage';
+import { sanitizeExamScore, sanitizeFinalExamPayload } from '@/lib/sanitize';
+import { persistAvatarDataUri, removeAvatarFileIfLocal, resolveStudentAvatarUrl } from '@/lib/avatarStorage';
 
 export const GET = withAuth<{ id: string }>(async (request, user, { params }) => {
   const { id } = await params;
@@ -26,7 +27,12 @@ export const GET = withAuth<{ id: string }>(async (request, user, { params }) =>
     return NextResponse.json({ message: 'Student not found' }, { status: 404 });
   }
 
-  return NextResponse.json({ data: student });
+  const formatted = formatStudentListItem({
+    ...student,
+    avatar: resolveStudentAvatarUrl(student.id, student.avatar, student.updatedAt),
+  });
+
+  return NextResponse.json({ data: { ...student, ...formatted } });
 }, 'Failed to get student');
 
 export const PUT = withAuth<{ id: string }>(async (request, user, { params }) => {
@@ -49,12 +55,13 @@ export const PUT = withAuth<{ id: string }>(async (request, user, { params }) =>
     name: 'name', student_code: 'studentCode', grade_level: 'gradeLevel',
     branch: 'branch', email: 'email', classroom_id: 'classroomId',
     midterm_score: 'midtermScore', final_score: 'finalScore',
+    affective_score: 'affectiveScore',
     avatar: 'avatar',
   };
 
   // Lookup classroom max scores if updating exam scores
   let classroomMaxScores: { midterm: number; final: number } = { midterm: 100, final: 100 };
-  if (body.midterm_score !== undefined || body.final_score !== undefined) {
+  if (body.midterm_score !== undefined || body.final_score !== undefined || body.exam_status !== undefined) {
     const targetClassroomId =
       body.classroom_id !== undefined
         ? body.classroom_id
@@ -73,6 +80,31 @@ export const PUT = withAuth<{ id: string }>(async (request, user, { params }) =>
         };
       }
     }
+  }
+
+  const canSafelyRemoveOldAvatar = async (oldAvatar?: string | null) => {
+    if (!oldAvatar || !oldAvatar.startsWith('/uploads/avatars/')) return false;
+    const otherRefs = await prisma.student.count({
+      where: { avatar: oldAvatar, id: { not: numericId } },
+    });
+    return otherRefs === 0;
+  };
+
+  if (body.remove_avatar === true && body.avatar === undefined) {
+    if (await canSafelyRemoveOldAvatar(student.avatar)) {
+      removeAvatarFileIfLocal(student.avatar);
+    }
+    updateData.avatar = null;
+  }
+
+  if (body.exam_status !== undefined && body.final_score === undefined) {
+    const { finalScore, examStatus } = sanitizeFinalExamPayload(
+      student.finalScore,
+      body.exam_status,
+      classroomMaxScores.final
+    );
+    updateData.finalScore = finalScore;
+    updateData.examStatus = examStatus;
   }
 
   for (const [key, prismaKey] of Object.entries(fieldMap)) {
@@ -97,6 +129,8 @@ export const PUT = withAuth<{ id: string }>(async (request, user, { params }) =>
           const num = Number(val);
           val = isNaN(num) ? null : Math.min(classroomMaxScores.midterm, Math.max(0, num));
         }
+      } else if (prismaKey === 'affectiveScore') {
+        val = sanitizeExamScore(val, false);
       } else if (prismaKey === 'finalScore') {
         const { finalScore, examStatus } = sanitizeFinalExamPayload(
           val,
@@ -107,7 +141,9 @@ export const PUT = withAuth<{ id: string }>(async (request, user, { params }) =>
         updateData.examStatus = examStatus;
       } else if (prismaKey === 'avatar') {
         if (body.remove_avatar === true) {
-          removeAvatarFileIfLocal(student.avatar);
+          if (await canSafelyRemoveOldAvatar(student.avatar)) {
+            removeAvatarFileIfLocal(student.avatar);
+          }
           val = null;
         } else if (val && String(val).trim()) {
           val = String(val).trim();
@@ -116,7 +152,8 @@ export const PUT = withAuth<{ id: string }>(async (request, user, { params }) =>
           if (val.length > 150_000) {
             return NextResponse.json({ message: 'Avatar is too large' }, { status: 400 });
           }
-          val = persistAvatarDataUri(val, `student-${numericId}`, student.avatar);
+          const isUnshared = await canSafelyRemoveOldAvatar(student.avatar);
+          val = persistAvatarDataUri(val, `student-${numericId}`, isUnshared ? student.avatar : null);
         } else {
           // Keep existing avatar if not explicitly set or removed
           continue;

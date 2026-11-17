@@ -133,19 +133,7 @@ export const PUT = withAuth<{ id: string }>(async (request, user, { params }) =>
   if (data.curriculum_type !== undefined) updateData.curriculumType = data.curriculum_type as CurriculumType;
   if (data.total_weeks !== undefined) updateData.totalWeeks = data.total_weeks;
 
-  // Handle activation toggle
-  if (data.is_active === true) {
-    // Deactivate all others first
-    await prisma.semester.updateMany({
-      where: { userId, isActive: true, id: { not: semesterId } },
-      data: { isActive: false },
-    });
-    updateData.isActive = true;
-  } else if (data.is_active === false) {
-    updateData.isActive = false;
-  }
-
-  // Check for duplicate if term_number or academic_year changed
+  // Check for duplicate if term_number or academic_year changed BEFORE mutating active states
   if (data.term_number !== undefined || data.academic_year !== undefined) {
     const checkTermNumber = data.term_number ?? existing.termNumber;
     const checkAcademicYear = data.academic_year ?? existing.academicYear;
@@ -166,9 +154,24 @@ export const PUT = withAuth<{ id: string }>(async (request, user, { params }) =>
     }
   }
 
-  const updated = await prisma.semester.update({
-    where: { id: semesterId },
-    data: updateData,
+  if (data.is_active === true) {
+    updateData.isActive = true;
+  } else if (data.is_active === false) {
+    updateData.isActive = false;
+  }
+
+  const updated = await prisma.$transaction(async (tx) => {
+    if (data.is_active === true) {
+      await tx.semester.updateMany({
+        where: { userId, isActive: true, id: { not: semesterId } },
+        data: { isActive: false },
+      });
+    }
+
+    return tx.semester.update({
+      where: { id: semesterId },
+      data: updateData,
+    });
   });
 
   invalidateCache(userCacheKey(userId, 'semester'));

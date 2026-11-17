@@ -44,7 +44,8 @@ const MemoizedScoreInput = memo(function MemoizedScoreInput({
   return (
     prev.value === next.value &&
     prev.maxScore === next.maxScore &&
-    prev.focusColor === next.focusColor
+    prev.focusColor === next.focusColor &&
+    prev.onChange === next.onChange
   );
 });
 

@@ -1,8 +1,8 @@
 'use client';
 
 import { createPortal } from 'react-dom';
-import { History, X, Loader2, Calendar as CalendarIcon, Trash2 } from 'lucide-react';
-import { Student, AttendanceRecord } from './types';
+import { History, X, Loader2, Calendar as CalendarIcon, Trash2, Clock } from 'lucide-react';
+import { Student, AttendanceRecord, formatCheckInTime, formatCheckInFullDateTime } from './types';
 
 export interface AttendanceHistoryModalProps {
   student: Student | null;
@@ -65,13 +65,27 @@ export const AttendanceHistoryModal = ({
                 day: 'numeric',
                 weekday: 'short'
               });
+              const rawTimestamp = record.updated_at || record.created_at;
+              const checkInTime = formatCheckInTime(rawTimestamp);
+              const checkInFull = formatCheckInFullDateTime(rawTimestamp);
               return (
                 <div key={record.id} className="flex items-center justify-between bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-indigo-50/60 dark:hover:bg-slate-750 transition-colors group">
-                  <div className="flex items-center gap-3">
-                    <CalendarIcon className="w-4 h-4 text-indigo-400" />
-                    <span className="text-sm text-slate-700 dark:text-slate-200 font-semibold">{formattedDate}</span>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <CalendarIcon className="w-4 h-4 text-indigo-400 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm text-slate-700 dark:text-slate-200 font-semibold truncate">{formattedDate}</p>
+                      {checkInTime && (
+                        <p
+                          className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5"
+                          title={checkInFull || undefined}
+                        >
+                          <Clock className="w-3 h-3 text-indigo-400 shrink-0" />
+                          <span>เช็คเมื่อ {checkInTime}</span>
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 shrink-0">
                     {getStatusDisplay(record.status)}
                     <button
                       onClick={() => onDeleteRecord(record.id)}

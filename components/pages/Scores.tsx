@@ -369,11 +369,15 @@ export default function Scores() {
       });
       setMatrixScores(mScores);
 
-      if (finalStructs.length > 0 && (!selectedLesson || !finalStructs.some(s => String(s.lesson_number) === String(selectedLesson)))) {
-        setSelectedLesson(finalStructs[0].lesson_number.toString());
+      if (finalStructs.length > 0) {
+        setSelectedLesson(prev =>
+          !prev || !finalStructs.some(s => String(s.lesson_number) === String(prev))
+            ? finalStructs[0].lesson_number.toString()
+            : prev
+        );
       }
     }
-  }, [matrixData, classroomObj, selectedLesson, targetTeachingWeeks]);
+  }, [matrixData, targetTeachingWeeks]);
 
   // Reset state when class deselected
   useEffect(() => {
@@ -398,16 +402,16 @@ export default function Scores() {
     setScores(scoresMap);
   }, [selectedLesson, matrixScores, students, selectedClass]);
 
-  // ─── Auto-sync attendanceDate with the currently selected weekly lesson ───
+  // ─── Auto-sync attendanceDate when switching the selected weekly lesson ───
   useEffect(() => {
     const weekNum = parseInt(selectedLesson);
     if (!isNaN(weekNum) && weekNum > 0) {
       const targetDate = calculatedWeekDates[weekNum] || weekDateMap[weekNum];
-      if (targetDate && targetDate !== attendanceDate) {
+      if (targetDate) {
         setAttendanceDate(targetDate);
       }
     }
-  }, [selectedLesson, calculatedWeekDates, weekDateMap, attendanceDate]);
+  }, [selectedLesson, calculatedWeekDates, weekDateMap]);
 
   // ─── Analytics Summary Computations ───
   const analyticsSummary = useMemo(() => {
@@ -419,7 +423,10 @@ export default function Scores() {
     structures.forEach(s => {
       totalPossibleAcademicScore += Number(s.max_assignment_score || 0) + Number(s.max_post_test_score || 0);
     });
-    totalPossibleAcademicScore += Number(classroomObj?.midterm_max_score || 0) + Number(classroomObj?.final_max_score || 0) + Number(classroomObj?.affective_weight || 0);
+    totalPossibleAcademicScore +=
+      (hasMidterm ? Number(classroomObj?.midterm_max_score || 0) : 0) +
+      Number(classroomObj?.final_max_score || 0) +
+      Number(classroomObj?.affective_weight || 0);
     if (totalPossibleAcademicScore === 0) totalPossibleAcademicScore = 100;
 
     let totalStudentScoresSum = 0;
@@ -444,7 +451,10 @@ export default function Scores() {
           }
         }
       });
-      currentStudentTotal += Number(student.midterm_score || 0) + Number(Math.max(0, Number(student.final_score || 0))) + Number(student.affective_score || 0);
+      currentStudentTotal +=
+        (hasMidterm ? Number(student.midterm_score || 0) : 0) +
+        Number(Math.max(0, Number(student.final_score || 0))) +
+        Number(student.affective_score || 0);
 
       totalStudentScoresSum += currentStudentTotal;
       if (currentStudentTotal > maxStudentScore) maxStudentScore = currentStudentTotal;
@@ -461,7 +471,7 @@ export default function Scores() {
       lowestScore: minStudentScore === Infinity ? 0 : Math.round(minStudentScore * 10) / 10,
       totalMaxScore: totalPossibleAcademicScore,
     };
-  }, [sectionScopedStudents, structures, matrixScores, classroomObj]);
+  }, [sectionScopedStudents, structures, matrixScores, classroomObj, hasMidterm]);
 
   // Index of `${studentId}_${YYYY-MM-DD}` -> status
   const attendanceStatusIndex = useMemo(() => {
@@ -576,6 +586,9 @@ export default function Scores() {
           }
         }
       });
+      if (changedMatrix) {
+        setHasPendingChanges(true);
+      }
       return changedMatrix ? nextMatrixScores : prevMatrix;
     });
   }, [selectedLesson, selectedClass, students, getStudentAttendanceStatus]);
@@ -649,10 +662,11 @@ export default function Scores() {
 
   // ─── Mutation: บันทึกโครงสร้างคะแนน ───
   const saveStructureMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (overrideStructures?: ScoreStructure[]) => {
+      const targetStructures = overrideStructures || structures;
       await api.post(`/scores?classroom_id=${selectedClass}&type=structure`, {
         classroom_id: selectedClass,
-        structures: structures.map(s => ({
+        structures: targetStructures.map(s => ({
           ...s,
           max_assignment_score: parseFloat(String(s.max_assignment_score)) || 0,
           max_post_test_score: parseFloat(String(s.max_post_test_score)) || 0,
@@ -672,7 +686,7 @@ export default function Scores() {
 
   const saveStructure = () => {
     if (!selectedClass) return;
-    saveStructureMutation.mutate();
+    saveStructureMutation.mutate(undefined);
   };
 
   // --- Handle Matrix Score Inline Change ---
@@ -798,19 +812,16 @@ export default function Scores() {
 
   const handleTabChange = (tab: string) => {
     if (tab === activeTab) return;
-    setHasPendingChanges(false);
     setActiveTab(tab);
   };
 
   const handleViewModeChange = (mode: 'matrix' | 'weekly') => {
     if (mode === viewMode) return;
-    setHasPendingChanges(false);
     setViewMode(mode);
   };
 
   const handleLessonChange = (newLesson: string) => {
     if (newLesson === selectedLesson) return;
-    setHasPendingChanges(false);
     setSelectedLesson(newLesson);
     const weekNum = parseInt(newLesson);
     if (!isNaN(weekNum) && weekNum > 0) {
@@ -1330,8 +1341,8 @@ export default function Scores() {
                       <table
                         className="text-left border-separate border-spacing-0 text-xs table-fixed"
                         style={{
-                          width: 120 + 200 + (structures.length * 104) + 260,
-                          minWidth: 120 + 200 + (structures.length * 104) + 260,
+                          width: 120 + 200 + (structures.length * 104) + (hasMidterm ? 280 : 205),
+                          minWidth: 120 + 200 + (structures.length * 104) + (hasMidterm ? 280 : 205),
                         }}
                       >
                         <colgroup>
@@ -1343,8 +1354,8 @@ export default function Scores() {
                               <col style={{ width: 52, minWidth: 52, maxWidth: 52 }} />
                             </Fragment>
                           ))}
-                          <col style={{ width: 65, minWidth: 65, maxWidth: 65 }} />
-                          <col style={{ width: 65, minWidth: 65, maxWidth: 65 }} />
+                          {hasMidterm && <col style={{ width: 75, minWidth: 75, maxWidth: 75 }} />}
+                          <col style={{ width: 75, minWidth: 75, maxWidth: 75 }} />
                           <col style={{ width: 65, minWidth: 65, maxWidth: 65 }} />
                           <col style={{ width: 65, minWidth: 65, maxWidth: 65 }} />
                         </colgroup>
@@ -1490,7 +1501,7 @@ export default function Scores() {
                   weeklyAttendanceCounts={weeklyAttendanceCounts}
                   hideAbsentInWeekly={hideAbsentInWeekly}
                   setHideAbsentInWeekly={setHideAbsentInWeekly}
-                  studentsCount={students.length}
+                  studentsCount={sectionScopedStudents.length}
                   weeklyDisplayedStudents={weeklyDisplayedStudents}
                   scores={scores}
                   getStudentAttendanceStatus={getStudentAttendanceStatus}
@@ -1570,7 +1581,7 @@ export default function Scores() {
               }}
               onImportBlueprint={(newStructs) => {
                 setStructures(newStructs);
-                saveStructureMutation.mutate();
+                saveStructureMutation.mutate(newStructs);
               }}
             />
           )}

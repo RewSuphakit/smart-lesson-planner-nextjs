@@ -218,19 +218,27 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ message: 'ไม่มีการตั้งค่า LINE Bot ที่จะลบ' }, { status: 404 });
     }
 
-    // Delete bindings for students of this teacher
-    const studentCodes = await prisma.student.findMany({
+    // Delete bindings for students of this teacher only
+    const teacherStudents = await prisma.student.findMany({
       where: { userId: user.id },
-      select: { studentCode: true },
-    }).then(students =>
-      students
-        .map(s => s.studentCode)
-        .filter((code): code is string => code !== null)
+      select: { studentCode: true, classroomId: true },
+    });
+    const studentCodes = Array.from(
+      new Set(teacherStudents.map(s => s.studentCode).filter((code): code is string => code !== null))
+    );
+    const teacherClassroomIds = Array.from(
+      new Set(teacherStudents.map(s => s.classroomId).filter((id): id is number => typeof id === 'number'))
     );
 
     if (studentCodes.length > 0) {
       await prisma.lineBinding.deleteMany({
-        where: { studentCode: { in: studentCodes } },
+        where: {
+          studentCode: { in: studentCodes },
+          OR: [
+            ...(teacherClassroomIds.length > 0 ? [{ classroomId: { in: teacherClassroomIds } }] : []),
+            { classroomId: null },
+          ],
+        },
       });
     }
 

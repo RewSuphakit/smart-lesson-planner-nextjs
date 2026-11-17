@@ -277,9 +277,11 @@ export default function AttendanceCsvModal({
     const end = new Date().toISOString().split('T')[0];
     if (days === 'month') {
       const now = new Date();
-      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      setStartDate(firstDay);
-      setEndDate(end);
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const d = String(now.getDate()).padStart(2, '0');
+      setStartDate(`${y}-${m}-01`);
+      setEndDate(`${y}-${m}-${d}`);
       return;
     }
     const startObj = new Date();

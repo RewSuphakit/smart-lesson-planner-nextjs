@@ -267,9 +267,15 @@ export default function ScoreExcelModal({
         r.push(toNumOrBlank(mid));
       }
       if (includeFinal) {
-        const fin = s.final_score !== undefined && s.final_score !== null ? Number(s.final_score) : '';
-        if (typeof fin === 'number') studentTotal += fin;
-        r.push(toNumOrBlank(fin));
+        const rawFin = s.final_score !== undefined && s.final_score !== null ? Number(s.final_score) : null;
+        if (rawFin === -1) {
+          r.push('ข.ส.');
+        } else if (rawFin === -2) {
+          r.push('ม.ส.');
+        } else {
+          if (typeof rawFin === 'number' && !isNaN(rawFin) && rawFin > 0) studentTotal += rawFin;
+          r.push(toNumOrBlank(rawFin));
+        }
       }
       if (includeAffective) {
         const aff = s.affective_score !== undefined && s.affective_score !== null ? Number(s.affective_score) : '';
@@ -391,9 +397,11 @@ export default function ScoreExcelModal({
       });
 
       const mid = Number(s.midterm_score || 0);
-      const fin = Number(s.final_score || 0);
+      const rawFin = s.final_score !== undefined && s.final_score !== null ? Number(s.final_score) : null;
+      const finNumeric = rawFin !== null && rawFin > 0 ? rawFin : 0;
+      const finDisplay = rawFin === -1 ? 'ข.ส.' : rawFin === -2 ? 'ม.ส.' : toNumOrBlank(s.final_score);
       const aff = Number(s.affective_score || 0);
-      const grandTotal = Math.round((sumAssign + sumTest + mid + fin + aff) * 100) / 100;
+      const grandTotal = Math.round((sumAssign + sumTest + mid + finNumeric + aff) * 100) / 100;
 
       return [
         idx + 1,
@@ -402,7 +410,7 @@ export default function ScoreExcelModal({
         Math.round(sumAssign * 100) / 100,
         Math.round(sumTest * 100) / 100,
         toNumOrBlank(s.midterm_score),
-        toNumOrBlank(s.final_score),
+        finDisplay,
         toNumOrBlank(s.affective_score),
         grandTotal
       ];

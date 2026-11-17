@@ -84,6 +84,7 @@ export async function replyMessage(
   if (!response.ok) {
     const errorBody = await response.text();
     console.error('LINE reply error:', response.status, errorBody);
+    throw new Error(`LINE reply failed (${response.status}): ${errorBody}`);
   }
 }
 
@@ -92,11 +93,12 @@ export async function pushMessage(
   messages: Record<string, unknown>[],
   channelAccessToken: string
 ): Promise<void> {
+  const cleanToken = channelAccessToken.trim().replace(/^["']|["']$/g, '');
   const response = await fetch('https://api.line.me/v2/bot/message/push', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${channelAccessToken}`,
+      Authorization: `Bearer ${cleanToken}`,
     },
     body: JSON.stringify({ to, messages }),
   });

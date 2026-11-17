@@ -707,9 +707,10 @@ async function handleScoreQuery(
   );
   const isF = attConv.isF;
 
-  // Sum scores
+  // Sum scores (up to targetWeeks, consistent with /api/grades)
   let sumAssignRaw = 0, sumPostTestRaw = 0;
   for (const sc of studentScores) {
+    if (sc.lessonNumber > targetWeeks) continue;
     if (sc.assignmentScore !== null) sumAssignRaw += Number(sc.assignmentScore);
     if (sc.postTestScore !== null) sumPostTestRaw += Number(sc.postTestScore);
   }
@@ -731,6 +732,7 @@ async function handleScoreQuery(
     criteria,
   });
 
+  let replySucceeded = false;
   try {
     await replyMessage(replyToken, [
       buildScoreFlexMessage({
@@ -752,26 +754,34 @@ async function handleScoreQuery(
         maxAffective: weightAffective,
       }),
     ], accessToken);
+    replySucceeded = true;
   } catch (err) {
     console.error('Score flex reply error, falling back to text:', err);
-    await replyMessage(replyToken, [
-      textMessage(
-        `📊 สรุปคะแนน\n` +
-        `👤 ${student.name}\n` +
-        `📚 ${classroom.name}\n\n` +
-        `🏆 เกรด: ${calc.grade}\n` +
-        `📈 ร้อยละ: ${calc.percentage}%\n` +
-        `🎯 คะแนนรวม: ${calc.totalScore}/${totalWeightSum}`
-      ),
-    ], accessToken);
+    try {
+      await replyMessage(replyToken, [
+        textMessage(
+          `📊 สรุปคะแนน\n` +
+          `👤 ${student.name}\n` +
+          `📚 ${classroom.name}\n\n` +
+          `🏆 เกรด: ${calc.grade}\n` +
+          `📈 ร้อยละ: ${calc.percentage}%\n` +
+          `🎯 คะแนนรวม: ${calc.totalScore}/${totalWeightSum}`
+        ),
+      ], accessToken);
+      replySucceeded = true;
+    } catch (fallbackErr) {
+      console.error('Score text fallback reply error:', fallbackErr);
+    }
   }
 
-  await recordSuccessfulQueryAsync({
-    lineUserId,
-    studentCode: student.studentCode || binding.studentCode,
-    classroomId: classroom.id,
-    category: 'score',
-  });
+  if (replySucceeded) {
+    await recordSuccessfulQueryAsync({
+      lineUserId,
+      studentCode: student.studentCode || binding.studentCode,
+      classroomId: classroom.id,
+      category: 'score',
+    });
+  }
 }
 
 async function handleAttendanceQuery(
@@ -841,6 +851,7 @@ async function handleAttendanceQuery(
     status = 'warning';
   }
 
+  let replySucceeded = false;
   try {
     await replyMessage(replyToken, [
       buildAttendanceFlexMessage({
@@ -858,30 +869,38 @@ async function handleAttendanceQuery(
         isF,
       }),
     ], accessToken);
+    replySucceeded = true;
   } catch (err) {
     console.error('Attendance flex reply error, falling back to text:', err);
-    await replyMessage(replyToken, [
-      textMessage(
-        `📋 สถิติการเข้าเรียน\n` +
-        `👤 ${student.name}\n` +
-        `📚 ${classroom.name}\n\n` +
-        `🟢 มาเรียน: ${presentCount} ครั้ง\n` +
-        `🟡 สาย: ${lateCount} ครั้ง\n` +
-        `🔴 ขาด: ${absentCount} ครั้ง\n` +
-        `🔵 ลา: ${leaveCount} ครั้ง\n\n` +
-        `ขาดรวม: ${totalConverted}/${maxAllowedAbsences}\n` +
-        `เหลือขาดได้อีก: ${remaining} ครั้ง\n` +
-        `อัตราเข้าเรียน: ${attendancePercent}%`
-      ),
-    ], accessToken);
+    try {
+      await replyMessage(replyToken, [
+        textMessage(
+          `📋 สถิติการเข้าเรียน\n` +
+          `👤 ${student.name}\n` +
+          `📚 ${classroom.name}\n\n` +
+          `🟢 มาเรียน: ${presentCount} ครั้ง\n` +
+          `🟡 สาย: ${lateCount} ครั้ง\n` +
+          `🔴 ขาด: ${absentCount} ครั้ง\n` +
+          `🔵 ลา: ${leaveCount} ครั้ง\n\n` +
+          `ขาดรวม: ${totalConverted}/${maxAllowedAbsences}\n` +
+          `เหลือขาดได้อีก: ${remaining} ครั้ง\n` +
+          `อัตราเข้าเรียน: ${attendancePercent}%`
+        ),
+      ], accessToken);
+      replySucceeded = true;
+    } catch (fallbackErr) {
+      console.error('Attendance text fallback reply error:', fallbackErr);
+    }
   }
 
-  await recordSuccessfulQueryAsync({
-    lineUserId,
-    studentCode: student.studentCode || binding.studentCode,
-    classroomId: classroom.id,
-    category: 'attendance',
-  });
+  if (replySucceeded) {
+    await recordSuccessfulQueryAsync({
+      lineUserId,
+      studentCode: student.studentCode || binding.studentCode,
+      classroomId: classroom.id,
+      category: 'attendance',
+    });
+  }
 }
 
 async function handleMissingTasksQuery(
@@ -957,7 +976,10 @@ async function handleMissingTasksQuery(
 
   // Determine current active week limit (do not count weeks that haven't reached teaching time yet)
   const earliestAttendanceDate = classroomAttendanceDates.length > 0 ? classroomAttendanceDates[0].date : null;
-  const effectiveStartDate = classroom.semesterStartDate || earliestAttendanceDate;
+  const effectiveStartDate =
+    classroom.semesterStartDate ||
+    (classroom as { semester?: { startDate?: Date | null } | null }).semester?.startDate ||
+    earliestAttendanceDate;
   const highestRecordedWeek = latestScoreInClassroom?.lessonNumber || 0;
   const timetableDays = Array.from(new Set(classroomWeeklySchedules.map((ws) => ws.dayOfWeek)));
 
@@ -1029,6 +1051,7 @@ async function handleMissingTasksQuery(
     }
   }
 
+  let replySucceeded = false;
   try {
     await replyMessage(replyToken, [
       buildMissingTasksFlexMessage({
@@ -1039,48 +1062,56 @@ async function handleMissingTasksQuery(
         weeks: missingWeeks,
       }),
     ], accessToken);
+    replySucceeded = true;
   } catch (err) {
     console.error('Missing tasks flex reply error, falling back to text:', err);
-    if (missingWeeks.length === 0) {
-      await replyMessage(replyToken, [
-        textMessage(
-          `🎉 ยอดเยี่ยมมาก!\n` +
-          `👤 ${student.name}\n` +
-          `📚 ${classroom.name}\n\n` +
-          `คุณไม่มีงานค้างเลย ส่งงานครบทุกสัปดาห์แล้ว 💯`
-        ),
-      ], accessToken);
-    } else {
-      const weekLines = missingWeeks.slice(0, 10).map((w) => {
-        const details: string[] = [];
-        if (w.missingAssignment) details.push(`• 📝 ใบงาน/การบ้าน (${w.maxAssignmentScore} คะแนน)`);
-        if (w.missingPostTest) details.push(`• 📊 แบบทดสอบ (${w.maxPostTestScore} คะแนน)`);
-        return `📌 สัปดาห์ที่ ${w.lessonNumber}: ${w.lessonName}\n${details.join('\n')}`;
-      });
+    try {
+      if (missingWeeks.length === 0) {
+        await replyMessage(replyToken, [
+          textMessage(
+            `🎉 ยอดเยี่ยมมาก!\n` +
+            `👤 ${student.name}\n` +
+            `📚 ${classroom.name}\n\n` +
+            `คุณไม่มีงานค้างเลย ส่งงานครบทุกสัปดาห์แล้ว 💯`
+          ),
+        ], accessToken);
+      } else {
+        const weekLines = missingWeeks.slice(0, 10).map((w) => {
+          const details: string[] = [];
+          if (w.missingAssignment) details.push(`• 📝 ใบงาน/การบ้าน (${w.maxAssignmentScore} คะแนน)`);
+          if (w.missingPostTest) details.push(`• 📊 แบบทดสอบ (${w.maxPostTestScore} คะแนน)`);
+          return `📌 สัปดาห์ที่ ${w.lessonNumber}: ${w.lessonName}\n${details.join('\n')}`;
+        });
 
-      const moreText = missingWeeks.length > 10 ? `\n...และอีก ${missingWeeks.length - 10} สัปดาห์` : '';
+        const moreText = missingWeeks.length > 10 ? `\n...และอีก ${missingWeeks.length - 10} สัปดาห์` : '';
 
-      await replyMessage(replyToken, [
-        textMessage(
-          `📝 รายการงานค้าง / ยังไม่ส่ง\n` +
-          `👤 ${student.name}\n` +
-          `📚 ${classroom.name}\n\n` +
-          `🔴 ค้างส่ง: ${totalMissing} งาน\n` +
-          `🟢 ส่งแล้ว: ${totalCompleted} งาน\n\n` +
-          weekLines.join('\n\n') +
-          moreText +
-          `\n\n💡 ติดต่อครูผู้สอนเพื่อส่งงานหรือสอบแก้ตัวย้อนหลัง`
-        ),
-      ], accessToken);
+        await replyMessage(replyToken, [
+          textMessage(
+            `📝 รายการงานค้าง / ยังไม่ส่ง\n` +
+            `👤 ${student.name}\n` +
+            `📚 ${classroom.name}\n\n` +
+            `🔴 ค้างส่ง: ${totalMissing} งาน\n` +
+            `🟢 ส่งแล้ว: ${totalCompleted} งาน\n\n` +
+            weekLines.join('\n\n') +
+            moreText +
+            `\n\n💡 ติดต่อครูผู้สอนเพื่อส่งงานหรือสอบแก้ตัวย้อนหลัง`
+          ),
+        ], accessToken);
+      }
+      replySucceeded = true;
+    } catch (fallbackErr) {
+      console.error('Missing tasks text fallback reply error:', fallbackErr);
     }
   }
 
-  await recordSuccessfulQueryAsync({
-    lineUserId,
-    studentCode: student.studentCode || binding.studentCode,
-    classroomId: classroom.id,
-    category: 'tasks',
-  });
+  if (replySucceeded) {
+    await recordSuccessfulQueryAsync({
+      lineUserId,
+      studentCode: student.studentCode || binding.studentCode,
+      classroomId: classroom.id,
+      category: 'tasks',
+    });
+  }
 }
 
 // ==================== Helpers ====================
@@ -1108,7 +1139,11 @@ async function resolveStudentContext(lineUserId: string, _teacherUserId: number)
       classroomId: { not: null },
     },
     include: {
-      classroom: true,
+      classroom: {
+        include: {
+          semester: { select: { startDate: true } },
+        },
+      },
     },
   });
 

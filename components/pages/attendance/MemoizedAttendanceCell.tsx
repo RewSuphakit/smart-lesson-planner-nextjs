@@ -2,10 +2,11 @@
 
 import { memo } from 'react';
 import { Trash2 } from 'lucide-react';
-import { HolidayInfo } from './types';
+import { HolidayInfo, formatCheckInTime, formatCheckInFullDateTime } from './types';
 
 export interface MemoizedAttendanceCellProps {
   status: string | null;
+  checkedAt?: string | null;
   isEditing: boolean;
   onEditClick: () => void;
   onStatusSelect: (status: string) => void;
@@ -16,6 +17,7 @@ export interface MemoizedAttendanceCellProps {
 
 export const MemoizedAttendanceCell = memo(({
   status,
+  checkedAt,
   isEditing,
   onEditClick,
   onStatusSelect,
@@ -25,6 +27,8 @@ export const MemoizedAttendanceCell = memo(({
 }: MemoizedAttendanceCellProps) => {
   const isGovHoliday = holiday?.type === 'government';
   const isWeekend = holiday?.type === 'weekend';
+  const shortTime = formatCheckInTime(checkedAt);
+  const fullTime = formatCheckInFullDateTime(checkedAt);
 
   return (
     <td className={`p-2 border-r border-indigo-100/40 text-center relative h-14 min-w-[80px] transition-colors ${isGovHoliday ? 'bg-amber-50/40' : isWeekend ? 'bg-slate-50/50' : ''
@@ -45,13 +49,17 @@ export const MemoizedAttendanceCell = memo(({
       ) : (
         <button
           onClick={onEditClick}
-          className={`w-14 py-1.5 rounded-xl text-[10px] font-bold mx-auto flex items-center justify-center border transition-all hover:scale-105 touch-manipulation ${status === 'present' ? 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100' :
+          title={fullTime || 'คลิกเพื่อแก้ไขสถานะ'}
+          className={`w-16 py-1 rounded-xl text-[10px] font-bold mx-auto flex flex-col items-center justify-center border transition-all hover:scale-105 touch-manipulation leading-tight ${status === 'present' ? 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100' :
             status === 'late' ? 'bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100' :
               status === 'absent' ? 'bg-red-50 border-red-200 text-red-500 hover:bg-red-100' :
                 'bg-blue-50 border-blue-200 text-blue-500 hover:bg-blue-100'
             }`}
         >
-          {status === 'present' ? 'มา' : status === 'late' ? 'สาย' : status === 'absent' ? 'ขาด' : 'ลา'}
+          <span>{status === 'present' ? 'มา' : status === 'late' ? 'สาย' : status === 'absent' ? 'ขาด' : 'ลา'}</span>
+          {shortTime && (
+            <span className="text-[8px] font-medium opacity-75 mt-0.5">{shortTime}</span>
+          )}
         </button>
       )}
 
@@ -103,6 +111,7 @@ export const MemoizedAttendanceCell = memo(({
   );
 }, (prev, next) => (
   prev.status === next.status &&
+  prev.checkedAt === next.checkedAt &&
   prev.isEditing === next.isEditing &&
   prev.holiday?.date === next.holiday?.date &&
   prev.holiday?.type === next.holiday?.type

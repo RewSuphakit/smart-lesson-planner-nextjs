@@ -20,7 +20,8 @@ export function calculateAffectiveScore({
   absentDeduction = 2,
   lateDeduction = 1,
 }: CalculateAffectiveScoreParams): number {
-  const weight = Number(maxWeight) || 20;
+  const parsedWeight = maxWeight !== undefined && maxWeight !== null ? Number(maxWeight) : 20;
+  const weight = Number.isFinite(parsedWeight) && parsedWeight >= 0 ? parsedWeight : 20;
   const absDeduct = absentDeduction !== undefined && absentDeduction !== null ? Number(absentDeduction) : 2;
   const lateDeduct = lateDeduction !== undefined && lateDeduction !== null ? Number(lateDeduction) : 1;
 

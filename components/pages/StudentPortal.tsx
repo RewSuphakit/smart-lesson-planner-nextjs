@@ -237,16 +237,16 @@ export default function StudentPortal() {
   };
 
   const handleSelectClassroom = (classroomId: number) => {
-    setSelectedClassroomId(classroomId);
-
     // Instant switch from in-memory cache if already fetched
     const cached = classroomCacheRef.current.get(classroomId);
     if (cached) {
+      setSelectedClassroomId(classroomId);
       setData(cached);
       return;
     }
 
-    fetchStudentData(studentCodeInput, classroomId);
+    const activeCode = data?.student?.student_code || studentCodeInput;
+    fetchStudentData(activeCode, classroomId);
   };
 
   const handleReset = () => {
@@ -285,13 +285,24 @@ export default function StudentPortal() {
         throw new Error(resData.message || 'ไม่สามารถอัพโหลดรูปภาพได้');
       }
 
+      const updatedAvatar = resData.avatar || compressed;
+      classroomCacheRef.current.forEach((cachedItem, key) => {
+        classroomCacheRef.current.set(key, {
+          ...cachedItem,
+          student: {
+            ...cachedItem.student,
+            avatar: updatedAvatar,
+          },
+        });
+      });
+
       setData((prev) => {
         if (!prev) return prev;
         return {
           ...prev,
           student: {
             ...prev.student,
-            avatar: resData.avatar || compressed,
+            avatar: updatedAvatar,
           },
         };
       });
@@ -327,6 +338,16 @@ export default function StudentPortal() {
       if (!res.ok) {
         throw new Error(resData.message || 'ไม่สามารถลบรูปภาพได้');
       }
+
+      classroomCacheRef.current.forEach((cachedItem, key) => {
+        classroomCacheRef.current.set(key, {
+          ...cachedItem,
+          student: {
+            ...cachedItem.student,
+            avatar: null,
+          },
+        });
+      });
 
       setData((prev) => {
         if (!prev) return prev;

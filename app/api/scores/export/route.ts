@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { withAuth } from '@/lib/apiHandler';
 import prisma from '@/lib/prisma';
 import { resolveTargetWeeks } from '@/lib/semester';
+import { resolveExamStatus } from '@/lib/gradeCalculator';
 import * as XLSX from 'xlsx';
 
 export const GET = withAuth(async (request, user) => {
@@ -24,7 +25,7 @@ export const GET = withAuth(async (request, user) => {
   }
 
   // Resolve target weeks from classroom settings (replaces old name-guessing logic)
-  let targetWeeks = resolveTargetWeeks(classroom as Parameters<typeof resolveTargetWeeks>[0]);
+  const targetWeeks = resolveTargetWeeks(classroom as Parameters<typeof resolveTargetWeeks>[0]);
 
   // Fetch students
   const students = await prisma.student.findMany({
@@ -35,6 +36,7 @@ export const GET = withAuth(async (request, user) => {
       studentCode: true,
       midtermScore: true,
       finalScore: true,
+      examStatus: true,
       affectiveScore: true,
     },
     orderBy: [
@@ -48,11 +50,6 @@ export const GET = withAuth(async (request, user) => {
     where: { classroomId: Number(classroomId) },
     orderBy: { lessonNumber: 'asc' }
   });
-
-  // If teacher already defined custom structures (e.g. 15 weeks for ปวส. or 18 for ปวช.), use that exact count
-  if (structures.length > 0) {
-    targetWeeks = structures.length;
-  }
 
   // Map structures by lessonNumber for quick lookup
   const structureMap = new Map();
@@ -174,7 +171,14 @@ export const GET = withAuth(async (request, user) => {
       }
 
       const midVal = student.midtermScore !== null ? Number(student.midtermScore) : '';
-      const finVal = student.finalScore !== null ? Number(student.finalScore) : '';
+      const resolvedFin = resolveExamStatus(student.finalScore, student.examStatus);
+      const finVal: string | number = resolvedFin.isAbsentFinal
+        ? 'ข.ส.'
+        : resolvedFin.isIncomplete
+          ? 'ม.ส.'
+          : resolvedFin.rawFinalScore !== null
+            ? resolvedFin.numericFinalScore
+            : '';
       const affVal = student.affectiveScore !== null ? Number(student.affectiveScore) : '';
 
       if (typeof midVal === 'number') totalScore += midVal;
@@ -257,7 +261,14 @@ export const GET = withAuth(async (request, user) => {
           if (score && score.postTestScore !== null) total += Number(score.postTestScore);
         }
         const mid = student.midtermScore !== null ? Number(student.midtermScore) : '';
-        const fin = student.finalScore !== null ? Number(student.finalScore) : '';
+        const resolvedFin = resolveExamStatus(student.finalScore, student.examStatus);
+        const fin: string | number = resolvedFin.isAbsentFinal
+          ? 'ข.ส.'
+          : resolvedFin.isIncomplete
+            ? 'ม.ส.'
+            : resolvedFin.rawFinalScore !== null
+              ? resolvedFin.numericFinalScore
+              : '';
         const aff = student.affectiveScore !== null ? Number(student.affectiveScore) : '';
         if (typeof mid === 'number') total += mid;
         if (typeof fin === 'number') total += fin;

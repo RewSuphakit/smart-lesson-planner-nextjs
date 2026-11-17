@@ -83,7 +83,25 @@ export interface AttendanceRecord {
   student_id: string;
   date: string;
   status: string;
+  created_at?: string;
+  updated_at?: string;
 }
+
+export const formatCheckInTime = (isoStr?: string | null): string | null => {
+  if (!isoStr) return null;
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return null;
+  return `${d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false })} น.`;
+};
+
+export const formatCheckInFullDateTime = (isoStr?: string | null): string | null => {
+  if (!isoStr) return null;
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return null;
+  const datePart = d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+  const timePart = d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  return `บันทึกเมื่อ ${datePart} เวลา ${timePart} น.`;
+};
 
 export interface StudentStats {
   student_id: string;

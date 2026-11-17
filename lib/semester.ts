@@ -48,8 +48,9 @@ export function getDefaultWeeks(type: CurriculumType): number {
  * End date is the last day of the last week (start + totalWeeks*7 - 1 day).
  */
 export function getSemesterEndDate(startDate: Date, totalWeeks: number): Date {
-  const end = new Date(startDate);
-  end.setDate(end.getDate() + (totalWeeks * 7) - 1);
+  const startStr = startDate.toISOString().split('T')[0];
+  const end = new Date(startStr);
+  end.setUTCDate(end.getUTCDate() + (totalWeeks * 7) - 1);
   return end;
 }
 
@@ -111,10 +112,10 @@ export function getWeekDateRanges(startDate: Date, totalWeeks: number): WeekRang
 
   for (let i = 0; i < totalWeeks; i++) {
     const weekStart = new Date(baseDate);
-    weekStart.setDate(baseDate.getDate() + (i * 7));
+    weekStart.setUTCDate(baseDate.getUTCDate() + (i * 7));
 
     const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 6);
+    weekEnd.setUTCDate(weekStart.getUTCDate() + 6);
 
     weeks.push({
       week: i + 1,
@@ -186,7 +187,7 @@ export function resolveCurrentTeachingWeek(params: ResolveTeachingWeekParams): n
 
       // Check timetable days for the current week (if provided)
       if (timetableDays.length > 0) {
-        const jsDay = nowThai.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+        const jsDay = nowThai.getUTCDay(); // 0=Sun, 1=Mon, ..., 6=Sat in Thai time
         const dbDay = jsDay === 0 ? 6 : jsDay - 1; // 0=Mon, 1=Tue, ..., 6=Sun
         const minTeachingDay = Math.min(...timetableDays);
 
@@ -267,14 +268,19 @@ export function buildSemesterInfo(classroomId: number, classroom: ClassroomSemes
 export function isClassroomTeachingActive(classroom: ClassroomSemesterFields, asOfDate?: Date): boolean {
   if (!classroom.semesterStartDate) return true;
   const totalWeeks = resolveTargetWeeks(classroom);
-  const currentWeek = getCurrentWeek(classroom.semesterStartDate, totalWeeks);
+  const startStr = classroom.semesterStartDate.toISOString().split('T')[0];
+  const start = new Date(startStr);
+  const end = getSemesterEndDate(start, totalWeeks);
 
+  const target = asOfDate
+    ? new Date(asOfDate.toISOString().split('T')[0])
+    : new Date(new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().split('T')[0]);
+
+  if (target < start || target > end) return false;
+
+  const currentWeek = getWeekNumberForDate(target, start, totalWeeks);
   if (currentWeek === null) return false;
   if (currentWeek >= totalWeeks) return false; // Final exam / evaluation week
-
-  const end = getSemesterEndDate(classroom.semesterStartDate, totalWeeks);
-  const today = asOfDate || new Date();
-  if (today > end) return false;
 
   return true;
 }
@@ -285,12 +291,20 @@ export function isClassroomTeachingActive(classroom: ClassroomSemesterFields, as
 export function isClassroomSemesterEnded(classroom: ClassroomSemesterFields, asOfDate?: Date): boolean {
   if (!classroom.semesterStartDate) return false;
   const totalWeeks = resolveTargetWeeks(classroom);
-  const currentWeek = getCurrentWeek(classroom.semesterStartDate, totalWeeks);
-  const end = getSemesterEndDate(classroom.semesterStartDate, totalWeeks);
-  const today = asOfDate || new Date();
+  const startStr = classroom.semesterStartDate.toISOString().split('T')[0];
+  const start = new Date(startStr);
+  const end = getSemesterEndDate(start, totalWeeks);
 
-  // If today is past end date, or currentWeek is null, or in final exam week (currentWeek >= totalWeeks)
-  return today > end || currentWeek === null || currentWeek >= totalWeeks;
+  const target = asOfDate
+    ? new Date(asOfDate.toISOString().split('T')[0])
+    : new Date(new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().split('T')[0]);
+
+  // If semester has not started yet, it is NOT ended
+  if (target < start) return false;
+  if (target > end) return true;
+
+  const currentWeek = getWeekNumberForDate(target, start, totalWeeks);
+  return currentWeek === null || currentWeek >= totalWeeks;
 }
 
 // ==================== Semester Model Helpers ====================

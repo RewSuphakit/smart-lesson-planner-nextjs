@@ -100,6 +100,10 @@ export const PUT = withAuth<{ id: string }>(async (request, user, { params }) =>
   invalidateCache(userCacheKey(user.id, 'classroom'));
   invalidateCache(userCacheKey(user.id, 'classrooms'));
   invalidateCache(userCacheKey(user.id, 'grades'));
+  invalidateCache(userCacheKey(user.id, 'scores'));
+  invalidateCache(userCacheKey(user.id, 'students'));
+  invalidateCache(userCacheKey(user.id, 'attendance'));
+  invalidateCache(userCacheKey(user.id, 'timetable'));
   invalidateCache(userCacheKey(user.id, 'dashboard'));
 
   return NextResponse.json({ message: 'Updated' });
@@ -123,6 +127,10 @@ export const DELETE = withAuth<{ id: string }>(async (request, user, { params })
   invalidateCache(userCacheKey(user.id, 'classroom'));
   invalidateCache(userCacheKey(user.id, 'classrooms'));
   invalidateCache(userCacheKey(user.id, 'grades'));
+  invalidateCache(userCacheKey(user.id, 'scores'));
+  invalidateCache(userCacheKey(user.id, 'students'));
+  invalidateCache(userCacheKey(user.id, 'attendance'));
+  invalidateCache(userCacheKey(user.id, 'timetable'));
   invalidateCache(userCacheKey(user.id, 'dashboard'));
 
   return NextResponse.json({ message: 'Deleted' });

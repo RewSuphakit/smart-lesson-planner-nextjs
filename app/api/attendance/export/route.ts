@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
+import { normalizeAttendanceDate } from '@/lib/formatters';
 import * as XLSX from 'xlsx';
 import {
   buildStudentSectionGroups,
@@ -56,8 +57,12 @@ export async function GET(request: NextRequest) {
 
     // Build the query filter for records within range
     const where: Record<string, unknown> = { classroomId: Number(classroomId) };
-    if (startDate) where.date = { ...(where.date as Record<string, unknown> || {}), gte: new Date(startDate) };
-    if (endDate) where.date = { ...(where.date as Record<string, unknown> || {}), lte: new Date(endDate) };
+    try {
+      if (startDate) where.date = { ...(where.date as Record<string, unknown> || {}), gte: normalizeAttendanceDate(startDate) };
+      if (endDate) where.date = { ...(where.date as Record<string, unknown> || {}), lte: normalizeAttendanceDate(endDate) };
+    } catch {
+      return NextResponse.json({ message: 'Invalid date format' }, { status: 400 });
+    }
 
     // Fetch students, range records, and overall grouped counts in parallel
     const [rawStudents, allRecords, overallCountsGrouped] = await Promise.all([
@@ -113,9 +118,9 @@ export async function GET(request: NextRequest) {
       ? allRecords.filter(r => activeStudentIdSet.has(r.studentId))
       : allRecords;
 
-    // Find unique dates in sorted order
+    // Find unique dates in sorted order for the active scope
     const uniqueDates = Array.from(
-      new Set(allRecords.map(r => r.date.toISOString().split('T')[0]))
+      new Set(records.map(r => r.date.toISOString().split('T')[0]))
     ).sort();
 
     // Map range records by student_id
@@ -207,9 +212,9 @@ export async function GET(request: NextRequest) {
             targetStudents.length > 0
               ? { t: 'n', f: `AVERAGE(${colRangePercentLetter}7:${colRangePercentLetter}${targetStudents.length + 6})`, v: sheetAvgInit }
               : 100,
-            `นักเรียนติด มส.:`,
+            `นักเรียนติด ข.ร.:`,
             targetStudents.length > 0
-              ? { t: 'n', f: `COUNTIF(${colOverallStatusLetter}7:${colOverallStatusLetter}${targetStudents.length + 6},"หมดสิทธิ์สอบ (มส.)")`, v: sheetFCount }
+              ? { t: 'n', f: `COUNTIF(${colOverallStatusLetter}7:${colOverallStatusLetter}${targetStudents.length + 6},"หมดสิทธิ์สอบ (ข.ร.)")`, v: sheetFCount }
               : 0,
             '',
             ''
@@ -252,7 +257,7 @@ export async function GET(request: NextRequest) {
           const oLeave = overallMap.get(student.id)?.leave || 0;
           const overallConvertedAbsent = oAbsent + Math.floor(oLate / ratioLate) + Math.floor(oLeave / ratioLeave);
           const isF = overallConvertedAbsent > maxAllowedAbsences;
-          const statusLabel = isF ? 'หมดสิทธิ์สอบ (มส.)' : 'ปกติ';
+          const statusLabel = isF ? 'หมดสิทธิ์สอบ (ข.ร.)' : 'ปกติ';
 
           type ExcelCell = string | number | { t: string; f?: string; v: unknown };
           const studentRow: ExcelCell[] = [
@@ -285,7 +290,7 @@ export async function GET(request: NextRequest) {
               { t: 'n', f: `IF((${colPresentLetter}${R}+${colLateLetter}${R}+${colAbsentLetter}${R}+${colLeaveLetter}${R})>0,ROUND(((${colPresentLetter}${R}+${colLateLetter}${R}+${colAbsentLetter}${R}+${colLeaveLetter}${R})-${colRangeConvertedLetter}${R})/(${colPresentLetter}${R}+${colLateLetter}${R}+${colAbsentLetter}${R}+${colLeaveLetter}${R})*100,2),100)`, v: rangePercent },
               { t: 's', f: `REPT("🟢",ROUND(${colRangePercentLetter}${R}/10,0))&REPT("🔴",10-ROUND(${colRangePercentLetter}${R}/10,0))`, v: '🟢'.repeat(Math.round(rangePercent / 10)) + '🔴'.repeat(10 - Math.round(rangePercent / 10)) },
               { t: 'n', v: overallConvertedAbsent },
-              { t: 's', f: `IF(${colOverallConvertedLetter}${R}>${maxAllowedAbsences},"หมดสิทธิ์สอบ (มส.)","ปกติ")`, v: statusLabel }
+              { t: 's', f: `IF(${colOverallConvertedLetter}${R}>${maxAllowedAbsences},"หมดสิทธิ์สอบ (ข.ร.)","ปกติ")`, v: statusLabel }
             );
           } else {
             studentRow.push(0, 0, 0, 0, 0, 100, '🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢', overallConvertedAbsent, statusLabel);

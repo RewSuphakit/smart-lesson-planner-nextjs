@@ -3,15 +3,18 @@
 import { memo } from 'react';
 import { CheckCircle, Clock, XCircle, FileText, History } from 'lucide-react';
 import UserAvatar from '@/components/UserAvatar';
-import { Student, StudentStats } from './types';
+import { Student, StudentStats, formatCheckInTime, formatCheckInFullDateTime } from './types';
 
 export interface DesktopStudentRowProps {
   student: Student;
   idx: number;
   showRoomPill?: boolean;
   status: string | undefined;
+  checkedAt?: string | null;
   stats: StudentStats;
   maxAllowedAbsences: number;
+  lateToAbsentRatio?: number;
+  leaveToAbsentRatio?: number;
   onStatusSelect: (studentId: string, status: string) => void;
   onViewHistory: (student: Student) => void;
 }
@@ -21,13 +24,25 @@ export const MemoizedDesktopStudentRow = memo(({
   idx,
   showRoomPill = false,
   status,
+  checkedAt,
   stats,
   maxAllowedAbsences,
+  lateToAbsentRatio = 3,
+  leaveToAbsentRatio = 2,
   onStatusSelect,
   onViewHistory,
 }: DesktopStudentRowProps) => {
   const isCloseToFRisk = stats.converted_absent_count >= maxAllowedAbsences * 0.75;
   const sId = String(student.id);
+  const formattedTime = formatCheckInTime(checkedAt);
+  const formattedFullTime = formatCheckInFullDateTime(checkedAt);
+
+  const safeMaxAbsences = maxAllowedAbsences || 1;
+  const convertedWidth = Math.min((stats.converted_absent_count / safeMaxAbsences) * 100, 100);
+  const partialAbsenceUnits =
+    (stats.remaining_late_count / Math.max(1, lateToAbsentRatio)) +
+    (stats.remaining_leave_count / Math.max(1, leaveToAbsentRatio));
+  const partialWidth = Math.min(100 - convertedWidth, (partialAbsenceUnits / safeMaxAbsences) * 100);
 
   const renderStatusBtn = (statusVal: string, icon: React.ReactNode, label: string, activeClass: string) => {
     const isActive = status === statusVal;
@@ -98,6 +113,15 @@ export const MemoizedDesktopStudentRow = memo(({
                 {student.grade_level}
               </span>
             )}
+            {status && formattedTime && (
+              <span
+                className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/70"
+                title={formattedFullTime || undefined}
+              >
+                <Clock className="w-3 h-3 shrink-0" />
+                <span>เช็คเมื่อ {formattedTime}</span>
+              </span>
+            )}
             <button
               type="button"
               onClick={() => onViewHistory(student)}
@@ -130,32 +154,42 @@ export const MemoizedDesktopStudentRow = memo(({
               {stats.is_f ? 'หมดสิทธิ์สอบ' : `ขาดได้อีก ${Math.max(0, maxAllowedAbsences - stats.converted_absent_count)} คาบ`}
             </span>
           </div>
-          <div className="w-full bg-slate-200/80 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+          <div className="w-full bg-slate-200/80 dark:bg-slate-700 h-2 rounded-full overflow-hidden flex">
             <div
-              className={`h-full rounded-full transition-all duration-300 ${
+              className={`h-full transition-all duration-300 ${
                 isCloseToFRisk
                   ? 'bg-rose-500 animate-pulse'
                   : stats.converted_absent_count >= maxAllowedAbsences * 0.5
                   ? 'bg-amber-500'
                   : 'bg-indigo-500'
               }`}
-              style={{ width: `${Math.min((stats.converted_absent_count / (maxAllowedAbsences || 1)) * 100, 100)}%` }}
+              style={{ width: `${convertedWidth}%` }}
             />
+            {partialWidth > 0 && (
+              <div
+                className="h-full bg-amber-400/85 dark:bg-amber-500/75 transition-all duration-300"
+                style={{ width: `${partialWidth}%` }}
+                title={`เศษสาย ${stats.remaining_late_count} ครั้ง / เศษลา ${stats.remaining_leave_count} ครั้ง`}
+              />
+            )}
           </div>
-          {(stats.remaining_late_count > 0 || stats.remaining_leave_count > 0) && (
-            <div className="flex gap-1.5 text-[9px] mt-1 font-bold justify-end">
-              {stats.remaining_late_count > 0 && (
-                <span className="text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.2 rounded border border-amber-200/60 dark:border-amber-800">
-                  สาย {stats.remaining_late_count}
-                </span>
-              )}
-              {stats.remaining_leave_count > 0 && (
-                <span className="text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/60 px-1.5 py-0.2 rounded border border-sky-200/60 dark:border-sky-800">
-                  ลา {stats.remaining_leave_count}
-                </span>
-              )}
-            </div>
-          )}
+          <div className="flex gap-1.5 text-[9px] mt-1 font-bold justify-end flex-wrap">
+            {stats.present_count > 0 && (
+              <span className="text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.2 rounded border border-emerald-200/60 dark:border-emerald-800">
+                มา {stats.present_count}
+              </span>
+            )}
+            {stats.remaining_late_count > 0 && (
+              <span className="text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.2 rounded border border-amber-200/60 dark:border-amber-800">
+                สาย {stats.remaining_late_count}
+              </span>
+            )}
+            {stats.remaining_leave_count > 0 && (
+              <span className="text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/60 px-1.5 py-0.2 rounded border border-sky-200/60 dark:border-sky-800">
+                ลา {stats.remaining_leave_count}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -169,7 +203,14 @@ export const MemoizedDesktopStudentRow = memo(({
     prev.idx === next.idx &&
     prev.showRoomPill === next.showRoomPill &&
     prev.status === next.status &&
+    prev.checkedAt === next.checkedAt &&
     prev.maxAllowedAbsences === next.maxAllowedAbsences &&
+    prev.lateToAbsentRatio === next.lateToAbsentRatio &&
+    prev.leaveToAbsentRatio === next.leaveToAbsentRatio &&
+    prev.stats.present_count === next.stats.present_count &&
+    prev.stats.late_count === next.stats.late_count &&
+    prev.stats.absent_count === next.stats.absent_count &&
+    prev.stats.leave_count === next.stats.leave_count &&
     prev.stats.converted_absent_count === next.stats.converted_absent_count &&
     prev.stats.remaining_late_count === next.stats.remaining_late_count &&
     prev.stats.remaining_leave_count === next.stats.remaining_leave_count &&

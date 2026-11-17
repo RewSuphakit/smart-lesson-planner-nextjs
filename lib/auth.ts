@@ -38,7 +38,20 @@ export function generateToken(
 }
 
 export function verifyToken(token: string): JwtPayload {
-  return jwt.verify(token, getJwtSecret()) as JwtPayload;
+  const decoded = jwt.verify(token, getJwtSecret()) as JwtPayload & { type?: string };
+  if (
+    !decoded ||
+    typeof decoded !== 'object' ||
+    decoded.type === 'portal_session' ||
+    typeof decoded.id !== 'number' ||
+    !Number.isInteger(decoded.id) ||
+    decoded.id <= 0 ||
+    typeof decoded.email !== 'string' ||
+    !decoded.email
+  ) {
+    throw new AuthError('Invalid authentication token');
+  }
+  return decoded;
 }
 
 export interface PortalSessionPayload {

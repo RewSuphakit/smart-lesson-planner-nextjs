@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { withAuth } from '@/lib/apiHandler';
 import { invalidateCache, userCacheKey } from '@/lib/cache';
 import { normalizeGradeLevel, normalizeBranchDisplay } from '@/lib/studentSections';
+import { persistAvatarDataUri } from '@/lib/avatarStorage';
 
 export const POST = withAuth(async (request, user) => {
 
@@ -45,24 +46,31 @@ export const POST = withAuth(async (request, user) => {
     }
   }
 
-  const data = (students as StudentBulkInput[]).map((s) => ({
-    userId: user.id,
-    name: s.name,
-    studentCode: s.student_code ? String(s.student_code).trim() : null,
-    gradeLevel: s.grade_level ? normalizeGradeLevel(s.grade_level) || null : null,
-    branch: s.branch ? normalizeBranchDisplay(s.branch) || null : null,
-    email: s.email ? String(s.email).trim() : null,
-    classroomId: s.classroom_id ? Number(s.classroom_id) : null,
-    avatar: s.avatar || null,
-  }));
+  const data = (students as StudentBulkInput[])
+    .filter((s) => s && typeof s.name === 'string' && s.name.trim().length > 0)
+    .map((s, idx) => ({
+      userId: user.id,
+      name: s.name.trim(),
+      studentCode: s.student_code ? String(s.student_code).trim() : null,
+      gradeLevel: s.grade_level ? normalizeGradeLevel(s.grade_level) || null : null,
+      branch: s.branch ? normalizeBranchDisplay(s.branch) || null : null,
+      email: s.email ? String(s.email).trim() : null,
+      classroomId: s.classroom_id ? Number(s.classroom_id) : null,
+      avatar: s.avatar ? persistAvatarDataUri(s.avatar, `student-bulk-${user.id}-${idx}`) : null,
+    }));
+
+  if (data.length === 0) {
+    return NextResponse.json({ message: 'No valid student records provided' }, { status: 400 });
+  }
 
   const result = await prisma.student.createMany({
     data,
-    skipDuplicates: true,
   });
 
   invalidateCache(userCacheKey(user.id, 'students'));
   invalidateCache(userCacheKey(user.id, 'classrooms'));
+  invalidateCache(userCacheKey(user.id, 'grades'));
+  invalidateCache(userCacheKey(user.id, 'scores'));
   invalidateCache(userCacheKey(user.id, 'dashboard'));
 
   return NextResponse.json({

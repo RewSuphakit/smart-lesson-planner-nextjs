@@ -1205,6 +1205,41 @@ export default function SemestersPage() {
                 </div>
               </div>
 
+              {/* Curriculum Type */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  ประเภทหลักสูตรในภาคเรียนนี้
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {[
+                    { id: 'pvch', label: 'รวม ปวช. & ปวส.', desc: '18 สัปดาห์ (แนะนำ)' },
+                    { id: 'pvs', label: 'เฉพาะ ปวส.', desc: '15 สัปดาห์' },
+                    { id: 'custom', label: 'กำหนดเอง', desc: 'ระบุสัปดาห์เอง' },
+                  ].map((cur) => (
+                    <button
+                      key={cur.id}
+                      type="button"
+                      onClick={() => {
+                        const type = cur.id as 'pvch' | 'pvs' | 'custom';
+                        setEditingSemester(prev => {
+                          if (!prev) return null;
+                          const weeks = type === 'pvs' ? 15 : type === 'pvch' ? 18 : (prev.total_weeks || 18);
+                          const end = prev.start_date ? computeAutoEndDate(prev.start_date, weeks) : prev.end_date;
+                          return { ...prev, curriculum_type: type, total_weeks: weeks, end_date: end };
+                        });
+                      }}
+                      className={`p-2.5 text-center rounded-xl text-xs border transition-all ${(editingSemester.curriculum_type || 'pvch') === cur.id
+                        ? 'bg-indigo-50 text-indigo-700 border-indigo-300 font-bold shadow-xs'
+                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                        }`}
+                    >
+                      <span className="block font-bold">{cur.label}</span>
+                      <span className="block text-[10px] text-slate-500 mt-0.5">{cur.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -1215,7 +1250,14 @@ export default function SemestersPage() {
                     min={1}
                     max={30}
                     value={editingSemester.total_weeks || 18}
-                    onChange={(e) => setEditingSemester(prev => prev ? { ...prev, total_weeks: Number(e.target.value) } : null)}
+                    onChange={(e) => {
+                      const w = Number(e.target.value) || 18;
+                      setEditingSemester(prev => {
+                        if (!prev) return null;
+                        const end = prev.start_date ? computeAutoEndDate(prev.start_date, w) : prev.end_date;
+                        return { ...prev, total_weeks: w, end_date: end };
+                      });
+                    }}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   />
                 </div>
@@ -1226,7 +1268,14 @@ export default function SemestersPage() {
                   <input
                     type="date"
                     value={editingSemester.start_date || ''}
-                    onChange={(e) => setEditingSemester(prev => prev ? { ...prev, start_date: e.target.value } : null)}
+                    onChange={(e) => {
+                      const start = e.target.value;
+                      setEditingSemester(prev => {
+                        if (!prev) return null;
+                        const end = start ? computeAutoEndDate(start, prev.total_weeks || 18) : prev.end_date;
+                        return { ...prev, start_date: start, end_date: end };
+                      });
+                    }}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   />
                 </div>

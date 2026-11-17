@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuth, AuthError, handleAuthError } from '@/lib/auth';
-import { generateOtpCode, sendEmailChangeOtpEmail } from '@/lib/email';
+import { generateOtpCode, sendEmailChangeOtpEmail, hashOtp } from '@/lib/email';
 import { protectRequest, authLimiter } from '@/lib/arcjet';
 
 export async function POST(request: NextRequest) {
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
       where: { id: currentUser.id },
       data: {
         pendingEmail: rawEmail,
-        verificationCode: otp,
+        verificationCode: hashOtp(otp),
         verificationCodeExpiry: expiry,
         verificationAttempts: 0,
       },
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
       message: 'รหัสยืนยัน OTP ได้ถูกส่งไปยังอีเมลใหม่เรียบร้อยแล้ว กรุณาตรวจสอบกล่องจดหมาย',
       newEmail: rawEmail,
       isDevMode: emailResult.isDevMode,
-      devCode: emailResult.isDevMode ? otp : undefined,
+      devCode: process.env.NODE_ENV !== 'production' && emailResult.isDevMode ? otp : undefined,
     });
   } catch (error) {
     if (error instanceof AuthError) return handleAuthError();

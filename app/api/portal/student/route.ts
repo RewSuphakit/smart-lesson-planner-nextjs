@@ -466,9 +466,9 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // In case the student has recorded scores in any week beyond currentTeachingWeek, include them in score sums
+    // In case the student has recorded scores in any week beyond currentTeachingWeek (up to targetWeeks), include them in score sums
     for (const [lessonNum, sc] of scoresMap.entries()) {
-      if (lessonNum > currentTeachingWeek) {
+      if (lessonNum > currentTeachingWeek && lessonNum <= targetWeeks) {
         if (sc.assignmentScore !== null) sumAssignRaw += sc.assignmentScore;
         if (sc.postTestScore !== null) sumPostTestRaw += sc.postTestScore;
       }
@@ -706,10 +706,11 @@ async function handleAvatarUpdate(request: NextRequest) {
       data: { avatar },
     });
 
-    // Invalidate caches for affected teachers (including students:list)
+    // Invalidate caches for affected teachers (including students:list and grades)
     const distinctUserIds = Array.from(new Set(authorizedStudents.map((s) => s.userId)));
     for (const uId of distinctUserIds) {
       invalidateCache(userCacheKey(uId, 'students'));
+      invalidateCache(userCacheKey(uId, 'grades'));
       invalidateCache(userCacheKey(uId, 'classrooms'));
       invalidateCache(userCacheKey(uId, 'dashboard'));
     }

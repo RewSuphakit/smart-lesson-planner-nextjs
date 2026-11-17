@@ -250,9 +250,12 @@ export const ThaiDateRangePicker = memo(({ startDate, endDate, onChange }: ThaiD
               type="button"
               onClick={() => {
                 const now = new Date();
-                const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+                const y = now.getFullYear();
+                const m = String(now.getMonth() + 1).padStart(2, '0');
+                const d = String(now.getDate()).padStart(2, '0');
+                const firstDay = `${y}-${m}-01`;
                 setDraftStart(firstDay);
-                setDraftEnd(now.toISOString().split('T')[0]);
+                setDraftEnd(`${y}-${m}-${d}`);
               }}
               className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-indigo-50/70 text-indigo-700 hover:bg-indigo-100 transition-all cursor-pointer"
             >

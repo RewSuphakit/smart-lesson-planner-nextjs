@@ -107,9 +107,9 @@ export const AttendanceRetroactiveModal = ({
                     const daysInThisWeek = [];
                     for (let i = 0; i < 7; i++) {
                       const curD = new Date(weekStart);
-                      curD.setDate(weekStart.getDate() + i);
+                      curD.setUTCDate(weekStart.getUTCDate() + i);
                       const curDateStr = curD.toISOString().split('T')[0];
-                      const dayOfWeek = (curD.getDay() + 6) % 7; // 0=Mon..6=Sun
+                      const dayOfWeek = (curD.getUTCDay() + 6) % 7; // 0=Mon..6=Sun
                       daysInThisWeek.push({
                         dateStr: curDateStr,
                         dateObj: curD,

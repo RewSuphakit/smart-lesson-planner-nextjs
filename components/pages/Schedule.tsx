@@ -328,7 +328,7 @@ export default function Schedule() {
   // ─── Mutation: ล้างข้อมูลตารางเรียน ───
   const clearTimetableMutation = useMutation({
     mutationFn: async () => {
-      return api.delete('/timetable/clear');
+      return api.delete('/timetable');
     },
     onSuccess: () => {
       toast.success('ล้างตารางสอนแล้ว');
@@ -404,6 +404,13 @@ export default function Schedule() {
     updateDragOverCell(null);
     if (!draggedEntry) return;
 
+    const numericSlot = Number(slotId);
+    if (slotId === 'lunch' || slotId === '' || !Number.isFinite(numericSlot)) {
+      setDraggedEntry(null);
+      setDragType(null);
+      return;
+    }
+
     if (dragType === 'resize') {
       if (dayIdx !== draggedEntry.day_of_week) {
         toast.error('ไม่สามารถยืดคาบเรียนข้ามวันได้');
@@ -411,15 +418,15 @@ export default function Schedule() {
         setDragType(null);
         return;
       }
-      if (Number(slotId) < draggedEntry.start_period) {
+      if (numericSlot < draggedEntry.start_period) {
         toast.error('เวลาสิ้นสุดต้องไม่น้อยกว่าคาบเริ่มต้น');
         setDraggedEntry(null);
         setDragType(null);
         return;
       }
-      resizeTimetableMutation.mutate({ id: draggedEntry.id, end_period: Number(slotId) });
+      resizeTimetableMutation.mutate({ id: draggedEntry.id, end_period: numericSlot });
     } else {
-      moveTimetableMutation.mutate({ id: draggedEntry.id, day_of_week: dayIdx, start_period: Number(slotId) });
+      moveTimetableMutation.mutate({ id: draggedEntry.id, day_of_week: dayIdx, start_period: numericSlot });
     }
     setDraggedEntry(null);
     setDragType(null);
@@ -536,8 +543,9 @@ export default function Schedule() {
                         const gridColEnd = effectiveEndIdx + 3;
 
                         const calcPeriodFromMouse = (e: React.MouseEvent<HTMLDivElement> | React.DragEvent<HTMLDivElement>) => {
-                          const width = e.currentTarget.clientWidth || 1;
-                          const offsetX = (e.nativeEvent as MouseEvent).offsetX ?? 0;
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const width = rect.width || e.currentTarget.clientWidth || 1;
+                          const offsetX = Math.max(0, e.clientX - rect.left);
                           const colWidth = width / span;
                           const colIdx = Math.min(span - 1, Math.max(0, Math.floor(offsetX / colWidth)));
                           return TIME_SLOTS[startIdx + colIdx]?.id;

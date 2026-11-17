@@ -81,11 +81,11 @@ function parseCSV(content: string, userId: number) {
     const dayNum = DAY_MAP[dayStr];
     if (dayNum === undefined) continue;
 
-    const startPeriod = parseInt(cols[headerMap.start_period] || '1') || 1;
-    const endPeriod = headerMap.end_period !== undefined
-      ? (parseInt(cols[headerMap.end_period]) || startPeriod)
-      : startPeriod;
-    const hours = endPeriod - startPeriod + 1;
+    const parsedStart = parseInt(cols[headerMap.start_period] ?? '1', 10);
+    const startPeriod = Number.isNaN(parsedStart) ? 1 : Math.max(0, Math.min(12, parsedStart));
+    const parsedEnd = headerMap.end_period !== undefined ? parseInt(cols[headerMap.end_period], 10) : NaN;
+    const endPeriod = Number.isNaN(parsedEnd) ? startPeriod : Math.max(startPeriod, Math.min(12, parsedEnd));
+    const hours = startPeriod === 0 ? 0 : (endPeriod - startPeriod + 1);
 
     const typeStr = (headerMap.entry_type !== undefined ? cols[headerMap.entry_type] : '') || '';
     const entryType = (TYPE_MAP[typeStr.toLowerCase()] || 'lecture') as EntryType;
@@ -222,8 +222,10 @@ async function parsePDF(buffer: Buffer, userId: number) {
     const aiData = parsedData;
     const entries = [];
     for (const item of aiData) {
-      const startP = item.start_period !== undefined && item.start_period !== null ? parseInt(String(item.start_period), 10) || 1 : 1;
-      const endP = item.end_period !== undefined && item.end_period !== null ? parseInt(String(item.end_period), 10) || startP : startP;
+      const parsedStart = item.start_period !== undefined && item.start_period !== null ? parseInt(String(item.start_period), 10) : NaN;
+      const startP = Number.isNaN(parsedStart) ? 1 : Math.max(0, Math.min(12, parsedStart));
+      const parsedEnd = item.end_period !== undefined && item.end_period !== null ? parseInt(String(item.end_period), 10) : NaN;
+      const endP = Number.isNaN(parsedEnd) ? startP : Math.max(startP, Math.min(12, parsedEnd));
       
       const rawType = (item.entry_type || 'lecture').toLowerCase().trim();
       let normalizedType = 'lecture';
@@ -237,7 +239,7 @@ async function parsePDF(buffer: Buffer, userId: number) {
 
       entries.push({
         userId,
-        dayOfWeek: Number(item.day_of_week),
+        dayOfWeek: Math.max(0, Math.min(6, Number(item.day_of_week) || 0)),
         startPeriod: startP,
         endPeriod: endP,
         startTime: parseTimeToUtc(PERIOD_TIMES[startP]?.start),
@@ -407,8 +409,10 @@ async function parseImageWithAI(buffer: Buffer, mimeType: string, userId: number
 
     const entries = [];
     for (const item of data) {
-      const startP = item.start_period !== undefined && item.start_period !== null ? parseInt(String(item.start_period), 10) || 1 : 1;
-      const endP = item.end_period !== undefined && item.end_period !== null ? parseInt(String(item.end_period), 10) || startP : startP;
+      const parsedStart = item.start_period !== undefined && item.start_period !== null ? parseInt(String(item.start_period), 10) : NaN;
+      const startP = Number.isNaN(parsedStart) ? 1 : Math.max(0, Math.min(12, parsedStart));
+      const parsedEnd = item.end_period !== undefined && item.end_period !== null ? parseInt(String(item.end_period), 10) : NaN;
+      const endP = Number.isNaN(parsedEnd) ? startP : Math.max(startP, Math.min(12, parsedEnd));
       
       // Normalize entry type to match MySQL enum constraints: 'lecture' | 'lab' | 'activity' | 'homeroom'
       const rawType = (item.entry_type || 'lecture').toLowerCase().trim();
@@ -537,10 +541,10 @@ export const POST = withAuth(async (request, user) => {
 
     let createdCount = 0;
     if (formData.get('replace') === 'true') {
-      const deleteWhere: { userId: number; semesterId?: number } = { userId: user.id };
-      if (resolvedSemesterId) {
-        deleteWhere.semesterId = resolvedSemesterId;
-      }
+      const deleteWhere: { userId: number; semesterId: number | null } = {
+        userId: user.id,
+        semesterId: resolvedSemesterId ?? null,
+      };
       const [, created] = await prisma.$transaction([
         prisma.weeklySchedule.deleteMany({ where: deleteWhere }),
         prisma.weeklySchedule.createMany({ data: entries }),

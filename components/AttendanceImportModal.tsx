@@ -269,7 +269,8 @@ export default function AttendanceImportModal({
           let matched = null;
           if (studentCode) matched = students.find(s => s.student_code === studentCode);
           if (!matched && fullName) {
-            matched = students.find(s => fullName.includes(s.name) || s.name.includes(fullName.replace(/นาย|นางสาว|เด็กชาย|เด็กหญิง/g, '').trim()));
+            const strippedName = fullName.replace(/นาย|นางสาว|เด็กชาย|เด็กหญิง/g, '').trim();
+            matched = students.find(s => fullName.includes(s.name) || (strippedName.length > 0 && s.name.includes(strippedName)));
           }
 
           if (matched) {

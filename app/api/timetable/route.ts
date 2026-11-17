@@ -217,7 +217,7 @@ export const DELETE = withAuth(async (request, user) => {
   const semesterIdParam = searchParams.get('semester_id');
   const allSemesters = searchParams.get('all') === 'true';
 
-  const deleteWhere: { userId: number; semesterId?: number } = { userId: user.id };
+  const deleteWhere: { userId: number; semesterId?: number | null } = { userId: user.id };
 
   if (!allSemesters) {
     if (semesterIdParam) {
@@ -227,9 +227,7 @@ export const DELETE = withAuth(async (request, user) => {
       }
     } else {
       const activeSemesterId = await getActiveSemesterId(user.id);
-      if (activeSemesterId) {
-        deleteWhere.semesterId = activeSemesterId;
-      }
+      deleteWhere.semesterId = activeSemesterId ?? null;
     }
   }
 

@@ -32,13 +32,18 @@ export const GET = withAuth(async (request, user) => {
     const { buildSemesterInfo } = await import('@/lib/semester');
     const classroom = await prisma.classroom.findFirst({
       where: { id: numericClassroomId, userId },
+      include: { semester: { select: { startDate: true, totalWeeks: true, curriculumType: true } } },
     });
 
     if (!classroom) {
       return NextResponse.json({ message: 'Classroom not found or unauthorized' }, { status: 404 });
     }
 
-    const semesterInfo = buildSemesterInfo(numericClassroomId, classroom as Parameters<typeof buildSemesterInfo>[1]);
+    const effectiveClassroom = {
+      ...classroom,
+      semesterStartDate: classroom.semesterStartDate ?? classroom.semester?.startDate ?? null,
+    };
+    const semesterInfo = buildSemesterInfo(numericClassroomId, effectiveClassroom as Parameters<typeof buildSemesterInfo>[1]);
     return NextResponse.json({ data: semesterInfo });
   }
 
@@ -137,26 +142,27 @@ export const POST = withAuth(async (request, user) => {
   });
   const shouldBeActive = is_active || existingCount === 0;
 
-  // If this semester should be active, deactivate others first
-  if (shouldBeActive) {
-    await prisma.semester.updateMany({
-      where: { userId: user.id, isActive: true },
-      data: { isActive: false },
-    });
-  }
+  const semester = await prisma.$transaction(async (tx) => {
+    if (shouldBeActive) {
+      await tx.semester.updateMany({
+        where: { userId: user.id, isActive: true },
+        data: { isActive: false },
+      });
+    }
 
-  const semester = await prisma.semester.create({
-    data: {
-      userId: user.id,
-      name,
-      termNumber: term_number,
-      academicYear: academic_year,
-      startDate: start_date ? new Date(start_date) : null,
-      endDate: end_date ? new Date(end_date) : null,
-      isActive: shouldBeActive,
-      curriculumType: (curriculum_type as CurriculumType) || CurriculumType.pvch,
-      totalWeeks: resolvedWeeks,
-    },
+    return tx.semester.create({
+      data: {
+        userId: user.id,
+        name,
+        termNumber: term_number,
+        academicYear: academic_year,
+        startDate: start_date ? new Date(start_date) : null,
+        endDate: end_date ? new Date(end_date) : null,
+        isActive: shouldBeActive,
+        curriculumType: (curriculum_type as CurriculumType) || CurriculumType.pvch,
+        totalWeeks: resolvedWeeks,
+      },
+    });
   });
 
   invalidateCache(userCacheKey(user.id, 'semester'));

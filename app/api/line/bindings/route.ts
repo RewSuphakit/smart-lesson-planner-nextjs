@@ -35,18 +35,25 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const studentCodes = teacherStudents
-      .map((s) => s.studentCode)
-      .filter((c): c is string => !!c);
+    const studentCodes = Array.from(
+      new Set(teacherStudents.map((s) => s.studentCode).filter((c): c is string => !!c))
+    );
+    const teacherClassroomIds = Array.from(
+      new Set(teacherStudents.map((s) => s.classroomId).filter((id): id is number => typeof id === 'number'))
+    );
 
     if (studentCodes.length === 0) {
       return NextResponse.json({ data: [] });
     }
 
-    // Find bindings for these students
+    // Find bindings for these students scoped to this teacher's classrooms (or unbound classroomId)
     const bindings = await prisma.lineBinding.findMany({
       where: {
         studentCode: { in: studentCodes },
+        OR: [
+          ...(teacherClassroomIds.length > 0 ? [{ classroomId: { in: teacherClassroomIds } }] : []),
+          { classroomId: null },
+        ],
       },
       include: {
         classroom: {
@@ -56,14 +63,22 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     });
 
-    // Map student details
-    const studentMap = new Map<string, (typeof teacherStudents)[0]>();
+    // Map student details (prefer matching classroomId + studentCode, fallback to studentCode)
+    const studentByClassAndCode = new Map<string, (typeof teacherStudents)[0]>();
+    const studentByCode = new Map<string, (typeof teacherStudents)[0]>();
     for (const s of teacherStudents) {
-      if (s.studentCode) studentMap.set(s.studentCode, s);
+      if (s.studentCode) {
+        studentByCode.set(s.studentCode, s);
+        if (s.classroomId) {
+          studentByClassAndCode.set(`${s.classroomId}_${s.studentCode}`, s);
+        }
+      }
     }
 
     const data = bindings.map((b) => {
-      const s = studentMap.get(b.studentCode);
+      const s =
+        (b.classroomId ? studentByClassAndCode.get(`${b.classroomId}_${b.studentCode}`) : undefined) ||
+        studentByCode.get(b.studentCode);
       return {
         id: b.id,
         lineUserId: b.lineUserId,
@@ -93,21 +108,31 @@ export async function DELETE(request: NextRequest) {
     const studentCode = searchParams.get('student_code');
     const unbindAll = searchParams.get('all') === 'true';
 
-    // Get this teacher's student codes for authorization
+    // Get this teacher's student codes and classroom IDs for authorization
     const teacherStudents = await prisma.student.findMany({
       where: { userId: user.id },
-      select: { studentCode: true },
+      select: { studentCode: true, classroomId: true },
     });
 
     const allowedCodes = new Set(
       teacherStudents.map((s) => s.studentCode).filter((c): c is string => !!c)
     );
+    const teacherClassroomIds = Array.from(
+      new Set(teacherStudents.map((s) => s.classroomId).filter((id): id is number => typeof id === 'number'))
+    );
+    const teacherScopeFilter = {
+      OR: [
+        ...(teacherClassroomIds.length > 0 ? [{ classroomId: { in: teacherClassroomIds } }] : []),
+        { classroomId: null },
+      ],
+    };
 
     if (unbindAll) {
       // Unbind all students of this teacher
       const deleted = await prisma.lineBinding.deleteMany({
         where: {
           studentCode: { in: Array.from(allowedCodes) },
+          ...teacherScopeFilter,
         },
       });
 
@@ -123,7 +148,10 @@ export async function DELETE(request: NextRequest) {
       }
 
       const deleted = await prisma.lineBinding.deleteMany({
-        where: { studentCode },
+        where: {
+          studentCode,
+          ...teacherScopeFilter,
+        },
       });
 
       return NextResponse.json({
@@ -142,7 +170,10 @@ export async function DELETE(request: NextRequest) {
         return NextResponse.json({ message: 'ไม่พบรายการผูกบัญชี' }, { status: 404 });
       }
 
-      if (!allowedCodes.has(binding.studentCode)) {
+      if (
+        !allowedCodes.has(binding.studentCode) ||
+        (binding.classroomId !== null && !teacherClassroomIds.includes(binding.classroomId))
+      ) {
         return NextResponse.json({ message: 'ไม่มีสิทธิ์จัดการนักเรียนคนนี้' }, { status: 403 });
       }
 

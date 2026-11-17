@@ -148,7 +148,8 @@ export default function Students() {
       queryClient.invalidateQueries({ queryKey: ['student-grade-levels'] });
       queryClient.invalidateQueries({ queryKey: ['classrooms'] });
       queryClient.invalidateQueries({ queryKey: ['grades'] });
-      queryClient.invalidateQueries({ queryKey: ['scores-matrix'] });
+      queryClient.invalidateQueries({ queryKey: ['scores-matrix-data'] });
+      queryClient.invalidateQueries({ queryKey: ['affective-students'] });
       queryClient.invalidateQueries({ queryKey: ['attendance-data'] });
     },
     onError: (err: { response?: { data?: { message?: string; errors?: Array<{ message: string }> } } }) => {
@@ -167,7 +168,8 @@ export default function Students() {
       queryClient.invalidateQueries({ queryKey: ['student-grade-levels'] });
       queryClient.invalidateQueries({ queryKey: ['classrooms'] });
       queryClient.invalidateQueries({ queryKey: ['grades'] });
-      queryClient.invalidateQueries({ queryKey: ['scores-matrix'] });
+      queryClient.invalidateQueries({ queryKey: ['scores-matrix-data'] });
+      queryClient.invalidateQueries({ queryKey: ['affective-students'] });
       queryClient.invalidateQueries({ queryKey: ['attendance-data'] });
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
@@ -187,7 +189,8 @@ export default function Students() {
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['classrooms'] });
       queryClient.invalidateQueries({ queryKey: ['grades'] });
-      queryClient.invalidateQueries({ queryKey: ['scores-matrix'] });
+      queryClient.invalidateQueries({ queryKey: ['scores-matrix-data'] });
+      queryClient.invalidateQueries({ queryKey: ['affective-students'] });
       queryClient.invalidateQueries({ queryKey: ['attendance-data'] });
     },
     onError: () => {
@@ -209,7 +212,8 @@ export default function Students() {
       queryClient.invalidateQueries({ queryKey: ['student-grade-levels'] });
       queryClient.invalidateQueries({ queryKey: ['classrooms'] });
       queryClient.invalidateQueries({ queryKey: ['grades'] });
-      queryClient.invalidateQueries({ queryKey: ['scores-matrix'] });
+      queryClient.invalidateQueries({ queryKey: ['scores-matrix-data'] });
+      queryClient.invalidateQueries({ queryKey: ['affective-students'] });
       queryClient.invalidateQueries({ queryKey: ['attendance-data'] });
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
@@ -228,7 +232,8 @@ export default function Students() {
       queryClient.invalidateQueries({ queryKey: ['student-grade-levels'] });
       queryClient.invalidateQueries({ queryKey: ['classrooms'] });
       queryClient.invalidateQueries({ queryKey: ['grades'] });
-      queryClient.invalidateQueries({ queryKey: ['scores-matrix'] });
+      queryClient.invalidateQueries({ queryKey: ['scores-matrix-data'] });
+      queryClient.invalidateQueries({ queryKey: ['affective-students'] });
       queryClient.invalidateQueries({ queryKey: ['attendance-data'] });
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
@@ -250,7 +255,8 @@ export default function Students() {
       queryClient.invalidateQueries({ queryKey: ['student-grade-levels'] });
       queryClient.invalidateQueries({ queryKey: ['classrooms'] });
       queryClient.invalidateQueries({ queryKey: ['grades'] });
-      queryClient.invalidateQueries({ queryKey: ['scores-matrix'] });
+      queryClient.invalidateQueries({ queryKey: ['scores-matrix-data'] });
+      queryClient.invalidateQueries({ queryKey: ['affective-students'] });
       queryClient.invalidateQueries({ queryKey: ['attendance-data'] });
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
@@ -273,7 +279,8 @@ export default function Students() {
       queryClient.invalidateQueries({ queryKey: ['student-grade-levels'] });
       queryClient.invalidateQueries({ queryKey: ['classrooms'] });
       queryClient.invalidateQueries({ queryKey: ['grades'] });
-      queryClient.invalidateQueries({ queryKey: ['scores-matrix'] });
+      queryClient.invalidateQueries({ queryKey: ['scores-matrix-data'] });
+      queryClient.invalidateQueries({ queryKey: ['affective-students'] });
       queryClient.invalidateQueries({ queryKey: ['attendance-data'] });
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
@@ -416,7 +423,7 @@ export default function Students() {
   };
 
   const handleSelectAll = () => {
-    if (selectedStudents.length === filtered.length) {
+    if (filtered.length > 0 && filtered.every(s => selectedStudents.includes(s.id))) {
       setSelectedStudents([]);
     } else {
       setSelectedStudents(filtered.map(s => s.id));
@@ -607,8 +614,16 @@ export default function Students() {
     return students.filter(s => {
       const matchSearch = s.name?.toLowerCase().includes(search.toLowerCase()) || s.student_code?.toLowerCase().includes(search.toLowerCase());
       const matchClass = filterClassroomId ? String(s.classroom_id) === String(filterClassroomId) : true;
-      const matchBranch = filterBranch ? (s.branch || '') === filterBranch : true;
-      const matchGradeLevel = filterGradeLevel ? (s.grade_level || '') === filterGradeLevel : true;
+      const matchBranch = filterBranch
+        ? filterBranch === '__NONE__'
+          ? !s.branch
+          : (s.branch || '') === filterBranch
+        : true;
+      const matchGradeLevel = filterGradeLevel
+        ? filterGradeLevel === '__NONE__'
+          ? !s.grade_level
+          : (s.grade_level || '') === filterGradeLevel
+        : true;
       return matchSearch && matchClass && matchBranch && matchGradeLevel;
     });
   }, [students, search, filterClassroomId, filterBranch, filterGradeLevel]);
@@ -626,7 +641,7 @@ export default function Students() {
   // Group students by grade level (within selected branch, or all students)
   const gradeLevelGroups = useMemo(() => {
     const pool = filterBranch
-      ? students.filter(s => (s.branch || '') === filterBranch)
+      ? students.filter(s => filterBranch === '__NONE__' ? !s.branch : (s.branch || '') === filterBranch)
       : students;
     const groups = new Map<string, number>();
     for (const s of pool) {
@@ -642,12 +657,15 @@ export default function Students() {
     return filtered.slice(start, start + itemsPerPage);
   }, [filtered, currentPage, itemsPerPage]);
 
-  // Reset to page 1 when filters change — derived from useMemo instead of useEffect
+  // Reset to page 1 and clear stale selection when filters change — derived from useMemo instead of useEffect
   const prevFilterKey = `${search}|${filterClassroomId}|${filterBranch}|${filterGradeLevel}`;
   const [lastFilterKey, setLastFilterKey] = useState(prevFilterKey);
   if (prevFilterKey !== lastFilterKey) {
     setLastFilterKey(prevFilterKey);
     setCurrentPage(1);
+    if (selectedStudents.length > 0) {
+      setSelectedStudents([]);
+    }
   }
 
   if (isLoading) return <div className="space-y-4">{[1, 2, 3].map(i => <div key={i} className="skeleton h-24 rounded-2xl" />)}</div>;
@@ -726,7 +744,7 @@ export default function Students() {
               <button
                 key={branch}
                 onClick={() => {
-                  setFilterBranch(branch === 'ไม่ระบุสาขา' ? '' : branch);
+                  setFilterBranch(branch === 'ไม่ระบุสาขา' ? '__NONE__' : branch);
                   setFilterGradeLevel('');
                 }}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all hover:scale-105 hover:shadow-sm bg-white/80 border-indigo-100 text-slate-700 hover:bg-indigo-50 hover:border-indigo-300"
@@ -748,7 +766,7 @@ export default function Students() {
               <span className="text-xs text-slate-500 font-medium">สาขาที่เลือก:</span>
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-indigo-600 text-white shadow-sm shadow-indigo-600/20">
                 <GitBranch className="w-3.5 h-3.5" />
-                {filterBranch}
+                {filterBranch === '__NONE__' ? 'ไม่ระบุสาขา' : filterBranch}
               </span>
               <button
                 onClick={() => {
@@ -767,7 +785,7 @@ export default function Students() {
                 <span className="text-xs text-slate-500 font-medium">ระดับที่เลือก:</span>
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-emerald-600 text-white shadow-sm shadow-emerald-600/20">
                   <GraduationCap className="w-3.5 h-3.5" />
-                  {filterGradeLevel}
+                  {filterGradeLevel === '__NONE__' ? 'ไม่ระบุระดับ' : filterGradeLevel}
                 </span>
                 <button
                   onClick={() => setFilterGradeLevel('')}
@@ -796,7 +814,7 @@ export default function Students() {
                 ทุกระดับ
               </button>
               {gradeLevelGroups.map(([grade, count]) => {
-                const actualGrade = grade === 'ไม่ระบุระดับ' ? '' : grade;
+                const actualGrade = grade === 'ไม่ระบุระดับ' ? '__NONE__' : grade;
                 const isSelected = filterGradeLevel === actualGrade;
                 return (
                   <button
@@ -826,7 +844,7 @@ export default function Students() {
         <div className="flex items-center gap-2 animate-fade-in-up">
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white">
             <GraduationCap className="w-3.5 h-3.5" />
-            ระดับ {filterGradeLevel}
+            ระดับ {filterGradeLevel === '__NONE__' ? 'ไม่ระบุระดับ' : filterGradeLevel}
           </span>
           <button
             onClick={() => setFilterGradeLevel('')}
@@ -938,12 +956,12 @@ export default function Students() {
             <input
               type="checkbox"
               className="sr-only peer"
-              checked={selectedStudents.length === filtered.length}
+              checked={filtered.length > 0 && filtered.every(s => selectedStudents.includes(s.id))}
               onChange={handleSelectAll}
               aria-label="เลือกทั้งหมดบนหน้าจอนี้"
             />
-            <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all peer-focus:ring-2 peer-focus:ring-indigo-500 ${selectedStudents.length === filtered.length ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600 group-hover:border-indigo-400 bg-indigo-50'}`}>
-              {selectedStudents.length === filtered.length && <CheckCircle className="w-3.5 h-3.5 text-slate-800" />}
+            <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all peer-focus:ring-2 peer-focus:ring-indigo-500 ${filtered.length > 0 && filtered.every(s => selectedStudents.includes(s.id)) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600 group-hover:border-indigo-400 bg-indigo-50'}`}>
+              {filtered.length > 0 && filtered.every(s => selectedStudents.includes(s.id)) && <CheckCircle className="w-3.5 h-3.5 text-slate-800" />}
             </div>
             <span className="text-sm text-slate-600 group-hover:text-slate-700">เลือกทั้งหมดบนหน้าจอนี้</span>
           </label>
@@ -1625,7 +1643,7 @@ export default function Students() {
       <StudentExcelModal
         isOpen={showExportModal}
         onClose={() => setShowExportModal(false)}
-        students={filtered}
+        students={students}
         classrooms={classrooms}
         filterClassroomId={filterClassroomId}
         selectedStudentIds={selectedStudents}

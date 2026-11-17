@@ -12,6 +12,8 @@ export interface Classroom {
   final_weight?: number;
   midterm_max_score?: number;
   final_max_score?: number;
+  late_deduction_score?: number;
+  absent_deduction_score?: number;
 }
 
 export interface Criterion {
@@ -69,6 +71,8 @@ export interface Weights {
   is_pws?: boolean;
   max_assign_raw?: number;
   max_post_test_raw?: number;
+  late_deduction_score?: number;
+  absent_deduction_score?: number;
 }
 
 export const EMPTY_CLASSROOMS: Classroom[] = [];

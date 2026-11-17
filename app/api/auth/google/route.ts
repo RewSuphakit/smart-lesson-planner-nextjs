@@ -85,7 +85,8 @@ export async function POST(request: NextRequest) {
     if (!user) {
       const existingByEmail = await withDbRetry(() => prisma.user.findUnique({ where: { email: cleanEmail } }));
       if (existingByEmail) {
-        // Link Google ID to existing user account and ensure email is verified
+        // Link Google ID to existing user account and ensure email is verified.
+        // If the existing account was unverified, clear its password to prevent pre-account takeover.
         user = await withDbRetry(() =>
           prisma.user.update({
             where: { id: existingByEmail.id },
@@ -93,6 +94,7 @@ export async function POST(request: NextRequest) {
               googleId,
               avatar: existingByEmail.avatar || picture,
               emailVerified: true,
+              ...(existingByEmail.emailVerified ? {} : { password: null }),
             },
           })
         );
@@ -112,11 +114,15 @@ export async function POST(request: NextRequest) {
       }
     } else {
       const existingUser = user;
-      if (picture && (!existingUser.avatar || existingUser.avatar.includes('googleusercontent.com'))) {
+      const shouldUpdateAvatar = Boolean(picture && (!existingUser.avatar || existingUser.avatar.includes('googleusercontent.com')));
+      if (shouldUpdateAvatar || !existingUser.emailVerified) {
         user = await withDbRetry(() =>
           prisma.user.update({
             where: { id: existingUser.id },
-            data: { avatar: picture, emailVerified: true },
+            data: {
+              ...(shouldUpdateAvatar ? { avatar: picture } : {}),
+              emailVerified: true,
+            },
           })
         );
       }

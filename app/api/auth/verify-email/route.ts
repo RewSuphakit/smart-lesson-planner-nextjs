@@ -34,6 +34,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'อีเมลนี้ได้รับการยืนยันเรียบร้อยแล้ว สามารถเข้าสู่ระบบได้ทันที' }, { status: 400 });
     }
 
+    if (user.pendingEmail && user.pendingEmail.toLowerCase() !== lowerEmail) {
+      return NextResponse.json(
+        { message: 'บัญชีนี้มีคำขอเปลี่ยนอีเมลค้างอยู่ กรุณายืนยันรหัสกับอีเมลใหม่ หรือกดขอรหัสยืนยันใหม่อีกครั้ง' },
+        { status: 400 }
+      );
+    }
+
     const currentAttempts = (user as { verificationAttempts?: number }).verificationAttempts ?? 0;
     const MAX_VERIFY_ATTEMPTS = 5;
 
@@ -90,6 +97,7 @@ export async function POST(request: NextRequest) {
       where: { id: user.id },
       data: {
         emailVerified: true,
+        pendingEmail: null,
         verificationCode: null,
         verificationCodeExpiry: null,
         verificationAttempts: 0,

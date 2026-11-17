@@ -21,7 +21,7 @@ export const PUT = withAuth<{ id: string }>(async (request, user, { params }) =>
   const endPeriod = body.end_period !== undefined ? Number(body.end_period) : entry.endPeriod;
   const startPeriod = entry.startPeriod;
 
-  if (endPeriod < startPeriod) {
+  if (!Number.isFinite(endPeriod) || endPeriod < startPeriod) {
     return NextResponse.json({ message: 'End period cannot be less than start period' }, { status: 400 });
   }
   if (endPeriod > 12) {
