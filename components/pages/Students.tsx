@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useDeferredValue } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
@@ -610,9 +610,12 @@ export default function Students() {
     importMutation.mutate(payload);
   };
 
+  const deferredSearch = useDeferredValue(search);
+
   const filtered = useMemo(() => {
+    const q = deferredSearch.toLowerCase();
     return students.filter(s => {
-      const matchSearch = s.name?.toLowerCase().includes(search.toLowerCase()) || s.student_code?.toLowerCase().includes(search.toLowerCase());
+      const matchSearch = !q || s.name?.toLowerCase().includes(q) || s.student_code?.toLowerCase().includes(q);
       const matchClass = filterClassroomId ? String(s.classroom_id) === String(filterClassroomId) : true;
       const matchBranch = filterBranch
         ? filterBranch === '__NONE__'
@@ -626,7 +629,7 @@ export default function Students() {
         : true;
       return matchSearch && matchClass && matchBranch && matchGradeLevel;
     });
-  }, [students, search, filterClassroomId, filterBranch, filterGradeLevel]);
+  }, [students, deferredSearch, filterClassroomId, filterBranch, filterGradeLevel]);
 
   // Group students by branch for summary display
   const branchGroups = useMemo(() => {
@@ -1640,14 +1643,16 @@ export default function Students() {
       )}
 
       {/* Student Excel Preview & Export Modal */}
-      <StudentExcelModal
-        isOpen={showExportModal}
-        onClose={() => setShowExportModal(false)}
-        students={students}
-        classrooms={classrooms}
-        filterClassroomId={filterClassroomId}
-        selectedStudentIds={selectedStudents}
-      />
+      {showExportModal && (
+        <StudentExcelModal
+          isOpen={showExportModal}
+          onClose={() => setShowExportModal(false)}
+          students={students}
+          classrooms={classrooms}
+          filterClassroomId={filterClassroomId}
+          selectedStudentIds={selectedStudents}
+        />
+      )}
 
     </div>
   );

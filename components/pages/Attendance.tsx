@@ -240,13 +240,19 @@ export default function Attendance({
   const { data: attendanceData, isLoading: loadingAttendance } = useQuery({
     queryKey: ['attendance-data', selectedClass, date],
     queryFn: async () => {
-      const [stuRes, attRes, statsRes] = await Promise.all([
-        api.get(`/students?classroom_id=${selectedClass}&include_avatar=true`),
+      const [classStudents, attRes, statsRes] = await Promise.all([
+        queryClient.fetchQuery({
+          queryKey: ['students', 'classroom-roster', selectedClass],
+          queryFn: async () => {
+            const stuRes = await api.get(`/students?classroom_id=${selectedClass}&include_avatar=true`);
+            return stuRes.data.data || [];
+          },
+          staleTime: 5 * 60 * 1000,
+        }),
         api.get(`/attendance?classroom_id=${selectedClass}&date=${date}`),
         api.get(`/attendance?classroom_id=${selectedClass}`)
       ]);
 
-      const classStudents = stuRes.data.data || [];
       const existing = attRes.data.data || [];
 
       const newAtt: Record<string, string> = {};
@@ -365,9 +371,11 @@ export default function Attendance({
     return students;
   }, [activeSectionGroup, sectionGroups, students]);
 
+  const deferredSearchQuery = useDeferredValue(searchQuery);
+
   // Filters students by search query within active section scope (Memoized)
   const filteredStudents = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+    const q = deferredSearchQuery.trim().toLowerCase();
     if (!q) return sectionScopedStudents;
     return sectionScopedStudents.filter(student =>
       student.name.toLowerCase().includes(q) ||
@@ -375,11 +383,11 @@ export default function Attendance({
       (student.grade_level && student.grade_level.toLowerCase().includes(q)) ||
       (student.branch && student.branch.toLowerCase().includes(q))
     );
-  }, [sectionScopedStudents, searchQuery]);
+  }, [sectionScopedStudents, deferredSearchQuery]);
 
   // Grouped sections filtered by searchQuery (for combined 'all' mode when hasMultipleSections)
   const visibleSectionGroups = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+    const q = deferredSearchQuery.trim().toLowerCase();
     if (!q) return sectionGroups;
     return sectionGroups
       .map(grp => ({
@@ -392,7 +400,7 @@ export default function Attendance({
         ),
       }))
       .filter(grp => grp.students.length > 0);
-  }, [sectionGroups, searchQuery]);
+  }, [sectionGroups, deferredSearchQuery]);
 
   // Live daily statistics per section (for section switcher badges & group headers)
   const sectionDailyStatsMap = useMemo(() => {
@@ -1285,7 +1293,7 @@ export default function Attendance({
     day: 'numeric',
   });
 
-  const loading = loadingClassrooms || (!!selectedClass && loadingAttendance);
+  const loading = loadingClassrooms && classrooms.length === 0;
   const saving = saveMutation.isPending || clearDataMutation.isPending || markAllMutation.isPending;
   const matrixLoading = loadingMatrix;
   const historyLoading = loadingHistory;
@@ -2135,24 +2143,26 @@ export default function Attendance({
       />
 
       {/* ================= ATTENDANCE CSV PREVIEW & EXPORT MODAL ================= */}
-      <AttendanceCsvModal
-        isOpen={showExportModal}
-        onClose={() => setShowExportModal(false)}
-        classroom={selectedClassData ? {
-          id: selectedClassData.id,
-          name: selectedClassData.name,
-          min_attendance_percent: selectedClassData.min_attendance_percent,
-          total_classes: selectedClassData.total_classes,
-          late_to_absent_ratio: selectedClassData.late_to_absent_ratio,
-          leave_to_absent_ratio: selectedClassData.leave_to_absent_ratio,
-        } : null}
-        initialStartDate={exportStartDate}
-        initialEndDate={exportEndDate}
-        initialSectionKey={selectedSectionKey}
-      />
+      {showExportModal && (
+        <AttendanceCsvModal
+          isOpen={showExportModal}
+          onClose={() => setShowExportModal(false)}
+          classroom={selectedClassData ? {
+            id: selectedClassData.id,
+            name: selectedClassData.name,
+            min_attendance_percent: selectedClassData.min_attendance_percent,
+            total_classes: selectedClassData.total_classes,
+            late_to_absent_ratio: selectedClassData.late_to_absent_ratio,
+            leave_to_absent_ratio: selectedClassData.leave_to_absent_ratio,
+          } : null}
+          initialStartDate={exportStartDate}
+          initialEndDate={exportEndDate}
+          initialSectionKey={selectedSectionKey}
+        />
+      )}
 
       {/* ================= ATTENDANCE EXCEL IMPORT & TEMPLATE MODAL ================= */}
-      {selectedClass && (
+      {selectedClass && showImportModal && (
         <AttendanceImportModal
           isOpen={showImportModal}
           onClose={() => setShowImportModal(false)}
@@ -2172,17 +2182,19 @@ export default function Attendance({
       )}
 
       {/* ================= RETROACTIVE ATTENDANCE MODAL ================= */}
-      <AttendanceRetroactiveModal
-        isOpen={showRetroactiveModal}
-        onClose={() => setShowRetroactiveModal(false)}
-        selectedClassData={selectedClassData}
-        semesterInfo={semesterInfo}
-        date={date}
-        setDate={setDate}
-        setActiveTab={setActiveTab}
-        teachingDays={teachingDays}
-        todayStr={todayStr}
-      />
+      {showRetroactiveModal && (
+        <AttendanceRetroactiveModal
+          isOpen={showRetroactiveModal}
+          onClose={() => setShowRetroactiveModal(false)}
+          selectedClassData={selectedClassData}
+          semesterInfo={semesterInfo}
+          date={date}
+          setDate={setDate}
+          setActiveTab={setActiveTab}
+          teachingDays={teachingDays}
+          todayStr={todayStr}
+        />
+      )}
     </div>
   );
 }

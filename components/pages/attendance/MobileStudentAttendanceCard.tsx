@@ -178,6 +178,29 @@ export const MobileStudentAttendanceCard = memo(({
       )}
     </div>
   );
+}, (prev, next) => {
+  return (
+    prev.student.id === next.student.id &&
+    prev.student.name === next.student.name &&
+    prev.student.student_code === next.student.student_code &&
+    prev.student.avatar === next.student.avatar &&
+    prev.status === next.status &&
+    prev.checkedAt === next.checkedAt &&
+    prev.sectionBadge === next.sectionBadge &&
+    prev.maxAllowedAbsences === next.maxAllowedAbsences &&
+    prev.lateToAbsentRatio === next.lateToAbsentRatio &&
+    prev.leaveToAbsentRatio === next.leaveToAbsentRatio &&
+    prev.stats.present_count === next.stats.present_count &&
+    prev.stats.late_count === next.stats.late_count &&
+    prev.stats.absent_count === next.stats.absent_count &&
+    prev.stats.leave_count === next.stats.leave_count &&
+    prev.stats.converted_absent_count === next.stats.converted_absent_count &&
+    prev.stats.remaining_late_count === next.stats.remaining_late_count &&
+    prev.stats.remaining_leave_count === next.stats.remaining_leave_count &&
+    prev.stats.is_f === next.stats.is_f &&
+    prev.onStatusSelect === next.onStatusSelect &&
+    prev.onViewHistory === next.onViewHistory
+  );
 });
 
 MobileStudentAttendanceCard.displayName = 'MobileStudentAttendanceCard';

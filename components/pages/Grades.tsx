@@ -194,10 +194,9 @@ export default function Grades() {
   }, [selectedClass]);
 
   const { groups: sectionGroups, hasMultipleSections, sharedBranch } = useMemo(() => {
-    const list = report.map(s => ({
-      ...s,
-      id: s.id || s.student_id,
-    }));
+    const list = report.map(s =>
+      s.id !== undefined ? (s as ReportStudent & { id: string | number }) : { ...s, id: s.student_id }
+    );
     return buildStudentSectionGroups(list);
   }, [report]);
 
@@ -1063,22 +1062,26 @@ export default function Grades() {
       {/* ==================== MODALS ==================== */}
       {selectedClass && (
         <>
-          <GradePdfModal
-            isOpen={showPdfPreviewModal}
-            onClose={() => setShowPdfPreviewModal(false)}
-            classroom={classroomObj}
-            report={sectionScopedReport}
-            weights={weights}
-            criteria={criteria}
-            teacherNameDefault={user?.name || 'ครูผู้สอน'}
-          />
-          <GradeCsvModal
-            isOpen={showCsvPreviewModal}
-            onClose={() => setShowCsvPreviewModal(false)}
-            classroom={classroomObj}
-            report={sectionScopedReport}
-            weights={weights}
-          />
+          {showPdfPreviewModal && (
+            <GradePdfModal
+              isOpen={showPdfPreviewModal}
+              onClose={() => setShowPdfPreviewModal(false)}
+              classroom={classroomObj}
+              report={sectionScopedReport}
+              weights={weights}
+              criteria={criteria}
+              teacherNameDefault={user?.name || 'ครูผู้สอน'}
+            />
+          )}
+          {showCsvPreviewModal && (
+            <GradeCsvModal
+              isOpen={showCsvPreviewModal}
+              onClose={() => setShowCsvPreviewModal(false)}
+              classroom={classroomObj}
+              report={sectionScopedReport}
+              weights={weights}
+            />
+          )}
         </>
       )}
     </div>

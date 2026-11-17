@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, Fragment } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, Fragment, useDeferredValue } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
 import {
@@ -389,31 +389,40 @@ export default function Scores() {
     }
   }, [selectedClass]);
 
-  // Sync single week scores
+  // Sync single week scores when lesson, classroom, or viewMode changes (avoids double re-render on every keystroke)
+  const matrixScoresRef = useRef<FullMatrixScoresMap>(matrixScores);
+  matrixScoresRef.current = matrixScores;
+
   useEffect(() => {
     if (!selectedClass || !selectedLesson) return;
 
+    const currentMatrix = matrixScoresRef.current;
     const scoresMap: ScoresMap = {};
     students.forEach(s => {
       const key = `${s.id}_${selectedLesson}`;
-      const val = matrixScores[key] || { assignment_score: '', post_test_score: '' };
+      const val = currentMatrix[key] || { assignment_score: '', post_test_score: '' };
       scoresMap[String(s.id)] = val;
     });
     setScores(scoresMap);
-  }, [selectedLesson, matrixScores, students, selectedClass]);
+  }, [selectedLesson, students, selectedClass, viewMode, matrixData]);
 
   // ─── Auto-sync attendanceDate when switching the selected weekly lesson ───
+  const prevSyncedLessonRef = useRef<string>('');
   useEffect(() => {
+    if (!selectedLesson || prevSyncedLessonRef.current === selectedLesson) return;
     const weekNum = parseInt(selectedLesson);
     if (!isNaN(weekNum) && weekNum > 0) {
       const targetDate = calculatedWeekDates[weekNum] || weekDateMap[weekNum];
       if (targetDate) {
+        prevSyncedLessonRef.current = selectedLesson;
         setAttendanceDate(targetDate);
       }
     }
   }, [selectedLesson, calculatedWeekDates, weekDateMap]);
 
-  // ─── Analytics Summary Computations ───
+  const deferredMatrixScores = useDeferredValue(matrixScores);
+
+  // ─── Analytics Summary Computations (deferred to keep input typing at 60fps) ───
   const analyticsSummary = useMemo(() => {
     if (!sectionScopedStudents.length || !structures.length) {
       return { avgScore: 0, completionRate: 0, highestScore: 0, lowestScore: 0, totalMaxScore: 100 };
@@ -439,7 +448,7 @@ export default function Scores() {
       let currentStudentTotal = 0;
       structures.forEach(struct => {
         const key = `${student.id}_${struct.lesson_number}`;
-        const val = matrixScores[key];
+        const val = deferredMatrixScores[key];
         if (val) {
           if (val.assignment_score !== '' && val.assignment_score !== null) {
             currentStudentTotal += Number(val.assignment_score);
@@ -471,7 +480,7 @@ export default function Scores() {
       lowestScore: minStudentScore === Infinity ? 0 : Math.round(minStudentScore * 10) / 10,
       totalMaxScore: totalPossibleAcademicScore,
     };
-  }, [sectionScopedStudents, structures, matrixScores, classroomObj, hasMidterm]);
+  }, [sectionScopedStudents, structures, deferredMatrixScores, classroomObj, hasMidterm]);
 
   // Index of `${studentId}_${YYYY-MM-DD}` -> status
   const attendanceStatusIndex = useMemo(() => {
@@ -1547,20 +1556,22 @@ export default function Scores() {
           />
 
           {/* Excel Live Preview & Export Modal */}
-          <ScoreExcelModal
-            isOpen={showExportModal}
-            onClose={() => setShowExportModal(false)}
-            classroom={classroomObj || null}
-            students={sectionScopedStudents}
-            structures={structures}
-            matrixScores={matrixScores}
-            calculatedWeekDates={calculatedWeekDates}
-            weekAttendanceMap={weekAttendanceMap}
-            analyticsSummary={analyticsSummary}
-          />
+          {showExportModal && (
+            <ScoreExcelModal
+              isOpen={showExportModal}
+              onClose={() => setShowExportModal(false)}
+              classroom={classroomObj || null}
+              students={sectionScopedStudents}
+              structures={structures}
+              matrixScores={matrixScores}
+              calculatedWeekDates={calculatedWeekDates}
+              weekAttendanceMap={weekAttendanceMap}
+              analyticsSummary={analyticsSummary}
+            />
+          )}
 
           {/* Excel Import & Template Modal */}
-          {selectedClass && (
+          {selectedClass && showExcelImportModal && (
             <ScoreImportModal
               isOpen={showExcelImportModal}
               onClose={() => setShowExcelImportModal(false)}
