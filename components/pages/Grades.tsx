@@ -359,8 +359,8 @@ export default function Grades() {
             examStatus: updatedStudent.exam_status,
             baseAffectiveScore:
               updatedStudent.affective_score === '' ||
-              updatedStudent.affective_score === undefined ||
-              updatedStudent.affective_score === null
+                updatedStudent.affective_score === undefined ||
+                updatedStudent.affective_score === null
                 ? null
                 : updatedStudent.affective_score,
             absentCount: updatedStudent.absent_count || 0,
